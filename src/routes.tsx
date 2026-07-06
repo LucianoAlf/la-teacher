@@ -2,6 +2,8 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import DesignSystemPage from './pages/dev/DesignSystem'
 import LoginPage from './pages/app/Login'
 import HomePage from './pages/app/Home'
+import AgendaPage from './pages/app/Agenda'
+import AlunosPage from './pages/app/Alunos'
 import { RequireProfessor } from './pages/app/RequireProfessor'
 import { useAuth } from './lib/auth'
 
@@ -19,7 +21,11 @@ export const router = createBrowserRouter(
     {
       // Guard por sessão + vínculo de professor.
       element: <RequireProfessor />,
-      children: [{ path: '/app', element: <HomePage /> }],
+      children: [
+        { path: '/app', element: <HomePage /> },
+        { path: '/app/agenda', element: <AgendaPage /> },
+        { path: '/app/alunos', element: <AlunosPage /> },
+      ],
     },
     // Vitrine do design system — pública (sem guard), útil no dev.
     { path: '/dev/ds', element: <DesignSystemPage /> },

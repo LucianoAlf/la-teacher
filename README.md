@@ -39,9 +39,59 @@ O agente **Fábio** tem alma própria (prompt de normalização) e vive no runti
 | `supabase/migrations/` | SQL de fundação e motor |
 | `prompts/` | Pacotes de execução por sprint (para o Claude Code) |
 
+## Rodando localmente (do zero)
+
+Pré-requisitos: **Node 20+** e npm.
+
+```bash
+git clone https://github.com/LucianoAlf/la-teacher.git
+cd la-teacher
+npm install
+
+cp .env.example .env      # depois edite o .env
+```
+
+No `.env`, preencha (a `anon key` é pública por design — a segurança é a RLS + as RPCs `app_*`):
+
+```
+VITE_SUPABASE_URL=https://ouqwbbermlzqqvtqwlul.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon/publishable key do projeto LA Report>
+```
+
+```bash
+npm run dev        # sobe o Vite em http://localhost:5173
+```
+
+Rotas: `/app` (Home), `/app/agenda`, `/app/alunos`, `/app/login`, e `/dev/ds` (vitrine do design system, sem login).
+
+### Scripts
+
+| Comando | O que faz |
+|---|---|
+| `npm run dev` | servidor de desenvolvimento (HMR) |
+| `npm run build` | type-check (`tsc`) + build de produção (`vite build`) |
+| `npm run preview` | serve o build de produção localmente |
+
+### Login do professor de teste
+
+O app usa o Supabase Auth do LA Report. Para um professor entrar e ver a própria
+agenda/carteira, é preciso **vincular** o usuário a um `professores.id` — passo a passo
+em [`docs/seed-professor-teste.md`](docs/seed-professor-teste.md). Sem vínculo, o login
+funciona mas cai na tela **VínculoPendente** (comportamento esperado).
+
+### Regra de ouro do código (anti-hex)
+
+Nenhuma cor/sombra/raio/fonte crua fora de `src/styles/tokens.css`. Verificação:
+
+```bash
+grep -rnE '#[0-9a-fA-F]{3,8}' src/ --include='*.tsx' --include='*.ts' --include='*.css' | grep -v tokens.css
+# saída vazia = ok
+```
+
 ## Status
 
-🚧 Sprint 2 (app base) — em execução. Ver `docs/ROADMAP.md`.
+🚧 Sprint 2 (app base) — Home, Agenda e Alunos com dados vivos; auth + vínculo; design
+system em `/dev/ds`. Ver `docs/ROADMAP.md`. Próximo: Sprint 3 (motor de registro por voz).
 
 ---
 

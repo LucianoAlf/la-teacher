@@ -58,3 +58,25 @@ export function formatHoraBRT(time: string | null | undefined): string {
 export function isHoje(iso: string): boolean {
   return iso === hojeBRT()
 }
+
+/** Segunda-feira da semana que contém `iso` (semana começa na segunda). */
+export function inicioSemana(iso: string): string {
+  const offset = (diaSemana(iso) + 6) % 7 // 0 se já é segunda
+  return addDias(iso, -offset)
+}
+
+/** Os 7 dias (segunda→domingo) da semana que contém `iso`. */
+export function diasDaSemana(iso: string): string[] {
+  const seg = inicioSemana(iso)
+  return Array.from({ length: 7 }, (_, i) => addDias(seg, i))
+}
+
+/** Letra do dia da semana (S T Q Q S S D) para strip compacta. */
+export function inicialDiaSemana(iso: string): string {
+  return ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'][diaSemana(iso)]
+}
+
+/** Dia do mês (1-31). */
+export function diaDoMes(iso: string): number {
+  return parse(iso).d
+}

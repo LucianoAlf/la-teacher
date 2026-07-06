@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
-import { isSemVinculo, minhaAgenda, type Agenda } from '../../lib/api'
+import { isSemVinculo, minhaCarteira, type CarteiraAluno } from '../../lib/api'
 
-export type EstadoAgenda =
+export type EstadoCarteira =
   | { fase: 'carregando' }
-  | { fase: 'ok'; agenda: Agenda }
+  | { fase: 'ok'; alunos: CarteiraAluno[] }
   | { fase: 'sem_vinculo' }
   | { fase: 'erro' }
 
-/** Busca a agenda de uma data (app_minha_agenda) com estados de UI. */
-export function useAgenda(data: string) {
-  const [estado, setEstado] = useState<EstadoAgenda>({ fase: 'carregando' })
+/** Carrega a carteira do professor (app_minha_carteira) com estados de UI. */
+export function useCarteira() {
+  const [estado, setEstado] = useState<EstadoCarteira>({ fase: 'carregando' })
   const [tentativa, setTentativa] = useState(0)
 
   const recarregar = useCallback(() => setTentativa((t) => t + 1), [])
@@ -17,17 +17,17 @@ export function useAgenda(data: string) {
   useEffect(() => {
     let vivo = true
     setEstado({ fase: 'carregando' })
-    minhaAgenda(data)
+    minhaCarteira()
       .then((res) => {
         if (!vivo) return
         if (isSemVinculo(res)) setEstado({ fase: 'sem_vinculo' })
-        else setEstado({ fase: 'ok', agenda: res })
+        else setEstado({ fase: 'ok', alunos: res })
       })
       .catch(() => vivo && setEstado({ fase: 'erro' }))
     return () => {
       vivo = false
     }
-  }, [data, tentativa])
+  }, [tentativa])
 
   return { estado, recarregar }
 }

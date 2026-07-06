@@ -1,31 +1,15 @@
 import { useEffect, useState } from 'react'
-import {
-  Button,
-  Card,
-  EmptyState,
-  Fab,
-  FabioCard,
-  Skeleton,
-  TabBar,
-  Toast,
-  useToast,
-} from '../../components/ui'
+import { Card, EmptyState, FabioCard, Skeleton, Toast, useToast } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../lib/theme'
-import { formatDiaCurto, hojeBRT, isHoje } from '../../lib/date'
-import { contarRegistradas } from '../../features/agenda/aula'
+import { formatDiaCurto, hojeBRT } from '../../lib/date'
 import { AgendaAulaRow } from '../../features/agenda/AgendaAulaRow'
+import { CardAulasDoDia } from '../../features/agenda/CardAulasDoDia'
 import { DateNav } from '../../features/agenda/DateNav'
 import { useAgenda } from '../../features/agenda/useAgenda'
 import { buscarPendencias, type Pendencias } from '../../features/agenda/pendencias'
 import { AppFrame } from './AppFrame'
-
-const TABS = [
-  { id: 'inicio', label: 'Início', icon: 'fa-solid fa-house' },
-  { id: 'alunos', label: 'Alunos', icon: 'fa-solid fa-user-group' },
-  { id: 'agenda', label: 'Agenda', icon: 'fa-solid fa-calendar' },
-  { id: 'fabio', label: 'Fábio', icon: 'fa-solid fa-robot' },
-]
+import { AppNav } from './AppNav'
 
 const TOAST_S3 = 'Registro por voz chega no Sprint 3 🎙️'
 
@@ -38,10 +22,9 @@ function primeiroNome(email?: string, nome?: string): string {
 
 /** /app — Home do professor (tela 1 do protótipo) com dados vivos do LA Report. */
 export default function HomePage() {
-  const { session, signOut } = useAuth()
+  const { session } = useAuth()
   const { toggle } = useTheme()
   const { message, visible, show } = useToast()
-  const [tab, setTab] = useState('inicio')
   const [data, setData] = useState<string>(hojeBRT())
 
   const { estado, recarregar } = useAgenda(data)
@@ -89,130 +72,20 @@ export default function HomePage() {
 
         {/* 3 · Aulas do dia */}
         <div className="mb-3">
-          <CardAulasDoDia data={data} estado={estado} onRetry={recarregar} onToastS3={() => show(TOAST_S3)} />
+          <CardAulasDoDia data={data} estado={estado} onRetry={recarregar} onRegistrar={() => show(TOAST_S3)} />
         </div>
 
         {/* 4 · Pendências */}
         <PendenciasCard onToastS3={() => show(TOAST_S3)} />
-
-        <div className="mt-3">
-          <Button block variant="ghost" onClick={signOut}>
-            <i className="fa-solid fa-arrow-right-from-bracket" aria-hidden="true" /> Sair
-          </Button>
-        </div>
       </div>
 
-      <TabBar
-        items={TABS}
-        activeId={tab}
-        onSelect={(id) => {
-          setTab(id)
-          if (id === 'agenda') show('Agenda entra no P4 📅')
-          if (id === 'alunos') show('Alunos entra no P4 👥')
-          if (id === 'fabio') show('Chat com o Fábio chega no Sprint 4 🤖')
-        }}
-      />
-      <Fab onClick={() => show(TOAST_S3)} />
+      <AppNav onFabMic={() => show(TOAST_S3)} onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')} />
       <Toast message={message} visible={visible} />
     </AppFrame>
   )
 }
 
 // ---------------------------------------------------------------------------
-
-function CardAulasDoDia({
-  data,
-  estado,
-  onRetry,
-  onToastS3,
-}: {
-  data: string
-  estado: ReturnType<typeof useAgenda>['estado']
-  onRetry: () => void
-  onToastS3: () => void
-}) {
-  const titulo = isHoje(data) ? 'Hoje' : formatDiaCurto(data)
-
-  if (estado.fase === 'carregando') {
-    return (
-      <Card title={titulo} icon="fa-solid fa-calendar-day">
-        <div className="space-y-3 py-1">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton className="h-4 w-9" />
-              <div className="flex-1 space-y-[6px]">
-                <Skeleton className="h-[14px] w-1/2" />
-                <Skeleton className="h-3 w-1/3" />
-              </div>
-              <Skeleton className="h-4 w-16" />
-            </div>
-          ))}
-        </div>
-      </Card>
-    )
-  }
-
-  if (estado.fase === 'erro') {
-    return (
-      <Card title={titulo} icon="fa-solid fa-calendar-day">
-        <EmptyState
-          icon="fa-solid fa-triangle-exclamation"
-          title="Não consegui carregar"
-          description="Deu um problema ao buscar suas aulas. Verifica a conexão e tenta de novo."
-          action={
-            <Button size="sm" onClick={onRetry}>
-              <i className="fa-solid fa-rotate-right" aria-hidden="true" /> Tentar de novo
-            </Button>
-          }
-        />
-      </Card>
-    )
-  }
-
-  if (estado.fase === 'sem_vinculo') {
-    // O guard já trata isso; fallback defensivo pra nunca renderizar vazio.
-    return (
-      <Card title={titulo} icon="fa-solid fa-calendar-day">
-        <EmptyState
-          icon="fa-solid fa-id-badge"
-          title="Acesso não ativado"
-          description="Fala com a coordenação pra vincular seu login a um professor."
-        />
-      </Card>
-    )
-  }
-
-  const { aulas, total } = estado.agenda
-  const registradas = contarRegistradas(aulas)
-
-  if (total === 0) {
-    return (
-      <Card title={titulo} icon="fa-solid fa-calendar-day">
-        <EmptyState
-          icon="fa-solid fa-music"
-          title="Nenhuma aula neste dia 🎵"
-          description={
-            isHoje(data)
-              ? 'Dia livre por aqui. Use as setas acima pra ver outro dia da sua agenda.'
-              : 'Sem aulas nesta data. Navegue pelos dias com as setas acima.'
-          }
-        />
-      </Card>
-    )
-  }
-
-  return (
-    <Card
-      title={titulo}
-      icon="fa-solid fa-calendar-day"
-      right={`${registradas} de ${total} registradas`}
-    >
-      {aulas.map((a) => (
-        <AgendaAulaRow key={a.aula_local_id} aula={a} onRegistrar={onToastS3} />
-      ))}
-    </Card>
-  )
-}
 
 function PendenciasCard({ onToastS3 }: { onToastS3: () => void }) {
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'erro'>('carregando')
