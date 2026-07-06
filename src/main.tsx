@@ -5,9 +5,12 @@ import { RouterProvider } from 'react-router-dom'
 import './styles/tokens.css'
 import './styles/tailwind.css'
 import { router } from './routes'
+import { AuthProvider } from './lib/auth'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <RouterProvider router={router} future={{ v7_startTransition: true }} />
+    <AuthProvider>
+      <RouterProvider router={router} future={{ v7_startTransition: true }} />
+    </AuthProvider>
   </React.StrictMode>,
 )
