@@ -1,0 +1,129 @@
+/* ============================================================
+   LA Teacher · tokens.css — Fábio DS v1.0
+   ÚNICA fonte de valores brutos (hex, px, shadow) do projeto.
+   Blocos :root, [data-theme="dark"] e [data-theme="light"]
+   copiados EXATAMENTE de docs/design-system-fabio-v1.html.
+   Componentes e páginas só conhecem os tokens SEMÂNTICOS.
+   ============================================================ */
+
+/* ---------- 1. TOKENS PRIMITIVOS (nunca usar direto na UI) ---------- */
+:root{
+  /* Marca — Teal */
+  --teal-200:#84DDD5; --teal-300:#66CEC4; --teal-400:#48BFB3;
+  --teal-500:#2A9D8F; --teal-600:#21867A; --teal-700:#1B6E64;
+
+  /* Neutros escuros (verde-carvão) */
+  --ink-950:#0A0F0E; --ink-900:#111916; --ink-800:#1A2421; --ink-700:#243430;
+
+  /* Neutros claros (névoa esverdeada) */
+  --mist-50:#F2F7F5; --mist-100:#E9F1EE; --mist-200:#DFE9E5; --mist-300:#C8D6D2;
+
+  /* Cinzas de apoio */
+  --slate-400:#9CA3AF; --slate-500:#6B7280;
+  --white-off:#F5F5F5; --white:#FFFFFF;
+
+  /* Funcionais */
+  --green-400:#4ADE80; --green-500:#22C55E; --green-600:#16A34A;
+  --red-400:#F87171;   --red-500:#EF4444;   --red-600:#DC2626;
+  --amber-400:#FACC15; --amber-500:#EAB308; --amber-600:#CA8A04;
+  --blue-400:#60A5FA;  --blue-500:#3B82F6;  --blue-600:#2563EB;
+  --purple-400:#C084FC;--purple-500:#A855F7;--purple-600:#9333EA;
+  --orange-500:#F97316; --whatsapp:#25D366;
+
+  /* Dataviz (ordem fixa das séries) */
+  --viz-1:#2A9D8F; --viz-2:#9D4EDD; --viz-3:#F77F00;
+  --viz-4:#06D6A0; --viz-5:#48BFB3; --viz-6:#E9C46A;
+
+  /* Celebração (confete / conquistas) */
+  --party-1:#2A9D8F; --party-2:#F4A261; --party-3:#E76F51;
+  --party-4:#E9C46A; --party-5:#264653;
+
+  /* Geometria */
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --r-full:9999px;
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px;
+  --s-6:24px; --s-8:32px; --s-10:40px; --s-12:48px;
+
+  --font:'Inter',-apple-system,sans-serif;
+  --mono:ui-monospace,'SF Mono','Cascadia Code',Menlo,monospace;
+}
+
+/* ---------- 2. TOKENS SEMÂNTICOS — DARK (tema padrão) ---------- */
+[data-theme="dark"]{
+  --bg-app:var(--ink-950);
+  --bg-surface:var(--ink-900);
+  --bg-inset:var(--ink-950);
+  --bg-hover:var(--ink-800);
+
+  --text-primary:var(--white-off);
+  --text-secondary:var(--slate-400);
+  --text-muted:rgba(245,245,245,.45);
+
+  --border-subtle:#1E2A26;
+  --border-strong:#2C3B36;
+
+  --brand:var(--teal-500);
+  --brand-hover:var(--teal-400);
+  --brand-text:var(--teal-500);
+  --brand-soft:rgba(42,157,143,.15);
+  --brand-border:rgba(42,157,143,.30);
+  --on-brand:var(--ink-950);
+
+  --success:var(--green-500); --success-text:var(--green-400); --success-soft:rgba(34,197,94,.12);
+  --danger:var(--red-500);    --danger-text:var(--red-400);    --danger-soft:rgba(239,68,68,.12);
+  --warning:var(--amber-500); --warning-text:var(--amber-400); --warning-soft:rgba(234,179,8,.12);
+  --info:var(--blue-500);     --info-text:var(--blue-400);     --info-soft:rgba(59,130,246,.12);
+  --event:var(--purple-500);  --event-text:var(--purple-400);  --event-soft:rgba(168,85,247,.14);
+
+  --chart-grid:#1A2421;
+  --shadow-card:none;
+  --shadow-fab:0 10px 25px -5px rgba(42,157,143,.45);
+  --focus-ring:0 0 0 2px var(--bg-app),0 0 0 4px var(--teal-400);
+  --scrim:rgba(2,6,5,.7);
+}
+
+/* ---------- 3. TOKENS SEMÂNTICOS — LIGHT ---------- */
+[data-theme="light"]{
+  --bg-app:var(--mist-50);
+  --bg-surface:var(--white);
+  --bg-inset:var(--mist-100);
+  --bg-hover:var(--mist-100);
+
+  --text-primary:#0F1D19;
+  --text-secondary:#5A6B66;
+  --text-muted:#8A9994;
+
+  --border-subtle:var(--mist-200);
+  --border-strong:var(--mist-300);
+
+  --brand:var(--teal-500);
+  --brand-hover:var(--teal-600);
+  --brand-text:var(--teal-700);
+  --brand-soft:rgba(42,157,143,.12);
+  --brand-border:rgba(42,157,143,.35);
+  --on-brand:var(--ink-950);
+
+  --success:var(--green-600); --success-text:var(--green-600); --success-soft:rgba(22,163,74,.10);
+  --danger:var(--red-600);    --danger-text:var(--red-600);    --danger-soft:rgba(220,38,38,.08);
+  --warning:var(--amber-600); --warning-text:var(--amber-600); --warning-soft:rgba(202,138,4,.10);
+  --info:var(--blue-600);     --info-text:var(--blue-600);     --info-soft:rgba(37,99,235,.08);
+  --event:var(--purple-600);  --event-text:var(--purple-600);  --event-soft:rgba(147,51,234,.08);
+
+  --chart-grid:var(--mist-200);
+  --shadow-card:0 1px 2px rgba(15,29,25,.05),0 4px 14px rgba(15,29,25,.06);
+  --shadow-fab:0 10px 25px -5px rgba(42,157,143,.5);
+  --focus-ring:0 0 0 2px var(--bg-app),0 0 0 4px var(--teal-600);
+  --scrim:rgba(15,29,25,.45);
+}
+
+/* ---------- 4. EXTENSÕES SEMÂNTICAS DO APP (P0) ----------
+   Regra do frontend-tokens.md: se um componente precisaria de um
+   primitivo, cria-se o token semântico aqui — nunca se usa o bruto.
+   Toast: superfície invertida nos dois temas (protótipo golden-path). */
+[data-theme="dark"]{
+  --toast-bg:var(--ink-800);
+  --toast-text:var(--white-off);
+}
+[data-theme="light"]{
+  --toast-bg:#0F1D19;
+  --toast-text:var(--white-off);
+}

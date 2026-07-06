@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base do documento — só tokens semânticos, nenhum valor cru aqui. */
+@layer base {
+  body {
+    margin: 0;
+    background: var(--bg-app);
+    color: var(--text-primary);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  button {
+    font-family: var(--font);
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--r-sm);
+  }
+}
