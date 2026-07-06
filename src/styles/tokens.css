@@ -122,8 +122,12 @@
 [data-theme="dark"]{
   --toast-bg:var(--ink-800);
   --toast-text:var(--white-off);
+  --avatar-grad:linear-gradient(135deg,var(--teal-500),var(--teal-700));
+  --avatar-fg:var(--white-off);
 }
 [data-theme="light"]{
   --toast-bg:#0F1D19;
   --toast-text:var(--white-off);
+  --avatar-grad:linear-gradient(135deg,var(--teal-500),var(--teal-700));
+  --avatar-fg:var(--white-off);
 }

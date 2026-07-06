@@ -34,8 +34,13 @@ export function RequireProfessor() {
   const [estado, setEstado] = useState<Estado>('checando')
   const [tentativa, setTentativa] = useState(0)
 
+  // Chaveia a checagem no id do usuário (estável), NÃO no objeto session:
+  // onAuthStateChange emite nova session a cada refresh de token / foco de aba,
+  // e re-checar aqui remontaria o app inteiro (perdendo data selecionada, scroll…).
+  const userId = session?.user.id
+
   useEffect(() => {
-    if (loading || !session) return
+    if (loading || !userId) return
     let vivo = true
     setEstado('checando')
     minhaAgenda()
@@ -47,7 +52,7 @@ export function RequireProfessor() {
     return () => {
       vivo = false
     }
-  }, [loading, session, tentativa])
+  }, [loading, userId, tentativa])
 
   if (loading) return <Carregando />
   if (!session) return <Navigate to="/app/login" replace />

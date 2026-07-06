@@ -18,8 +18,24 @@ export function isSemVinculo(v: unknown): v is RpcErro {
 // ---- Shapes leves do retorno (o detalhe fino das aulas vem no P3) ----
 
 export interface AgendaAula {
-  aula_id?: number
-  data_hora_inicio?: string
+  aula_local_id: number
+  aula_emusys_id: number | null
+  data_aula: string
+  data_hora_inicio: string | null
+  data_hora_fim: string | null
+  horario_inicio_brt: string | null
+  horario_fim_brt: string | null
+  aula_tipo: string | null
+  aula_categoria: string | null
+  turma_nome: string | null
+  curso_nome: string | null
+  aluno_nome: string | null
+  qtd_alunos: number | null
+  presenca_status: string | null
+  cancelada: boolean | null
+  anotacoes: string | null
+  anotacoes_fabio: string | null
+  qualidade_contexto: string | null
   [k: string]: unknown
 }
 
