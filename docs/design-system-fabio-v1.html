@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fábio DS · Design System — App Pedagógico LA Music</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+/* ============================================================
+   FÁBIO DS · v1.0 · Julho 2026
+   Design System do App Pedagógico LA Music ("a casa do Fábio")
+   Dark-first · Mobile-first · Token-driven
+   ============================================================ */
+
+/* ---------- 1. TOKENS PRIMITIVOS (nunca usar direto na UI) ---------- */
+:root{
+  /* Marca — Teal */
+  --teal-200:#84DDD5; --teal-300:#66CEC4; --teal-400:#48BFB3;
+  --teal-500:#2A9D8F; --teal-600:#21867A; --teal-700:#1B6E64;
+
+  /* Neutros escuros (verde-carvão) */
+  --ink-950:#0A0F0E; --ink-900:#111916; --ink-800:#1A2421; --ink-700:#243430;
+
+  /* Neutros claros (névoa esverdeada) */
+  --mist-50:#F2F7F5; --mist-100:#E9F1EE; --mist-200:#DFE9E5; --mist-300:#C8D6D2;
+
+  /* Cinzas de apoio */
+  --slate-400:#9CA3AF; --slate-500:#6B7280;
+  --white-off:#F5F5F5; --white:#FFFFFF;
+
+  /* Funcionais */
+  --green-400:#4ADE80; --green-500:#22C55E; --green-600:#16A34A;
+  --red-400:#F87171;   --red-500:#EF4444;   --red-600:#DC2626;
+  --amber-400:#FACC15; --amber-500:#EAB308; --amber-600:#CA8A04;
+  --blue-400:#60A5FA;  --blue-500:#3B82F6;  --blue-600:#2563EB;
+  --purple-400:#C084FC;--purple-500:#A855F7;--purple-600:#9333EA;
+  --orange-500:#F97316; --whatsapp:#25D366;
+
+  /* Dataviz (ordem fixa das séries) */
+  --viz-1:#2A9D8F; --viz-2:#9D4EDD; --viz-3:#F77F00;
+  --viz-4:#06D6A0; --viz-5:#48BFB3; --viz-6:#E9C46A;
+
+  /* Celebração (confete / conquistas) */
+  --party-1:#2A9D8F; --party-2:#F4A261; --party-3:#E76F51;
+  --party-4:#E9C46A; --party-5:#264653;
+
+  /* Geometria */
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --r-full:9999px;
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px;
+  --s-6:24px; --s-8:32px; --s-10:40px; --s-12:48px;
+
+  --font:'Inter',-apple-system,sans-serif;
+  --mono:ui-monospace,'SF Mono','Cascadia Code',Menlo,monospace;
+}
+
+/* ---------- 2. TOKENS SEMÂNTICOS — DARK (tema padrão) ---------- */
+[data-theme="dark"]{
+  --bg-app:var(--ink-950);
+  --bg-surface:var(--ink-900);
+  --bg-inset:var(--ink-950);
+  --bg-hover:var(--ink-800);
+
+  --text-primary:var(--white-off);
+  --text-secondary:var(--slate-400);
+  --text-muted:rgba(245,245,245,.45);
+
+  --border-subtle:#1E2A26;
+  --border-strong:#2C3B36;
+
+  --brand:var(--teal-500);
+  --brand-hover:var(--teal-400);
+  --brand-text:var(--teal-500);
+  --brand-soft:rgba(42,157,143,.15);
+  --brand-border:rgba(42,157,143,.30);
+  --on-brand:var(--ink-950);
+
+  --success:var(--green-500); --success-text:var(--green-400); --success-soft:rgba(34,197,94,.12);
+  --danger:var(--red-500);    --danger-text:var(--red-400);    --danger-soft:rgba(239,68,68,.12);
+  --warning:var(--amber-500); --warning-text:var(--amber-400); --warning-soft:rgba(234,179,8,.12);
+  --info:var(--blue-500);     --info-text:var(--blue-400);     --info-soft:rgba(59,130,246,.12);
+  --event:var(--purple-500);  --event-text:var(--purple-400);  --event-soft:rgba(168,85,247,.14);
+
+  --chart-grid:#1A2421;
+  --shadow-card:none;
+  --shadow-fab:0 10px 25px -5px rgba(42,157,143,.45);
+  --focus-ring:0 0 0 2px var(--bg-app),0 0 0 4px var(--teal-400);
+  --scrim:rgba(2,6,5,.7);
+}
+
+/* ---------- 3. TOKENS SEMÂNTICOS — LIGHT ---------- */
+[data-theme="light"]{
+  --bg-app:var(--mist-50);
+  --bg-surface:var(--white);
+  --bg-inset:var(--mist-100);
+  --bg-hover:var(--mist-100);
+
+  --text-primary:#0F1D19;
+  --text-secondary:#5A6B66;
+  --text-muted:#8A9994;
+
+  --border-subtle:var(--mist-200);
+  --border-strong:var(--mist-300);
+
+  --brand:var(--teal-500);
+  --brand-hover:var(--teal-600);
+  --brand-text:var(--teal-700);
+  --brand-soft:rgba(42,157,143,.12);
+  --brand-border:rgba(42,157,143,.35);
+  --on-brand:var(--ink-950);
+
+  --success:var(--green-600); --success-text:var(--green-600); --success-soft:rgba(22,163,74,.10);
+  --danger:var(--red-600);    --danger-text:var(--red-600);    --danger-soft:rgba(220,38,38,.08);
+  --warning:var(--amber-600); --warning-text:var(--amber-600); --warning-soft:rgba(202,138,4,.10);
+  --info:var(--blue-600);     --info-text:var(--blue-600);     --info-soft:rgba(37,99,235,.08);
+  --event:var(--purple-600);  --event-text:var(--purple-600);  --event-soft:rgba(147,51,234,.08);
+
+  --chart-grid:var(--mist-200);
+  --shadow-card:0 1px 2px rgba(15,29,25,.05),0 4px 14px rgba(15,29,25,.06);
+  --shadow-fab:0 10px 25px -5px rgba(42,157,143,.5);
+  --focus-ring:0 0 0 2px var(--bg-app),0 0 0 4px var(--teal-600);
+  --scrim:rgba(15,29,25,.45);
+}
+
+/* ---------- 4. BASE DO DOCUMENTO ---------- */
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--bg-app); color:var(--text-primary);
+  font-family:var(--font); font-size:15px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  transition:background .25s ease,color .25s ease;
+}
+::-webkit-scrollbar{height:6px;width:6px}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:99px}
+a{color:var(--brand-text);text-decoration:none}
+h1,h2,h3,h4{margin:0;line-height:1.25;font-weight:700}
+p{margin:0}
+button{font-family:var(--font);cursor:pointer}
+:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--r-sm)}
+
+.wrap{max-width:1100px;margin:0 auto;padding:0 var(--s-5)}
+section{padding:var(--s-12) 0;scroll-margin-top:130px;border-bottom:1px solid var(--border-subtle)}
+section:last-of-type{border-bottom:none}
+
+.sec-tag{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--brand-text);margin-bottom:var(--s-3);
+}
+.sec-tag::before{content:'';width:20px;height:2px;background:var(--brand);border-radius:2px}
+.sec-title{font-size:28px;font-weight:800;letter-spacing:-.02em;margin-bottom:var(--s-2)}
+.sec-desc{color:var(--text-secondary);max-width:720px;margin-bottom:var(--s-6)}
+.sub{font-size:17px;font-weight:700;margin:var(--s-8) 0 var(--s-4)}
+.sub:first-of-type{margin-top:0}
+.note{
+  display:flex;gap:10px;align-items:flex-start;
+  background:var(--brand-soft);border:1px solid var(--brand-border);
+  border-radius:var(--r-md);padding:var(--s-3) var(--s-4);
+  font-size:13.5px;color:var(--text-primary);margin:var(--s-4) 0;
+}
+.note i{color:var(--brand-text);margin-top:3px}
+.note.warn{background:var(--warning-soft);border-color:var(--warning)}
+.note.warn i{color:var(--warning-text)}
+
+/* Header do documento */
+.ds-header{
+  position:sticky;top:0;z-index:100;
+  background:color-mix(in srgb,var(--bg-app) 85%,transparent);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border-subtle);
+}
+.ds-header-row{display:flex;align-items:center;justify-content:space-between;gap:var(--s-4);padding:var(--s-3) 0}
+.ds-logo{display:flex;align-items:center;gap:12px}
+.ds-logo-mark{
+  width:38px;height:38px;border-radius:var(--r-md);
+  background:linear-gradient(135deg,var(--teal-500),var(--teal-700));
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:17px;flex-shrink:0;
+}
+.ds-logo-txt b{font-size:15px;font-weight:800;letter-spacing:-.01em;display:block}
+.ds-logo-txt span{font-size:11px;color:var(--text-secondary)}
+.theme-toggle{
+  display:flex;align-items:center;gap:6px;padding:5px;
+  background:var(--bg-surface);border:1px solid var(--border-subtle);
+  border-radius:var(--r-full);
+}
+.theme-toggle button{
+  width:34px;height:34px;border-radius:var(--r-full);border:none;
+  background:transparent;color:var(--text-secondary);font-size:14px;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;
+}
+.theme-toggle button.on{background:var(--brand);color:var(--on-brand)}
+.ds-nav{display:flex;gap:8px;overflow-x:auto;padding:0 0 var(--s-3);scrollbar-width:none}
+.ds-nav::-webkit-scrollbar{display:none}
+.ds-nav a{
+  flex-shrink:0;padding:7px 14px;border-radius:var(--r-full);
+  background:var(--bg-surface);border:1px solid var(--border-subtle);
+  color:var(--text-secondary);font-size:12.5px;font-weight:600;white-space:nowrap;
+  transition:all .15s;
+}
+.ds-nav a:hover{color:var(--brand-text);border-color:var(--brand-border)}
+
+/* Hero */
+.hero{padding:var(--s-12) 0 var(--s-10);border-bottom:1px solid var(--border-subtle)}
+.hero-eyebrow{font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--brand-text);margin-bottom:var(--s-3)}
+.hero h1{font-size:clamp(34px,6vw,52px);font-weight:800;letter-spacing:-.03em;margin-bottom:var(--s-3)}
+.hero h1 em{font-style:normal;color:var(--brand-text)}
+.hero p{color:var(--text-secondary);max-width:640px;font-size:16px;margin-bottom:var(--s-5)}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px}
+.hero-meta span{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:7px 14px;border-radius:var(--r-full);font-size:12.5px;font-weight:600;
+  background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-secondary);
+}
+.hero-meta span i{color:var(--brand-text);font-size:11px}
+
+/* Grids e utilitários */
+.grid{display:grid;gap:var(--s-4)}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.g5{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+
+/* Painéis / stages de demonstração */
+.panel{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);padding:var(--s-5);box-shadow:var(--shadow-card)}
+.panel h4{font-size:14px;font-weight:700;margin-bottom:4px}
+.panel .hint{font-size:12.5px;color:var(--text-secondary)}
+.stage{
+  background:var(--bg-app);border:1px dashed var(--border-strong);
+  border-radius:var(--r-lg);padding:var(--s-5);position:relative;margin-top:var(--s-3);
+}
+.stage::before{
+  content:'PREVIEW';position:absolute;top:-9px;left:14px;
+  background:var(--bg-app);padding:0 8px;font-size:9.5px;font-weight:800;
+  letter-spacing:.16em;color:var(--text-muted);
+}
+.stage-col{display:flex;flex-direction:column;gap:var(--s-3);max-width:420px}
+.specs{list-style:none;margin:var(--s-3) 0 0;padding:0;font-size:13px;color:var(--text-secondary)}
+.specs li{padding:7px 0;border-bottom:1px dashed var(--border-subtle);display:flex;justify-content:space-between;gap:16px}
+.specs li:last-child{border-bottom:none}
+.specs b{color:var(--text-primary);font-weight:600}
+.specs code{font-family:var(--mono);font-size:12px;color:var(--brand-text);background:var(--brand-soft);padding:1px 7px;border-radius:6px;white-space:nowrap}
+
+/* Código */
+pre.code{
+  background:var(--bg-inset);border:1px solid var(--border-subtle);
+  border-radius:var(--r-md);padding:var(--s-4);overflow-x:auto;
+  font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--text-primary);
+  margin:var(--s-3) 0;
+}
+pre.code .c{color:var(--text-muted)}
+pre.code .k{color:var(--brand-text)}
+pre.code .s{color:var(--party-2)}
+.codehead{display:flex;justify-content:space-between;align-items:center;margin-top:var(--s-4)}
+.codehead span{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary)}
+.copybtn{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 14px;
+  background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-full);
+  color:var(--text-secondary);font-size:12px;font-weight:600;transition:all .15s;
+}
+.copybtn:hover{color:var(--brand-text);border-color:var(--brand-border)}
+
+/* Tabelas */
+.tblwrap{overflow-x:auto;border:1px solid var(--border-subtle);border-radius:var(--r-md);margin-top:var(--s-3)}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
+.tbl th{
+  text-align:left;padding:11px 14px;background:var(--bg-inset);
+  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-secondary);border-bottom:1px solid var(--border-subtle);
+}
+.tbl td{padding:11px 14px;border-bottom:1px solid var(--border-subtle);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl code{font-family:var(--mono);font-size:12px;color:var(--brand-text);background:var(--brand-soft);padding:2px 7px;border-radius:6px;white-space:nowrap}
+.tbl .old{font-family:var(--mono);font-size:12px;color:var(--danger-text);text-decoration:line-through;text-decoration-thickness:1px;opacity:.85}
+.dotcell{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:8px;border:1px solid var(--border-subtle)}
+</style>
+<style>
+/* ---------- 5. COMPONENTES DO DESIGN SYSTEM (demos vivas) ---------- */
+
+/* Swatches de cor */
+.swatch{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-md);overflow:hidden;box-shadow:var(--shadow-card)}
+.swatch-chip{height:64px;position:relative}
+.swatch-body{padding:10px 12px}
+.swatch-body b{display:block;font-size:12.5px;font-weight:700}
+.swatch-body small{font-size:11px;color:var(--text-secondary);display:block;margin-top:1px}
+.swatch-hex{
+  margin-top:7px;display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:11px;color:var(--text-secondary);
+  background:var(--bg-inset);border:1px solid var(--border-subtle);
+  padding:3px 8px;border-radius:6px;cursor:pointer;transition:all .15s;border-width:1px;border-style:solid;
+}
+.swatch-hex:hover{color:var(--brand-text);border-color:var(--brand-border)}
+
+/* Tipografia specimen */
+.type-row{display:flex;align-items:baseline;gap:var(--s-5);padding:var(--s-4) 0;border-bottom:1px dashed var(--border-subtle);flex-wrap:wrap}
+.type-row:last-child{border-bottom:none}
+.type-meta{width:190px;flex-shrink:0;font-size:11.5px;color:var(--text-secondary);font-family:var(--mono)}
+.type-meta b{display:block;font-family:var(--font);font-size:12.5px;color:var(--text-primary);font-weight:700;margin-bottom:2px}
+
+/* Espaçamento */
+.space-row{display:flex;align-items:center;gap:var(--s-4);padding:8px 0}
+.space-bar{height:22px;background:var(--brand-soft);border:1px solid var(--brand-border);border-radius:5px;position:relative}
+.space-lbl{font-family:var(--mono);font-size:12px;color:var(--text-secondary);width:150px;flex-shrink:0}
+.space-lbl b{color:var(--text-primary)}
+
+/* Radius */
+.rad-demo{display:flex;gap:var(--s-4);flex-wrap:wrap}
+.rad-box{width:104px;height:104px;background:var(--bg-surface);border:2px solid var(--brand);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.rad-box b{font-size:13px}.rad-box small{font-family:var(--mono);font-size:10.5px;color:var(--text-secondary)}
+
+/* Ícones */
+.icon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:var(--s-3)}
+.icon-cell{
+  background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-md);
+  padding:var(--s-4) var(--s-2);text-align:center;box-shadow:var(--shadow-card);
+}
+.icon-cell i{font-size:20px;color:var(--brand-text);display:block;margin-bottom:8px}
+.icon-cell b{font-size:11.5px;font-weight:600;display:block}
+.icon-cell small{font-family:var(--mono);font-size:9.5px;color:var(--text-muted)}
+
+/* ===== BOTÕES ===== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:none;border-radius:var(--r-md);font-weight:600;font-size:15px;
+  padding:14px 22px;min-height:48px;transition:all .18s;
+}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--brand);color:var(--on-brand)}
+.btn-primary:hover{background:var(--brand-hover)}
+.btn-secondary{background:var(--bg-surface);color:var(--text-primary);border:1px solid var(--brand-border)}
+.btn-secondary:hover{background:var(--brand-soft)}
+.btn-soft{background:var(--brand-soft);color:var(--brand-text)}
+.btn-danger{background:var(--danger-soft);color:var(--danger-text)}
+.btn-ghost{background:transparent;color:var(--brand-text);padding:10px 14px;min-height:40px}
+.btn-sm{padding:9px 16px;min-height:38px;font-size:13.5px;border-radius:var(--r-sm)}
+.btn-block{width:100%}
+.btn-icon{
+  width:40px;height:40px;min-height:40px;padding:0;border-radius:var(--r-md);
+  background:var(--bg-surface);color:var(--text-primary);border:1px solid transparent;font-size:15px;
+}
+.btn-icon:hover{border-color:var(--border-strong)}
+.fab{
+  width:56px;height:56px;min-height:56px;padding:0;border-radius:var(--r-full);
+  background:var(--brand);color:var(--on-brand);font-size:21px;box-shadow:var(--shadow-fab);
+}
+[data-theme="light"] .btn-icon{border-color:var(--border-subtle)}
+
+/* ===== CHIPS & PILLS ===== */
+.chip{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:9px 16px;border-radius:var(--r-full);border:1px solid transparent;
+  background:var(--bg-surface);color:var(--text-primary);
+  font-size:13.5px;font-weight:500;transition:all .15s;
+}
+[data-theme="light"] .chip{border-color:var(--border-subtle)}
+.chip:hover{border-color:var(--brand-border)}
+.chip.on{background:var(--brand);color:var(--on-brand);font-weight:600;border-color:transparent}
+.chip.outline{background:var(--brand-soft);border:2px solid var(--brand);color:var(--text-primary);font-weight:600}
+.chip .x{opacity:.55;font-size:12px}
+.chip img{width:22px;height:22px;border-radius:var(--r-full);object-fit:cover}
+.chiprow{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ===== FORMULÁRIOS ===== */
+.field{display:flex;flex-direction:column;gap:8px}
+.field label{font-size:13.5px;font-weight:500}
+.field .helper{font-size:12px;color:var(--text-secondary)}
+.input{
+  width:100%;background:var(--bg-surface);color:var(--text-primary);
+  border:1px solid var(--border-subtle);border-radius:var(--r-md);
+  padding:13px 16px;font-size:14.5px;font-family:var(--font);
+  transition:border-color .15s, box-shadow .15s;
+}
+.input::placeholder{color:var(--text-muted)}
+.input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.input-wrap{position:relative}
+.input-wrap .lead{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--brand-text);font-size:14px}
+.input-wrap .lead.txt{color:var(--text-secondary);font-weight:600;font-size:14px}
+.input-wrap .input{padding-left:42px}
+.input-wrap.money .input{padding-left:44px}
+select.input{appearance:none;background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M1 1.5L6 6.5L11 1.5' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 16px center;padding-right:40px}
+textarea.input{resize:none;line-height:1.55}
+
+/* Toggle */
+.toggle{position:relative;display:inline-block;width:48px;height:28px;flex-shrink:0}
+.toggle input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.toggle .track{position:absolute;inset:0;background:var(--border-strong);border-radius:var(--r-full);transition:background .2s}
+.toggle .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;background:#fff;border-radius:var(--r-full);transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.toggle input:checked ~ .track{background:var(--brand)}
+.toggle input:checked ~ .knob{transform:translateX(20px)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:var(--s-4);background:var(--bg-surface);border-radius:var(--r-md);padding:14px 16px}
+[data-theme="light"] .toggle-row{border:1px solid var(--border-subtle)}
+.toggle-row span{font-size:14px}
+
+/* ===== CARDS ===== */
+.card{background:var(--bg-surface);border-radius:var(--r-md);padding:var(--s-4);box-shadow:var(--shadow-card)}
+[data-theme="light"] .card{border:1px solid var(--border-subtle)}
+.kpi{min-width:160px}
+.kpi-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.kpi-head i{color:var(--brand-text);font-size:14px}
+.kpi-head span{font-size:12px;color:var(--text-secondary)}
+.kpi-val{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.kpi-delta{display:flex;align-items:center;gap:5px;font-size:12px;margin-top:4px}
+.kpi-delta.up{color:var(--success-text)}
+.kpi-delta.down{color:var(--danger-text)}
+.kpi-delta.flat{color:var(--text-secondary)}
+.kpi-row{display:flex;gap:var(--s-3);overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.kpi-row::-webkit-scrollbar{display:none}
+
+.tile{width:44px;height:44px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.tile.brand{background:var(--brand-soft);color:var(--brand-text)}
+.tile.success{background:var(--success-soft);color:var(--success-text)}
+.tile.danger{background:var(--danger-soft);color:var(--danger-text)}
+.tile.warning{background:var(--warning-soft);color:var(--warning-text)}
+.tile.info{background:var(--info-soft);color:var(--info-text)}
+.tile.event{background:var(--event-soft);color:var(--event-text)}
+
+.li-card{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3)}
+.li-main{display:flex;align-items:center;gap:var(--s-3);min-width:0}
+.li-main b{font-size:14px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li-main small{font-size:12px;color:var(--text-secondary)}
+.li-end{text-align:right;flex-shrink:0}
+.li-end b{font-size:14.5px;font-weight:700;display:block}
+.li-end small{font-size:11.5px;color:var(--text-secondary)}
+
+.event-card{border-left:4px solid var(--brand);display:flex;flex-direction:column;gap:10px}
+.event-card.purple{border-left-color:var(--event)}
+.event-top{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--brand-text)}
+.event-card.purple .event-top{color:var(--event-text)}
+.event-top .pill-mini{margin-left:auto;display:inline-flex;align-items:center;gap:5px;background:var(--brand-soft);color:var(--brand-text);font-size:11px;padding:4px 9px;border-radius:var(--r-sm)}
+.event-card h5{font-size:15.5px;font-weight:700}
+.event-meta{display:flex;gap:14px;font-size:12px;color:var(--text-secondary)}
+.event-meta span{display:inline-flex;align-items:center;gap:5px}
+.event-actions{display:flex;gap:8px}
+.event-actions .btn{flex:1}
+
+.alert-card{border-left:4px solid var(--danger);display:flex;gap:12px;align-items:flex-start}
+.alert-card.warn{border-left-color:var(--warning)}
+.alert-card.tip{border-left-color:var(--brand)}
+.alert-card>i{font-size:17px;margin-top:2px;color:var(--danger-text)}
+.alert-card.warn>i{color:var(--warning-text)}
+.alert-card.tip>i{color:var(--brand-text)}
+.alert-card b{font-size:14px;display:block;margin-bottom:2px}
+.alert-card p{font-size:12.5px;color:var(--text-secondary);margin-bottom:7px}
+.alert-card a{font-size:12.5px;font-weight:600}
+
+/* ===== BADGES ===== */
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:var(--r-full);font-size:11.5px;font-weight:600}
+.badge i{font-size:7px}
+.badge.success{background:var(--success-soft);color:var(--success-text)}
+.badge.warning{background:var(--warning-soft);color:var(--warning-text)}
+.badge.danger{background:var(--danger-soft);color:var(--danger-text)}
+.badge.info{background:var(--info-soft);color:var(--info-text)}
+.badge.brand{background:var(--brand-soft);color:var(--brand-text)}
+.badge.neutral{background:var(--bg-inset);color:var(--text-secondary);border:1px solid var(--border-subtle)}
+
+/* ===== AVATAR ===== */
+.avatar{border-radius:var(--r-full);object-fit:cover;background:linear-gradient(135deg,var(--teal-400),var(--teal-700));color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+.av-24{width:24px;height:24px;font-size:10px}
+.av-40{width:40px;height:40px;font-size:14px}
+.av-56{width:56px;height:56px;font-size:19px}
+.av-96{width:96px;height:96px;font-size:32px;border:4px solid var(--brand)}
+.av-wrap{position:relative;display:inline-block}
+.av-dot{position:absolute;bottom:-1px;right:-1px;width:16px;height:16px;border-radius:var(--r-full);border:3px solid var(--bg-surface);background:var(--success)}
+.av-dot.away{background:var(--warning)}
+
+/* ===== NAVEGAÇÃO ===== */
+.phone{
+  width:100%;max-width:375px;background:var(--bg-app);
+  border:1px solid var(--border-strong);border-radius:var(--r-xl);
+  overflow:hidden;position:relative;margin:0 auto;
+}
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border-subtle);background:var(--bg-app)}
+.app-header h6{font-size:16.5px;font-weight:700}
+.bottom-nav{position:relative;background:var(--bg-surface);border-top:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-around;padding:10px 12px 12px}
+.bn-item{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;color:var(--text-secondary);font-size:10.5px;font-weight:500;padding:4px 8px}
+.bn-item i{font-size:19px}
+.bn-item.on{color:var(--brand-text);font-weight:600}
+.bn-fab{margin-top:-38px}
+.tabs{display:flex;gap:4px;background:var(--bg-surface);border-radius:var(--r-md);padding:4px}
+[data-theme="light"] .tabs{border:1px solid var(--border-subtle)}
+.tabs button{flex:1;padding:10px 8px;border-radius:var(--r-sm);border:none;background:transparent;color:var(--text-secondary);font-size:13px;font-weight:600;transition:all .15s}
+.tabs button.on{background:var(--brand);color:var(--on-brand)}
+.month-nav{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.month-nav .mid{text-align:center}
+.month-nav .mid b{font-size:16px;display:block}
+.month-nav .mid small{font-size:11.5px;color:var(--text-secondary)}
+
+/* ===== CARD DO AGENTE (FÁBIO) ===== */
+.agent-card{
+  background:linear-gradient(135deg,var(--brand-soft),var(--event-soft));
+  border:1px solid var(--brand-border);border-radius:var(--r-md);padding:var(--s-4);
+}
+.agent-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.agent-av{width:40px;height:40px;border-radius:var(--r-full);background:var(--brand);color:var(--on-brand);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.agent-head b{font-size:15px;display:block}
+.agent-head small{font-size:12px;color:var(--text-secondary)}
+.agent-list{display:flex;flex-direction:column;gap:10px}
+.agent-item{display:flex;gap:9px;font-size:13.5px;line-height:1.5}
+.agent-item i{color:var(--brand-text);font-size:12px;margin-top:4px;flex-shrink:0}
+.agent-bubble{background:var(--bg-surface);border:1px solid var(--brand-border);border-radius:var(--r-md);border-bottom-left-radius:4px;padding:12px 14px;font-size:13.5px;line-height:1.55;box-shadow:var(--shadow-card)}
+.agent-bubble .who{font-size:12px;font-weight:700;color:var(--brand-text);display:block;margin-bottom:4px}
+
+/* ===== PROGRESSO ===== */
+.progress{height:8px;background:var(--bg-inset);border-radius:var(--r-full);overflow:hidden}
+[data-theme="light"] .progress{background:var(--mist-200)}
+.progress>span{display:block;height:100%;background:var(--brand);border-radius:var(--r-full)}
+.progress>span.purple{background:var(--event)}
+.progress>span.green{background:var(--success)}
+.goal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.goal-head .l{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500}
+.goal-head .l i{color:var(--brand-text)}
+.goal-head .pct{font-size:12.5px;font-weight:700;color:var(--brand-text)}
+.goal-foot{display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-top:8px}
+.ring{--v:75;--c:var(--brand);width:92px;height:92px;border-radius:var(--r-full);background:conic-gradient(var(--c) calc(var(--v)*1%),var(--bg-inset) 0);display:flex;align-items:center;justify-content:center;position:relative}
+[data-theme="light"] .ring{background:conic-gradient(var(--c) calc(var(--v)*1%),var(--mist-200) 0)}
+.ring::before{content:'';position:absolute;inset:9px;background:var(--bg-surface);border-radius:var(--r-full)}
+.ring b{position:relative;font-size:18px}
+
+/* ===== CALENDÁRIO ===== */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal .dow{text-align:center;font-size:10.5px;font-weight:600;color:var(--text-secondary);padding:4px 0}
+.cal .day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:13px;border-radius:var(--r-sm);position:relative}
+.cal .day.mut{color:var(--text-muted)}
+.cal .day.today{background:var(--brand);color:var(--on-brand);font-weight:700}
+.cal .day .d{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);display:flex;gap:2px}
+.cal .day .d i{width:4px;height:4px;border-radius:99px;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px}
+.legend span{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--text-secondary)}
+.legend i{width:10px;height:10px;border-radius:99px;display:inline-block}
+
+/* ===== DATAVIZ ===== */
+.bars{display:flex;flex-direction:column;gap:12px}
+.bar-row{display:grid;grid-template-columns:110px 1fr 58px;align-items:center;gap:12px;font-size:12.5px}
+.bar-row .track{height:14px;background:var(--bg-inset);border-radius:var(--r-sm);overflow:hidden}
+[data-theme="light"] .bar-row .track{background:var(--mist-100)}
+.bar-row .track>i{display:block;height:100%;background:var(--viz-1);border-radius:var(--r-sm)}
+.bar-row b{text-align:right;font-family:var(--mono);font-size:12px}
+.donut{--a:38;--b:32;--c:20;width:150px;height:150px;border-radius:var(--r-full);margin:0 auto;position:relative;
+  background:conic-gradient(var(--viz-1) 0 calc(var(--a)*1%),var(--viz-2) 0 calc((var(--a) + var(--b))*1%),var(--viz-3) 0 calc((var(--a) + var(--b) + var(--c))*1%),var(--viz-4) 0)}
+.donut::before{content:'';position:absolute;inset:26%;background:var(--bg-surface);border-radius:var(--r-full)}
+.donut span{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:17px}
+.donut span small{font-size:10.5px;color:var(--text-secondary);font-weight:500}
+
+/* Anatomia de tela */
+.anat{display:grid;grid-template-columns:auto 1fr;gap:var(--s-6);align-items:start}
+.zone{border:2px dashed var(--brand-border);border-radius:var(--r-sm);padding:8px;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--brand-text);text-transform:uppercase;text-align:center}
+.footer{padding:var(--s-8) 0 var(--s-12);color:var(--text-secondary);font-size:13px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+
+/* Do & Don't */
+.dd{border-radius:var(--r-md);overflow:hidden;border:1px solid var(--border-subtle);background:var(--bg-surface)}
+.dd .h{padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.dd.yes .h{background:var(--success-soft);color:var(--success-text)}
+.dd.no .h{background:var(--danger-soft);color:var(--danger-text)}
+.dd .b{padding:12px 14px;font-size:13px;color:var(--text-secondary)}
+.dd .b b{color:var(--text-primary)}
+
+@media(max-width:760px){
+  .anat{grid-template-columns:1fr}
+  .type-meta{width:100%}
+  .sec-title{font-size:23px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= HEADER DO DOCUMENTO ================= -->
+<header class="ds-header">
+  <div class="wrap">
+    <div class="ds-header-row">
+      <div class="ds-logo">
+        <div class="ds-logo-mark"><i class="fa-solid fa-robot"></i></div>
+        <div class="ds-logo-txt"><b>Fábio DS</b><span>App Pedagógico · LA Music</span></div>
+      </div>
+      <div class="theme-toggle" role="group" aria-label="Alternar tema">
+        <button id="btnDark" class="on" onclick="setTheme('dark')" aria-label="Tema escuro"><i class="fa-solid fa-moon"></i></button>
+        <button id="btnLight" onclick="setTheme('light')" aria-label="Tema claro"><i class="fa-solid fa-sun"></i></button>
+      </div>
+    </div>
+    <nav class="ds-nav">
+      <a href="#principios">Princípios</a>
+      <a href="#cores">Cores</a>
+      <a href="#tipografia">Tipografia</a>
+      <a href="#espacamento">Espaçamento</a>
+      <a href="#geometria">Geometria</a>
+      <a href="#icones">Ícones</a>
+      <a href="#tokens">Tokens</a>
+      <a href="#componentes">Componentes</a>
+      <a href="#dataviz">Dataviz</a>
+      <a href="#anatomia">Anatomia de tela</a>
+      <a href="#acessibilidade">Acessibilidade</a>
+      <a href="#implementacao">Implementação</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ================= HERO ================= -->
+<div class="hero">
+  <div class="wrap">
+    <div class="hero-eyebrow">LA Music · Time Pedagógico · Grupo LA</div>
+    <h1>Fábio <em>Design System</em></h1>
+    <p>A fonte única de verdade visual do App Pedagógico — a casa do Fábio. Professores e coordenadores registram aulas, acompanham alunos, geram relatórios, cifras e lições num ambiente escuro, calmo e focado. Este documento normaliza as telas de referência em tokens, componentes e regras que qualquer pessoa (ou agente) consegue implementar.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-code-branch"></i> v1.0 · Julho 2026</span>
+      <span><i class="fa-solid fa-moon"></i> Dark-first</span>
+      <span><i class="fa-solid fa-mobile-screen"></i> Mobile-first · 375px</span>
+      <span><i class="fa-solid fa-font"></i> Inter</span>
+      <span><i class="fa-solid fa-icons"></i> Font Awesome 6.4</span>
+      <span><i class="fa-solid fa-palette"></i> Teal #2A9D8F</span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 01 PRINCÍPIOS ================= -->
+<section id="principios">
+  <div class="wrap">
+    <div class="sec-tag">01 · Fundamentos</div>
+    <h2 class="sec-title">Princípios de design</h2>
+    <p class="sec-desc">Quatro decisões que governam todas as telas. Em caso de dúvida na hora de construir, volte aqui.</p>
+    <div class="grid g4">
+      <div class="panel"><div class="tile brand" style="margin-bottom:12px"><i class="fa-solid fa-moon"></i></div>
+        <h4>Dark-first</h4><p class="hint">O tema escuro é o padrão e a referência de contraste. O tema claro é derivado por tokens — nunca redesenhado tela a tela.</p></div>
+      <div class="panel"><div class="tile brand" style="margin-bottom:12px"><i class="fa-solid fa-mobile-screen"></i></div>
+        <h4>Mobile-first</h4><p class="hint">Layout base em 375px, container <code style="font-family:var(--mono);font-size:12px">max-w-md</code> (448px) centralizado. O professor usa o app entre uma aula e outra, com uma mão.</p></div>
+      <div class="panel"><div class="tile brand" style="margin-bottom:12px"><i class="fa-solid fa-layer-group"></i></div>
+        <h4>Token-driven</h4><p class="hint">Nenhuma cor ou medida hardcoded. UI consome apenas tokens semânticos (<code style="font-family:var(--mono);font-size:12px">--bg-surface</code>), nunca primitivos (<code style="font-family:var(--mono);font-size:12px">--teal-500</code>).</p></div>
+      <div class="panel"><div class="tile brand" style="margin-bottom:12px"><i class="fa-solid fa-robot"></i></div>
+        <h4>Fábio presente</h4><p class="hint">O agente é um habitante do app, não um chatbot escondido: insights, dicas e o registro de aula por voz têm componentes próprios e destaque visual.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 02 CORES ================= -->
+<section id="cores">
+  <div class="wrap">
+    <div class="sec-tag">02 · Fundamentos</div>
+    <h2 class="sec-title">Cores</h2>
+    <p class="sec-desc">A paleta nasce das telas de referência: um verde-carvão profundo como palco e o teal <b style="color:var(--brand-text)">#2A9D8F</b> como única voz de marca. Cores funcionais aparecem apenas com significado (sucesso, risco, aviso, informação, evento).</p>
+
+    <h3 class="sub">2.1 · Marca — Teal</h3>
+    <div class="grid g5">
+      <div class="swatch"><div class="swatch-chip" style="background:#84DDD5"></div><div class="swatch-body"><b>teal-200</b><small>Séries claras de gráfico</small><button class="swatch-hex" data-hex="#84DDD5">#84DDD5 <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#66CEC4"></div><div class="swatch-body"><b>teal-300</b><small>Linhas secundárias</small><button class="swatch-hex" data-hex="#66CEC4">#66CEC4 <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#48BFB3"></div><div class="swatch-body"><b>teal-400</b><small>Hover no dark</small><button class="swatch-hex" data-hex="#48BFB3">#48BFB3 <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#2A9D8F"></div><div class="swatch-body"><b>teal-500 ★</b><small>Cor de marca (--brand)</small><button class="swatch-hex" data-hex="#2A9D8F">#2A9D8F <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#21867A"></div><div class="swatch-body"><b>teal-600</b><small>Hover no light</small><button class="swatch-hex" data-hex="#21867A">#21867A <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#1B6E64"></div><div class="swatch-body"><b>teal-700</b><small>Texto teal no light (AA)</small><button class="swatch-hex" data-hex="#1B6E64">#1B6E64 <i class="fa-regular fa-copy"></i></button></div></div>
+    </div>
+
+    <h3 class="sub">2.2 · Neutros</h3>
+    <div class="grid g5">
+      <div class="swatch"><div class="swatch-chip" style="background:#0A0F0E"></div><div class="swatch-body"><b>ink-950</b><small>Fundo do app (dark)</small><button class="swatch-hex" data-hex="#0A0F0E">#0A0F0E <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#111916"></div><div class="swatch-body"><b>ink-900</b><small>Cards (dark)</small><button class="swatch-hex" data-hex="#111916">#111916 <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#1A2421"></div><div class="swatch-body"><b>ink-800</b><small>Hover, grid de gráfico</small><button class="swatch-hex" data-hex="#1A2421">#1A2421 <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#F5F5F5"></div><div class="swatch-body"><b>white-off</b><small>Texto primário (dark)</small><button class="swatch-hex" data-hex="#F5F5F5">#F5F5F5 <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#9CA3AF"></div><div class="swatch-body"><b>slate-400</b><small>Texto secundário (dark)</small><button class="swatch-hex" data-hex="#9CA3AF">#9CA3AF <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#F2F7F5"></div><div class="swatch-body"><b>mist-50</b><small>Fundo do app (light)</small><button class="swatch-hex" data-hex="#F2F7F5">#F2F7F5 <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#E9F1EE"></div><div class="swatch-body"><b>mist-100</b><small>Inset (light)</small><button class="swatch-hex" data-hex="#E9F1EE">#E9F1EE <i class="fa-regular fa-copy"></i></button></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background:#DFE9E5"></div><div class="swatch-body"><b>mist-200</b><small>Bordas (light)</small><button class="swatch-hex" data-hex="#DFE9E5">#DFE9E5 <i class="fa-regular fa-copy"></i></button></div></div>
+    </div>
+    <div class="note"><i class="fa-solid fa-circle-info"></i><span>Os neutros escuros têm um leve tom de verde (não são cinza puro). Isso mantém coesão com o teal e diferencia o app de dashboards genéricos. <b>Nunca</b> use <code style="font-family:var(--mono);font-size:12px">#000000</code> ou slate azulado (<code style="font-family:var(--mono);font-size:12px">#0F172A</code>) como fundo.</span></div>
+
+    <h3 class="sub">2.3 · Funcionais (uso apenas com significado)</h3>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Papel</th><th>Token</th><th>Dark</th><th>Light</th><th>Quando usar no App Pedagógico</th></tr></thead>
+      <tbody>
+        <tr><td><span class="dotcell" style="background:#22C55E"></span><b>Sucesso</b></td><td><code>--success</code></td><td>#22C55E / txt #4ADE80</td><td>#16A34A</td><td>Relatório enviado, presença confirmada, meta batida, deltas positivos</td></tr>
+        <tr><td><span class="dotcell" style="background:#EF4444"></span><b>Perigo</b></td><td><code>--danger</code></td><td>#EF4444 / txt #F87171</td><td>#DC2626</td><td>Aluno em risco de evasão, faltas críticas, relatório atrasado, excluir</td></tr>
+        <tr><td><span class="dotcell" style="background:#EAB308"></span><b>Aviso</b></td><td><code>--warning</code></td><td>#EAB308 / txt #FACC15</td><td>#CA8A04</td><td>Relatório pendente, aula sem confirmação, frequência caindo</td></tr>
+        <tr><td><span class="dotcell" style="background:#3B82F6"></span><b>Info</b></td><td><code>--info</code></td><td>#3B82F6 / txt #60A5FA</td><td>#2563EB</td><td>Aluno novo, reposição de aula, sincronização com o Emusys</td></tr>
+        <tr><td><span class="dotcell" style="background:#A855F7"></span><b>Evento</b></td><td><code>--event</code></td><td>#A855F7 / txt #C084FC</td><td>#9333EA</td><td>Recital, workshop, apresentação, banca de checkpoint</td></tr>
+        <tr><td><span class="dotcell" style="background:#25D366"></span><b>WhatsApp</b></td><td><code>--whatsapp</code></td><td colspan="2">#25D366 (fixo nos dois temas)</td><td>Somente no botão de contato via WhatsApp</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3 class="sub">2.4 · Categorias de agenda (dots do calendário e bordas de card)</h3>
+    <div class="chiprow">
+      <span class="badge brand"><i class="fa-solid fa-circle"></i> Aula · --brand</span>
+      <span class="badge info"><i class="fa-solid fa-circle"></i> Reposição · --info</span>
+      <span class="badge" style="background:var(--event-soft);color:var(--event-text)"><i class="fa-solid fa-circle"></i> Recital/Evento · --event</span>
+      <span class="badge warning"><i class="fa-solid fa-circle"></i> Reunião · --warning</span>
+      <span class="badge neutral"><i class="fa-solid fa-circle"></i> Outro · neutro</span>
+    </div>
+
+    <h3 class="sub">2.5 · Dataviz & Celebração</h3>
+    <div class="grid g2">
+      <div class="panel">
+        <h4>Série de gráficos (ordem fixa)</h4>
+        <p class="hint" style="margin-bottom:12px">Sempre nesta sequência. Série 1 é sempre teal.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="swatch-hex" data-hex="#2A9D8F"><span class="dotcell" style="background:#2A9D8F;margin:0"></span> viz-1</button>
+          <button class="swatch-hex" data-hex="#9D4EDD"><span class="dotcell" style="background:#9D4EDD;margin:0"></span> viz-2</button>
+          <button class="swatch-hex" data-hex="#F77F00"><span class="dotcell" style="background:#F77F00;margin:0"></span> viz-3</button>
+          <button class="swatch-hex" data-hex="#06D6A0"><span class="dotcell" style="background:#06D6A0;margin:0"></span> viz-4</button>
+          <button class="swatch-hex" data-hex="#48BFB3"><span class="dotcell" style="background:#48BFB3;margin:0"></span> viz-5</button>
+          <button class="swatch-hex" data-hex="#E9C46A"><span class="dotcell" style="background:#E9C46A;margin:0"></span> viz-6</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>Celebração (confete, conquistas)</h4>
+        <p class="hint" style="margin-bottom:12px">Usada só em momentos de conquista — checkpoint concluído, meta de relatórios batida.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="swatch-hex" data-hex="#2A9D8F"><span class="dotcell" style="background:#2A9D8F;margin:0"></span> party-1</button>
+          <button class="swatch-hex" data-hex="#F4A261"><span class="dotcell" style="background:#F4A261;margin:0"></span> party-2</button>
+          <button class="swatch-hex" data-hex="#E76F51"><span class="dotcell" style="background:#E76F51;margin:0"></span> party-3</button>
+          <button class="swatch-hex" data-hex="#E9C46A"><span class="dotcell" style="background:#E9C46A;margin:0"></span> party-4</button>
+          <button class="swatch-hex" data-hex="#264653"><span class="dotcell" style="background:#264653;margin:0"></span> party-5</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 03 TIPOGRAFIA ================= -->
+<section id="tipografia">
+  <div class="wrap">
+    <div class="sec-tag">03 · Fundamentos</div>
+    <h2 class="sec-title">Tipografia</h2>
+    <p class="sec-desc"><b>Inter</b> em todos os papéis (300–800, Google Fonts). Uma família só mantém o app leve e coeso; a hierarquia vem de tamanho, peso e cor — nunca de fonte diferente. Números grandes usam <code style="font-family:var(--mono);font-size:12px">letter-spacing:-0.01em</code>.</p>
+    <div class="panel">
+      <div class="type-row"><div class="type-meta"><b>Display / Valor-herói</b>30px · 800 · lh 1.15</div><div style="font-size:30px;font-weight:800;letter-spacing:-.02em">R$ 6.000 · 38 alunos</div></div>
+      <div class="type-row"><div class="type-meta"><b>H1 · Título de tela</b>24px · 700 · lh 1.25</div><div style="font-size:24px;font-weight:700">Análise por Aluno</div></div>
+      <div class="type-row"><div class="type-meta"><b>H2 · Valor de KPI</b>24px · 700 · tracking -1%</div><div style="font-size:24px;font-weight:700;letter-spacing:-.01em">91%</div></div>
+      <div class="type-row"><div class="type-meta"><b>H3 · Título de seção</b>18px · 600 · lh 1.3</div><div style="font-size:18px;font-weight:600">Relatórios da semana</div></div>
+      <div class="type-row"><div class="type-meta"><b>H4 · Título de card</b>16px · 600</div><div style="font-size:16px;font-weight:600">Maria Santos — Violão</div></div>
+      <div class="type-row"><div class="type-meta"><b>Body</b>15px · 400 · lh 1.6</div><div style="font-size:15px">O Fábio transforma o áudio do professor em relatório estruturado no Emusys.</div></div>
+      <div class="type-row"><div class="type-meta"><b>Body-sm / Item de lista</b>14px · 500–600</div><div style="font-size:14px;font-weight:500">Aula de bateria · Checkpoint 2 em andamento</div></div>
+      <div class="type-row"><div class="type-meta"><b>Caption / Meta</b>12px · 400–500 · secondary</div><div style="font-size:12px;color:var(--text-secondary)">Hoje, 14:30 · Unidade Recreio · presencial</div></div>
+      <div class="type-row"><div class="type-meta"><b>Label / Overline</b>11px · 700 · caps · +10%</div><div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand-text)">Financeiro · Evento</div></div>
+      <div class="type-row"><div class="type-meta"><b>Micro / Nav</b>10.5px · 500</div><div style="font-size:10.5px;font-weight:500;color:var(--text-secondary)">Início · Alunos · Agenda · Fábio</div></div>
+    </div>
+    <ul class="specs" style="max-width:640px">
+      <li><b>Fonte de dados / cifra</b><code>ui-monospace · 13px</code></li>
+      <li><b>Peso máximo em texto corrido</b><code>600 (semibold)</code></li>
+      <li><b>Truncamento de nomes</b><code>1 linha + ellipsis (truncate)</code></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= 04 ESPAÇAMENTO ================= -->
+<section id="espacamento">
+  <div class="wrap">
+    <div class="sec-tag">04 · Fundamentos</div>
+    <h2 class="sec-title">Espaçamento &amp; grid</h2>
+    <p class="sec-desc">Escala base de <b>4px</b> (compatível com Tailwind). O ritmo vertical padrão entre cards é <b>12px</b>; entre seções, <b>24px</b>.</p>
+    <div class="grid g2">
+      <div class="panel">
+        <div class="space-row"><span class="space-lbl"><b>s-1</b> · 4px</span><span class="space-bar" style="width:4px"></span></div>
+        <div class="space-row"><span class="space-lbl"><b>s-2</b> · 8px · gap de chips</span><span class="space-bar" style="width:8px"></span></div>
+        <div class="space-row"><span class="space-lbl"><b>s-3</b> · 12px · gap de cards</span><span class="space-bar" style="width:12px"></span></div>
+        <div class="space-row"><span class="space-lbl"><b>s-4</b> · 16px · padding de card</span><span class="space-bar" style="width:16px"></span></div>
+        <div class="space-row"><span class="space-lbl"><b>s-5</b> · 20px · padding lateral</span><span class="space-bar" style="width:20px"></span></div>
+        <div class="space-row"><span class="space-lbl"><b>s-6</b> · 24px · entre seções</span><span class="space-bar" style="width:24px"></span></div>
+        <div class="space-row"><span class="space-lbl"><b>s-8</b> · 32px</span><span class="space-bar" style="width:32px"></span></div>
+        <div class="space-row"><span class="space-lbl"><b>s-12</b> · 48px</span><span class="space-bar" style="width:48px"></span></div>
+      </div>
+      <div class="panel">
+        <h4>Regras de layout</h4>
+        <ul class="specs">
+          <li><b>Container</b><code>max-w-md (448px) · mx-auto</code></li>
+          <li><b>Padding lateral da tela</b><code>16–20px (px-4 / px-5)</code></li>
+          <li><b>Respiro p/ bottom nav</b><code>padding-bottom: 96px (pb-24)</code></li>
+          <li><b>Grid de KPIs</b><code>scroll-x · min-width 160px</code></li>
+          <li><b>Grid 2 colunas</b><code>grid-cols-2 · gap 12px</code></li>
+          <li><b>Área de toque mínima</b><code>44 × 44px</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 05 GEOMETRIA ================= -->
+<section id="geometria">
+  <div class="wrap">
+    <div class="sec-tag">05 · Fundamentos</div>
+    <h2 class="sec-title">Raio, borda &amp; elevação</h2>
+    <p class="sec-desc">O app é feito de retângulos suaves: <b>12px é o raio padrão</b> de praticamente tudo (cards, botões, inputs). No dark, a elevação vem do contraste de superfície — sombras só no FAB. No light, cards ganham borda + sombra sutil.</p>
+    <div class="rad-demo">
+      <div class="rad-box" style="border-radius:8px"><b>sm</b><small>8px · chips internos, mini-pills</small></div>
+      <div class="rad-box" style="border-radius:12px;border-width:3px"><b>md ★</b><small>12px · padrão geral</small></div>
+      <div class="rad-box" style="border-radius:16px"><b>lg</b><small>16px · modais, stages</small></div>
+      <div class="rad-box" style="border-radius:9999px"><b>full</b><small>pills, avatares, FAB</small></div>
+    </div>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Camada</th><th>Dark</th><th>Light</th></tr></thead>
+      <tbody>
+        <tr><td><b>Card</b></td><td>Sem sombra · sem borda (contraste ink-900 sobre ink-950)</td><td>Borda <code>--border-subtle</code> + sombra <code>--shadow-card</code></td></tr>
+        <tr><td><b>Divisores</b></td><td colspan="2"><code>1px solid --border-subtle</code> (nunca linhas pretas ou brancas puras)</td></tr>
+        <tr><td><b>Destaque de card</b></td><td colspan="2">Borda esquerda <code>4px</code> na cor da categoria (evento, alerta) ou borda <code>2px --brand</code> (card do Fábio)</td></tr>
+        <tr><td><b>FAB</b></td><td colspan="2"><code>--shadow-fab</code> — sombra teal 45% (assinatura visual do app)</td></tr>
+        <tr><td><b>Modal / sheet</b></td><td colspan="2">Scrim <code>--scrim</code> + sheet com raio <code>16px 16px 0 0</code></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ================= 06 ÍCONES ================= -->
+<section id="icones">
+  <div class="wrap">
+    <div class="sec-tag">06 · Fundamentos</div>
+    <h2 class="sec-title">Iconografia</h2>
+    <p class="sec-desc"><b>Font Awesome 6.4</b>, estilo <b>solid</b> como padrão (regular apenas em relógios/calendários de metadados). Ícone sempre acompanhado de cor semântica — nunca decorativo solto. Tamanhos: 12px (meta), 14px (inline), 17–20px (tiles e nav), 24px (destaque).</p>
+    <div class="icon-grid">
+      <div class="icon-cell"><i class="fa-solid fa-house"></i><b>Início</b><small>fa-house</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-users"></i><b>Alunos</b><small>fa-users</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-calendar"></i><b>Agenda</b><small>fa-calendar</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-robot"></i><b>Fábio</b><small>fa-robot</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-microphone"></i><b>Registrar aula (voz)</b><small>fa-microphone</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-file-lines"></i><b>Relatório</b><small>fa-file-lines</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-music"></i><b>Cifra / repertório</b><small>fa-music</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-file-pdf"></i><b>Lição em PDF</b><small>fa-file-pdf</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-wand-magic-sparkles"></i><b>Sugestão do Fábio</b><small>fa-wand-magic-sparkles</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-user-clock"></i><b>Faltas / risco</b><small>fa-user-clock</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-rotate"></i><b>Sync Emusys</b><small>fa-rotate</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-graduation-cap"></i><b>Aula</b><small>fa-graduation-cap</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-guitar"></i><b>Cordas</b><small>fa-guitar</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-drum"></i><b>Bateria</b><small>fa-drum</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-piano"></i><b>Teclas</b><small>fa-piano*</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-microphone-lines"></i><b>Canto</b><small>fa-microphone-lines</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-baby"></i><b>Musicalização</b><small>fa-baby</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-flag-checkered"></i><b>Checkpoint</b><small>fa-flag-checkered</small></div>
+      <div class="icon-cell"><i class="fa-solid fa-trophy"></i><b>Conquista</b><small>fa-trophy</small></div>
+      <div class="icon-cell"><i class="fa-brands fa-whatsapp"></i><b>WhatsApp</b><small>fa-whatsapp</small></div>
+    </div>
+    <div class="note warn"><i class="fa-solid fa-triangle-exclamation"></i><span><b>fa-piano</b> é FA Pro. No plano free, usar <code style="font-family:var(--mono);font-size:12px">fa-keyboard</code> ou migrar o app para <b>Phosphor Icons</b> (padrão do LA Journey) — decisão a registrar na v1.1.</span></div>
+  </div>
+</section>
+
+<!-- ================= 07 TOKENS ================= -->
+<section id="tokens">
+  <div class="wrap">
+    <div class="sec-tag">07 · Código</div>
+    <h2 class="sec-title">Tokens (fonte de verdade)</h2>
+    <p class="sec-desc">Copie este bloco para o CSS global do app. A UI consome <b>somente a camada semântica</b>; o tema troca com <code style="font-family:var(--mono);font-size:12px">data-theme</code> no <code style="font-family:var(--mono);font-size:12px">&lt;html&gt;</code>.</p>
+
+    <div class="codehead"><span>tokens.css · dark + light</span><button class="copybtn" data-copy="tokens"><i class="fa-regular fa-copy"></i> Copiar tokens</button></div>
+<pre class="code" id="tokens-code">/* ===== PRIMITIVOS (não usar direto na UI) ===== */
+:root{
+  --teal-200:#84DDD5; --teal-300:#66CEC4; --teal-400:#48BFB3;
+  --teal-500:#2A9D8F; --teal-600:#21867A; --teal-700:#1B6E64;
+  --ink-950:#0A0F0E;  --ink-900:#111916;  --ink-800:#1A2421;
+  --mist-50:#F2F7F5;  --mist-100:#E9F1EE; --mist-200:#DFE9E5; --mist-300:#C8D6D2;
+  --green-400:#4ADE80; --green-500:#22C55E; --green-600:#16A34A;
+  --red-400:#F87171;   --red-500:#EF4444;   --red-600:#DC2626;
+  --amber-400:#FACC15; --amber-500:#EAB308; --amber-600:#CA8A04;
+  --blue-400:#60A5FA;  --blue-500:#3B82F6;  --blue-600:#2563EB;
+  --purple-400:#C084FC;--purple-500:#A855F7;--purple-600:#9333EA;
+  --whatsapp:#25D366;
+  --viz-1:#2A9D8F; --viz-2:#9D4EDD; --viz-3:#F77F00;
+  --viz-4:#06D6A0; --viz-5:#48BFB3; --viz-6:#E9C46A;
+  --party-1:#2A9D8F; --party-2:#F4A261; --party-3:#E76F51;
+  --party-4:#E9C46A; --party-5:#264653;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:9999px;
+  --font:'Inter',-apple-system,sans-serif;
+}
+
+/* ===== SEMÂNTICOS — DARK (padrão) ===== */
+[data-theme="dark"]{
+  --bg-app:var(--ink-950);      --bg-surface:var(--ink-900);
+  --bg-inset:var(--ink-950);    --bg-hover:var(--ink-800);
+  --text-primary:#F5F5F5;       --text-secondary:#9CA3AF;
+  --text-muted:rgba(245,245,245,.45);
+  --border-subtle:#1E2A26;      --border-strong:#2C3B36;
+  --brand:var(--teal-500);      --brand-hover:var(--teal-400);
+  --brand-text:var(--teal-500); --brand-soft:rgba(42,157,143,.15);
+  --brand-border:rgba(42,157,143,.30); --on-brand:var(--ink-950);
+  --success:var(--green-500); --success-text:var(--green-400); --success-soft:rgba(34,197,94,.12);
+  --danger:var(--red-500);    --danger-text:var(--red-400);    --danger-soft:rgba(239,68,68,.12);
+  --warning:var(--amber-500); --warning-text:var(--amber-400); --warning-soft:rgba(234,179,8,.12);
+  --info:var(--blue-500);     --info-text:var(--blue-400);     --info-soft:rgba(59,130,246,.12);
+  --event:var(--purple-500);  --event-text:var(--purple-400);  --event-soft:rgba(168,85,247,.14);
+  --chart-grid:#1A2421;
+  --shadow-card:none;
+  --shadow-fab:0 10px 25px -5px rgba(42,157,143,.45);
+  --scrim:rgba(2,6,5,.7);
+}
+
+/* ===== SEMÂNTICOS — LIGHT ===== */
+[data-theme="light"]{
+  --bg-app:var(--mist-50);      --bg-surface:#FFFFFF;
+  --bg-inset:var(--mist-100);   --bg-hover:var(--mist-100);
+  --text-primary:#0F1D19;       --text-secondary:#5A6B66;
+  --text-muted:#8A9994;
+  --border-subtle:var(--mist-200); --border-strong:var(--mist-300);
+  --brand:var(--teal-500);      --brand-hover:var(--teal-600);
+  --brand-text:var(--teal-700); --brand-soft:rgba(42,157,143,.12);
+  --brand-border:rgba(42,157,143,.35); --on-brand:var(--ink-950);
+  --success:var(--green-600); --success-text:var(--green-600); --success-soft:rgba(22,163,74,.10);
+  --danger:var(--red-600);    --danger-text:var(--red-600);    --danger-soft:rgba(220,38,38,.08);
+  --warning:var(--amber-600); --warning-text:var(--amber-600); --warning-soft:rgba(202,138,4,.10);
+  --info:var(--blue-600);     --info-text:var(--blue-600);     --info-soft:rgba(37,99,235,.08);
+  --event:var(--purple-600);  --event-text:var(--purple-600);  --event-soft:rgba(147,51,234,.08);
+  --chart-grid:var(--mist-200);
+  --shadow-card:0 1px 2px rgba(15,29,25,.05),0 4px 14px rgba(15,29,25,.06);
+  --shadow-fab:0 10px 25px -5px rgba(42,157,143,.5);
+  --scrim:rgba(15,29,25,.45);
+}</pre>
+
+    <h3 class="sub">7.1 · Migração — nomes antigos das telas → token oficial</h3>
+    <p class="sec-desc" style="margin-bottom:8px">As telas de referência usam nomes inconsistentes (<code style="font-family:var(--mono);font-size:12px">card</code>/<code style="font-family:var(--mono);font-size:12px">cardBg</code>, <code style="font-family:var(--mono);font-size:12px">text</code>/<code style="font-family:var(--mono);font-size:12px">textPrimary</code>/<code style="font-family:var(--mono);font-size:12px">textLight</code>…). Esta tabela é o de-para obrigatório na refatoração.</p>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Nas telas (Tailwind config antigo)</th><th>Token oficial</th><th>Observação</th></tr></thead>
+      <tbody>
+        <tr><td><span class="old">background</span> · <span class="old">bgDark</span> · <span class="old">bg-bgDark</span></td><td><code>--bg-app</code></td><td>Fundo da tela</td></tr>
+        <tr><td><span class="old">card</span> · <span class="old">cardBg</span></td><td><code>--bg-surface</code></td><td>Cards e superfícies</td></tr>
+        <tr><td><span class="old">bg-background</span> (dentro de card)</td><td><code>--bg-inset</code></td><td>Sub-blocos, trilhas de progresso, inputs internos</td></tr>
+        <tr><td><span class="old">text</span> · <span class="old">textPrimary</span> · <span class="old">textLight</span></td><td><code>--text-primary</code></td><td>Texto principal</td></tr>
+        <tr><td><span class="old">text-gray-400</span> · <span class="old">text-text/60</span> · <span class="old">text-text/70</span></td><td><code>--text-secondary</code></td><td>Metadados, subtítulos</td></tr>
+        <tr><td><span class="old">text-text/40</span> · <span class="old">placeholder</span></td><td><code>--text-muted</code></td><td>Placeholder, desabilitado</td></tr>
+        <tr><td><span class="old">border-gray-800 (#1F2937)</span> · <span class="old">border-card</span></td><td><code>--border-subtle</code></td><td>Corrige o cinza azulado p/ verde-carvão</td></tr>
+        <tr><td><span class="old">primary (#2A9D8F)</span></td><td><code>--brand</code></td><td>Fills; texto teal usa <code>--brand-text</code></td></tr>
+        <tr><td><span class="old">bg-primary/10 · /20</span></td><td><code>--brand-soft</code></td><td>Tiles e realces</td></tr>
+        <tr><td><span class="old">text-background</span> (sobre primary)</td><td><code>--on-brand</code></td><td>Mesmo valor nos 2 temas (ink-950)</td></tr>
+        <tr><td><span class="old">gridcolor #1F2937 · #1a2421</span></td><td><code>--chart-grid</code></td><td>Gráficos Plotly</td></tr>
+        <tr><td><span class="old">green/red/yellow/blue/purple-500</span></td><td><code>--success · --danger · --warning · --info · --event</code></td><td>Sempre via papel semântico</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ================= 08 COMPONENTES ================= -->
+<section id="componentes">
+  <div class="wrap">
+    <div class="sec-tag">08 · Biblioteca</div>
+    <h2 class="sec-title">Componentes</h2>
+    <p class="sec-desc">Todos os componentes abaixo estão <b>renderizados ao vivo com os tokens</b> — troque o tema no topo e veja dark ⇄ light. O HTML/CSS deste próprio documento serve de implementação de referência (view-source).</p>
+
+    <!-- 8.1 BOTÕES -->
+    <h3 class="sub">8.1 · Botões</h3>
+    <div class="grid g2">
+      <div class="panel">
+        <div class="stage"><div class="stage-col">
+          <button class="btn btn-primary btn-block"><i class="fa-solid fa-microphone"></i> Registrar aula por voz</button>
+          <button class="btn btn-secondary btn-block"><i class="fa-solid fa-file-lines"></i> Ver relatórios pendentes</button>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-soft btn-sm"><i class="fa-solid fa-wand-magic-sparkles"></i> Sugerir lição</button>
+            <button class="btn btn-danger btn-sm"><i class="fa-solid fa-trash"></i> Excluir</button>
+            <button class="btn btn-ghost btn-sm">Ver todos</button>
+            <button class="btn btn-icon" aria-label="Filtrar"><i class="fa-solid fa-filter"></i></button>
+            <button class="btn fab" aria-label="Nova ação"><i class="fa-solid fa-plus"></i></button>
+          </div>
+        </div></div>
+      </div>
+      <div class="panel">
+        <h4>Especificação</h4>
+        <ul class="specs">
+          <li><b>Primário</b><code>bg --brand · texto --on-brand · h 48–56px</code></li>
+          <li><b>Secundário</b><code>bg --bg-surface · borda 1px --brand-border</code></li>
+          <li><b>Soft / terciário</b><code>bg --brand-soft · texto --brand-text</code></li>
+          <li><b>Destrutivo</b><code>--danger-soft + --danger-text (nunca fill vermelho)</code></li>
+          <li><b>Ícone</b><code>40×40 · raio md · bg --bg-surface</code></li>
+          <li><b>FAB</b><code>56×56 · raio full · --shadow-fab</code></li>
+          <li><b>Raio / fonte / press</b><code>12px · Inter 600 15px · scale(.97)</code></li>
+          <li><b>1 primário por tela</b><code>CTA sempre full-width no rodapé</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 8.2 CHIPS -->
+    <h3 class="sub">8.2 · Chips &amp; pills</h3>
+    <div class="grid g2">
+      <div class="panel">
+        <div class="stage"><div class="stage-col" style="max-width:none">
+          <div class="chiprow">
+            <button class="chip">Hoje</button><button class="chip on">Semana</button><button class="chip">Mês</button><button class="chip">Trimestre</button>
+            <button class="chip"><i class="fa-solid fa-calendar" style="font-size:11px"></i> Custom</button>
+          </div>
+          <div class="chiprow">
+            <button class="chip outline">R$ 10.000</button>
+            <span class="chip">Asa Branca <span class="x"><i class="fa-solid fa-xmark"></i></span></span>
+            <span class="chip"><span class="avatar av-24">MS</span> Maria Santos <span class="x"><i class="fa-solid fa-xmark"></i></span></span>
+          </div>
+        </div></div>
+      </div>
+      <div class="panel">
+        <h4>Especificação</h4>
+        <ul class="specs">
+          <li><b>Base</b><code>raio full · 9×16px · 13.5px 500 · bg --bg-surface</code></li>
+          <li><b>Selecionado</b><code>bg --brand · --on-brand · peso 600</code></li>
+          <li><b>Seleção enfática</b><code>borda 2px --brand + bg --brand-soft</code></li>
+          <li><b>Removível</b><code>ícone xmark 55% opacidade à direita</code></li>
+          <li><b>Com avatar</b><code>avatar 22–24px à esquerda</code></li>
+          <li><b>Grupo</b><code>scroll-x sem scrollbar · gap 8px · sem quebra</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 8.3 FORMULÁRIOS -->
+    <h3 class="sub">8.3 · Formulários</h3>
+    <div class="grid g2">
+      <div class="panel">
+        <div class="stage"><div class="stage-col">
+          <div class="field"><label>Aluno</label>
+            <div class="input-wrap"><i class="fa-solid fa-user lead"></i><input class="input" type="text" placeholder="Buscar aluno…" value="Maria Santos"></div>
+          </div>
+          <div class="field"><label>Instrumento / turma</label>
+            <select class="input"><option>Violão — Foundation</option><option>Bateria — Grow</option><option>Canto — Kids</option></select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="field"><label>Data</label><input class="input" type="date" value="2026-07-03"></div>
+            <div class="field"><label>Início</label><input class="input" type="time" value="14:00"></div>
+          </div>
+          <div class="field"><label>Valor da hora-aula</label>
+            <div class="input-wrap money"><span class="lead txt">R$</span><input class="input" type="text" placeholder="0,00"></div>
+          </div>
+          <div class="field"><label>Observações da aula</label>
+            <textarea class="input" rows="3" placeholder="O Fábio completa a partir do seu áudio…"></textarea>
+          </div>
+          <label class="toggle-row"><span>Notificar responsável no WhatsApp</span>
+            <span class="toggle"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></span>
+          </label>
+        </div></div>
+      </div>
+      <div class="panel">
+        <h4>Especificação</h4>
+        <ul class="specs">
+          <li><b>Input</b><code>bg --bg-surface · borda --border-subtle · raio 12px</code></li>
+          <li><b>Padding / fonte</b><code>13×16px · 14.5px · placeholder --text-muted</code></li>
+          <li><b>Focus</b><code>borda --brand + ring 3px --brand-soft</code></li>
+          <li><b>Label</b><code>13.5px 500 · 8px acima do campo</code></li>
+          <li><b>Ícone à esquerda</b><code>--brand-text · padding-left 42px</code></li>
+          <li><b>Prefixo R$</b><code>--text-secondary 600</code></li>
+          <li><b>Select</b><code>appearance none + chevron SVG à direita</code></li>
+          <li><b>Toggle</b><code>48×28 · knob 22px · on = --brand</code></li>
+          <li><b>Erro</b><code>borda --danger + helper 12px --danger-text</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 8.4 CARDS -->
+    <h3 class="sub">8.4 · Cards</h3>
+    <div class="grid g2">
+      <div class="panel">
+        <h4>KPI (carrossel horizontal)</h4>
+        <div class="stage">
+          <div class="kpi-row">
+            <div class="card kpi"><div class="kpi-head"><i class="fa-solid fa-users"></i><span>Alunos ativos</span></div><div class="kpi-val">38</div><div class="kpi-delta up"><i class="fa-solid fa-arrow-up" style="font-size:10px"></i> +3 este mês</div></div>
+            <div class="card kpi"><div class="kpi-head"><i class="fa-solid fa-chart-line"></i><span>Frequência média</span></div><div class="kpi-val">91%</div><div class="kpi-delta down"><i class="fa-solid fa-arrow-down" style="font-size:10px"></i> −2% vs jun</div></div>
+            <div class="card kpi"><div class="kpi-head"><i class="fa-solid fa-file-lines"></i><span>Relatórios pendentes</span></div><div class="kpi-val">4</div><div class="kpi-delta flat">de 26 aulas</div></div>
+          </div>
+        </div>
+        <ul class="specs">
+          <li><b>Largura / gap</b><code>min-width 160px · gap 12px · scroll-x</code></li>
+          <li><b>Anatomia</b><code>ícone brand 14px + label 12px → valor 24/700 → delta 12px</code></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h4>Item de lista (registro, aluno, transação)</h4>
+        <div class="stage"><div class="stage-col">
+          <div class="card li-card">
+            <div class="li-main"><div class="tile success"><i class="fa-solid fa-file-circle-check"></i></div>
+              <div><b>Relatório enviado — Maria Santos</b><small>Violão · hoje, 14:30 · via Fábio</small></div></div>
+            <div class="li-end"><span class="badge success"><i class="fa-solid fa-circle"></i> Enviado</span></div>
+          </div>
+          <div class="card li-card">
+            <div class="li-main"><div class="tile warning"><i class="fa-solid fa-clock"></i></div>
+              <div><b>Aula sem registro — Pedro Costa</b><small>Bateria · ontem, 16:00</small></div></div>
+            <div class="li-end"><b style="color:var(--warning-text)">2 dias</b><small>pendente</small></div>
+          </div>
+          <div class="card li-card">
+            <div class="li-main"><div class="av-wrap"><span class="avatar av-40">AC</span><span class="av-dot"></span></div>
+              <div><b>Ana Costa</b><small>Canto · Checkpoint 2 · 96% presença</small></div></div>
+            <div class="li-end"><i class="fa-solid fa-chevron-right" style="color:var(--text-muted)"></i></div>
+          </div>
+        </div></div>
+        <ul class="specs">
+          <li><b>Tile</b><code>44×44 · raio 12px · fundo -soft + ícone -text</code></li>
+          <li><b>Título / sub</b><code>14px 600 truncate · 12px --text-secondary</code></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h4>Card de evento (agenda)</h4>
+        <div class="stage"><div class="stage-col">
+          <div class="card event-card">
+            <div class="event-top"><i class="fa-solid fa-guitar"></i> Aula de Violão
+              <span class="pill-mini"><i class="fa-solid fa-bell"></i> 15 min</span></div>
+            <h5>Maria Santos</h5>
+            <div class="event-meta"><span><i class="fa-regular fa-clock"></i> 14:00 – 15:00</span><span><i class="fa-solid fa-location-dot"></i> Recreio · Sala 2</span></div>
+            <div class="event-actions">
+              <button class="btn btn-soft btn-sm"><i class="fa-solid fa-microphone"></i> Registrar</button>
+              <button class="btn btn-icon btn-sm" style="flex:0 0 40px" aria-label="Mais"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+            </div>
+          </div>
+          <div class="card event-card purple">
+            <div class="event-top"><i class="fa-solid fa-microphone-lines"></i> Recital</div>
+            <h5>Recital de Inverno — Barra</h5>
+            <div class="event-meta"><span><i class="fa-regular fa-clock"></i> 19:00</span><span><i class="fa-solid fa-location-dot"></i> Auditório</span></div>
+          </div>
+        </div></div>
+        <ul class="specs">
+          <li><b>Borda esquerda</b><code>4px na cor da categoria (§2.4)</code></li>
+          <li><b>Lembrete</b><code>pill-mini --brand-soft com fa-bell</code></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h4>Card de alerta</h4>
+        <div class="stage"><div class="stage-col">
+          <div class="card alert-card"><i class="fa-solid fa-circle-exclamation"></i>
+            <div><b>3 alunos com faltas críticas</b><p>Gael, Rafael e Sofia faltaram 3+ aulas seguidas.</p><a href="#">Ver alunos em risco</a></div></div>
+          <div class="card alert-card warn"><i class="fa-solid fa-clock"></i>
+            <div><b>5 relatórios pendentes</b><p>Aulas desta semana ainda sem registro no Emusys.</p><a href="#">Registrar agora</a></div></div>
+          <div class="card alert-card tip"><i class="fa-solid fa-wand-magic-sparkles"></i>
+            <div><b>Sugestão do Fábio</b><p>2 alunos de violão estão prontos para o Checkpoint 2.</p><a href="#">Revisar jornada</a></div></div>
+        </div></div>
+        <ul class="specs">
+          <li><b>Severidades</b><code>danger · warning · tip (--brand)</code></li>
+          <li><b>Anatomia</b><code>borda-l 4px · ícone 17px · título 14/600 · ação em link 600</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 8.5 BADGES + AVATAR -->
+    <h3 class="sub">8.5 · Badges de status &amp; avatares</h3>
+    <div class="grid g2">
+      <div class="panel">
+        <div class="stage"><div class="chiprow">
+          <span class="badge success"><i class="fa-solid fa-circle"></i> Enviado</span>
+          <span class="badge warning"><i class="fa-solid fa-circle"></i> Pendente</span>
+          <span class="badge danger"><i class="fa-solid fa-circle"></i> Em risco</span>
+          <span class="badge brand"><i class="fa-solid fa-circle"></i> Ativo</span>
+          <span class="badge info"><i class="fa-solid fa-circle"></i> Novo</span>
+          <span class="badge" style="background:var(--event-soft);color:var(--event-text)"><i class="fa-solid fa-circle"></i> Recital</span>
+          <span class="badge neutral"><i class="fa-solid fa-circle"></i> Rascunho</span>
+        </div></div>
+        <ul class="specs">
+          <li><b>Forma</b><code>pill · 4×11px · 11.5px 600 · dot 7px opcional</code></li>
+          <li><b>Regra</b><code>sempre fundo -soft + texto -text (nunca fill sólido)</code></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <div class="stage"><div style="display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap">
+          <span class="avatar av-24">G</span>
+          <div class="av-wrap"><span class="avatar av-40">MS</span><span class="av-dot"></span></div>
+          <div class="av-wrap"><span class="avatar av-56">PC</span><span class="av-dot away"></span></div>
+          <span class="avatar av-96">AC</span>
+        </div></div>
+        <ul class="specs">
+          <li><b>Tamanhos</b><code>24 · 40 (padrão) · 56 · 96 (perfil, borda 4px --brand)</code></li>
+          <li><b>Fallback</b><code>iniciais sobre gradiente teal 400→700</code></li>
+          <li><b>Status dot</b><code>16px · borda 3px --bg-surface · success/warning</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 8.6 NAVEGAÇÃO -->
+    <h3 class="sub">8.6 · Navegação</h3>
+    <div class="grid g2">
+      <div class="panel">
+        <h4>Estrutura do app (header + bottom nav + FAB)</h4>
+        <div class="stage">
+          <div class="phone">
+            <div class="app-header">
+              <button class="btn btn-icon" aria-label="Voltar"><i class="fa-solid fa-arrow-left"></i></button>
+              <h6>Meus Alunos</h6>
+              <button class="btn btn-icon" aria-label="Filtrar"><i class="fa-solid fa-sliders"></i></button>
+            </div>
+            <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+              <div class="tabs">
+                <button class="on">Info</button><button>Aulas</button><button>Evolução</button><button>Relatórios</button>
+              </div>
+              <div class="card month-nav">
+                <button class="btn btn-icon" style="width:36px;height:36px;min-height:36px" aria-label="Anterior"><i class="fa-solid fa-chevron-left" style="font-size:13px"></i></button>
+                <div class="mid"><b>Julho 2026</b><small>Período atual</small></div>
+                <button class="btn btn-icon" style="width:36px;height:36px;min-height:36px" aria-label="Próximo"><i class="fa-solid fa-chevron-right" style="font-size:13px"></i></button>
+              </div>
+              <div style="height:8px"></div>
+            </div>
+            <div class="bottom-nav">
+              <button class="bn-item on"><i class="fa-solid fa-house"></i><span>Início</span></button>
+              <button class="bn-item"><i class="fa-solid fa-users"></i><span>Alunos</span></button>
+              <button class="btn fab bn-fab" aria-label="Registrar aula por voz"><i class="fa-solid fa-microphone"></i></button>
+              <button class="bn-item"><i class="fa-solid fa-calendar"></i><span>Agenda</span></button>
+              <button class="bn-item"><i class="fa-solid fa-robot"></i><span>Fábio</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>Especificação</h4>
+        <ul class="specs">
+          <li><b>App header</b><code>sticky · bg --bg-app · borda-b --border-subtle</code></li>
+          <li><b>Anatomia do header</b><code>voltar 40px · título 16.5/700 · ação 40px</code></li>
+          <li><b>Bottom nav</b><code>fixed · bg --bg-surface · 5 posições · safe-area</code></li>
+          <li><b>Item</b><code>ícone 19px + label 10.5px · ativo = --brand-text 600</code></li>
+          <li><b>FAB central</b><code>56px · −38px acima da barra · fa-microphone</code></li>
+          <li><b>Tabs segmentadas</b><code>container --bg-surface p-4px · ativo bg --brand</code></li>
+          <li><b>Navegação de período</b><code>card com setas 36px + centro b/small</code></li>
+        </ul>
+        <div class="note"><i class="fa-solid fa-microphone"></i><span><b>Decisão de produto:</b> o FAB é o <b>registro de aula por voz</b> — o fluxo nº 1 do app (áudio do professor → Fábio → relatório no Emusys). A 5ª aba é o próprio Fábio (chat/insights).</span></div>
+      </div>
+    </div>
+
+    <!-- 8.7 FÁBIO -->
+    <h3 class="sub">8.7 · Card do agente — Fábio</h3>
+    <div class="grid g2">
+      <div class="panel">
+        <div class="stage"><div class="stage-col">
+          <div class="agent-card">
+            <div class="agent-head">
+              <div class="agent-av"><i class="fa-solid fa-robot"></i></div>
+              <div><b>Insights do Fábio</b><small>Análise pedagógica da semana</small></div>
+            </div>
+            <div class="agent-list">
+              <div class="agent-item"><i class="fa-solid fa-circle-check"></i><span>Sua taxa de registro subiu para <b>85%</b> — 22 de 26 aulas com relatório.</span></div>
+              <div class="agent-item"><i class="fa-solid fa-circle-check"></i><span><b>Gael</b> faltou 3 aulas seguidas. Quer que eu prepare uma mensagem para o responsável?</span></div>
+              <div class="agent-item"><i class="fa-solid fa-circle-check"></i><span>Terças às 16h têm a maior presença da sua grade — bom horário para reposições.</span></div>
+            </div>
+            <button class="btn btn-primary btn-block" style="margin-top:14px">Ver mais insights</button>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start">
+            <div class="agent-av" style="flex-shrink:0"><i class="fa-solid fa-robot"></i></div>
+            <div class="agent-bubble"><span class="who">Fábio diz:</span>Recebi seu áudio da aula da Maria. Montei o relatório no Molde C com repertório e checkpoint — quer revisar antes de eu enviar ao Emusys?</div>
+          </div>
+        </div></div>
+      </div>
+      <div class="panel">
+        <h4>Especificação</h4>
+        <ul class="specs">
+          <li><b>Container insights</b><code>gradiente --brand-soft → --event-soft · borda --brand-border</code></li>
+          <li><b>Avatar do Fábio</b><code>40px full · bg --brand · fa-robot --on-brand</code></li>
+          <li><b>Itens</b><code>fa-circle-check --brand-text + texto 13.5px</code></li>
+          <li><b>Bolha de chat</b><code>bg --bg-surface · borda --brand-border · canto inf-esq 4px</code></li>
+          <li><b>Assinatura</b><code>"Fábio diz:" 12px 700 --brand-text</code></li>
+          <li><b>Tom de voz</b><code>1ª pessoa, propositivo, sempre com ação sugerida</code></li>
+        </ul>
+        <div class="note"><i class="fa-solid fa-circle-info"></i><span>Nas telas de referência o agente aparecia como <b>"Tom"</b>. No App Pedagógico o agente é o <b>Fábio</b> — o componente é idêntico, apenas renomeado. Nunca usar os dois nomes no mesmo produto.</span></div>
+      </div>
+    </div>
+
+    <!-- 8.8 PROGRESSO -->
+    <h3 class="sub">8.8 · Progresso &amp; metas</h3>
+    <div class="grid g2">
+      <div class="panel">
+        <div class="stage"><div class="stage-col">
+          <div class="card">
+            <div class="goal-head"><span class="l"><i class="fa-solid fa-bullseye"></i> Relatórios do mês</span><span class="pct">75%</span></div>
+            <div class="progress"><span style="width:75%"></span></div>
+            <div class="goal-foot"><span>42 de 56 aulas</span><span>Faltam 14</span></div>
+          </div>
+          <div class="card">
+            <div class="goal-head"><span class="l"><i class="fa-solid fa-flag-checkered" style="color:var(--event-text)"></i> Jornada — Foundation</span><span class="pct" style="color:var(--event-text)">62%</span></div>
+            <div class="progress"><span class="purple" style="width:62%"></span></div>
+            <div class="goal-foot"><span>Checkpoint 2 de 4</span><span>Maria Santos</span></div>
+          </div>
+          <div class="card" style="display:flex;gap:18px;align-items:center">
+            <div class="ring" style="--v:91"><b>91%</b></div>
+            <div><b style="font-size:14.5px">Frequência do trimestre</b><br><small style="color:var(--text-secondary);font-size:12.5px">Meta: 90% · <span style="color:var(--success-text)">meta atingida ✓</span></small></div>
+          </div>
+        </div></div>
+      </div>
+      <div class="panel">
+        <h4>Especificação</h4>
+        <ul class="specs">
+          <li><b>Barra</b><code>h 8px · trilha --bg-inset · fill na cor do contexto</code></li>
+          <li><b>Cabeçalho</b><code>ícone + label 14px ↔ % 12.5/700 na cor do fill</code></li>
+          <li><b>Rodapé</b><code>12px --text-secondary · atual ↔ restante</code></li>
+          <li><b>Anel</b><code>conic-gradient · 92px · valor 18/700 no centro</code></li>
+          <li><b>100%</b><code>fill --success + microtexto "meta atingida"</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 8.9 CALENDÁRIO -->
+    <h3 class="sub">8.9 · Calendário mensal</h3>
+    <div class="grid g2">
+      <div class="panel">
+        <div class="stage" style="max-width:420px">
+          <div class="card">
+            <div class="cal">
+              <span class="dow">Dom</span><span class="dow">Seg</span><span class="dow">Ter</span><span class="dow">Qua</span><span class="dow">Qui</span><span class="dow">Sex</span><span class="dow">Sáb</span>
+              <span class="day mut">28</span><span class="day mut">29</span><span class="day mut">30</span><span class="day">1</span><span class="day">2</span><span class="day today">3</span><span class="day">4</span>
+              <span class="day">5</span><span class="day">6</span>
+              <span class="day">7<span class="d"><i style="background:var(--brand)"></i></span></span>
+              <span class="day">8</span>
+              <span class="day">9<span class="d"><i style="background:var(--info)"></i></span></span>
+              <span class="day">10</span><span class="day">11</span>
+              <span class="day">12</span><span class="day">13</span>
+              <span class="day">14<span class="d"><i style="background:var(--brand)"></i><i style="background:var(--event)"></i></span></span>
+              <span class="day">15</span><span class="day">16</span>
+              <span class="day">17<span class="d"><i style="background:var(--warning)"></i></span></span>
+              <span class="day">18<span class="d"><i style="background:var(--event)"></i></span></span>
+            </div>
+            <div class="legend">
+              <span><i style="background:var(--brand)"></i> Aula</span>
+              <span><i style="background:var(--info)"></i> Reposição</span>
+              <span><i style="background:var(--event)"></i> Recital</span>
+              <span><i style="background:var(--warning)"></i> Reunião</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>Especificação</h4>
+        <ul class="specs">
+          <li><b>Grade</b><code>7 colunas · gap 6px · célula quadrada (aspect 1)</code></li>
+          <li><b>Dia</b><code>13px centrado · fora do mês = --text-muted</code></li>
+          <li><b>Hoje / selecionado</b><code>bg --brand · --on-brand · 700 · raio 8px</code></li>
+          <li><b>Eventos</b><code>dots 4px na base · máx. 3 · cores da §2.4</code></li>
+          <li><b>Legenda</b><code>obrigatória abaixo · 12px --text-secondary</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 09 DATAVIZ ================= -->
+<section id="dataviz">
+  <div class="wrap">
+    <div class="sec-tag">09 · Dados</div>
+    <h2 class="sec-title">Gráficos &amp; visualização</h2>
+    <p class="sec-desc">Biblioteca: <b>Plotly 3.1</b> (mesma das telas). Gráficos vivem sempre dentro de um card; fundo do gráfico = fundo do card. Série 1 é sempre teal; use <code style="font-family:var(--mono);font-size:12px">--viz-*</code> na ordem.</p>
+    <div class="grid g2">
+      <div class="panel">
+        <h4>Barras — Relatórios por instrumento</h4>
+        <div class="stage"><div class="card" style="max-width:420px">
+          <div class="bars">
+            <div class="bar-row"><span>Violão</span><span class="track"><i style="width:86%"></i></span><b>24</b></div>
+            <div class="bar-row"><span>Bateria</span><span class="track"><i style="width:64%;background:var(--viz-5)"></i></span><b>18</b></div>
+            <div class="bar-row"><span>Canto</span><span class="track"><i style="width:50%;background:var(--viz-2)"></i></span><b>14</b></div>
+            <div class="bar-row"><span>Teclas</span><span class="track"><i style="width:36%;background:var(--viz-3)"></i></span><b>10</b></div>
+          </div>
+        </div></div>
+      </div>
+      <div class="panel">
+        <h4>Donut — Presenças do mês</h4>
+        <div class="stage"><div class="card" style="max-width:420px;display:flex;gap:18px;align-items:center;justify-content:center;flex-wrap:wrap">
+          <div class="donut" style="--a:78;--b:12;--c:6"><span>91%<small>presença</small></span></div>
+          <div class="legend" style="flex-direction:column;align-items:flex-start;gap:8px;margin:0">
+            <span><i style="background:var(--viz-1)"></i> Presentes · 78%</span>
+            <span><i style="background:var(--viz-2)"></i> Faltas justif. · 12%</span>
+            <span><i style="background:var(--viz-3)"></i> Faltas · 6%</span>
+            <span><i style="background:var(--viz-4)"></i> Reposições · 4%</span>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="codehead"><span>Config padrão Plotly (todas as telas)</span><button class="copybtn" data-copy="plotly"><i class="fa-regular fa-copy"></i> Copiar</button></div>
+<pre class="code" id="plotly-code"><span class="c">// Lê os tokens do tema atual — o gráfico acompanha dark/light</span>
+const css = getComputedStyle(document.documentElement);
+const T = (v) => css.getPropertyValue(v).trim();
+
+const layoutBase = {
+  paper_bgcolor: T('--bg-surface'),
+  plot_bgcolor:  T('--bg-surface'),
+  font: { family: 'Inter', color: T('--text-primary'), size: 11 },
+  margin: { t: 20, r: 20, b: 40, l: 48 },
+  xaxis: { gridcolor: T('--chart-grid'), zeroline: false },
+  yaxis: { gridcolor: T('--chart-grid'), zeroline: false },
+  showlegend: true,
+  legend: { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center' }
+};
+const configBase = { responsive: true, displayModeBar: false, displaylogo: false };
+const VIZ = ['#2A9D8F','#9D4EDD','#F77F00','#06D6A0','#48BFB3','#E9C46A'];
+
+<span class="c">// Regras: donut hole 0.5 · barras horizontais p/ rankings (texto fora, 11px)</span>
+<span class="c">// · linha 3px c/ fill tozeroy 10% · sempre try/catch + fallback textual</span>
+<span class="c">// · ao trocar o tema, chamar Plotly.relayout com as novas cores</span></pre>
+  </div>
+</section>
+
+<!-- ================= 10 ANATOMIA DE TELA ================= -->
+<section id="anatomia">
+  <div class="wrap">
+    <div class="sec-tag">10 · Padrões</div>
+    <h2 class="sec-title">Anatomia de tela</h2>
+    <p class="sec-desc">Toda tela do app segue a mesma estrutura de três zonas. Se uma tela nova não couber nesse esqueleto, a discussão é de produto — não de layout.</p>
+    <div class="anat">
+      <div class="phone" style="max-width:320px">
+        <div style="padding:10px 12px;border-bottom:1px solid var(--border-subtle)">
+          <div class="zone">1 · Header sticky · 64px</div>
+        </div>
+        <div style="padding:12px;display:flex;flex-direction:column;gap:10px;min-height:290px">
+          <div class="zone" style="min-height:230px;display:flex;align-items:center;justify-content:center">2 · Conteúdo · px-16 · pb-96<br>scroll vertical · gap 12px</div>
+        </div>
+        <div style="padding:10px 12px;border-top:1px solid var(--border-subtle);background:var(--bg-surface)">
+          <div class="zone">3 · Bottom nav fixa · 5 posições + FAB</div>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>Regras da estrutura</h4>
+        <ul class="specs">
+          <li><b>Zona 1 — Header</b><code>position sticky · z-50 · bg --bg-app</code></li>
+          <li><b>Título de tela</b><code>16.5–24px 700 · voltar sempre à esquerda</code></li>
+          <li><b>Zona 2 — Conteúdo</b><code>max-w-md mx-auto · px-16 · pb-96</code></li>
+          <li><b>Ordem do conteúdo</b><code>KPIs → alertas → lista/agenda → Fábio</code></li>
+          <li><b>Zona 3 — Bottom nav</b><code>position fixed bottom-0 · z-50</code></li>
+          <li><b>Safe area iOS</b><code>padding-bottom: env(safe-area-inset-bottom)</code></li>
+          <li><b>Modais</b><code>bottom-sheet · raio 16px 16px 0 0 · scrim --scrim</code></li>
+          <li><b>Estado vazio</b><code>ícone 40px --text-muted + frase + CTA soft</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 11 ACESSIBILIDADE ================= -->
+<section id="acessibilidade">
+  <div class="wrap">
+    <div class="sec-tag">11 · Qualidade</div>
+    <h2 class="sec-title">Acessibilidade &amp; boas práticas</h2>
+    <p class="sec-desc">Professores usam o app em salas escuras, corredores claros e no meio de aula. Contraste e área de toque não são detalhe — são requisito.</p>
+    <div class="grid g2">
+      <div class="panel">
+        <h4>Checklist mínimo (toda tela nova)</h4>
+        <ul class="specs">
+          <li><b>Contraste de texto</b><code>AA · ≥ 4.5:1 (corpo) · ≥ 3:1 (títulos)</code></li>
+          <li><b>Teal como texto no light</b><code>usar teal-700 (--brand-text), nunca teal-500</code></li>
+          <li><b>Texto sobre teal</b><code>--on-brand (ink-950) nos DOIS temas</code></li>
+          <li><b>Área de toque</b><code>≥ 44×44px (inclui ícones da nav)</code></li>
+          <li><b>Foco visível</b><code>:focus-visible → --focus-ring</code></li>
+          <li><b>Movimento</b><code>respeitar prefers-reduced-motion</code></li>
+          <li><b>Ícone nunca sozinho</b><code>aria-label em botões só-ícone</code></li>
+          <li><b>Cor nunca sozinha</b><code>status = cor + texto/ícone (badge)</code></li>
+        </ul>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="dd yes"><div class="h"><i class="fa-solid fa-check"></i> FAZER</div><div class="b"><b>Um CTA primário por tela</b>, full-width, acima da bottom nav. Ações secundárias em botões soft ou ghost.</div></div>
+        <div class="dd no"><div class="h"><i class="fa-solid fa-xmark"></i> NÃO FAZER</div><div class="b"><b>Vermelho sólido em botões de excluir.</b> Destrutivo usa --danger-soft + --danger-text; a confirmação acontece no modal.</div></div>
+        <div class="dd yes"><div class="h"><i class="fa-solid fa-check"></i> FAZER</div><div class="b"><b>Dinheiro e métricas sempre com tabular feel:</b> peso 700, tracking -1%, prefixo R$ em --text-secondary.</div></div>
+        <div class="dd no"><div class="h"><i class="fa-solid fa-xmark"></i> NÃO FAZER</div><div class="b"><b>Misturar #1F2937 (cinza azulado)</b> nas bordas do dark — o token correto é --border-subtle (#1E2A26, verde-carvão).</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 12 IMPLEMENTAÇÃO ================= -->
+<section id="implementacao">
+  <div class="wrap">
+    <div class="sec-tag">12 · Código</div>
+    <h2 class="sec-title">Implementação</h2>
+    <p class="sec-desc">Como ligar os tokens ao stack real das telas (Tailwind CDN + Font Awesome + Plotly). O Tailwind aponta para as variáveis CSS — assim o mesmo classname funciona nos dois temas.</p>
+
+    <div class="codehead"><span>Ordem de imports no &lt;head&gt;</span></div>
+<pre class="code">&lt;script src="https://cdn.tailwindcss.com"&gt;&lt;/script&gt;
+&lt;link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"&gt;
+&lt;link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"&gt;
+&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/3.1.0/plotly.min.js"&gt;&lt;/script&gt;
+&lt;style&gt; /* tokens.css da seção 07 */ &lt;/style&gt;</pre>
+
+    <div class="codehead"><span>tailwind.config → variáveis (uma vez, vale p/ dark e light)</span></div>
+<pre class="code">tailwind.config = {
+  theme: { extend: {
+    colors: {
+      app:      'var(--bg-app)',
+      surface:  'var(--bg-surface)',
+      inset:    'var(--bg-inset)',
+      hoverbg:  'var(--bg-hover)',
+      ink:      'var(--text-primary)',
+      sub:      'var(--text-secondary)',
+      mute:     'var(--text-muted)',
+      line:     'var(--border-subtle)',
+      brand:    { DEFAULT:'var(--brand)', hover:'var(--brand-hover)', text:'var(--brand-text)', soft:'var(--brand-soft)' },
+      onbrand:  'var(--on-brand)',
+      success:  { DEFAULT:'var(--success)', text:'var(--success-text)', soft:'var(--success-soft)' },
+      danger:   { DEFAULT:'var(--danger)',  text:'var(--danger-text)',  soft:'var(--danger-soft)' },
+      warning:  { DEFAULT:'var(--warning)', text:'var(--warning-text)', soft:'var(--warning-soft)' },
+      info:     { DEFAULT:'var(--info)',    text:'var(--info-text)',    soft:'var(--info-soft)' },
+      event:    { DEFAULT:'var(--event)',   text:'var(--event-text)',   soft:'var(--event-soft)' }
+    },
+    borderRadius: { app:'12px' },
+    fontFamily: { sans:['Inter','sans-serif'] }
+  }}
+}
+// Uso: class="bg-surface text-ink border-line rounded-app"
+//      class="bg-brand text-onbrand" · class="bg-warning-soft text-warning-text"</pre>
+
+    <div class="codehead"><span>Troca de tema (sem localStorage em artifacts)</span></div>
+<pre class="code">// dark é o padrão no &lt;html data-theme="dark"&gt;
+function setTheme(t){
+  document.documentElement.dataset.theme = t;
+  // se houver gráficos Plotly na tela, redesenhar com os novos tokens:
+  // renderCharts();
+}
+// Detectar preferência do aparelho (opcional):
+// if (window.matchMedia('(prefers-color-scheme: light)').matches) setTheme('light');</pre>
+
+    <div class="codehead"><span>Font Awesome (config das telas)</span></div>
+<pre class="code">&lt;script&gt;
+  window.FontAwesomeConfig = { autoReplaceSvg: 'nest' };
+&lt;/script&gt;</pre>
+
+    <h3 class="sub">Checklist para toda tela nova</h3>
+    <div class="panel">
+      <ul class="specs">
+        <li><b>1.</b> Estrutura de 3 zonas (§10) com <code>max-w-md · pb-96</code></li>
+        <li><b>2.</b> Só tokens semânticos — zero hex hardcoded no HTML</li>
+        <li><b>3.</b> Testar nos dois temas antes de entregar (toggle <code>data-theme</code>)</li>
+        <li><b>4.</b> 1 CTA primário · destrutivo sempre soft · badges nunca sólidos</li>
+        <li><b>5.</b> Ícones com <code>aria-label</code> · toque ≥ 44px · foco visível</li>
+        <li><b>6.</b> Gráficos com <code>layoutBase + VIZ</code> (§09) e fallback textual</li>
+        <li><b>7.</b> Textos do Fábio em 1ª pessoa, com ação sugerida</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="wrap" style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:0 20px">
+    <span><b style="color:var(--text-primary)">Fábio DS v1.0</b> · Julho 2026 · Grupo LA Music</span>
+    <span>Dark-first · Mobile-first · Feito para transformar vidas através da música <i class="fa-solid fa-music" style="color:var(--brand-text)"></i></span>
+  </div>
+</footer>
+
+<script>
+// ===== Tema =====
+function setTheme(t){
+  document.documentElement.dataset.theme = t;
+  var d = document.getElementById('btnDark');
+  var l = document.getElementById('btnLight');
+  if(d && l){
+    d.classList.toggle('on', t === 'dark');
+    l.classList.toggle('on', t === 'light');
+  }
+}
+
+// ===== Copiar hex dos swatches =====
+document.querySelectorAll('.swatch-hex').forEach(function(btn){
+  var original = btn.innerHTML;
+  btn.addEventListener('click', function(){
+    var hex = btn.getAttribute('data-hex');
+    if(!hex) return;
+    try{
+      navigator.clipboard.writeText(hex).then(function(){
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+        setTimeout(function(){ btn.innerHTML = original; }, 1200);
+      }).catch(function(){
+        btn.innerHTML = hex;
+        setTimeout(function(){ btn.innerHTML = original; }, 1200);
+      });
+    }catch(e){ /* clipboard indisponível — hex já está visível */ }
+  });
+});
+
+// ===== Copiar blocos de código =====
+document.querySelectorAll('.copybtn').forEach(function(btn){
+  var original = btn.innerHTML;
+  btn.addEventListener('click', function(){
+    var map = { tokens: 'tokens-code', plotly: 'plotly-code' };
+    var id = map[btn.getAttribute('data-copy')];
+    var pre = id ? document.getElementById(id) : null;
+    if(!pre) return;
+    try{
+      navigator.clipboard.writeText(pre.textContent).then(function(){
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+        setTimeout(function(){ btn.innerHTML = original; }, 1400);
+      }).catch(function(){});
+    }catch(e){}
+  });
+});
+</script>
+</body>
+</html>

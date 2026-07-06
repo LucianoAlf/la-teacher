@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LA Teacher · Mapa de Produto v1.1 — A casa do Fábio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+/* Tokens do Fábio DS v1.0 (idênticos ao design system) */
+:root{
+  --teal-200:#84DDD5;--teal-300:#66CEC4;--teal-400:#48BFB3;--teal-500:#2A9D8F;--teal-600:#21867A;--teal-700:#1B6E64;
+  --ink-950:#0A0F0E;--ink-900:#111916;--ink-800:#1A2421;
+  --mist-50:#F2F7F5;--mist-100:#E9F1EE;--mist-200:#DFE9E5;--mist-300:#C8D6D2;
+  --green-400:#4ADE80;--green-500:#22C55E;--green-600:#16A34A;
+  --red-400:#F87171;--red-500:#EF4444;--red-600:#DC2626;
+  --amber-400:#FACC15;--amber-500:#EAB308;--amber-600:#CA8A04;
+  --blue-400:#60A5FA;--blue-500:#3B82F6;--blue-600:#2563EB;
+  --purple-400:#C084FC;--purple-500:#A855F7;--purple-600:#9333EA;
+  --r-sm:8px;--r-md:12px;--r-lg:16px;--r-full:9999px;
+  --font:'Inter',-apple-system,sans-serif;
+  --mono:ui-monospace,'SF Mono',Menlo,monospace;
+}
+[data-theme="dark"]{
+  --bg-app:var(--ink-950);--bg-surface:var(--ink-900);--bg-inset:var(--ink-950);--bg-hover:var(--ink-800);
+  --text-primary:#F5F5F5;--text-secondary:#9CA3AF;--text-muted:rgba(245,245,245,.45);
+  --border-subtle:#1E2A26;--border-strong:#2C3B36;
+  --brand:var(--teal-500);--brand-hover:var(--teal-400);--brand-text:var(--teal-500);
+  --brand-soft:rgba(42,157,143,.15);--brand-border:rgba(42,157,143,.30);--on-brand:var(--ink-950);
+  --success:var(--green-500);--success-text:var(--green-400);--success-soft:rgba(34,197,94,.12);
+  --danger:var(--red-500);--danger-text:var(--red-400);--danger-soft:rgba(239,68,68,.12);
+  --warning:var(--amber-500);--warning-text:var(--amber-400);--warning-soft:rgba(234,179,8,.12);
+  --info:var(--blue-500);--info-text:var(--blue-400);--info-soft:rgba(59,130,246,.12);
+  --event:var(--purple-500);--event-text:var(--purple-400);--event-soft:rgba(168,85,247,.14);
+  --shadow-card:none;--shadow-fab:0 10px 25px -5px rgba(42,157,143,.45);
+}
+[data-theme="light"]{
+  --bg-app:var(--mist-50);--bg-surface:#FFFFFF;--bg-inset:var(--mist-100);--bg-hover:var(--mist-100);
+  --text-primary:#0F1D19;--text-secondary:#5A6B66;--text-muted:#8A9994;
+  --border-subtle:var(--mist-200);--border-strong:var(--mist-300);
+  --brand:var(--teal-500);--brand-hover:var(--teal-600);--brand-text:var(--teal-700);
+  --brand-soft:rgba(42,157,143,.12);--brand-border:rgba(42,157,143,.35);--on-brand:var(--ink-950);
+  --success:var(--green-600);--success-text:var(--green-600);--success-soft:rgba(22,163,74,.10);
+  --danger:var(--red-600);--danger-text:var(--red-600);--danger-soft:rgba(220,38,38,.08);
+  --warning:var(--amber-600);--warning-text:var(--amber-600);--warning-soft:rgba(202,138,4,.10);
+  --info:var(--blue-600);--info-text:var(--blue-600);--info-soft:rgba(37,99,235,.08);
+  --event:var(--purple-600);--event-text:var(--purple-600);--event-soft:rgba(147,51,234,.08);
+  --shadow-card:0 1px 2px rgba(15,29,25,.05),0 4px 14px rgba(15,29,25,.06);--shadow-fab:0 10px 25px -5px rgba(42,157,143,.5);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg-app);color:var(--text-primary);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
+a{color:var(--brand-text);text-decoration:none}
+h1,h2,h3,h4,h5{margin:0;line-height:1.25}
+p{margin:0}
+button{font-family:var(--font);cursor:pointer}
+.wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+section{padding:44px 0;border-bottom:1px solid var(--border-subtle);scroll-margin-top:120px}
+section:last-of-type{border-bottom:none}
+.sec-tag{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--brand-text);margin-bottom:10px}
+.sec-tag::before{content:'';width:20px;height:2px;background:var(--brand);border-radius:2px}
+.sec-title{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:8px}
+.sec-desc{color:var(--text-secondary);max-width:740px;margin-bottom:22px}
+.sub{font-size:16.5px;font-weight:700;margin:28px 0 14px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.panel{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow-card)}
+.panel h4{font-size:14px;font-weight:700;margin-bottom:4px}
+.panel .hint{font-size:12.5px;color:var(--text-secondary)}
+.note{display:flex;gap:10px;align-items:flex-start;background:var(--brand-soft);border:1px solid var(--brand-border);border-radius:var(--r-md);padding:12px 16px;font-size:13.5px;margin:16px 0}
+.note i{color:var(--brand-text);margin-top:3px}
+.note.warn{background:var(--warning-soft);border-color:var(--warning)}
+.note.warn i{color:var(--warning-text)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:var(--r-full);font-size:11.5px;font-weight:600}
+.badge i{font-size:7px}
+.badge.success{background:var(--success-soft);color:var(--success-text)}
+.badge.warning{background:var(--warning-soft);color:var(--warning-text)}
+.badge.danger{background:var(--danger-soft);color:var(--danger-text)}
+.badge.info{background:var(--info-soft);color:var(--info-text)}
+.badge.brand{background:var(--brand-soft);color:var(--brand-text)}
+.badge.event{background:var(--event-soft);color:var(--event-text)}
+.badge.neutral{background:var(--bg-inset);color:var(--text-secondary);border:1px solid var(--border-subtle)}
+.tblwrap{overflow-x:auto;border:1px solid var(--border-subtle);border-radius:var(--r-md);margin-top:12px}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+.tbl th{text-align:left;padding:11px 14px;background:var(--bg-inset);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary);border-bottom:1px solid var(--border-subtle)}
+.tbl td{padding:11px 14px;border-bottom:1px solid var(--border-subtle);vertical-align:top}
+.tbl tr:last-child td{border-bottom:none}
+.tbl code,.mono{font-family:var(--mono);font-size:12px;color:var(--brand-text);background:var(--brand-soft);padding:2px 7px;border-radius:6px;white-space:nowrap}
+.specs{list-style:none;margin:12px 0 0;padding:0;font-size:13px;color:var(--text-secondary)}
+.specs li{padding:7px 0;border-bottom:1px dashed var(--border-subtle);display:flex;justify-content:space-between;gap:16px}
+.specs li:last-child{border-bottom:none}
+.specs b{color:var(--text-primary);font-weight:600}
+
+/* Header do documento */
+.ds-header{position:sticky;top:0;z-index:100;background:color-mix(in srgb,var(--bg-app) 85%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--border-subtle)}
+.ds-header-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0}
+.ds-logo{display:flex;align-items:center;gap:12px}
+.ds-logo-mark{width:38px;height:38px;border-radius:var(--r-md);background:linear-gradient(135deg,var(--teal-500),var(--teal-700));display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px}
+.ds-logo-txt b{font-size:15px;font-weight:800;display:block}
+.ds-logo-txt span{font-size:11px;color:var(--text-secondary)}
+.theme-toggle{display:flex;gap:6px;padding:5px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-full)}
+.theme-toggle button{width:34px;height:34px;border-radius:var(--r-full);border:none;background:transparent;color:var(--text-secondary);font-size:14px}
+.theme-toggle button.on{background:var(--brand);color:var(--on-brand)}
+.ds-nav{display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;scrollbar-width:none}
+.ds-nav::-webkit-scrollbar{display:none}
+.ds-nav a{flex-shrink:0;padding:7px 14px;border-radius:var(--r-full);background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-secondary);font-size:12.5px;font-weight:600;white-space:nowrap}
+.ds-nav a:hover{color:var(--brand-text);border-color:var(--brand-border)}
+.hero{padding:44px 0 36px;border-bottom:1px solid var(--border-subtle)}
+.hero-eyebrow{font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--brand-text);margin-bottom:10px}
+.hero h1{font-size:clamp(32px,6vw,48px);font-weight:800;letter-spacing:-.03em;margin-bottom:10px}
+.hero h1 em{font-style:normal;color:var(--brand-text)}
+.hero p{color:var(--text-secondary);max-width:680px;font-size:16px;margin-bottom:18px}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px}
+.hero-meta span{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:var(--r-full);font-size:12.5px;font-weight:600;background:var(--bg-surface);border:1px solid var(--border-subtle);color:var(--text-secondary)}
+.hero-meta span i{color:var(--brand-text);font-size:11px}
+
+/* Diagrama de arquitetura */
+.arch{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.arch-row{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap}
+.arch-box{flex:1;min-width:200px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-md);padding:14px 16px;box-shadow:var(--shadow-card)}
+.arch-box.hub{border:2px solid var(--brand);background:var(--brand-soft)}
+.arch-box.agent{border:1px solid var(--brand-border);background:linear-gradient(135deg,var(--brand-soft),var(--event-soft))}
+.arch-box b{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:4px}
+.arch-box b i{color:var(--brand-text)}
+.arch-box small{font-size:11.5px;color:var(--text-secondary);line-height:1.5;display:block}
+.arch-flow{display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px;gap:8px;padding:2px 0}
+.arch-flow i{color:var(--brand-text)}
+
+/* Árvore de telas */
+.tree{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.tree-tab{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-md);overflow:hidden;box-shadow:var(--shadow-card)}
+.tree-tab>header{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border-subtle)}
+.tree-tab>header .tile{width:38px;height:38px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--brand-soft);color:var(--brand-text);flex-shrink:0}
+.tree-tab>header .tile.mic{background:var(--brand);color:var(--on-brand);border-radius:var(--r-full);box-shadow:var(--shadow-fab)}
+.tree-tab>header b{font-size:14.5px;display:block}
+.tree-tab>header small{font-size:11.5px;color:var(--text-secondary)}
+.tree-screens{padding:8px 16px 14px}
+.scr{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--border-subtle);font-size:13px;align-items:flex-start}
+.scr:last-child{border-bottom:none}
+.scr .id{font-family:var(--mono);font-size:11px;color:var(--brand-text);background:var(--brand-soft);border-radius:6px;padding:2px 7px;flex-shrink:0;margin-top:2px}
+.scr .id.star{background:var(--event-soft);color:var(--event-text)}
+.scr div b{font-weight:600;font-size:13.5px}
+.scr div small{display:block;color:var(--text-secondary);font-size:12px;margin-top:1px}
+
+/* Golden path steps */
+.steps{display:flex;flex-direction:column;gap:0;margin-top:14px}
+.step{display:flex;gap:14px;position:relative;padding-bottom:22px}
+.step::before{content:'';position:absolute;left:19px;top:40px;bottom:0;width:2px;background:var(--border-subtle)}
+.step:last-child::before{display:none}
+.step .n{width:40px;height:40px;border-radius:var(--r-full);background:var(--brand);color:var(--on-brand);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0;z-index:1}
+.step .n.alt{background:var(--bg-surface);border:2px solid var(--brand);color:var(--brand-text)}
+.step-body{flex:1;padding-top:2px}
+.step-body b{font-size:14.5px;display:block}
+.step-body p{font-size:13px;color:var(--text-secondary);margin-top:3px}
+.step-body .tag{display:inline-flex;margin-top:7px;margin-right:6px}
+.footer{padding:32px 0 48px;color:var(--text-secondary);font-size:13px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+@media(max-width:700px){.sec-title{font-size:22px}.arch-row{flex-direction:column}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<header class="ds-header">
+  <div class="wrap">
+    <div class="ds-header-row">
+      <div class="ds-logo">
+        <div class="ds-logo-mark"><i class="fa-solid fa-graduation-cap"></i></div>
+        <div class="ds-logo-txt"><b>LA Teacher</b><span>Mapa de Produto · MVP · v1.1 consolidado</span></div>
+      </div>
+      <div class="theme-toggle" role="group" aria-label="Tema">
+        <button id="btnDark" class="on" onclick="setTheme('dark')" aria-label="Escuro"><i class="fa-solid fa-moon"></i></button>
+        <button id="btnLight" onclick="setTheme('light')" aria-label="Claro"><i class="fa-solid fa-sun"></i></button>
+      </div>
+    </div>
+    <nav class="ds-nav">
+      <a href="#visao">Visão</a><a href="#nome">Nome</a><a href="#arquitetura">Arquitetura</a><a href="#features">Features MVP</a><a href="#painel">Painel Coordenação</a><a href="#telas">Mapa de telas</a><a href="#golden">Golden Path</a><a href="#confirmacao">Confirmação</a><a href="#regras">Regras</a><a href="#ds11">DS v1.1</a><a href="#riscos">Riscos</a><a href="#sprints">Sprints</a><a href="#decisoes">Decisões</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="hero-eyebrow">LA Music · Sistema Pedagógico Agent-First · Fase 4 do PRD</div>
+    <h1>LA Teacher — <em>a casa do Fábio</em></h1>
+    <p>Mapa de produto do MVP: features, arquitetura dual-channel e árvore de telas. O Fábio é o protagonista; o app é onde ele mora. Derivado do PRD do Sistema Pedagógico, dos Moldes Canônicos e da LA Journey — <b>v1.1 consolidada</b> com a auditoria do LA Report (Fases 1–2) e as respostas de Hugo, Quintela/Juliana e Alf.</p>
+    <div class="hero-meta">
+      <span><i class="fa-solid fa-code-branch"></i> v1.1 · Julho 2026</span>
+      <span><i class="fa-solid fa-robot"></i> Agent-first · Fábio</span>
+      <span><i class="fa-solid fa-mobile-screen"></i> Mobile-first · Fábio DS</span>
+      <span><i class="fa-solid fa-database"></i> Hub: LA Report</span>
+      <span><i class="fa-solid fa-microphone"></i> Áudio no coração</span>
+      <span><i class="fa-solid fa-gauge-high"></i> Baseline 45,9% → meta 90%</span>
+    </div>
+  </div>
+</div>
+
+<!-- 01 VISÃO -->
+<section id="visao">
+  <div class="wrap">
+    <div class="sec-tag">01 · Produto</div>
+    <h2 class="sec-title">Visão &amp; North Star</h2>
+    <p class="sec-desc">O LA Teacher existe para uma coisa acima de todas: <b>nenhuma aula sem registro, sem custar o intervalo do professor</b>. Tudo o mais (agenda, jornada, insights) orbita esse núcleo. O app não substitui o Fábio — ele dá corpo ao Fábio.</p>
+    <div class="grid g4">
+      <div class="panel"><h4><i class="fa-solid fa-star" style="color:var(--brand-text)"></i> North Star</h4><p class="hint"><b style="color:var(--text-primary)">% de aulas com relatório em até 24h</b> — a métrica que prova que o ciclo vicioso virou virtuoso. <b style="color:var(--danger-text)">Baseline auditada: 45,9%</b> (90d) → meta <b style="color:var(--success-text)">&gt;90%</b>.</p></div>
+      <div class="panel"><h4>Métrica de esforço</h4><p class="hint">Tempo mediano do fim da aula até "Confirmado" — meta: <b style="color:var(--text-primary)">&lt; 90 segundos</b> (fala de ~40s + 3 toques).</p></div>
+      <div class="panel"><h4>Métrica de confiança</h4><p class="hint">% de relatórios confirmados <b style="color:var(--text-primary)">sem edição manual</b> — mede a qualidade da normalização do Fábio.</p></div>
+      <div class="panel"><h4>Métrica de adoção</h4><p class="hint">Professores ativos na semana (WAU) sobre os ~45 professores — app + WhatsApp somados.</p></div>
+    </div>
+    <div class="note"><i class="fa-solid fa-heart"></i><span><b>Princípio herdado do PRD:</b> apoio e régua, não policial. Por isso o Health Score consolidado <b>não aparece</b> no app do professor no MVP — o professor vê metas acionáveis (registros em dia, frequência dos alunos), nunca um placar de vigilância.</span></div>
+  </div>
+</section>
+
+<!-- 02 NOME -->
+<section id="nome">
+  <div class="wrap">
+    <div class="sec-tag">02 · Marca</div>
+    <h2 class="sec-title">Nome do produto</h2>
+    <p class="sec-desc">Lição do Tom, registrada como regra: <b>agente tem persona, produto tem nome</b> — nunca batizar o app com o nome do agente (não queimar o "Fábio"). Recomendação e alternativas:</p>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Nome</th><th>Prós</th><th>Contras</th><th>Veredito</th></tr></thead>
+      <tbody>
+        <tr><td><b>LA Teacher</b> ⭐</td><td>Consistente com a família (LA Report, LA Journey, LA Organizer); claro; escala p/ Emusys Academy no futuro</td><td>Inglês genérico</td><td><span class="badge success"><i class="fa-solid fa-check"></i> Confirmado (A1)</span></td></tr>
+        <tr><td><b>LA Professor</b></td><td>Português, direto</td><td>Colide com o programa <b>Professor+LA</b> (premiação) e com professor-la.vercel.app (health score) — confunde dois produtos</td><td><span class="badge warning"><i class="fa-solid fa-circle"></i> Evitar</span></td></tr>
+        <tr><td><b>LA Maestro</b></td><td>Bonito, musical</td><td>Colide com <b>Maestros da Gestão</b> (sua mentoria)</td><td><span class="badge danger"><i class="fa-solid fa-circle"></i> Descartar</span></td></tr>
+        <tr><td><b>Backstage LA</b></td><td>Conceito forte: o palco é do aluno, o professor rege dos bastidores</td><td>Menos óbvio; foge do padrão "LA + substantivo"</td><td><span class="badge neutral"><i class="fa-solid fa-circle"></i> Plano B criativo</span></td></tr>
+      </tbody>
+    </table></div>
+    <p class="sec-desc" style="margin-top:14px;margin-bottom:0">✅ <b>Nome confirmado pelo Alf (04/07/2026).</b> Assinatura: <i>"LA Teacher — com Fábio, seu copiloto pedagógico"</i>. Regra permanente da casa: agente tem persona, produto tem nome.</p>
+  </div>
+</section>
+
+<!-- 03 ARQUITETURA -->
+<section id="arquitetura">
+  <div class="wrap">
+    <div class="sec-tag">03 · Sistema</div>
+    <h2 class="sec-title">Arquitetura dual-channel</h2>
+    <p class="sec-desc">Decisão central (sua, e ótima): o professor fala com o <b>mesmo Fábio</b> por dois canais — WhatsApp e app. Mesmo motor, mesmas tabelas, mesma fila. Se a Meta banir o número ou instabilizar, <b>o trabalho não para</b>: o app é o canal soberano.</p>
+    <div class="arch">
+      <div class="arch-row">
+        <div class="arch-box"><b><i class="fa-brands fa-whatsapp"></i> Canal 1 · WhatsApp</b><small>UAZAPI (lamusic.uazapi.com). Áudio, texto, quick replies. Zero fricção — já está na mão do professor hoje.</small></div>
+        <div class="arch-box"><b><i class="fa-solid fa-mobile-screen"></i> Canal 2 · App LA Teacher</b><small>PWA React + TS + Tailwind (mesmo stack do LA Organizer). Gravação nativa, fila offline, telas ricas. Canal à prova de banimento.</small></div>
+      </div>
+      <div class="arch-flow"><i class="fa-solid fa-arrow-down"></i> os dois canais convergem no mesmo agente <i class="fa-solid fa-arrow-down"></i></div>
+      <div class="arch-row">
+        <div class="arch-box agent"><b><i class="fa-solid fa-robot"></i> FÁBIO · Hermes (VPS LAHQ)</b><small>Transcreve → escolhe o Molde (A/B/C) → normaliza → fatia turma → pergunta em ambiguidade → grava após confirmação. <b>Única porta de escrita pedagógica</b> — o app nunca escreve relatório direto no banco; até o "Confirmar" do professor é uma mensagem para o Fábio. Tudo auditável, agent-first de verdade. Entra na <span class="mono">governanca</span> no padrão Lia (grupos com modo + ACL de professores) e usa a infra <span class="mono">agente_conversas</span> já existente para o chat espelhado.</small></div>
+      </div>
+      <div class="arch-flow"><i class="fa-solid fa-arrow-down"></i> lê e escreve <i class="fa-solid fa-arrow-down"></i></div>
+      <div class="arch-row">
+        <div class="arch-box hub"><b><i class="fa-solid fa-database"></i> LA REPORT · Hub central (Supabase ouqwbber…)</b><small>Fonte e destino operacional. Espelha o Emusys (aulas, alunos, turmas, presenças) e recebe os relatórios — campo canônico <span class="mono">aulas_emusys.anotacoes_fabio</span>. Auditoria confirmou as peças prontas: RPC <span class="mono">registrar_aula_fabio</span> (idempotente · modos novo/substituir/complementar), <span class="mono">vw_fabio_aulas_contexto</span> e <span class="mono">vw_fabio_carteira_professor</span> (derivar versão sem financeiro p/ o app) + log de auditoria. Também alimenta o app (leituras via RLS por professor).</small></div>
+      </div>
+      <div class="arch-row">
+        <div class="arch-box"><b><i class="fa-solid fa-rotate"></i> Emusys</b><small>Fonte da verdade acadêmica (matrículas, grade, presenças). Alimenta o LA Report via endpoint; recebe de volta o relatório gravado.</small></div>
+        <div class="arch-box"><b><i class="fa-solid fa-map"></i> LA Journey</b><small>Jornadas por instrumento (Checkpoints → Marcos → Ancoragens). O Fábio lê para sugerir checkpoint no relatório; atualização de progresso passa por ele.</small></div>
+        <div class="arch-box"><b><i class="fa-solid fa-user-plus"></i> Mila → handoff</b><small>Interesse capturado no comercial vira briefing da experimental entregue ao professor (a dor da Barra resolvida).</small></div>
+      </div>
+    </div>
+    <ul class="specs" style="max-width:760px">
+      <li><b>Autenticação</b><span>Supabase Auth · RLS: professor só enxerga seus alunos/turmas/aulas</span></li>
+      <li><b>Áudio</b><span>Gravação local → fila offline → Storage → Fábio (à prova de wifi ruim de sala)</span></li>
+      <li><b>Tempo real</b><span>Supabase Realtime: status do processamento e chat espelhado entre canais</span></li>
+      <li><b>Escrita no Emusys</b><span>Desbloqueia com a audio skill do Fábio (Fase 2 do PRD) — hoje o MCP é read-only</span></li>
+      <li><b>Fundação (4 criações)</b><span>fabio_registros_aula · bucket+fila de áudios · risco_evasao (modelo Hugo) · vínculo professores↔auth (hoje 0 professores logam)</span></li>
+      <li><b>Push</b><span>Notificações contextuais (pós-aula, briefing 15 min antes, pendências)</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- 04 FEATURES -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-tag">04 · Escopo</div>
+    <h2 class="sec-title">Features do MVP</h2>
+    <p class="sec-desc">Oito features, todas rastreadas ao PRD (Sprints 4.1–4.4) e aos Moldes Canônicos. O que não está aqui, não está no MVP.</p>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>#</th><th>Feature</th><th>O que entrega</th><th>Canal</th><th>Rastreio</th></tr></thead>
+      <tbody>
+        <tr><td><b>F1</b></td><td><b>Registro de aula por áudio</b> 🎤</td><td>Golden path completo: gravar → Fábio normaliza (Molde A/B/C) → confirmar → grava no LA Report/Emusys + Journey</td><td>App + WhatsApp</td><td>Sprint 4.3 · Moldes §1.6</td></tr>
+        <tr><td><b>F2</b></td><td><b>Tela de confirmação</b> ★</td><td>Campos extraídos (só o que foi dito), checkpoint sugerido, fatias por aluno em turma, corrigir por voz ou editar inline</td><td>App (no WhatsApp vira mensagem estruturada)</td><td>Moldes §1.3 · regra de ouro</td></tr>
+        <tr><td><b>F3</b></td><td><b>Agenda do professor</b></td><td>Dia/semana/mês vindos do Emusys via LA Report; aula passada sem registro exibe CTA Registrar; categorias com cores do DS</td><td>App</td><td>Sprint 4.2 · Frente 6</td></tr>
+        <tr><td><b>F4</b></td><td><b>Briefing pré-aula (revisitação)</b></td><td>Card no topo: última aula, dever deixado, sugestão do Fábio; briefing rico da experimental (handoff da Mila)</td><td>App + WhatsApp</td><td>Frentes 3 e 4 · dor da Barra</td></tr>
+        <tr><td><b>F5</b></td><td><b>Alunos &amp; Jornada</b></td><td>Lista e perfil do aluno: frequência, timeline de relatórios, posição na Journey (checkpoint/marco), sinal de cuidado com privacidade</td><td>App</td><td>Sprint 4.4 · LA Journey</td></tr>
+        <tr><td><b>F6</b></td><td><b>Chat com o Fábio</b></td><td>Conversacional espelhado com o WhatsApp: quick replies, cards ricos (briefing, confirmação), mesmo histórico</td><td>App ⇄ WhatsApp</td><td>Camada 1 do Fábio</td></tr>
+        <tr><td><b>F7</b></td><td><b>Pendências &amp; alertas</b></td><td>Inbox: relatórios pendentes, aluno faltoso (≥3), lembretes; push contextual pós-aula</td><td>App + push</td><td>Frente 5 · MVP do PRD</td></tr>
+        <tr><td><b>F8</b></td><td><b>Onboarding &amp; acesso</b></td><td>Login (Supabase Auth), permissões de microfone/notificação, tour de 3 telas apresentando o Fábio</td><td>App</td><td>Sprint 4.1</td></tr>
+      </tbody>
+    </table></div>
+    <h3 class="sub">Fora do MVP (radar da v1.1+)</h3>
+    <div class="grid g3">
+      <div class="panel"><h4>Gerador de cifras &amp; lições PDF</h4><p class="hint">Reaproveita a skill Cifra Club do LA Journey + geração de PDF. Alto valor, mas não bloqueia o golden path.</p></div>
+      <div class="panel"><h4>Gamificação &amp; metas pessoais</h4><p class="hint">Streaks de registro, conquistas, celebração de checkpoints dos alunos (paleta party do DS).</p></div>
+      <div class="panel"><h4>Painel da Coordenação</h4><p class="hint">Promovido a superfície própria do produto (mesmo repo — A3). Ver seção dedicada logo abaixo.</p></div>
+      <div class="panel"><h4>Sugestão de lição</h4><p class="hint">Fábio propõe próxima lição a partir da Journey + histórico — e, na fase Fábio→aluno (Q7), envia exercícios com backing track e PDFs de música quando o aluno falta.</p></div>
+      <div class="panel"><h4>Cutucada do dever de casa</h4><p class="hint">Moldes §1.6: se o áudio não citar dever, Fábio pergunta — Fase 2 explícita no documento canônico.</p></div>
+      <div class="panel"><h4>Agenda pessoal do professor</h4><p class="hint">Compromissos fora da LA (Sprint 4.5+ do PRD).</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PAINEL DA COORDENAÇÃO -->
+<section id="painel">
+  <div class="wrap">
+    <div class="sec-tag">Coordenação · duas superfícies, um produto</div>
+    <h2 class="sec-title">Painel da Coordenação</h2>
+    <p class="sec-desc">Decisão A3: <b>mesmo repo</b>, roles diferentes — o coordenador loga e ganha layout desktop (com versão mobile). Fronteira: <b>o LA Report mede, o Painel opera</b>. E a regra que mata o efeito policial: comunicação coordenação → professor flui <b>pelo Fábio</b> — a sugestão anexada no Painel chega ao professor como briefing do agente, não como mensagem do chefe.</p>
+    <div class="grid g2">
+      <div class="panel">
+        <h4>O que o Painel mostra</h4>
+        <ul class="specs">
+          <li><b>Funil de risco (modelo do Hugo)</b><span>vw_risco_atual: ativos → atenção → críticos · corte configurável por unidade (H4)</span></li>
+          <li><b>Fila de Casos</b><span>farmer_tarefas estendido: dono, SLA (janela de 30d), desfecho calculado em D+60/D+90 (H5+H6)</span></li>
+          <li><b>Calibração do Fábio</b><span>Relatórios recentes com "ficou bom / ajustar" — refina os Moldes com evidência (primeiros 90 dias)</span></li>
+          <li><b>KPIs prontos</b><span>30+ views já existentes (vw_kpis_professor_*, rankings, LTV, funil, dashboard)</span></li>
+          <li><b>Aluno 360</b><span>Semáforo + anamnese×expectativa + jornada + presença + risco preditivo, num perfil só</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h4>Fila de Casos — donos por tipo (Q4/Q5)</h4>
+        <ul class="specs">
+          <li><b>Pedagógico</b><span>Coordenação (Quintela/Juliana) — apontado pelo Fábio</span></li>
+          <li><b>Evasão / relacionamento</b><span>Sucesso do Aluno (Fabi/Jessica) — apontado pela Lia (faltas diárias, renovação, eventos)</span></li>
+          <li><b>Financeiro / administrativo</b><span>Gerência</span></li>
+          <li><b>Bastidores</b><span>SA monitora, aponta e normaliza pesquisas; a coordenação tem o olhar do todo por professor e carteira</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="note"><i class="fa-solid fa-heart-pulse"></i><span><b>Health Score do aluno v2 (visão do Alf):</b> frequência + participação em projetos/eventos + cruzamento anamnese×expectativa + semáforo do professor + <b>estudo em casa</b> (dever confirmado). Os dois últimos nascem no LA Teacher — e os pesos já são configuráveis por unidade na <span class="mono">config_health_score_aluno</span>.</span></div>
+  </div>
+</section>
+
+<!-- 05 MAPA DE TELAS -->
+<section id="telas">
+  <div class="wrap">
+    <div class="sec-tag">05 · Estrutura</div>
+    <h2 class="sec-title">Mapa de telas do MVP</h2>
+    <p class="sec-desc">5 áreas na bottom nav (Início · Alunos · 🎤 · Agenda · Fábio) + fluxos transversais. <b>19 telas no total</b> — enxuto de propósito: cada tela extra é fricção no intervalo do professor.</p>
+    <div class="tree">
+
+      <div class="tree-tab">
+        <header><div class="tile"><i class="fa-solid fa-right-to-bracket"></i></div><div><b>0 · Acesso &amp; Onboarding</b><small>3 telas · Sprint 4.1</small></header>
+        <div class="tree-screens">
+          <div class="scr"><span class="id">0.1</span><div><b>Login</b><small>Supabase Auth · e-mail + senha (ou magic link) · seleção automática de unidade pelo cadastro</small></div></div>
+          <div class="scr"><span class="id">0.2</span><div><b>Permissões</b><small>Microfone e notificações, com o porquê de cada uma (copy do Fábio)</small></div></div>
+          <div class="scr"><span class="id">0.3</span><div><b>Boas-vindas do Fábio</b><small>Tour de 3 cards: "eu registro por você", "eu te preparo pra aula", "eu cuido da jornada"</small></div></div>
+        </div>
+      </div>
+
+      <div class="tree-tab">
+        <header><div class="tile"><i class="fa-solid fa-house"></i></div><div><b>1 · Início</b><small>1 tela rica · o dia do professor em uma dobra</small></header>
+        <div class="tree-screens">
+          <div class="scr"><span class="id">1.0</span><div><b>Home</b><small>Saudação + sino (Inbox) → card <b>Próxima aula com briefing</b> (F4: última aula, dever deixado, sugestão) → KPIs (aulas hoje · pendências · frequência da semana) → alertas do Fábio → timeline "Hoje" com status ✓/pendente por aula</small></div></div>
+        </div>
+      </div>
+
+      <div class="tree-tab">
+        <header><div class="tile"><i class="fa-solid fa-users"></i></div><div><b>2 · Alunos</b><small>4 telas · Sprint 4.4</small></header>
+        <div class="tree-screens">
+          <div class="scr"><span class="id">2.0</span><div><b>Lista de alunos</b><small>Busca + filtros (instrumento, turma, status) · badge "Em risco" para faltosos · sinal de cuidado discreto (núcleo de inclusão, sem diagnóstico)</small></div></div>
+          <div class="scr"><span class="id">2.1</span><div><b>Perfil do aluno</b><small>Tabs: Visão geral (anel de frequência, dever atual, próxima aula) · Jornada · Relatórios · Info (responsável, observações)</small></div></div>
+          <div class="scr"><span class="id">2.2</span><div><b>Jornada do aluno</b><small>Checkpoint atual (Foundation…Master ou trilha Kids), marcos com progresso, 4 eixos de ancoragem, música desafio</small></div></div>
+          <div class="scr"><span class="id">2.3</span><div><b>Turmas (Kids)</b><small>Lista de turmas → perfil da turma: crianças, horário, últimos registros TURMA</small></div></div>
+        </div>
+      </div>
+
+      <div class="tree-tab">
+        <header><div class="tile mic"><i class="fa-solid fa-microphone"></i></div><div><b>3 · Registrar (FAB central)</b><small>4 telas · o coração do app · Sprint 4.3</small></header>
+        <div class="tree-screens">
+          <div class="scr"><span class="id">3.1</span><div><b>Gravação</b><small>Abre com contexto pré-inferido (última aula sem registro) e chip para trocar aula/turma · waveform · pausar/regravar · funciona offline (entra na fila)</small></div></div>
+          <div class="scr"><span class="id">3.2</span><div><b>Processando</b><small>"O Fábio está montando o relatório…" · transcrição aparecendo · pode sair da tela (avisa por push quando pronto)</small></div></div>
+          <div class="scr"><span class="id star">3.3 ★</span><div><b>Confirmação</b><small>A tela mais importante do produto — detalhada na seção 07. Campos do Molde, checkpoint sugerido, fatias por criança em turma</small></div></div>
+          <div class="scr"><span class="id">3.4</span><div><b>Sucesso</b><small>Confirmação leve + "próximo pendente" sugerido (emenda o hábito) · celebração forte só em marcos (checkpoint atingido)</small></div></div>
+        </div>
+      </div>
+
+      <div class="tree-tab">
+        <header><div class="tile"><i class="fa-solid fa-calendar"></i></div><div><b>4 · Agenda</b><small>2 telas · Sprint 4.2 · read-only no MVP (fonte: Emusys)</small></header>
+        <div class="tree-screens">
+          <div class="scr"><span class="id">4.0</span><div><b>Agenda</b><small>Dia | Semana | Mês (calendário com dots por categoria: aula, reposição, recital, reunião) · legenda obrigatória</small></div></div>
+          <div class="scr"><span class="id">4.1</span><div><b>Detalhe do evento</b><small>Aula passada sem registro → CTA "Registrar por voz" · recital/reunião com local e participantes</small></div></div>
+        </div>
+      </div>
+
+      <div class="tree-tab">
+        <header><div class="tile"><i class="fa-solid fa-robot"></i></div><div><b>5 · Fábio</b><small>2 telas · espelho do WhatsApp</small></header>
+        <div class="tree-screens">
+          <div class="scr"><span class="id">5.0</span><div><b>Chat</b><small>Mesmo histórico dos dois canais (Realtime) · quick replies contextuais · cards ricos nas bolhas (briefing, análise, confirmações) · entrada por texto ou áudio</small></div></div>
+          <div class="scr"><span class="id">5.1</span><div><b>Insights da semana</b><small>Card do Fábio: taxa de registro, presença, alunos que merecem atenção — sempre com ação sugerida</small></div></div>
+        </div>
+      </div>
+
+      <div class="tree-tab">
+        <header><div class="tile"><i class="fa-solid fa-layer-group"></i></div><div><b>T · Transversais</b><small>3 telas + padrões</small></header>
+        <div class="tree-screens">
+          <div class="scr"><span class="id">T1</span><div><b>Inbox de notificações</b><small>Sino no header · filtros (Todas | Pendentes | Resolvidas) · padrão validado na tela do Tom</small></div></div>
+          <div class="scr"><span class="id">T2</span><div><b>Perfil &amp; Configurações</b><small>Notificações granulares (toggle mestre + filhos), tema claro/escuro, fila de áudios offline, ajuda</small></div></div>
+          <div class="scr"><span class="id">T3</span><div><b>Estados</b><small>Vazio (padrão do Tom: ícone + frase + CTA), offline (banner + fila), erro com recuperação, modais de confirmação</small></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- 06 GOLDEN PATH -->
+<section id="golden">
+  <div class="wrap">
+    <div class="sec-tag">06 · Fluxo nº 1</div>
+    <h2 class="sec-title">Golden Path — do fim da aula ao Emusys</h2>
+    <p class="sec-desc">O caminho que define o sucesso do produto: <b>3 toques + a fala</b>. Tudo no app conspira para este fluxo nunca passar disso.</p>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div class="step-body"><b>Gatilho: fim da aula</b><p>Push contextual: "Como foi a aula da Maria? 🎤 Toca pra me contar" — ou o professor abre o app e o FAB pulsa discretamente se há pendência.</p><span class="tag badge brand"><i class="fa-solid fa-circle"></i> toque 1: abrir</span></div></div>
+      <div class="step"><div class="n">2</div><div class="step-body"><b>Gravação com contexto pré-inferido</b><p>A tela 3.1 já abre com "Maria Santos · Violão · 14h" selecionado (última aula sem registro). Um toque grande: gravar. O professor fala solto, ~40s — zero estrutura exigida (Moldes §1.2).</p><span class="tag badge brand"><i class="fa-solid fa-circle"></i> toque 2: gravar/parar</span></div></div>
+      <div class="step"><div class="n alt">F</div><div class="step-body"><b>Fábio trabalha (sem toque)</b><p>Transcreve, normaliza termos ("cava quente" → cavaquinho), escolhe o Molde, preenche <b>só o que foi dito</b>, cruza com a Journey e sugere checkpoint. Em turma, fatia por nome: tronco TURMA + fatia de cada criança. A gravação final usa a RPC <b>registrar_aula_fabio</b> — o modo <i>complementar</i> já habilita o "corrigir por voz".</p></div></div>
+      <div class="step"><div class="n">3</div><div class="step-body"><b>Confirmação em um toque</b><p>Tela 3.3: relatório pronto, checkpoint sugerido em destaque. Se está tudo certo — e a meta é que esteja na maioria das vezes — um toque em <b>Confirmar e enviar</b>. O Fábio grava no LA Report → Emusys e atualiza a Journey.</p><span class="tag badge brand"><i class="fa-solid fa-circle"></i> toque 3: confirmar</span><span class="tag badge event"><i class="fa-solid fa-circle"></i> ambiguidade? Fábio pergunta antes — nunca grava no escuro</span></div></div>
+      <div class="step"><div class="n"><i class="fa-solid fa-check"></i></div><div class="step-body"><b>Fechamento que emenda o hábito</b><p>Toast de sucesso + "Ficou 1 aula de ontem sem registro — quer emendar?" Um dia 100% registrado ganha micro-celebração. Checkpoint atingido pelo aluno ganha a celebração de verdade (paleta party).</p></div></div>
+    </div>
+    <div class="note"><i class="fa-brands fa-whatsapp"></i><span><b>O mesmo fluxo existe no WhatsApp</b> com as mesmas etapas: áudio → Fábio devolve o relatório formatado → professor responde "confirmar" (ou quick reply). Canal cai, o outro assume — mesmo estado, mesmas tabelas.</span></div>
+  </div>
+</section>
+
+<!-- 07 CONFIRMAÇÃO -->
+<section id="confirmacao">
+  <div class="wrap">
+    <div class="sec-tag">07 · Tela ★</div>
+    <h2 class="sec-title">Anatomia da Confirmação (3.3)</h2>
+    <p class="sec-desc">Evolução direta do padrão "Análise do Tom" que você mandou — de "campos extraídos de uma mensagem" para "relatório pedagógico normalizado". É onde a regra de ouro vira interface.</p>
+    <div class="grid g2">
+      <div class="panel">
+        <h4>Aula 1:1 (Molde C)</h4>
+        <ul class="specs">
+          <li><b>Cabeçalho</b><span>Aluno · instrumento · data — e o Molde aplicado (chip)</span></li>
+          <li><b>Campos ditos</b><span>Conteúdo · Objetivo · Repertório · Execução — cada um com ícone, editável inline. <b>Campo não dito não aparece</b> (nunca em branco)</span></li>
+          <li><b>Dever de casa</b><span>Destaque visual próprio (é a dor prioritária dos Moldes)</span></li>
+          <li><b>Checkpoint sugerido</b><span>Card do Fábio: "Foundation → tríades (atingido?)" · aceitar / ajustar / remover em 1 toque</span></li>
+          <li><b>Desenvolvimento</b><span>Pilar sempre descritivo do dia — a UI reforça com o rótulo "hoje"</span></li>
+          <li><b>Ações</b><span>Confirmar e enviar (primário) · Corrigir por voz (soft) · menu: descartar</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h4>Aula em turma (Moldes A/B) — o "tronco + galhos"</h4>
+        <ul class="specs">
+          <li><b>Bloco TURMA</b><span>Acolhimento · vivência/atividade · repertório · para casa (família) — o que foi comum a todos</span></li>
+          <li><b>Fatias por criança</b><span>Um card por nome citado no áudio (Heitor, Aurora, Liz…) com resposta observada, checkpoint e desenvolvimento — navegação por scroll</span></li>
+          <li><b>Criança não citada</b><span>Aparece como "sem observação individual" — pode receber a fatia por voz ali mesmo, ou ficar só com o TURMA (verdade acima de completude)</span></li>
+          <li><b>Gravação final</b><span>Fábio grava TURMA + fatia na ficha de cada aluno (Moldes §1.4)</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="note warn"><i class="fa-solid fa-triangle-exclamation"></i><span><b>Guardrail de UI:</b> a Confirmação nunca oferece "preencher automaticamente" campos não ditos. Completar é papel do professor falando — não de um botão que convida o Fábio a inventar (linha vermelha dos Moldes).</span></div>
+  </div>
+</section>
+
+<!-- 08 REGRAS -->
+<section id="regras">
+  <div class="wrap">
+    <div class="sec-tag">08 · Produto</div>
+    <h2 class="sec-title">Regras de produto na interface</h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Regra (origem)</th><th>Como vira UI</th></tr></thead>
+      <tbody>
+        <tr><td><b>Campo não dito não aparece</b> (Moldes §1.3)</td><td>Relatórios renderizam só campos presentes; sem placeholders vazios, sem "—"</td></tr>
+        <tr><td><b>Ambiguidade → perguntar antes de gravar</b> (PRD)</td><td>Fábio pergunta no chat/modal com opções em quick reply; nada é gravado no escuro</td></tr>
+        <tr><td><b>Pilar descritivo, nunca rótulo</b> (Moldes §1.5)</td><td>Campo "Desenvolvimento" sempre prefixado com "hoje"; sem tags fixas na ficha do aluno</td></tr>
+        <tr><td><b>Núcleo de inclusão com privacidade</b> (PRD)</td><td>Badge discreto "acompanhamento de cuidado" no perfil — nunca diagnóstico, laudo ou detalhe clínico</td></tr>
+        <tr><td><b>Apoio e régua, não policial</b> (PRD)</td><td>Sem Health Score consolidado no MVP; metas pessoais acionáveis no lugar</td></tr>
+        <tr><td><b>Fábio não trata financeiro</b> (domínio da Maria)</td><td>Nenhuma tela de valores/repasse no LA Teacher — a aba Finance do Tom morre aqui</td></tr>
+        <tr><td><b>1 CTA primário por tela · FAB único</b> (Fábio DS)</td><td>FAB central 🎤 é global; nunca um segundo FAB flutuante na mesma tela (ajuste sobre a tela de Reposições do Tom, que tinha dois)</td></tr>
+        <tr><td><b>Linguagem interna hoje</b> (Moldes §1.6)</td><td>Tom técnico e claro p/ professor/coordenação; camada celebrativa p/ famílias é derivação futura</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- 09 DS v1.1 -->
+<section id="ds11">
+  <div class="wrap">
+    <div class="sec-tag">09 · Design System</div>
+    <h2 class="sec-title">DS v1.1 — componentes novos identificados</h2>
+    <p class="sec-desc"><b>Veredito dos tokens:</b> nada a mudar — as 8 telas novas do Tom usam exatamente os primitivos já normalizados no Fábio DS v1.0 (validação dupla da paleta). O que entra na v1.1 são <b>padrões de componente</b>, extraídos das telas e adaptados ao contexto pedagógico:</p>
+    <div class="grid g3">
+      <div class="panel"><h4>1 · Chat completo</h4><p class="hint">Bolhas user/Fábio, cards ricos dentro de bolha, quick replies, typing indicator, input com áudio. Base: telas de Chat do Tom.</p></div>
+      <div class="panel"><h4>2 · Card de Análise do Fábio</h4><p class="hint">Ícone + label + valor por campo extraído — evolui para a Confirmação (3.3). Base: "Análise do Tom".</p></div>
+      <div class="panel"><h4>3 · Modais de confirmação</h4><p class="hint">Danger / atenção com checkbox de fricção / sucesso · overlay com scrim. Base: tela de modais.</p></div>
+      <div class="panel"><h4>4 · Empty states</h4><p class="hint">Ícone em círculo + título + texto + CTA · variante "tudo em dia ✓". Base: tela de estados vazios.</p></div>
+      <div class="panel"><h4>5 · Card de prazo/urgência</h4><p class="hint">Borda-esquerda por severidade + badge "expira em X dias" (danger ≤3d · warning na semana). Base: Reposições.</p></div>
+      <div class="panel"><h4>6 · Picker rows &amp; slots</h4><p class="hint">Linhas de data/hora/local + horários sugeridos com estado disponível/conflito + checagem de conflito. Base: Agendar Reposição.</p></div>
+    </div>
+    <p class="sec-desc" style="margin-top:14px;margin-bottom:0">+ padrão de <b>notificações aninhadas</b> (toggle mestre + sub-opções) nas Configurações. Esses componentes entram no documento do DS junto com o desenho das telas do golden path.</p>
+  </div>
+</section>
+
+<!-- 10 RISCOS -->
+<section id="riscos">
+  <div class="wrap">
+    <div class="sec-tag">10 · Realidade</div>
+    <h2 class="sec-title">Riscos &amp; mitigações</h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Risco</th><th>Mitigação</th></tr></thead>
+      <tbody>
+        <tr><td><b>Banimento/instabilidade do WhatsApp</b></td><td>✅ Já resolvido por decisão de arquitetura: dual-channel com o app como canal soberano</td></tr>
+        <tr><td><b>Transcrição PT-BR com termos musicais</b></td><td>Glossário de normalização (Moldes §1.6.7: "titi" → colcheias) + Confirmação sempre no meio do caminho + métrica de % sem edição</td></tr>
+        <tr><td><b>Wifi ruim nas salas</b></td><td>Fila offline de áudios com status visível; nada se perde</td></tr>
+        <tr><td><b>Adoção pelos ~45 professores</b></td><td>Golden path ≤3 toques · push contextual pós-aula · WhatsApp como porta de entrada suave · piloto com 3–5 professores aliados antes do rollout</td></tr>
+        <tr><td><b>Fábio parecer fiscal</b></td><td>Tom de parceiro (1ª pessoa, sempre com ação), sem score consolidado, celebração &gt; cobrança</td></tr>
+        <tr><td><b>Jornadas em reformulação (Q2)</b></td><td>Sugestão de checkpoint condicional por instrumento (flag); Fábio só sugere onde a jornada estiver cadastrada</td></tr>
+        <tr><td><b>Cadeia de evasão em transição</b></td><td>evasoes_v2 é legada (confirmado); localizar fonte canônica atual (candidata: movimentacoes_admin) e migrar views/pesquisa_evasao — Fase 3 da auditoria</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- 11 SPRINTS -->
+<section id="sprints">
+  <div class="wrap">
+    <div class="sec-tag">11 · Execução</div>
+    <h2 class="sec-title">Plano de construção (proposta)</h2>
+    <div class="steps">
+      <div class="step"><div class="n">S1</div><div class="step-body"><b>Protótipo navegável do golden path</b><p>DS v1.1 (componentes novos) + telas 3.1→3.4 + Home em HTML navegável — para validar com Quintela, Juliana e 2–3 professores <b>antes de codar o app</b>.</p></div></div>
+      <div class="step"><div class="n">S2</div><div class="step-body"><b>App base</b><p>PWA React+TS+Supabase (padrão LA Organizer): fundação SQL (4 criações), vínculo professores↔auth (hoje zero logam), RLS por professor, Home e Agenda lendo as views fabio.</p></div></div>
+      <div class="step"><div class="n">S3</div><div class="step-body"><b>Motor de registro</b><p>Gravação + fila offline + Storage + ponte com o Fábio no Hermes + telas de processamento/confirmação. Pré-requisito do PRD: audio skill do Fábio (destrava a escrita).</p></div></div>
+      <div class="step"><div class="n">S4</div><div class="step-body"><b>Alunos, Jornada e Chat</b><p>Perfil do aluno + Journey visual + chat espelhado (Realtime) + Inbox e push. Piloto com professores aliados → rollout por unidade.</p></div></div>
+    </div>
+    <div class="note"><i class="fa-solid fa-circle-info"></i><span><b>Sincronia com o PRD:</b> nada aqui fura a ordem do sistema — SOUL/AGENTS/PERMISSÕES do Fábio e a audio skill continuam sendo o caminho crítico. O S1 (protótipo) pode andar em paralelo sem depender do Hermes.</span></div>
+  </div>
+</section>
+
+<!-- 12 DECISÕES -->
+<section id="decisoes">
+  <div class="wrap">
+    <div class="sec-tag">12 · Em aberto</div>
+    <h2 class="sec-title">Decisões fechadas &amp; pendências vivas</h2>
+    <div class="grid g3">
+      <div class="panel"><h4>✅ D1 · Perfis</h4><p class="hint">Resolvida em discussão: duas superfícies, um produto — app do professor + Painel da Coordenação, mesmo repo (A3).</p></div>
+      <div class="panel"><h4>✅ D2 · Turma no MVP</h4><p class="hint">Turma completa desde o MVP — validada pela auditoria: 42% das aulas são de turma (14.802 de 34.885).</p></div>
+      <div class="panel"><h4>✅ D3 + A1 · PWA &amp; nome</h4><p class="hint">PWA instalável confirmado. Nome LA Teacher confirmado (04/07). Monorepo app + painel.</p></div>
+      <div class="panel"><h4>⏳ A2 · Piloto</h4><p class="hint">3–5 professores aliados e unidade de estreia: escolha adiada pelo Alf para a fase de protótipo validado.</p></div>
+      <div class="panel"><h4>⏳ Q2 · Jornadas</h4><p class="hint">LA Journey em reformulação — sugestão de checkpoint nasce <b>condicional por instrumento</b> (flag: só sugere onde a jornada estiver cadastrada).</p></div>
+      <div class="panel"><h4>⏳ Q3 · Semáforo</h4><p class="hint">Estrutura pronta, processo parado (583 sem score). O app com 1 toque + cutucada do Fábio vira o motor de adoção — igual anamnese (10/1.561).</p></div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="wrap" style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:0 20px">
+    <span><b style="color:var(--text-primary)">LA Teacher · Mapa de Produto v1.0</b> · Julho 2026 · Grupo LA Music</span>
+    <span>Agent-first · Fábio protagonista · <i class="fa-solid fa-music" style="color:var(--brand-text)"></i></span>
+  </div>
+</footer>
+
+<script>
+function setTheme(t){
+  document.documentElement.dataset.theme=t;
+  document.getElementById('btnDark').classList.toggle('on',t==='dark');
+  document.getElementById('btnLight').classList.toggle('on',t==='light');
+}
+</script>
+</body>
+</html>

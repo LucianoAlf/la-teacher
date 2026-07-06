@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>LA Teacher · Protótipo Golden Path — Sprint 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+/* ============ FÁBIO DS v1.0 — tokens ============ */
+:root{
+  --teal-200:#84DDD5; --teal-300:#66CEC4; --teal-400:#48BFB3;
+  --teal-500:#2A9D8F; --teal-600:#21867A; --teal-700:#1B6E64;
+  --ink-950:#0A0F0E; --ink-900:#111916; --ink-800:#1A2421; --ink-700:#243430;
+  --mist-50:#F2F7F5; --mist-100:#E9F1EE; --mist-200:#DFE9E5; --mist-300:#C8D6D2;
+  --slate-400:#9CA3AF; --slate-500:#6B7280; --white-off:#F5F5F5; --white:#FFF;
+  --green-400:#4ADE80; --green-500:#22C55E; --green-600:#16A34A;
+  --red-400:#F87171; --red-500:#EF4444; --red-600:#DC2626;
+  --amber-400:#FACC15; --amber-500:#EAB308; --amber-600:#CA8A04;
+  --blue-400:#60A5FA; --blue-500:#3B82F6; --blue-600:#2563EB;
+  --purple-400:#C084FC; --purple-500:#A855F7; --purple-600:#9333EA;
+  --party-1:#2A9D8F; --party-2:#F4A261; --party-3:#E76F51; --party-4:#E9C46A; --party-5:#264653;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --r-full:9999px;
+  --font:'Inter',-apple-system,sans-serif;
+  --mono:ui-monospace,'SF Mono',Menlo,monospace;
+}
+[data-theme="dark"]{
+  --bg-app:var(--ink-950); --bg-surface:var(--ink-900); --bg-inset:var(--ink-950); --bg-hover:var(--ink-800);
+  --text-primary:var(--white-off); --text-secondary:var(--slate-400); --text-muted:rgba(245,245,245,.45);
+  --border-subtle:#1E2A26; --border-strong:#2C3B36;
+  --brand:var(--teal-500); --brand-hover:var(--teal-400); --brand-text:var(--teal-500);
+  --brand-soft:rgba(42,157,143,.15); --brand-border:rgba(42,157,143,.30); --on-brand:var(--ink-950);
+  --success:var(--green-500); --success-text:var(--green-400); --success-soft:rgba(34,197,94,.12);
+  --danger:var(--red-500); --danger-text:var(--red-400); --danger-soft:rgba(239,68,68,.12);
+  --warning:var(--amber-500); --warning-text:var(--amber-400); --warning-soft:rgba(234,179,8,.12);
+  --info:var(--blue-500); --info-text:var(--blue-400); --info-soft:rgba(59,130,246,.12);
+  --shadow-card:none; --shadow-fab:0 10px 25px -5px rgba(42,157,143,.45);
+  --focus-ring:0 0 0 2px var(--bg-app),0 0 0 4px var(--teal-400);
+}
+[data-theme="light"]{
+  --bg-app:var(--mist-50); --bg-surface:var(--white); --bg-inset:var(--mist-100); --bg-hover:var(--mist-100);
+  --text-primary:#0F1D19; --text-secondary:#5A6B66; --text-muted:#8A9994;
+  --border-subtle:var(--mist-200); --border-strong:var(--mist-300);
+  --brand:var(--teal-500); --brand-hover:var(--teal-600); --brand-text:var(--teal-700);
+  --brand-soft:rgba(42,157,143,.12); --brand-border:rgba(42,157,143,.35); --on-brand:var(--ink-950);
+  --success:var(--green-600); --success-text:var(--green-600); --success-soft:rgba(22,163,74,.10);
+  --danger:var(--red-600); --danger-text:var(--red-600); --danger-soft:rgba(220,38,38,.08);
+  --warning:var(--amber-600); --warning-text:var(--amber-600); --warning-soft:rgba(202,138,4,.10);
+  --info:var(--blue-600); --info-text:var(--blue-600); --info-soft:rgba(37,99,235,.08);
+  --shadow-card:0 1px 2px rgba(15,29,25,.05),0 4px 14px rgba(15,29,25,.06);
+  --shadow-fab:0 10px 25px -5px rgba(42,157,143,.5);
+  --focus-ring:0 0 0 2px var(--bg-app),0 0 0 4px var(--teal-600);
+}
+
+/* ============ base / shell ============ */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:var(--font);background:#060A09;color:var(--text-primary);-webkit-font-smoothing:antialiased;display:flex;justify-content:center}
+[data-theme="light"] body{background:var(--mist-200)}
+.phone{width:100%;max-width:430px;min-height:100dvh;background:var(--bg-app);position:relative;display:flex;flex-direction:column;overflow:hidden}
+@media(min-width:480px){.phone{min-height:min(920px,96dvh);margin:2dvh 0;border-radius:28px;border:1px solid var(--border-strong);box-shadow:0 30px 80px rgba(0,0,0,.5)}}
+
+/* tarja protótipo */
+.proto-bar{display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--brand-soft);border-bottom:1px solid var(--brand-border);font-size:11px;font-weight:600;letter-spacing:.4px;color:var(--brand-text)}
+.proto-bar i{font-size:10px}
+.proto-bar .x{margin-left:auto;cursor:pointer;color:var(--text-muted);padding:2px 6px}
+
+/* telas */
+.screen{display:none;flex:1;flex-direction:column;overflow-y:auto;padding-bottom:96px}
+.screen.active{display:flex}
+.wrap{padding:16px 16px 0}
+
+/* header app */
+.app-head{display:flex;align-items:center;gap:12px;padding:14px 16px 4px}
+.app-head .hi b{display:block;font-size:20px;font-weight:800;letter-spacing:-.3px}
+.app-head .hi span{font-size:12.5px;color:var(--text-secondary)}
+.avatar{width:40px;height:40px;border-radius:var(--r-full);background:linear-gradient(135deg,var(--teal-500),var(--teal-700));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex:none}
+.icon-btn{margin-left:auto;width:38px;height:38px;border-radius:var(--r-full);border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-secondary);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px}
+
+/* cards & listas */
+.card{background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:14px;margin-bottom:12px}
+.card h3{font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.card h3 i{color:var(--brand-text);font-size:12px}
+.card h3 .right{margin-left:auto;font-size:11.5px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--text-muted)}
+.aula{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--border-subtle)}
+.aula:last-child{border-bottom:none}
+.aula .hora{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--text-secondary);width:44px;flex:none}
+.aula .info{flex:1;min-width:0}
+.aula .info b{display:block;font-size:14px;font-weight:600}
+.aula .info span{font-size:12px;color:var(--text-secondary)}
+.dot{width:9px;height:9px;border-radius:var(--r-full);flex:none}
+.dot.ok{background:var(--success)} .dot.now{background:var(--brand);box-shadow:0 0 0 4px var(--brand-soft);animation:pulse 1.6s infinite} .dot.next{background:var(--border-strong)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:var(--r-full)}
+.badge.ok{background:var(--success-soft);color:var(--success-text)}
+.badge.warn{background:var(--warning-soft);color:var(--warning-text)}
+.badge.danger{background:var(--danger-soft);color:var(--danger-text)}
+.badge.brand{background:var(--brand-soft);color:var(--brand-text)}
+.badge.info{background:var(--info-soft);color:var(--info-text)}
+
+/* card do Fábio (briefing) */
+.fabio-card{background:linear-gradient(150deg,var(--brand-soft),transparent 70%);border:1px solid var(--brand-border);border-radius:var(--r-lg);padding:14px;margin-bottom:12px}
+.fabio-card .head{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.fabio-card .head .bot{width:30px;height:30px;border-radius:var(--r-full);background:var(--brand);color:var(--on-brand);display:flex;align-items:center;justify-content:center;font-size:13px}
+.fabio-card .head b{font-size:13.5px}
+.fabio-card p{font-size:13.5px;line-height:1.55;color:var(--text-primary)}
+.fabio-card p+p{margin-top:7px}
+.fabio-card .tag{font-size:10.5px;font-weight:700;letter-spacing:.5px;color:var(--brand-text);text-transform:uppercase}
+
+/* botões */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font);font-size:14.5px;font-weight:700;border-radius:var(--r-md);border:none;cursor:pointer;padding:13px 18px;transition:transform .06s ease}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--brand);color:var(--on-brand)}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text-primary)}
+.btn-block{width:100%}
+.btn-sm{padding:8px 13px;font-size:12.5px;border-radius:var(--r-sm)}
+
+/* tab bar + FAB */
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:72px;background:var(--bg-surface);border-top:1px solid var(--border-subtle);display:flex;align-items:stretch;z-index:40;padding-bottom:env(safe-area-inset-bottom)}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--text-muted);cursor:pointer;background:none;border:none;font-family:var(--font)}
+.tab i{font-size:17px}
+.tab.active{color:var(--brand-text)}
+.fab{position:absolute;left:50%;transform:translateX(-50%);bottom:34px;width:62px;height:62px;border-radius:var(--r-full);background:var(--brand);color:var(--on-brand);border:4px solid var(--bg-app);box-shadow:var(--shadow-fab);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:50;transition:transform .12s ease}
+.fab:active{transform:translateX(-50%) scale(.93)}
+
+/* toast */
+.toast{position:absolute;left:50%;transform:translateX(-50%) translateY(20px);bottom:96px;background:var(--ink-800);color:var(--white-off);border:1px solid var(--border-strong);font-size:13px;font-weight:600;padding:11px 16px;border-radius:var(--r-md);opacity:0;pointer-events:none;transition:.25s ease;z-index:60;max-width:88%;text-align:center}
+[data-theme="light"] .toast{background:#0F1D19}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ============ tela gravação ============ */
+.rec-top{display:flex;align-items:center;gap:10px;padding:14px 16px}
+.rec-top .back{width:36px;height:36px;border-radius:var(--r-full);border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-secondary);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.rec-top b{font-size:16px}
+.ctx-card{margin:4px 16px 0;background:var(--bg-surface);border:1px solid var(--brand-border);border-radius:var(--r-lg);padding:13px 14px;display:flex;gap:11px;align-items:center}
+.ctx-card .ico{width:38px;height:38px;border-radius:var(--r-md);background:var(--brand-soft);color:var(--brand-text);display:flex;align-items:center;justify-content:center;font-size:16px;flex:none}
+.ctx-card b{display:block;font-size:14.5px}
+.ctx-card span{font-size:12px;color:var(--text-secondary)}
+.ctx-card .sw{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--brand-text);cursor:pointer;white-space:nowrap}
+.rec-stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:20px}
+.wave{display:flex;align-items:center;gap:4px;height:64px}
+.wave i{display:block;width:5px;border-radius:3px;background:var(--brand);height:12px;animation:wv 1s ease-in-out infinite}
+.wave i:nth-child(2n){animation-delay:.15s}.wave i:nth-child(3n){animation-delay:.3s}.wave i:nth-child(5n){animation-delay:.45s}
+.wave.paused i{animation-play-state:paused;opacity:.35}
+@keyframes wv{0%,100%{height:10px}50%{height:56px}}
+.rec-timer{font-family:var(--mono);font-size:38px;font-weight:600;letter-spacing:1px}
+.rec-hint{font-size:13px;color:var(--text-secondary);text-align:center;max-width:280px;line-height:1.5}
+.rec-ctrl{display:flex;align-items:center;gap:26px;padding-bottom:26px}
+.rc{width:56px;height:56px;border-radius:var(--r-full);border:1px solid var(--border-strong);background:var(--bg-surface);color:var(--text-primary);font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.rc.main{width:74px;height:74px;background:var(--danger);border:none;color:#fff;font-size:24px;box-shadow:0 10px 25px -5px rgba(239,68,68,.45)}
+
+/* ============ processando ============ */
+.proc{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:24px}
+.proc .bot-big{width:84px;height:84px;border-radius:var(--r-full);background:var(--brand-soft);border:1px solid var(--brand-border);color:var(--brand-text);display:flex;align-items:center;justify-content:center;font-size:34px;animation:bob 2.2s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.steps{width:100%;max-width:300px;display:flex;flex-direction:column;gap:13px}
+.step{display:flex;align-items:center;gap:11px;font-size:14px;color:var(--text-muted)}
+.step .st{width:26px;height:26px;border-radius:var(--r-full);border:2px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:11px;flex:none;color:transparent}
+.step.doing{color:var(--text-primary)}
+.step.doing .st{border-color:var(--brand);color:var(--brand-text)}
+.step.doing .st i{animation:spin 1s linear infinite}
+.step.done{color:var(--text-secondary)}
+.step.done .st{border-color:var(--success);background:var(--success-soft);color:var(--success-text)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ============ confirmação ============ */
+.conf-head{padding:14px 16px 8px;display:flex;align-items:center;gap:10px}
+.conf-head .back{width:36px;height:36px;border-radius:var(--r-full);border:1px solid var(--border-subtle);background:var(--bg-surface);color:var(--text-secondary);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.conf-head b{font-size:17px;letter-spacing:-.2px}
+.conf-head span{display:block;font-size:12px;color:var(--text-secondary)}
+.tronco{margin:8px 16px 12px;background:var(--bg-surface);border:1px solid var(--brand-border);border-radius:var(--r-lg);overflow:hidden}
+.tronco .th{display:flex;align-items:center;gap:9px;padding:12px 14px;background:var(--brand-soft);border-bottom:1px solid var(--brand-border)}
+.tronco .th i{color:var(--brand-text)}
+.tronco .th b{font-size:13px;letter-spacing:.5px;text-transform:uppercase}
+.tronco .th .badge{margin-left:auto}
+.campo{padding:11px 14px;border-bottom:1px solid var(--border-subtle)}
+.campo:last-child{border-bottom:none}
+.campo label{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px}
+.campo label i{font-size:10px;color:var(--brand-text)}
+.campo .val{font-size:14px;line-height:1.5;border-radius:var(--r-sm);padding:2px 4px;margin:-2px -4px}
+.campo .val[contenteditable="true"]{outline:none;background:var(--bg-inset);box-shadow:var(--focus-ring)}
+.campo.dever{background:var(--warning-soft)}
+.campo.dever label i{color:var(--warning-text)}
+.add-campo{display:inline-flex;align-items:center;gap:6px;margin:10px 14px 12px;font-size:12px;font-weight:700;color:var(--brand-text);background:none;border:1px dashed var(--brand-border);border-radius:var(--r-full);padding:6px 13px;cursor:pointer;font-family:var(--font)}
+.fatias-title{margin:4px 16px 8px;font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-secondary);display:flex;align-items:center;gap:8px}
+.fatias-title i{color:var(--brand-text)}
+.fatia{margin:0 16px 9px;background:var(--bg-surface);border:1px solid var(--border-subtle);border-radius:var(--r-lg);overflow:hidden}
+.fatia .fh{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
+.fatia .fh .av{width:34px;height:34px;border-radius:var(--r-full);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;background:var(--brand-soft);color:var(--brand-text)}
+.fatia .fh b{font-size:14.5px;flex:1}
+.fatia .fh .chev{color:var(--text-muted);transition:transform .2s}
+.fatia.open .fh .chev{transform:rotate(180deg)}
+.fatia .fb{display:none;border-top:1px solid var(--border-subtle)}
+.fatia.open .fb{display:block}
+.fatia.faltou .fh .av{background:var(--danger-soft);color:var(--danger-text)}
+.sug{margin:10px 14px 12px;background:var(--info-soft);border:1px solid rgba(59,130,246,.3);border-radius:var(--r-md);padding:10px 12px}
+.sug .sh{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--info-text);margin-bottom:5px}
+.sug p{font-size:13px;line-height:1.5}
+.sug .acts{display:flex;gap:8px;margin-top:9px}
+.conf-foot{position:absolute;left:0;right:0;bottom:0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg-app) 30%);display:flex;gap:10px;z-index:45}
+.conf-foot .btn{flex:1}
+
+/* ============ sucesso ============ */
+.done-stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:26px;text-align:center;position:relative}
+.done-check{width:92px;height:92px;border-radius:var(--r-full);background:var(--success-soft);border:2px solid var(--success);color:var(--success-text);display:flex;align-items:center;justify-content:center;font-size:40px;animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{0%{transform:scale(.4);opacity:0}100%{transform:scale(1);opacity:1}}
+.done-stage h2{font-size:22px;font-weight:800;letter-spacing:-.3px}
+.done-stage .sub{font-size:14px;color:var(--text-secondary);line-height:1.55;max-width:290px}
+.done-sum{display:flex;gap:9px;flex-wrap:wrap;justify-content:center}
+.done-tech{font-family:var(--mono);font-size:10.5px;color:var(--text-muted);letter-spacing:.3px}
+.confetti{position:absolute;top:-10px;width:9px;height:14px;border-radius:2px;opacity:0;pointer-events:none;animation:fall 2.6s ease-in forwards}
+@keyframes fall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(72vh) rotate(560deg)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <div class="proto-bar" id="protoBar">
+    <i class="fa-solid fa-flask"></i> PROTÓTIPO · Sprint 1 · Golden Path
+    <span class="x" onclick="document.getElementById('protoBar').style.display='none'">✕</span>
+  </div>
+
+  <!-- ================= HOME ================= -->
+  <section class="screen active" id="scr-home">
+    <div class="app-head">
+      <div class="avatar">R</div>
+      <div class="hi"><b>E aí, Rafa! 👋</b><span>Sexta, 4 de julho · Unidade Recreio</span></div>
+      <button class="icon-btn" onclick="toggleTheme()" title="Tema"><i class="fa-solid fa-circle-half-stroke"></i></button>
+    </div>
+
+    <div class="wrap">
+      <div class="fabio-card">
+        <div class="head">
+          <div class="bot"><i class="fa-solid fa-robot"></i></div>
+          <b>Briefing do Fábio</b>
+          <span class="tag" style="margin-left:auto">pré-aula · 17h</span>
+        </div>
+        <p>🥁 O <b>Gael</b> vem brilhando na condução rítmica há 2 aulas — hoje cabe um desafio novo.</p>
+        <p>💛 A <b>Alice</b> faltou 2 das últimas 4. Se ela vier, um cuidado extra faz diferença.</p>
+      </div>
+
+      <div class="card">
+        <h3><i class="fa-solid fa-calendar-day"></i> Hoje <span class="right" id="regCount">2 de 5 registradas</span></h3>
+        <div class="aula"><span class="hora">14h</span><div class="info"><b>Baby Class 1</b><span>Turma · 5 bebês</span></div><span class="badge ok"><i class="fa-solid fa-check"></i> Registrada</span><span class="dot ok"></span></div>
+        <div class="aula"><span class="hora">15h</span><div class="info"><b>Violão · Marina</b><span>Individual · Molde C</span></div><span class="badge ok"><i class="fa-solid fa-check"></i> Registrada</span><span class="dot ok"></span></div>
+        <div class="aula" id="aulaAgora"><span class="hora">17h</span><div class="info"><b>Musicalização Prep</b><span>Turma Qua/Sex · 4 crianças</span></div><span class="badge brand" id="aulaAgoraBadge" onclick="startRec()" style="cursor:pointer"><i class="fa-solid fa-microphone"></i> Registrar</span><span class="dot now" id="aulaAgoraDot"></span></div>
+        <div class="aula"><span class="hora">18h</span><div class="info"><b>Bateria · Theo</b><span>Individual · Molde C</span></div><span class="dot next"></span></div>
+        <div class="aula"><span class="hora">19h</span><div class="info"><b>Canto · Larissa A.</b><span>Individual · Molde C</span></div><span class="dot next"></span></div>
+      </div>
+
+      <div class="card" id="pendCard">
+        <h3><i class="fa-solid fa-bell"></i> Pendências</h3>
+        <div class="aula"><span class="hora">Ontem</span><div class="info"><b>Ukulele · Pedro</b><span>16h · sem registro ainda</span></div><span class="badge warn"><i class="fa-solid fa-clock"></i> 1 dia</span></div>
+        <p style="font-size:12.5px;color:var(--text-secondary);margin-top:9px;line-height:1.5"><i class="fa-solid fa-robot" style="color:var(--brand-text)"></i> Rafa, me manda um áudio de 30s da aula do Pedro que eu resolvo pra você 😉</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= GRAVAÇÃO ================= -->
+  <section class="screen" id="scr-rec">
+    <div class="rec-top">
+      <button class="back" onclick="stopRec();show('scr-home')"><i class="fa-solid fa-arrow-left"></i></button>
+      <b>Registrar aula</b>
+    </div>
+    <div class="ctx-card">
+      <div class="ico"><i class="fa-solid fa-users"></i></div>
+      <div><b>Musicalização Prep · 17h</b><span>Turma Qua/Sex · Gael, Alice, Bento e Sofia</span></div>
+      <span class="sw" onclick="toast('No piloto: seleção rápida de outra aula')">trocar</span>
+    </div>
+    <div class="rec-stage">
+      <div class="wave" id="wave">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+      <div class="rec-timer" id="timer">0:00</div>
+      <p class="rec-hint">Fala do seu jeito: o que rolou na aula, como cada um foi, e o dever de casa. O Fábio organiza. 🎙️</p>
+    </div>
+    <div class="rec-ctrl">
+      <button class="rc" id="pauseBtn" onclick="togglePause()"><i class="fa-solid fa-pause"></i></button>
+      <button class="rc main" onclick="finishRec()"><i class="fa-solid fa-stop"></i></button>
+      <button class="rc" onclick="stopRec();show('scr-home');toast('Gravação descartada')"><i class="fa-solid fa-trash"></i></button>
+    </div>
+  </section>
+
+  <!-- ================= PROCESSANDO ================= -->
+  <section class="screen" id="scr-proc">
+    <div class="proc">
+      <div class="bot-big"><i class="fa-solid fa-robot"></i></div>
+      <div style="text-align:center">
+        <b style="font-size:18px">Fábio no trabalho…</b>
+        <p style="font-size:13px;color:var(--text-secondary);margin-top:5px">Pode sair — eu te aviso quando estiver pronto.</p>
+      </div>
+      <div class="steps">
+        <div class="step" id="st1"><span class="st"><i class="fa-solid fa-spinner"></i></span> Transcrevendo seu áudio (1:12)</div>
+        <div class="step" id="st2"><span class="st"><i class="fa-solid fa-spinner"></i></span> Separando por aluno — tronco + fatias</div>
+        <div class="step" id="st3"><span class="st"><i class="fa-solid fa-spinner"></i></span> Montando o registro no Molde B</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CONFIRMAÇÃO ================= -->
+  <section class="screen" id="scr-conf">
+    <div class="conf-head">
+      <button class="back" onclick="show('scr-home')"><i class="fa-solid fa-arrow-left"></i></button>
+      <div><b>Confere aí, Rafa 👇</b><span>Musicalização Prep · hoje 17h · Molde B</span></div>
+    </div>
+
+    <div class="tronco">
+      <div class="th"><i class="fa-solid fa-tree"></i><b>Registro da turma</b><span class="badge brand">tronco</span></div>
+      <div class="campo"><label><i class="fa-solid fa-music"></i> Atividades</label><div class="val" onclick="edit(this)">Trem rítmico com copos e revezamento de andamento (rápido ⇄ lento).</div></div>
+      <div class="campo"><label><i class="fa-solid fa-bullseye"></i> Objetivo trabalhado</label><div class="val" onclick="edit(this)">Pulsação e percepção do tempo forte.</div></div>
+      <div class="campo dever"><label><i class="fa-solid fa-house"></i> Dever de casa</label><div class="val" onclick="edit(this)">Praticar a sequência de palmas acompanhando o vídeo enviado no grupo.</div></div>
+      <div id="complemento"></div>
+      <button class="add-campo" onclick="toast('No piloto: materiais, método, observações…')"><i class="fa-solid fa-plus"></i> adicionar campo</button>
+    </div>
+
+    <div class="fatias-title"><i class="fa-solid fa-user-group"></i> Fatias por aluno · 4</div>
+
+    <div class="fatia open" id="f-gael">
+      <div class="fh" onclick="flip('f-gael')"><span class="av">G</span><b>Gael</b><span class="badge ok">presente</span><i class="fa-solid fa-chevron-down chev"></i></div>
+      <div class="fb">
+        <div class="campo"><label><i class="fa-solid fa-arrow-trend-up"></i> Progresso</label><div class="val" onclick="edit(this)">Conduziu o grupo no trem rítmico com segurança — assumiu a liderança com naturalidade.</div></div>
+        <div class="campo"><label><i class="fa-solid fa-route"></i> Próximo passo</label><div class="val" onclick="edit(this)" style="color:var(--text-muted);font-style:italic">Não ouvi esse ponto no áudio — toque pra completar (eu nunca invento ✋)</div></div>
+        <div class="sug">
+          <div class="sh"><i class="fa-solid fa-wand-magic-sparkles"></i> Sugestão do Fábio · condicional à jornada</div>
+          <p>Marcar checkpoint <b>"Pulsação estável"</b> (Jornada Musicalização · Fase 2)?</p>
+          <div class="acts"><button class="btn btn-primary btn-sm" onclick="acceptCk(this)">Aceitar</button><button class="btn btn-ghost btn-sm" onclick="this.closest('.sug').remove();toast('Sugestão dispensada')">Agora não</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fatia" id="f-alice">
+      <div class="fh" onclick="flip('f-alice')"><span class="av">A</span><b>Alice</b><span class="badge ok">presente</span><i class="fa-solid fa-chevron-down chev"></i></div>
+      <div class="fb">
+        <div class="campo"><label><i class="fa-solid fa-arrow-trend-up"></i> Progresso</label><div class="val" onclick="edit(this)">Começou dispersa, engatou na segunda música e terminou puxando o coro da turma.</div></div>
+      </div>
+    </div>
+
+    <div class="fatia" id="f-sofia">
+      <div class="fh" onclick="flip('f-sofia')"><span class="av">S</span><b>Sofia</b><span class="badge ok">presente</span><i class="fa-solid fa-chevron-down chev"></i></div>
+      <div class="fb">
+        <div class="campo"><label><i class="fa-solid fa-route"></i> Próximo passo</label><div class="val" onclick="edit(this)">Consolidar o tempo forte — ainda troca em alguns momentos. Manter jogos de pulsação.</div></div>
+      </div>
+    </div>
+
+    <div class="fatia faltou" id="f-bento">
+      <div class="fh" onclick="flip('f-bento')"><span class="av">B</span><b>Bento</b><span class="badge danger">faltou</span><i class="fa-solid fa-chevron-down chev"></i></div>
+      <div class="fb">
+        <div class="campo"><label><i class="fa-solid fa-circle-info"></i> Presença</label><div class="val" style="color:var(--text-secondary)">Ausente — sem registro de conteúdo. Nada foi inventado. ✋</div></div>
+      </div>
+    </div>
+
+    <div style="height:88px"></div>
+    <div class="conf-foot">
+      <button class="btn btn-ghost" onclick="voz()"><i class="fa-solid fa-microphone"></i> Corrigir por voz</button>
+      <button class="btn btn-primary" onclick="confirmar()"><i class="fa-solid fa-check"></i> Confirmar</button>
+    </div>
+  </section>
+
+  <!-- ================= SUCESSO ================= -->
+  <section class="screen" id="scr-done">
+    <div class="done-stage" id="doneStage">
+      <div class="done-check"><i class="fa-solid fa-check"></i></div>
+      <h2>Registro confirmado! 🎉</h2>
+      <p class="sub">Gravado no diário da turma e visível pra coordenação. A Musicalização Prep de hoje está no capricho.</p>
+      <div class="done-sum">
+        <span class="badge brand">1 tronco</span>
+        <span class="badge brand">3 fatias</span>
+        <span class="badge warn">1 dever de casa</span>
+        <span class="badge info" id="ckBadge" style="display:none">1 checkpoint</span>
+      </div>
+      <button class="btn btn-primary btn-block" style="max-width:290px" onclick="voltarHome()">Voltar ao início</button>
+      <button class="btn btn-ghost btn-block" style="max-width:290px" onclick="toast('Fase 2: dever direto pro grupo da turma 😉')">Enviar dever pro grupo · em breve</button>
+      <span class="done-tech">registrar_aula_fabio · modo novo · origem áudio</span>
+    </div>
+  </section>
+
+  <!-- ================= TAB BAR ================= -->
+  <nav class="tabbar">
+    <button class="tab active" onclick="show('scr-home')"><i class="fa-solid fa-house"></i>Início</button>
+    <button class="tab" onclick="toast('No protótipo, só o fluxo de registro 😉')"><i class="fa-solid fa-user-group"></i>Alunos</button>
+    <span style="flex:1"></span>
+    <button class="tab" onclick="toast('Agenda completa entra no Sprint 2')"><i class="fa-solid fa-calendar"></i>Agenda</button>
+    <button class="tab" onclick="toast('Chat com o Fábio entra no Sprint 4')"><i class="fa-solid fa-robot"></i>Fábio</button>
+  </nav>
+  <button class="fab" id="fab" onclick="startRec()"><i class="fa-solid fa-microphone"></i></button>
+
+  <div class="toast" id="toast"></div>
+</div>
+<script>
+/* ===== navegação ===== */
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('fab').style.display = (id==='scr-home') ? 'flex' : 'none';
+  document.querySelector('.tabbar').style.display = (id==='scr-home') ? 'flex' : 'none';
+  document.getElementById(id).scrollTop = 0;
+}
+function toggleTheme(){
+  const h=document.documentElement;
+  h.dataset.theme = h.dataset.theme==='dark' ? 'light' : 'dark';
+}
+let tId=null;
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(tId); tId=setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+/* ===== gravação ===== */
+let sec=0, recTimer=null, paused=false;
+function startRec(){
+  sec=0; paused=false;
+  document.getElementById('timer').textContent='0:00';
+  document.getElementById('wave').classList.remove('paused');
+  document.getElementById('pauseBtn').innerHTML='<i class="fa-solid fa-pause"></i>';
+  show('scr-rec');
+  recTimer=setInterval(()=>{
+    if(!paused){sec++;
+      const m=Math.floor(sec/60), s=String(sec%60).padStart(2,'0');
+      document.getElementById('timer').textContent=`${m}:${s}`;}
+  },1000);
+}
+function togglePause(){
+  paused=!paused;
+  document.getElementById('wave').classList.toggle('paused',paused);
+  document.getElementById('pauseBtn').innerHTML=paused?'<i class="fa-solid fa-play"></i>':'<i class="fa-solid fa-pause"></i>';
+}
+function stopRec(){clearInterval(recTimer);recTimer=null}
+function finishRec(){
+  stopRec();
+  show('scr-proc');
+  runSteps();
+}
+
+/* ===== processando ===== */
+function runSteps(){
+  const st=['st1','st2','st3'];
+  st.forEach(id=>{const e=document.getElementById(id);e.classList.remove('doing','done');e.querySelector('.st').innerHTML='<i class="fa-solid fa-spinner"></i>'});
+  let i=0;
+  function next(){
+    if(i>0){const p=document.getElementById(st[i-1]);p.classList.replace('doing','done');p.querySelector('.st').innerHTML='<i class="fa-solid fa-check"></i>'}
+    if(i<st.length){document.getElementById(st[i]).classList.add('doing');i++;setTimeout(next,1100)}
+    else setTimeout(()=>show('scr-conf'),350);
+  }
+  next();
+}
+
+/* ===== confirmação ===== */
+function flip(id){document.getElementById(id).classList.toggle('open')}
+function edit(el){
+  el.setAttribute('contenteditable','true'); el.focus();
+  const done=()=>{el.removeAttribute('contenteditable');toast('Campo atualizado ✓');el.removeEventListener('blur',done)};
+  el.addEventListener('blur',done);
+}
+let ckAceito=false;
+function acceptCk(btn){
+  ckAceito=true;
+  btn.closest('.sug').innerHTML='<div class="sh"><i class="fa-solid fa-flag-checkered"></i> Checkpoint marcado</div><p><b>Pulsação estável</b> registrado na jornada do Gael. 🏁</p>';
+  toast('Checkpoint aceito!');
+}
+function voz(){
+  toast('🎤 Gravando complemento… (simulado)');
+  setTimeout(()=>{
+    document.getElementById('complemento').innerHTML =
+      '<div class="campo" style="background:var(--brand-soft)"><label><i class="fa-solid fa-microphone"></i> Complemento por voz</label><div class="val" onclick="edit(this)">A turma pediu pra repetir a música do trem na próxima aula — reservar 10 min.</div></div>';
+    toast('Complemento aplicado · modo complementar ✓');
+  },1600);
+}
+function confirmar(){
+  if(ckAceito) document.getElementById('ckBadge').style.display='inline-flex';
+  show('scr-done');
+  confete();
+}
+
+/* ===== sucesso ===== */
+function confete(){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cores=['--party-1','--party-2','--party-3','--party-4','--party-5'];
+  const stage=document.getElementById('doneStage');
+  stage.querySelectorAll('.confetti').forEach(c=>c.remove());
+  for(let i=0;i<16;i++){
+    const c=document.createElement('span');
+    c.className='confetti';
+    c.style.left=(6+Math.random()*88)+'%';
+    c.style.background=`var(${cores[i%5]})`;
+    c.style.animationDelay=(Math.random()*.5)+'s';
+    stage.appendChild(c);
+    setTimeout(()=>c.remove(),3200);
+  }
+}
+function voltarHome(){
+  /* estado: aula 17h vira registrada */
+  const b=document.getElementById('aulaAgoraBadge');
+  b.className='badge ok'; b.innerHTML='<i class="fa-solid fa-check"></i> Registrada';
+  document.getElementById('aulaAgoraDot').className='dot ok';
+  document.getElementById('regCount').textContent='3 de 5 registradas';
+  show('scr-home');
+  setTimeout(()=>toast('Fábio: registro de hoje no capricho 👏'),450);
+}
+</script>
+</body>
+</html>
