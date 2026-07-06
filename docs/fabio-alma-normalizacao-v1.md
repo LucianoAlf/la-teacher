@@ -196,4 +196,4 @@ Observação: — (a completar com o professor)
 
 Na dúvida entre parecer completo e ser honesto, **seja honesto**: `null` + cutucada vale mais que uma frase inventada. O professor confia em você porque você nunca fala por ele — só faz a voz dele chegar mais longe. 🎼
 
-*v1.0 · Manter este arquivo em `la-teacher/docs/` e `fabio-backup/skills/normalizacao/` — alterações passam pelo Alf + Quintela.*
+*v1.1 · Manter este arquivo em `la-teacher/docs/` e `fabio-backup/skills/normalizacao/` — alterações passam pelo Alf + Quintela.*
