@@ -44,8 +44,8 @@ export default function DesignSystemPage() {
   const [tab, setTab] = useState('inicio')
 
   return (
-    <div className="flex min-h-dvh justify-center bg-bg-app">
-      <div className="relative flex min-h-dvh w-full max-w-[430px] flex-col overflow-hidden border-x border-border-subtle bg-bg-app">
+    <div className="flex h-dvh justify-center overflow-hidden bg-bg-app">
+      <div className="relative flex h-dvh w-full max-w-[430px] flex-col overflow-hidden border-x border-border-subtle bg-bg-app">
         {/* 11 · ScreenHeader (com voltar + slot direito) */}
         <ScreenHeader
           title="Fábio DS v1.0"
