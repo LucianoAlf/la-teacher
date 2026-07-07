@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, EmptyState, FabioCard, Skeleton, Toast, useToast } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../lib/theme'
 import { formatDiaCurto, hojeBRT } from '../../lib/date'
+import type { AgendaAula } from '../../lib/api'
 import { AgendaAulaRow } from '../../features/agenda/AgendaAulaRow'
 import { CardAulasDoDia } from '../../features/agenda/CardAulasDoDia'
 import { DateNav } from '../../features/agenda/DateNav'
 import { useAgenda } from '../../features/agenda/useAgenda'
 import { buscarPendencias, type Pendencias } from '../../features/agenda/pendencias'
+import { useFilaOfflineCount } from '../../features/registro/filaOffline'
 import { AppFrame } from './AppFrame'
 import { AppNav } from './AppNav'
-
-const TOAST_S3 = 'Registro por voz chega no Sprint 3 🎙️'
 
 function primeiroNome(email?: string, nome?: string): string {
   if (nome) return nome.split(' ')[0]
@@ -25,9 +26,13 @@ export default function HomePage() {
   const { session } = useAuth()
   const { toggle } = useTheme()
   const { message, visible, show } = useToast()
+  const navigate = useNavigate()
   const [data, setData] = useState<string>(hojeBRT())
 
   const { estado, recarregar } = useAgenda(data)
+  const filaOffline = useFilaOfflineCount()
+  const abrirGravacao = (aula: AgendaAula) =>
+    navigate(`/app/gravar/${aula.aula_local_id}`, { state: { aula } })
   const nome = primeiroNome(
     session?.user.email,
     (session?.user.user_metadata?.name as string | undefined) ?? undefined,
@@ -55,6 +60,15 @@ export default function HomePage() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 pb-32 pt-2">
+        {/* Áudios aguardando conexão (fila offline) */}
+        {filaOffline > 0 && (
+          <div className="mb-3 flex items-center gap-2 rounded-md border border-border-subtle bg-warning-soft px-3 py-[10px] text-[12.5px] font-semibold text-warning-text">
+            <i className="fa-solid fa-cloud-arrow-up" aria-hidden="true" />
+            {filaOffline === 1 ? '1 áudio na fila' : `${filaOffline} áudios na fila`} — envio automático
+            quando a conexão voltar
+          </div>
+        )}
+
         {/* 2 · Briefing do Fábio (estático nesta fase) */}
         <div className="mb-3">
           <FabioCard tag="em breve">
@@ -72,14 +86,14 @@ export default function HomePage() {
 
         {/* 3 · Aulas do dia */}
         <div className="mb-3">
-          <CardAulasDoDia data={data} estado={estado} onRetry={recarregar} onRegistrar={() => show(TOAST_S3)} />
+          <CardAulasDoDia data={data} estado={estado} onRetry={recarregar} onGravar={abrirGravacao} />
         </div>
 
         {/* 4 · Pendências */}
-        <PendenciasCard onToastS3={() => show(TOAST_S3)} />
+        <PendenciasCard onGravar={abrirGravacao} />
       </div>
 
-      <AppNav onFabMic={() => show(TOAST_S3)} onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')} />
+      <AppNav onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')} />
       <Toast message={message} visible={visible} />
     </AppFrame>
   )
@@ -87,7 +101,7 @@ export default function HomePage() {
 
 // ---------------------------------------------------------------------------
 
-function PendenciasCard({ onToastS3 }: { onToastS3: () => void }) {
+function PendenciasCard({ onGravar }: { onGravar: (aula: AgendaAula) => void }) {
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'erro'>('carregando')
   const [pend, setPend] = useState<Pendencias | null>(null)
 
@@ -132,7 +146,7 @@ function PendenciasCard({ onToastS3 }: { onToastS3: () => void }) {
   return (
     <Card title="Pendências" icon="fa-solid fa-bell" right={formatDiaCurto(pend.data)}>
       {pend.aulas.map((a) => (
-        <AgendaAulaRow key={a.aula_local_id} aula={a} onRegistrar={onToastS3} />
+        <AgendaAulaRow key={a.aula_local_id} aula={a} onGravar={onGravar} />
       ))}
       <p className="mt-[9px] flex items-start gap-2 text-[12.5px] leading-relaxed text-text-secondary">
         <i className="fa-solid fa-robot mt-[3px] text-brand-text" aria-hidden="true" />

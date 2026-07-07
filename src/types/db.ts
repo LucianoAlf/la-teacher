@@ -4537,6 +4537,24 @@ export type Database = {
         }
         Relationships: []
       }
+      automacoes_config: {
+        Row: {
+          ativo: boolean
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bi_agent_config_lamusic: {
         Row: {
           cache_enabled: boolean | null
@@ -27569,9 +27587,25 @@ export type Database = {
         }
         Returns: Json
       }
-      app_confirmar_registro: { Args: { p_registro_id: string }; Returns: Json }
+      app_confirmar_registro: {
+        Args: { p_modo?: string; p_registro_id: string }
+        Returns: Json
+      }
+      app_enfileirar_audio: {
+        Args: {
+          p_aula_id: number
+          p_duracao_segundos?: number
+          p_registro_id?: string
+          p_storage_path: string
+        }
+        Returns: Json
+      }
       app_meus_registros: { Args: { p_status?: string }; Returns: Json }
       app_minha_agenda: { Args: { p_data?: string }; Returns: Json }
+      app_minha_agenda_mes: {
+        Args: { p_fim?: string; p_inicio?: string }
+        Returns: Json
+      }
       app_minha_carteira: { Args: never; Returns: Json }
       assert_competencia_aberta: {
         Args: { p_ano: number; p_mes: number; p_unidade_id: string }
@@ -27797,6 +27831,8 @@ export type Database = {
         Args: { p_ano: number; p_mes: number }
         Returns: undefined
       }
+      fn_fabio_chama_edge: { Args: { p_audio_id: string }; Returns: undefined }
+      fn_fabio_retry_fila: { Args: never; Returns: number }
       fn_professor_do_usuario: { Args: never; Returns: number }
       get_analise_pesquisas: {
         Args: {
@@ -27809,7 +27845,11 @@ export type Database = {
       get_anamnese_by_token: { Args: { p_token: string }; Returns: Json }
       get_anamnese_publica: { Args: { p_token: string }; Returns: Json }
       get_candidatos_pesquisa_primeira_aula: {
-        Args: { p_janela_dias?: number; p_unidade_id?: string }
+        Args: {
+          p_apenas_ontem?: boolean
+          p_janela_dias?: number
+          p_unidade_id?: string
+        }
         Returns: {
           aluno_id: number
           curso_nome: string
@@ -27924,6 +27964,16 @@ export type Database = {
         }
         Returns: Json
       }
+      get_conciliacao_experimentais_v2_legacy_p21_20260707: {
+        Args: {
+          p_ano: number
+          p_data?: string
+          p_mes: number
+          p_periodo?: string
+          p_unidade_id: string
+        }
+        Returns: Json
+      }
       get_conciliacao_leads_qualidade_v1: {
         Args: {
           p_ano?: number
@@ -27971,6 +28021,30 @@ export type Database = {
         Returns: Json
       }
       get_dados_relatorio_gerencial_legacy_p02r_20260620: {
+        Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
+        Returns: Json
+      }
+      get_dados_relatorio_gerencial_legacy_p16_20260706: {
+        Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
+        Returns: Json
+      }
+      get_dados_relatorio_gerencial_legacy_p17_20260707: {
+        Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
+        Returns: Json
+      }
+      get_dados_relatorio_gerencial_legacy_p18_20260707: {
+        Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
+        Returns: Json
+      }
+      get_dados_relatorio_gerencial_legacy_p19_20260707: {
+        Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
+        Returns: Json
+      }
+      get_dados_relatorio_gerencial_legacy_p20_20260707: {
+        Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
+        Returns: Json
+      }
+      get_dados_relatorio_gerencial_legacy_p21_20260707: {
         Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
         Returns: Json
       }

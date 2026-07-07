@@ -91,3 +91,35 @@ export async function confirmarRegistro(registroId: string): Promise<unknown> {
   if (error) throw error
   return res
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 3 · motor de registro
+// ---------------------------------------------------------------------------
+
+export interface EnfileirarResultado {
+  audio_id: string
+  status: 'pendente'
+  modo: 'novo' | 'complementar'
+  registro_id: string | null
+}
+
+/**
+ * Enfileira um áudio gravado (fabio_fila_audios) para o Fábio processar.
+ * A RPC resolve professor e unidade via auth.uid(); `registroId` não nulo
+ * marca correção por voz (modo complementar). LANÇA exceção em erro.
+ */
+export async function enfileirarAudio(
+  aulaId: number,
+  storagePath: string,
+  duracaoSegundos: number,
+  registroId: string | null = null,
+): Promise<EnfileirarResultado> {
+  const { data: res, error } = await supabase.rpc('app_enfileirar_audio', {
+    p_aula_id: aulaId,
+    p_storage_path: storagePath,
+    p_duracao_segundos: duracaoSegundos,
+    ...(registroId ? { p_registro_id: registroId } : {}),
+  })
+  if (error) throw error
+  return res as unknown as EnfileirarResultado
+}

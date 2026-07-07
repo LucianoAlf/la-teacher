@@ -4,6 +4,9 @@ import LoginPage from './pages/app/Login'
 import HomePage from './pages/app/Home'
 import AgendaPage from './pages/app/Agenda'
 import AlunosPage from './pages/app/Alunos'
+import GravarAulaPage from './features/registro/GravarAula'
+import ProcessandoPage from './features/registro/Processando'
+import ConfirmarStubPage from './features/registro/ConfirmarStub'
 import { RequireProfessor } from './pages/app/RequireProfessor'
 import { useAuth } from './lib/auth'
 
@@ -25,6 +28,10 @@ export const router = createBrowserRouter(
         { path: '/app', element: <HomePage /> },
         { path: '/app/agenda', element: <AgendaPage /> },
         { path: '/app/alunos', element: <AlunosPage /> },
+        { path: '/app/gravar', element: <GravarAulaPage /> },
+        { path: '/app/gravar/:aulaId', element: <GravarAulaPage /> },
+        { path: '/app/processando/:audioId', element: <ProcessandoPage /> },
+        { path: '/app/confirmar/:registroId', element: <ConfirmarStubPage /> },
       ],
     },
     // Vitrine do design system — pública (sem guard), útil no dev.

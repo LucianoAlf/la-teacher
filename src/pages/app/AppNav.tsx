@@ -15,14 +15,12 @@ const ROTA: Record<string, string> = {
 }
 
 interface Props {
-  /** Toque no FAB de microfone (fluxo real é do Sprint 3). */
-  onFabMic: () => void
   /** Toque na aba Fábio (chat é do Sprint 4). */
   onFabio: () => void
 }
 
-/** TabBar + FAB do app, com navegação real entre Início/Alunos/Agenda. */
-export function AppNav({ onFabMic, onFabio }: Props) {
+/** TabBar + FAB do app; o FAB de microfone abre a gravação (P5). */
+export function AppNav({ onFabio }: Props) {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const ativo = pathname.startsWith('/app/alunos')
@@ -41,7 +39,7 @@ export function AppNav({ onFabMic, onFabio }: Props) {
           else if (ROTA[id]) nav(ROTA[id])
         }}
       />
-      <Fab onClick={onFabMic} />
+      <Fab onClick={() => nav('/app/gravar')} />
     </>
   )
 }

@@ -7,8 +7,6 @@ import { AlunoRow } from '../../features/alunos/AlunoRow'
 import { AppFrame } from './AppFrame'
 import { AppNav } from './AppNav'
 
-const TOAST_S3 = 'Registro por voz chega no Sprint 3 🎙️'
-
 /** /app/alunos — carteira do professor, busca por nome, agrupada por curso. */
 export default function AlunosPage() {
   const { toggle } = useTheme()
@@ -63,7 +61,7 @@ export default function AlunosPage() {
         />
       </div>
 
-      <AppNav onFabMic={() => show(TOAST_S3)} onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')} />
+      <AppNav onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')} />
       <Toast message={message} visible={visible} />
     </AppFrame>
   )

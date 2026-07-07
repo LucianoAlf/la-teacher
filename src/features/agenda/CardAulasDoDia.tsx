@@ -1,6 +1,7 @@
 import { Button, Card, EmptyState, Skeleton } from '../../components/ui'
 import { formatDiaCurto, isHoje } from '../../lib/date'
 import { contarRegistradas } from './aula'
+import type { AgendaAula } from '../../lib/api'
 import { AgendaAulaRow } from './AgendaAulaRow'
 import type { EstadoAgenda } from './useAgenda'
 
@@ -8,14 +9,14 @@ interface Props {
   data: string
   estado: EstadoAgenda
   onRetry: () => void
-  /** Toque no badge "Registrar" (fluxo real é do Sprint 3). */
-  onRegistrar: () => void
+  /** Abrir a gravação da aula tocada (P5). */
+  onGravar: (aula: AgendaAula) => void
   /** Título do card. Default: "Hoje" quando é hoje, senão o dia curto. */
   titulo?: string
 }
 
 /** Card com as aulas de um dia (skeleton/erro/vazio/lista). Usado na Home e na Agenda. */
-export function CardAulasDoDia({ data, estado, onRetry, onRegistrar, titulo }: Props) {
+export function CardAulasDoDia({ data, estado, onRetry, onGravar, titulo }: Props) {
   const tit = titulo ?? (isHoje(data) ? 'Hoje' : formatDiaCurto(data))
 
   if (estado.fase === 'carregando') {
@@ -88,7 +89,7 @@ export function CardAulasDoDia({ data, estado, onRetry, onRegistrar, titulo }: P
   return (
     <Card title={tit} icon="fa-solid fa-calendar-day" right={`${registradas} de ${total} registradas`}>
       {aulas.map((a) => (
-        <AgendaAulaRow key={a.aula_local_id} aula={a} onRegistrar={onRegistrar} />
+        <AgendaAulaRow key={a.aula_local_id} aula={a} onGravar={onGravar} />
       ))}
     </Card>
   )

@@ -26,8 +26,16 @@ export default {
       keyframes: {
         // pulso do dot "agora" (protótipo golden-path) — só opacidade, sem cor
         'pulse-soft': { '0%,100%': { opacity: '1' }, '50%': { opacity: '.45' } },
+        // onda da gravação (protótipo .wave) — só altura
+        wave: { '0%,100%': { height: '10px' }, '50%': { height: '56px' } },
+        // robô do "processando" (protótipo .bot-big) — só translação
+        bob: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-7px)' } },
       },
-      animation: { 'pulse-soft': 'pulse-soft 1.6s infinite' },
+      animation: {
+        'pulse-soft': 'pulse-soft 1.6s infinite',
+        wave: 'wave 1s ease-in-out infinite',
+        bob: 'bob 2.2s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

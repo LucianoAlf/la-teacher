@@ -3,6 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { Button } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { isSemVinculo, minhaAgenda } from '../../lib/api'
+import { iniciarSincronizacaoFila } from '../../features/registro/uploadAudio'
 import { AppFrame } from './AppFrame'
 import VinculoPendentePage from './VinculoPendente'
 
@@ -53,6 +54,12 @@ export function RequireProfessor() {
       vivo = false
     }
   }, [loading, userId, tentativa])
+
+  // Professor autenticado e vinculado → liga o reenvio automático da fila
+  // offline (gravações feitas sem rede sobem sozinhas).
+  useEffect(() => {
+    if (estado === 'ok') iniciarSincronizacaoFila()
+  }, [estado])
 
   if (loading) return <Carregando />
   if (!session) return <Navigate to="/app/login" replace />

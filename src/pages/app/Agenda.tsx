@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button, ScreenHeader, Toast, useToast } from '../../components/ui'
 import { useTheme } from '../../lib/theme'
 import { hojeBRT } from '../../lib/date'
+import type { AgendaAula } from '../../lib/api'
 import { DateNav } from '../../features/agenda/DateNav'
 import { CardAulasDoDia } from '../../features/agenda/CardAulasDoDia'
 import { SemanaStrip } from '../../features/agenda/SemanaStrip'
@@ -10,16 +12,17 @@ import { useSemana } from '../../features/agenda/useSemana'
 import { AppFrame } from './AppFrame'
 import { AppNav } from './AppNav'
 
-const TOAST_S3 = 'Registro por voz chega no Sprint 3 🎙️'
-
 /** /app/agenda — semana compacta + dia selecionado (reusa app_minha_agenda). */
 export default function AgendaPage() {
   const { toggle } = useTheme()
   const { message, visible, show } = useToast()
+  const navigate = useNavigate()
   const [data, setData] = useState<string>(hojeBRT())
 
   const { estado, recarregar } = useAgenda(data)
   const { dias, contagem } = useSemana(data)
+  const abrirGravacao = (aula: AgendaAula) =>
+    navigate(`/app/gravar/${aula.aula_local_id}`, { state: { aula } })
 
   return (
     <AppFrame>
@@ -41,11 +44,11 @@ export default function AgendaPage() {
         </div>
 
         <div className="px-4">
-          <CardAulasDoDia data={data} estado={estado} onRetry={recarregar} onRegistrar={() => show(TOAST_S3)} />
+          <CardAulasDoDia data={data} estado={estado} onRetry={recarregar} onGravar={abrirGravacao} />
         </div>
       </div>
 
-      <AppNav onFabMic={() => show(TOAST_S3)} onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')} />
+      <AppNav onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')} />
       <Toast message={message} visible={visible} />
     </AppFrame>
   )
