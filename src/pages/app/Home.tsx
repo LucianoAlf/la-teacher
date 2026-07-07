@@ -4,7 +4,7 @@ import { Card, EmptyState, FabioCard, Skeleton, Toast, useToast } from '../../co
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../lib/theme'
 import { formatDiaCurto, hojeBRT } from '../../lib/date'
-import type { AgendaAula } from '../../lib/api'
+import { registrosPendentes, type AgendaAula, type RegistroRow } from '../../lib/api'
 import { AgendaAulaRow } from '../../features/agenda/AgendaAulaRow'
 import { CardAulasDoDia } from '../../features/agenda/CardAulasDoDia'
 import { DateNav } from '../../features/agenda/DateNav'
@@ -69,6 +69,9 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* Registros do Fábio esperando confirmação */}
+        <AguardandoConfirmacao onAbrir={(id) => navigate(`/app/confirmar/${id}`)} />
+
         {/* 2 · Briefing do Fábio (estático nesta fase) */}
         <div className="mb-3">
           <FabioCard tag="em breve">
@@ -100,6 +103,46 @@ export default function HomePage() {
 }
 
 // ---------------------------------------------------------------------------
+
+/** Atalho: registros que o Fábio estruturou e esperam o "confere e confirma". */
+function AguardandoConfirmacao({ onAbrir }: { onAbrir: (registroId: string) => void }) {
+  const [regs, setRegs] = useState<RegistroRow[]>([])
+
+  useEffect(() => {
+    let vivo = true
+    registrosPendentes()
+      .then((r) => vivo && setRegs(r))
+      .catch(() => {}) // atalho é bônus — nunca quebra a Home
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  if (regs.length === 0) return null
+  return (
+    <div className="mb-3 overflow-hidden rounded-lg border border-[color:var(--brand-border)] bg-bg-surface">
+      <div className="flex items-center gap-2 bg-brand-soft px-3 py-2 text-[12px] font-bold text-brand-text">
+        <i className="fa-solid fa-clipboard-check" aria-hidden="true" />
+        {regs.length === 1 ? '1 registro esperando sua confirmação' : `${regs.length} registros esperando sua confirmação`}
+      </div>
+      {regs.map((r) => (
+        <button
+          key={r.id}
+          type="button"
+          className="flex w-full items-center gap-2 border-t border-border-subtle bg-transparent px-3 py-[10px] text-left"
+          onClick={() => onAbrir(r.id)}
+        >
+          <i className="fa-solid fa-robot text-brand-text" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">
+            {(r.campos.turma as string) ?? 'Registro de aula'}
+          </span>
+          <span className="text-xs text-text-secondary">conferir</span>
+          <i className="fa-solid fa-chevron-right text-[11px] text-text-muted" aria-hidden="true" />
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function PendenciasCard({ onGravar }: { onGravar: (aula: AgendaAula) => void }) {
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'erro'>('carregando')

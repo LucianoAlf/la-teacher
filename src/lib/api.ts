@@ -82,19 +82,94 @@ export async function meusRegistros(status?: string): Promise<unknown[]> {
   return (res as unknown[]) ?? []
 }
 
+export interface PendenciaConfirmacao {
+  fatia_id: string
+  aluno_id: number | null
+  motivo: string
+}
+
+export interface ConfirmacaoResultado {
+  registro_id: string
+  gravadas: number
+  ausentes_puladas: number
+  pendencias: PendenciaConfirmacao[]
+}
+
 /**
- * Confirma um registro → grava via porta única registrar_aula_fabio.
- * A RPC LANÇA exceção (sem vínculo, registro inválido etc.) — vira throw aqui.
+ * Confirma um registro → grava POR ALUNO via porta única registrar_aula_fabio
+ * (fatias presentes com texto; ausentes são puladas). LANÇA exceção em erro.
  */
-export async function confirmarRegistro(registroId: string): Promise<unknown> {
+export async function confirmarRegistro(registroId: string): Promise<ConfirmacaoResultado> {
   const { data: res, error } = await supabase.rpc('app_confirmar_registro', { p_registro_id: registroId })
   if (error) throw error
-  return res
+  return res as unknown as ConfirmacaoResultado
 }
 
 // ---------------------------------------------------------------------------
 // Sprint 3 · motor de registro
 // ---------------------------------------------------------------------------
+
+/** Linha de fabio_registros_aula (tronco ou fatia) como a RPC devolve. */
+export interface RegistroRow {
+  id: string
+  aula_id: number | null
+  aluno_id: number | null
+  parent_id: string | null
+  molde: 'A' | 'B' | 'C'
+  campos: Record<string, unknown>
+  texto_consolidado: string | null
+  status: string
+  origem: string
+  criado_em: string
+  [k: string]: unknown
+}
+
+export interface AulaContexto {
+  data_aula: string | null
+  hora: string | null
+  turma: string | null
+  curso: string | null
+  tipo: string | null
+}
+
+export interface RegistroCompleto {
+  tronco: RegistroRow
+  fatias: RegistroRow[]
+  aula: AulaContexto | null
+}
+
+/** Tronco + fatias + contexto da aula. Erros da RPC: sem_professor | nao_encontrado. */
+export async function registroCompleto(registroId: string): Promise<RegistroCompleto | RpcErro> {
+  const { data: res, error } = await supabase.rpc('app_registro_completo', { p_registro_id: registroId })
+  if (error) throw error
+  const obj = res as unknown as RegistroCompleto | RpcErro
+  return obj
+}
+
+/** Registros (troncos) do professor aguardando confirmação, mais recentes primeiro. */
+export async function registrosPendentes(): Promise<RegistroRow[]> {
+  const { data: res, error } = await supabase.rpc('app_registros_pendentes')
+  if (error) throw error
+  return (res as unknown as RegistroRow[]) ?? []
+}
+
+/**
+ * Atualiza texto e/ou campos (merge) de um tronco/fatia em edição.
+ * Só o dono, só em rascunho/aguardando_confirmacao. LANÇA exceção em erro.
+ */
+export async function atualizarFatia(
+  id: string,
+  texto: string | null,
+  campos: Record<string, unknown> | null,
+): Promise<RegistroRow> {
+  const { data: res, error } = await supabase.rpc('app_atualizar_fatia', {
+    p_id: id,
+    ...(texto != null ? { p_texto: texto } : {}),
+    ...(campos != null ? { p_campos: campos as never } : {}),
+  })
+  if (error) throw error
+  return res as unknown as RegistroRow
+}
 
 export interface EnfileirarResultado {
   audio_id: string

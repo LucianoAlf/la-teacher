@@ -14,6 +14,8 @@ export interface ItemFilaLocal {
   blob: Blob
   mime: string
   duracaoSegundos: number
+  /** Não nulo = correção por voz (modo complementar). */
+  registroId?: string | null
   criadoEm: string
 }
 

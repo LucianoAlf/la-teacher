@@ -30,11 +30,22 @@ export default {
         wave: { '0%,100%': { height: '10px' }, '50%': { height: '56px' } },
         // robô do "processando" (protótipo .bot-big) — só translação
         bob: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-7px)' } },
+        // tela de sucesso (protótipo .done-check / .confetti) — geometria/opacidade
+        pop: {
+          '0%': { transform: 'scale(.4)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        fall: {
+          '0%': { opacity: '1', transform: 'translateY(0) rotate(0)' },
+          '100%': { opacity: '0', transform: 'translateY(72vh) rotate(560deg)' },
+        },
       },
       animation: {
         'pulse-soft': 'pulse-soft 1.6s infinite',
         wave: 'wave 1s ease-in-out infinite',
         bob: 'bob 2.2s ease-in-out infinite',
+        pop: 'pop .45s cubic-bezier(.2,1.6,.4,1)',
+        fall: 'fall 2.6s ease-in forwards',
       },
     },
   },

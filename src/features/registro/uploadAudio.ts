@@ -11,6 +11,8 @@ export interface DadosEnvio {
   blob: Blob
   mime: string
   duracaoSegundos: number
+  /** Não nulo = correção por voz (modo complementar) do registro. */
+  registroId?: string | null
 }
 
 export type ResultadoEnvio =
@@ -36,6 +38,7 @@ export async function enviarAudio(dados: DadosEnvio): Promise<ResultadoEnvio> {
         blob: dados.blob,
         mime: dados.mime,
         duracaoSegundos: dados.duracaoSegundos,
+        registroId: dados.registroId ?? null,
         criadoEm: new Date().toISOString(),
       })
       return { ok: false, guardadoOffline: true }
@@ -56,7 +59,7 @@ async function subirEEnfileirar(dados: DadosEnvio): Promise<string> {
   })
   if (upErro) throw upErro
 
-  const res = await enfileirarAudio(dados.aulaId, path, dados.duracaoSegundos)
+  const res = await enfileirarAudio(dados.aulaId, path, dados.duracaoSegundos, dados.registroId ?? null)
   return res.audio_id
 }
 
@@ -82,6 +85,7 @@ export async function esvaziarFilaLocal(): Promise<number> {
           blob: item.blob,
           mime: item.mime,
           duracaoSegundos: item.duracaoSegundos,
+          registroId: item.registroId ?? null,
         })
         await removerDaFila(item.id)
         enviados++

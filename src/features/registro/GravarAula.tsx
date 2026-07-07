@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, EmptyState, ScreenHeader, Skeleton } from '../../components/ui'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Badge, Button, Card, EmptyState, ScreenHeader, Skeleton } from '../../components/ui'
 import type { AgendaAula } from '../../lib/api'
 import { hojeBRT } from '../../lib/date'
 import { detalheAula, horaAula, nomeAula, temRegistro } from '../agenda/aula'
@@ -86,6 +86,9 @@ type FaseEnvio = 'nao_enviado' | 'enviando' | 'fila_offline' | 'erro_envio'
 function Gravador({ aulaId }: { aulaId: number }) {
   const navigate = useNavigate()
   const { state } = useLocation() as { state?: { aula?: AgendaAula } }
+  const [params] = useSearchParams()
+  /** Não nulo = correção por voz: complementa um registro existente. */
+  const registroCorrecao = params.get('registro')
   const aula = state?.aula
   const rec = useRecorder()
   const [envio, setEnvio] = useState<FaseEnvio>('nao_enviado')
@@ -103,6 +106,7 @@ function Gravador({ aulaId }: { aulaId: number }) {
       blob: rec.blob,
       mime: rec.mime || rec.blob.type,
       duracaoSegundos: rec.segundos,
+      registroId: registroCorrecao,
     })
     if (r.ok) {
       navigate(`/app/processando/${r.audioId}`, { state: { aulaLabel: titulo } })
@@ -124,7 +128,19 @@ function Gravador({ aulaId }: { aulaId: number }) {
           <b className="block truncate text-[14.5px]">{titulo}</b>
           {sub && <span className="block truncate text-xs text-text-secondary">{sub}</span>}
         </div>
+        {registroCorrecao && (
+          <Badge variant="info" icon="fa-solid fa-wand-magic-sparkles" className="ml-auto">
+            correção
+          </Badge>
+        )}
       </div>
+
+      {registroCorrecao && (
+        <p className="mx-4 mt-2 text-[12px] leading-relaxed text-text-secondary">
+          <i className="fa-solid fa-circle-info text-brand-text" aria-hidden="true" /> Modo correção: fala só o
+          que quer ajustar ou completar — o Fábio faz o merge no registro existente, sem apagar o resto.
+        </p>
+      )}
 
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-5 text-center">
         {rec.estado === 'erro' && (

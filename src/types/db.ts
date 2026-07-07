@@ -7948,6 +7948,131 @@ export type Database = {
           },
         ]
       }
+      emusys_faturas: {
+        Row: {
+          competencia: string
+          created_at: string
+          data_pagamento: string | null
+          data_vencimento: string
+          desconto_aplicado: number
+          desconto_condicional: number
+          desconto_fixo: number
+          descricao: string
+          emusys_contrato_id: number | null
+          emusys_fatura_id: number
+          emusys_matricula_id: number | null
+          emusys_student_id: number | null
+          id: string
+          juros_e_multa: number
+          payload: Json
+          status: string
+          synced_at: string
+          unidade_codigo: string
+          unidade_id: string
+          updated_at: string
+          valor_original: number
+          valor_pago: number | null
+        }
+        Insert: {
+          competencia: string
+          created_at?: string
+          data_pagamento?: string | null
+          data_vencimento: string
+          desconto_aplicado?: number
+          desconto_condicional?: number
+          desconto_fixo?: number
+          descricao?: string
+          emusys_contrato_id?: number | null
+          emusys_fatura_id: number
+          emusys_matricula_id?: number | null
+          emusys_student_id?: number | null
+          id?: string
+          juros_e_multa?: number
+          payload?: Json
+          status?: string
+          synced_at?: string
+          unidade_codigo: string
+          unidade_id: string
+          updated_at?: string
+          valor_original?: number
+          valor_pago?: number | null
+        }
+        Update: {
+          competencia?: string
+          created_at?: string
+          data_pagamento?: string | null
+          data_vencimento?: string
+          desconto_aplicado?: number
+          desconto_condicional?: number
+          desconto_fixo?: number
+          descricao?: string
+          emusys_contrato_id?: number | null
+          emusys_fatura_id?: number
+          emusys_matricula_id?: number | null
+          emusys_student_id?: number | null
+          id?: string
+          juros_e_multa?: number
+          payload?: Json
+          status?: string
+          synced_at?: string
+          unidade_codigo?: string
+          unidade_id?: string
+          updated_at?: string
+          valor_original?: number
+          valor_pago?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emusys_faturas_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emusys_faturas_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_dashboard_unidade"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "emusys_faturas_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_resumo_alertas"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "emusys_faturas_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_historico"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "emusys_faturas_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "emusys_faturas_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_gestao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "emusys_faturas_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_retencao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+        ]
+      }
       emusys_sync_log: {
         Row: {
           alunos_matched: number | null
@@ -27587,6 +27712,10 @@ export type Database = {
         }
         Returns: Json
       }
+      app_atualizar_fatia: {
+        Args: { p_campos?: Json; p_id: string; p_texto?: string }
+        Returns: Json
+      }
       app_confirmar_registro: {
         Args: { p_modo?: string; p_registro_id: string }
         Returns: Json
@@ -27607,6 +27736,8 @@ export type Database = {
         Returns: Json
       }
       app_minha_carteira: { Args: never; Returns: Json }
+      app_registro_completo: { Args: { p_registro_id: string }; Returns: Json }
+      app_registros_pendentes: { Args: never; Returns: Json }
       assert_competencia_aberta: {
         Args: { p_ano: number; p_mes: number; p_unidade_id: string }
         Returns: undefined
@@ -27974,6 +28105,16 @@ export type Database = {
         }
         Returns: Json
       }
+      get_conciliacao_experimentais_v2_legacy_p22_20260707: {
+        Args: {
+          p_ano: number
+          p_data?: string
+          p_mes: number
+          p_periodo?: string
+          p_unidade_id: string
+        }
+        Returns: Json
+      }
       get_conciliacao_leads_qualidade_v1: {
         Args: {
           p_ano?: number
@@ -28045,6 +28186,14 @@ export type Database = {
         Returns: Json
       }
       get_dados_relatorio_gerencial_legacy_p21_20260707: {
+        Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
+        Returns: Json
+      }
+      get_dados_relatorio_gerencial_legacy_p22_20260707: {
+        Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
+        Returns: Json
+      }
+      get_dados_relatorio_gerencial_legacy_p23_20260707: {
         Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
         Returns: Json
       }
@@ -28126,6 +28275,10 @@ export type Database = {
           unidade_id: string
           whatsapp: string
         }[]
+      }
+      get_financeiro_faturas_emusys: {
+        Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
+        Returns: Json
       }
       get_heatmap_data: {
         Args: { p_ano: number; p_metrica: string }
