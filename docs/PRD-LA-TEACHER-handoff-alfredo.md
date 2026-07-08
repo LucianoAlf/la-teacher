@@ -182,3 +182,48 @@ Detalhe completo na Alma v1.1 (`fabio-alma-normalizacao-v1-1.md`).
 
 *PRD & Handoff · LA Teacher · LA Music · Sistema Agent-First · 07/07/2026*
 *Alfredo, você é a peça que fecha o círculo do lado da VPS. Onde eu paro (banco), você começa (o Fábio ganhando a porta nova). Qualquer dúvida do desenho, é só perguntar.* 🌉🎼
+
+---
+
+## 12 · Atualização operacional — 08/07/2026
+
+> Esta seção atualiza o estado real depois do handoff original. O desenho acima continua válido, mas alguns itens que estavam como pendentes já foram configurados e testados.
+
+### Estado real do bloco Fábio/Hermes
+
+- **Alma v1.1:** ativa no Fábio/Hermes e versionada no `fabio-backup`.
+- **`fabio-backup`:** acesso SSH/GitHub funcionando; push validado.
+- **`la-teacher` na LAHQ:** clonado em `/home/fabio/la-teacher`, com acesso SSH ao GitHub.
+- **Webhook adapter Hermes:** ativo na porta `8644`.
+- **Rota:** `/webhooks/registro-aula` ativa.
+- **HMAC:** obrigatório e validado; sem assinatura retorna `401`, com assinatura válida retorna `202`.
+- **Edge Function carteiro:** deployada em `https://ouqwbbermlzqqvtqwlul.supabase.co/functions/v1/fabio-registro-aula`.
+- **HMAC da Edge → Hermes:** `X-Webhook-Signature` com HMAC-SHA256 em hex puro.
+- **Vault operacional:** `fabio_edge_url` e `fabio_edge_token` criados.
+- **`fn_fabio_chama_edge`:** validada chamando a Edge via `pg_net`; resposta `200 {"status":"enviado_ao_fabio"}`.
+- **Toolset mínimo do Fábio:** configurado para buscar contexto, transcrever áudio, chamar `fabio_criar_registro` e atualizar status da fila.
+
+### Guardrails adicionados depois do handoff
+
+- Transcrição vazia **não cria registro**.
+- Fila não pode ficar presa em `transcrevendo` após o webhook terminar.
+- `normalizado` só é permitido se existir registro real em `fabio_registros_aula` para o `audio_id`.
+- Áudios antigos/sintéticos do Matheus transcrevem vazio; devem ficar em `erro` e não servem como prova de qualidade do P6.
+
+### Próximo teste correto
+
+O próximo teste precisa ser ponta a ponta com **áudio novo e audível gravado pelo app**:
+
+1. professor grava áudio real;
+2. app sobe para Storage e enfileira;
+3. trigger chama `fn_fabio_chama_edge`;
+4. Edge assina e chama Hermes/Fábio;
+5. Fábio transcreve, normaliza pela Alma v1.1 e chama `fabio_criar_registro`;
+6. app mostra a tela de Confirmação via Realtime.
+
+### Regra operacional para o Fábio no repo
+
+- Feature nova: branch `fabio/<escopo-curto>`.
+- `main`: só docs/hotfix pequeno aprovado.
+- Alfredo audita infra/repo/VPS; Claude valida banco/contrato quando envolver RPC, Edge Function ou Supabase; Alf aprova decisão sensível de produto/fluxo.
+

@@ -218,3 +218,53 @@ Dashboard HTML clicável: `la-teacher-roadmap-dashboard.html` (marca tarefas, sa
 
 *Dossiê Central · LA Music · Sistema Agent-First · mantido no repo como fonte de verdade única.*
 *"Quem constrói ponte não é arrogante — arrogante é quem cobra pedágio."* 🌉🎼
+
+---
+
+## Atualização operacional — 08/07/2026 · Estado real do Fábio/Hermes
+
+O dossiê original dizia que a configuração do webhook ainda estava pendente. Isso ficou defasado depois da rodada Alfredo + Fábio + Claude. O estado real agora é:
+
+### Bloco C · Cérebro / Fábio real via Hermes
+
+| Item | Estado | Evidência |
+|---|---:|---|
+| Alma v1.1 | 🟢 Ativa | `fabio-backup` atualizado; regra turma comum vs nominal versionada |
+| Acesso GitHub Fábio | 🟢 Ativo | deploy keys SSH para `fabio-backup` e `la-teacher` |
+| `la-teacher` na LAHQ | 🟢 Ativo | `/home/fabio/la-teacher`, limpo em `main...origin/main` |
+| Webhook adapter | 🟢 Ativo | porta `8644` escutando na LAHQ |
+| Rota `registro-aula` | 🟢 Ativa | `/webhooks/registro-aula` |
+| HMAC | 🟢 Validado | sem assinatura `401`; assinatura válida `202` |
+| Edge carteiro | 🟢 Deployada | `fabio-registro-aula` no Supabase |
+| Vault | 🟢 Armado | `fabio_edge_url` + `fabio_edge_token` no Vault operacional |
+| Trigger → Edge | 🟢 Validado | `fn_fabio_chama_edge` gerou chamada `pg_net` com `200 enviado_ao_fabio` |
+| Teste com áudio antigo | 🟡 Inconclusivo | áudios antigos do Matheus transcrevem vazio; fluxo agora trata como erro |
+| Teste real P6 | 🟡 Próximo passo | precisa áudio novo/audível pelo app |
+
+### Arquitetura confirmada
+
+```text
+App LA Teacher
+  → Supabase Storage + fabio_fila_audios
+  → trigger/fn_fabio_chama_edge
+  → Edge Function carteiro
+  → HMAC X-Webhook-Signature
+  → Hermes/Fábio /webhooks/registro-aula
+  → transcrição + Alma v1.1
+  → RPC fabio_criar_registro
+  → app mostra Confirmação via Realtime
+```
+
+### Guardrails confirmados
+
+- Edge não pensa pedagogia: só assina e entrega.
+- Fábio/Hermes pensa, transcreve e normaliza.
+- Professor/app confirma.
+- Transcrição vazia não cria registro.
+- `normalizado` exige registro real para o `audio_id`.
+- Escrita pedagógica final passa por RPC/ferramenta restrita; sem SQL livre no webhook.
+
+### Próximo teste correto
+
+Gravar áudio novo, audível e natural no app. Os áudios antigos/sintéticos não servem para validar qualidade do Fábio, só serviram para validar o encadeamento técnico e os guardrails de erro.
+
