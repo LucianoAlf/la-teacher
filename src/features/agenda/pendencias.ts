@@ -1,28 +1,29 @@
-import { isSemVinculo, minhaAgenda, type AgendaAula } from '../../lib/api'
+import { isSemVinculo, minhaAgendaSessao, type SessaoAula } from '../../lib/api'
 import { addDias, hojeBRT } from '../../lib/date'
-import { temRegistro } from './aula'
+import { alunosPendentes, statusSessao } from './sessao'
 
 export interface Pendencias {
-  /** Data (YYYY-MM-DD) do dia com aulas pendentes encontrado. */
+  /** Data (YYYY-MM-DD) do dia com sessões pendentes encontrado. */
   data: string
-  aulas: AgendaAula[]
+  sessoes: SessaoAula[]
 }
 
 /**
- * Pendências = aulas sem registro do dia anterior COM aulas mais recente.
- * O espelho de aulas pode estar defasado (ex.: "ontem" vazio), então
- * varremos para trás até `maxDias` até achar o último dia que teve aula.
- * Retorna null se nada pendente na janela.
+ * Pendências = sessões sem registro do dia anterior COM aulas mais recente.
+ * Varre para trás até `maxDias` até achar o último dia que teve aula.
+ * Sessão onde só quem faltou ficou sem registro NÃO é pendência.
  */
 export async function buscarPendencias(maxDias = 21): Promise<Pendencias | null> {
+  const now = new Date()
   let data = addDias(hojeBRT(), -1)
   for (let i = 0; i < maxDias; i++, data = addDias(data, -1)) {
-    const res = await minhaAgenda(data)
+    const res = await minhaAgendaSessao(data)
     if (isSemVinculo(res)) return null
-    if (res.total > 0) {
-      // Primeiro dia (mais recente) com aulas: as sem registro são as pendências.
-      const pendentes = res.aulas.filter((a) => !temRegistro(a) && !a.cancelada)
-      return pendentes.length > 0 ? { data, aulas: pendentes } : null
+    if (res.length > 0) {
+      const pendentes = res.filter(
+        (s) => statusSessao(s, now) === 'pendente' && alunosPendentes(s, now).length > 0,
+      )
+      return pendentes.length > 0 ? { data, sessoes: pendentes } : null
     }
   }
   return null

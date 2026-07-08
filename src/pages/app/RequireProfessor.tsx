@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { Button } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
-import { isSemVinculo, minhaAgenda } from '../../lib/api'
+import { isSemVinculo, minhaAgendaSessao } from '../../lib/api'
 import { iniciarSincronizacaoFila } from '../../features/registro/uploadAudio'
 import { AppFrame } from './AppFrame'
 import VinculoPendentePage from './VinculoPendente'
@@ -44,7 +44,7 @@ export function RequireProfessor() {
     if (loading || !userId) return
     let vivo = true
     setEstado('checando')
-    minhaAgenda()
+    minhaAgendaSessao()
       .then((res) => {
         if (!vivo) return
         setEstado(isSemVinculo(res) ? 'sem_vinculo' : 'ok')

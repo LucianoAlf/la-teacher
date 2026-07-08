@@ -27735,6 +27735,7 @@ export type Database = {
         Args: { p_fim?: string; p_inicio?: string }
         Returns: Json
       }
+      app_minha_agenda_sessao: { Args: { p_data?: string }; Returns: Json }
       app_minha_carteira: { Args: never; Returns: Json }
       app_registro_completo: { Args: { p_registro_id: string }; Returns: Json }
       app_registros_pendentes: { Args: never; Returns: Json }
@@ -27943,6 +27944,7 @@ export type Database = {
         Args: { max_rows?: number; p_unidade_id?: string; query_text: string }
         Returns: Json
       }
+      fabio_criar_registro: { Args: { p_payload: Json }; Returns: Json }
       fechar_competencia: {
         Args: {
           p_ano: number

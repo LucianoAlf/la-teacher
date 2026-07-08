@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { isSemVinculo, minhaAgenda } from '../../lib/api'
+import { isSemVinculo, minhaAgendaSessao } from '../../lib/api'
 import { diasDaSemana } from '../../lib/date'
 
-/** Mapa data(YYYY-MM-DD) → nº de aulas, para a strip da semana. */
+/** Mapa data(YYYY-MM-DD) → nº de SESSÕES, para a strip da semana. */
 export type ContagemSemana = Record<string, number>
 
 /**
- * Conta as aulas de cada dia da semana que contém `dataRef` (7 chamadas em
+ * Conta as sessões de cada dia da semana que contém `dataRef` (7 chamadas em
  * paralelo). Degrada em silêncio: dia que falhar fica sem contagem, não quebra.
  */
 export function useSemana(dataRef: string) {
@@ -18,8 +18,8 @@ export function useSemana(dataRef: string) {
     let vivo = true
     Promise.all(
       dias.map((d) =>
-        minhaAgenda(d)
-          .then((res) => (isSemVinculo(res) ? 0 : res.total))
+        minhaAgendaSessao(d)
+          .then((res) => (isSemVinculo(res) ? 0 : res.length))
           .catch(() => 0),
       ),
     ).then((totais) => {

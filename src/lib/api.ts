@@ -15,34 +15,34 @@ export function isSemVinculo(v: unknown): v is RpcErro {
   return typeof v === 'object' && v !== null && (v as RpcErro).erro === SEM_VINCULO
 }
 
-// ---- Shapes leves do retorno (o detalhe fino das aulas vem no P3) ----
+// ---- Agenda por SESSÃO (contrato v3 — app_minha_agenda_sessao) ----
+// 1 sessão = 1 aula real. Turma agrupada com alunos nomeados; cada aluno
+// aponta pra própria aula individual (aula_id_alvo) — é nela que a fatia
+// do Fábio grava (nunca na âncora, senão o texto vaza entre alunos).
 
-export interface AgendaAula {
-  aula_local_id: number
-  aula_emusys_id: number | null
-  data_aula: string
-  data_hora_inicio: string | null
-  data_hora_fim: string | null
-  horario_inicio_brt: string | null
-  horario_fim_brt: string | null
-  aula_tipo: string | null
-  aula_categoria: string | null
-  turma_nome: string | null
-  curso_nome: string | null
-  aluno_nome: string | null
-  qtd_alunos: number | null
-  presenca_status: string | null
-  cancelada: boolean | null
-  anotacoes: string | null
-  anotacoes_fabio: string | null
-  qualidade_contexto: string | null
-  [k: string]: unknown
+export interface AlunoSessao {
+  aluno_id: number
+  nome: string
+  /** Aula individual do aluno — alvo da gravação da fatia dele. */
+  aula_id_alvo: number
+  /** Presença crua ('presente'|'ausente'). Em aula futura, 'ausente' = ainda não lançada, NÃO "faltou". */
+  presenca: string
+  tem_registro: boolean
 }
 
-export interface Agenda {
-  data: string
-  total: number
-  aulas: AgendaAula[]
+export interface SessaoAula {
+  hora: string
+  hora_fim: string | null
+  data_hora_inicio: string
+  data_hora_fim: string | null
+  curso: string | null
+  turma_nome: string | null
+  tipo: 'turma' | 'individual'
+  /** A aula da sessão — o áudio da gravação é enfileirado com este id. */
+  aula_id_ancora: number
+  n_alunos: number
+  n_registradas: number
+  alunos: AlunoSessao[]
 }
 
 export interface CarteiraAluno {
@@ -59,12 +59,12 @@ export interface CarteiraAluno {
 
 // ---------------------------------------------------------------------------
 
-/** Agenda do professor logado numa data (default: hoje, resolvido no banco). */
-export async function minhaAgenda(data?: string): Promise<Agenda | RpcErro> {
-  const { data: res, error } = await supabase.rpc('app_minha_agenda', data ? { p_data: data } : {})
+/** Sessões de aula do professor logado numa data (default: hoje, resolvido no banco). */
+export async function minhaAgendaSessao(data?: string): Promise<SessaoAula[] | RpcErro> {
+  const { data: res, error } = await supabase.rpc('app_minha_agenda_sessao', data ? { p_data: data } : {})
   if (error) throw error
   if (isSemVinculo(res)) return res
-  return res as unknown as Agenda
+  return (res as unknown as SessaoAula[]) ?? []
 }
 
 /** Carteira (alunos) do professor logado. Nunca retorna dado financeiro. */

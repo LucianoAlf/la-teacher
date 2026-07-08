@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Badge, Button, Card, EmptyState, ScreenHeader, Skeleton } from '../../components/ui'
-import type { AgendaAula } from '../../lib/api'
+import type { SessaoAula } from '../../lib/api'
 import { hojeBRT } from '../../lib/date'
-import { detalheAula, horaAula, nomeAula, temRegistro } from '../agenda/aula'
-import { AgendaAulaRow } from '../agenda/AgendaAulaRow'
-import { useAgenda } from '../agenda/useAgenda'
+import { horaSessao, statusSessao, subtituloSessao, tituloSessao } from '../agenda/sessao'
+import { SessaoRow } from '../agenda/SessaoRow'
+import { useSessoes } from '../agenda/useSessoes'
 import { AppFrame } from '../../pages/app/AppFrame'
 import { enviarAudio } from './uploadAudio'
 import { useRecorder, LIMITE_SEGUNDOS } from './useRecorder'
@@ -28,8 +28,8 @@ export default function GravarAulaPage() {
 
 function EscolherAula() {
   const navigate = useNavigate()
-  const { estado } = useAgenda(hojeBRT())
-  const aulas = estado.fase === 'ok' ? estado.agenda.aulas.filter((a) => !temRegistro(a)) : []
+  const { estado } = useSessoes(hojeBRT())
+  const sessoes = estado.fase === 'ok' ? estado.sessoes.filter((s) => statusSessao(s) !== 'registrada') : []
 
   return (
     <AppFrame>
@@ -42,7 +42,7 @@ function EscolherAula() {
             ))}
           </div>
         )}
-        {estado.fase === 'ok' && aulas.length === 0 && (
+        {estado.fase === 'ok' && sessoes.length === 0 && (
           <EmptyState
             icon="fa-solid fa-music"
             title="Nada pra registrar hoje 🎵"
@@ -54,13 +54,13 @@ function EscolherAula() {
             }
           />
         )}
-        {estado.fase === 'ok' && aulas.length > 0 && (
+        {estado.fase === 'ok' && sessoes.length > 0 && (
           <Card title="Hoje" icon="fa-solid fa-calendar-day">
-            {aulas.map((a) => (
-              <AgendaAulaRow
-                key={a.aula_local_id}
-                aula={a}
-                onGravar={(aula) => navigate(`/app/gravar/${aula.aula_local_id}`, { state: { aula } })}
+            {sessoes.map((s) => (
+              <SessaoRow
+                key={s.aula_id_ancora}
+                sessao={s}
+                onGravar={(sessao) => navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })}
               />
             ))}
           </Card>
@@ -85,16 +85,16 @@ type FaseEnvio = 'nao_enviado' | 'enviando' | 'fila_offline' | 'erro_envio'
 
 function Gravador({ aulaId }: { aulaId: number }) {
   const navigate = useNavigate()
-  const { state } = useLocation() as { state?: { aula?: AgendaAula } }
+  const { state } = useLocation() as { state?: { sessao?: SessaoAula } }
   const [params] = useSearchParams()
   /** Não nulo = correção por voz: complementa um registro existente. */
   const registroCorrecao = params.get('registro')
-  const aula = state?.aula
+  const sessao = state?.sessao
   const rec = useRecorder()
   const [envio, setEnvio] = useState<FaseEnvio>('nao_enviado')
 
-  const titulo = aula ? nomeAula(aula) : `Aula #${aulaId}`
-  const sub = aula ? [detalheAula(aula), horaAula(aula)].filter(Boolean).join(' · ') : undefined
+  const titulo = sessao ? tituloSessao(sessao) : `Aula #${aulaId}`
+  const sub = sessao ? [subtituloSessao(sessao), horaSessao(sessao)].filter(Boolean).join(' · ') : undefined
   const previewUrl = useMemo(() => (rec.blob ? URL.createObjectURL(rec.blob) : null), [rec.blob])
 
   async function enviar() {
@@ -122,7 +122,7 @@ function Gravador({ aulaId }: { aulaId: number }) {
       {/* contexto da aula (protótipo .ctx-card) */}
       <div className="mx-4 flex items-center gap-[11px] rounded-lg border border-[color:var(--brand-border)] bg-bg-surface px-[14px] py-[13px]">
         <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-md bg-brand-soft text-base text-brand-text">
-          <i className={aula?.aula_tipo === 'individual' ? 'fa-solid fa-user' : 'fa-solid fa-users'} aria-hidden="true" />
+          <i className={sessao?.tipo === 'turma' ? 'fa-solid fa-users' : 'fa-solid fa-user'} aria-hidden="true" />
         </div>
         <div className="min-w-0">
           <b className="block truncate text-[14.5px]">{titulo}</b>

@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { Button, ScreenHeader, Toast, useToast } from '../../components/ui'
 import { useTheme } from '../../lib/theme'
 import { hojeBRT } from '../../lib/date'
-import type { AgendaAula } from '../../lib/api'
+import type { SessaoAula } from '../../lib/api'
 import { DateNav } from '../../features/agenda/DateNav'
-import { CardAulasDoDia } from '../../features/agenda/CardAulasDoDia'
+import { CardSessoesDoDia } from '../../features/agenda/CardSessoesDoDia'
 import { SemanaStrip } from '../../features/agenda/SemanaStrip'
-import { useAgenda } from '../../features/agenda/useAgenda'
+import { useSessoes } from '../../features/agenda/useSessoes'
 import { useSemana } from '../../features/agenda/useSemana'
 import { AppFrame } from './AppFrame'
 import { AppNav } from './AppNav'
@@ -19,10 +19,10 @@ export default function AgendaPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<string>(hojeBRT())
 
-  const { estado, recarregar } = useAgenda(data)
+  const { estado, recarregar } = useSessoes(data)
   const { dias, contagem } = useSemana(data)
-  const abrirGravacao = (aula: AgendaAula) =>
-    navigate(`/app/gravar/${aula.aula_local_id}`, { state: { aula } })
+  const abrirGravacao = (sessao: SessaoAula) =>
+    navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
 
   return (
     <AppFrame>
@@ -44,7 +44,7 @@ export default function AgendaPage() {
         </div>
 
         <div className="px-4">
-          <CardAulasDoDia data={data} estado={estado} onRetry={recarregar} onGravar={abrirGravacao} />
+          <CardSessoesDoDia data={data} estado={estado} onRetry={recarregar} onGravar={abrirGravacao} />
         </div>
       </div>
 

@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
-import { isSemVinculo, minhaAgenda, type Agenda } from '../../lib/api'
+import { isSemVinculo, minhaAgendaSessao, type SessaoAula } from '../../lib/api'
 
-export type EstadoAgenda =
+export type EstadoSessoes =
   | { fase: 'carregando' }
-  | { fase: 'ok'; agenda: Agenda }
+  | { fase: 'ok'; sessoes: SessaoAula[] }
   | { fase: 'sem_vinculo' }
   | { fase: 'erro' }
 
-/** Busca a agenda de uma data (app_minha_agenda) com estados de UI. */
-export function useAgenda(data: string) {
-  const [estado, setEstado] = useState<EstadoAgenda>({ fase: 'carregando' })
+/** Sessões de um dia (app_minha_agenda_sessao) com estados de UI. */
+export function useSessoes(data: string) {
+  const [estado, setEstado] = useState<EstadoSessoes>({ fase: 'carregando' })
   const [tentativa, setTentativa] = useState(0)
 
   const recarregar = useCallback(() => setTentativa((t) => t + 1), [])
@@ -17,11 +17,11 @@ export function useAgenda(data: string) {
   useEffect(() => {
     let vivo = true
     setEstado({ fase: 'carregando' })
-    minhaAgenda(data)
+    minhaAgendaSessao(data)
       .then((res) => {
         if (!vivo) return
         if (isSemVinculo(res)) setEstado({ fase: 'sem_vinculo' })
-        else setEstado({ fase: 'ok', agenda: res })
+        else setEstado({ fase: 'ok', sessoes: res })
       })
       .catch(() => vivo && setEstado({ fase: 'erro' }))
     return () => {

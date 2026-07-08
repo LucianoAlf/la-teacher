@@ -4,11 +4,11 @@ import { Card, EmptyState, FabioCard, Skeleton, Toast, useToast } from '../../co
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../lib/theme'
 import { formatDiaCurto, hojeBRT } from '../../lib/date'
-import { registrosPendentes, type AgendaAula, type RegistroRow } from '../../lib/api'
-import { AgendaAulaRow } from '../../features/agenda/AgendaAulaRow'
-import { CardAulasDoDia } from '../../features/agenda/CardAulasDoDia'
+import { registrosPendentes, type RegistroRow, type SessaoAula } from '../../lib/api'
+import { SessaoRow } from '../../features/agenda/SessaoRow'
+import { CardSessoesDoDia } from '../../features/agenda/CardSessoesDoDia'
 import { DateNav } from '../../features/agenda/DateNav'
-import { useAgenda } from '../../features/agenda/useAgenda'
+import { useSessoes } from '../../features/agenda/useSessoes'
 import { buscarPendencias, type Pendencias } from '../../features/agenda/pendencias'
 import { useFilaOfflineCount } from '../../features/registro/filaOffline'
 import { AppFrame } from './AppFrame'
@@ -29,10 +29,10 @@ export default function HomePage() {
   const navigate = useNavigate()
   const [data, setData] = useState<string>(hojeBRT())
 
-  const { estado, recarregar } = useAgenda(data)
+  const { estado, recarregar } = useSessoes(data)
   const filaOffline = useFilaOfflineCount()
-  const abrirGravacao = (aula: AgendaAula) =>
-    navigate(`/app/gravar/${aula.aula_local_id}`, { state: { aula } })
+  const abrirGravacao = (sessao: SessaoAula) =>
+    navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
   const nome = primeiroNome(
     session?.user.email,
     (session?.user.user_metadata?.name as string | undefined) ?? undefined,
@@ -87,9 +87,9 @@ export default function HomePage() {
           <DateNav value={data} onChange={setData} />
         </div>
 
-        {/* 3 · Aulas do dia */}
+        {/* 3 · Aulas do dia (sessões) */}
         <div className="mb-3">
-          <CardAulasDoDia data={data} estado={estado} onRetry={recarregar} onGravar={abrirGravacao} />
+          <CardSessoesDoDia data={data} estado={estado} onRetry={recarregar} onGravar={abrirGravacao} />
         </div>
 
         {/* 4 · Pendências */}
@@ -144,7 +144,7 @@ function AguardandoConfirmacao({ onAbrir }: { onAbrir: (registroId: string) => v
   )
 }
 
-function PendenciasCard({ onGravar }: { onGravar: (aula: AgendaAula) => void }) {
+function PendenciasCard({ onGravar }: { onGravar: (sessao: SessaoAula) => void }) {
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'erro'>('carregando')
   const [pend, setPend] = useState<Pendencias | null>(null)
 
@@ -188,8 +188,8 @@ function PendenciasCard({ onGravar }: { onGravar: (aula: AgendaAula) => void }) 
 
   return (
     <Card title="Pendências" icon="fa-solid fa-bell" right={formatDiaCurto(pend.data)}>
-      {pend.aulas.map((a) => (
-        <AgendaAulaRow key={a.aula_local_id} aula={a} onGravar={onGravar} />
+      {pend.sessoes.map((s) => (
+        <SessaoRow key={s.aula_id_ancora} sessao={s} onGravar={onGravar} />
       ))}
       <p className="mt-[9px] flex items-start gap-2 text-[12.5px] leading-relaxed text-text-secondary">
         <i className="fa-solid fa-robot mt-[3px] text-brand-text" aria-hidden="true" />

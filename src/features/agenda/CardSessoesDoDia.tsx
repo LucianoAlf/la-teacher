@@ -1,22 +1,21 @@
 import { Button, Card, EmptyState, Skeleton } from '../../components/ui'
+import type { SessaoAula } from '../../lib/api'
 import { formatDiaCurto, isHoje } from '../../lib/date'
-import { contarRegistradas } from './aula'
-import type { AgendaAula } from '../../lib/api'
-import { AgendaAulaRow } from './AgendaAulaRow'
-import type { EstadoAgenda } from './useAgenda'
+import { contarSessoesRegistradas } from './sessao'
+import { SessaoRow } from './SessaoRow'
+import type { EstadoSessoes } from './useSessoes'
 
 interface Props {
   data: string
-  estado: EstadoAgenda
+  estado: EstadoSessoes
   onRetry: () => void
-  /** Abrir a gravação da aula tocada (P5). */
-  onGravar: (aula: AgendaAula) => void
-  /** Título do card. Default: "Hoje" quando é hoje, senão o dia curto. */
+  /** Abrir a gravação da sessão tocada. */
+  onGravar: (sessao: SessaoAula) => void
   titulo?: string
 }
 
-/** Card com as aulas de um dia (skeleton/erro/vazio/lista). Usado na Home e na Agenda. */
-export function CardAulasDoDia({ data, estado, onRetry, onGravar, titulo }: Props) {
+/** Card com as SESSÕES de um dia (skeleton/erro/vazio/lista). Home e Agenda. */
+export function CardSessoesDoDia({ data, estado, onRetry, onGravar, titulo }: Props) {
   const tit = titulo ?? (isHoje(data) ? 'Hoje' : formatDiaCurto(data))
 
   if (estado.fase === 'carregando') {
@@ -28,7 +27,7 @@ export function CardAulasDoDia({ data, estado, onRetry, onGravar, titulo }: Prop
               <Skeleton className="h-4 w-9" />
               <div className="flex-1 space-y-[6px]">
                 <Skeleton className="h-[14px] w-1/2" />
-                <Skeleton className="h-3 w-1/3" />
+                <Skeleton className="h-3 w-2/3" />
               </div>
               <Skeleton className="h-4 w-16" />
             </div>
@@ -67,10 +66,9 @@ export function CardAulasDoDia({ data, estado, onRetry, onGravar, titulo }: Prop
     )
   }
 
-  const { aulas, total } = estado.agenda
-  const registradas = contarRegistradas(aulas)
+  const { sessoes } = estado
 
-  if (total === 0) {
+  if (sessoes.length === 0) {
     return (
       <Card title={tit} icon="fa-solid fa-calendar-day">
         <EmptyState
@@ -86,10 +84,16 @@ export function CardAulasDoDia({ data, estado, onRetry, onGravar, titulo }: Prop
     )
   }
 
+  const registradas = contarSessoesRegistradas(sessoes)
+
   return (
-    <Card title={tit} icon="fa-solid fa-calendar-day" right={`${registradas} de ${total} registradas`}>
-      {aulas.map((a) => (
-        <AgendaAulaRow key={a.aula_local_id} aula={a} onGravar={onGravar} />
+    <Card
+      title={tit}
+      icon="fa-solid fa-calendar-day"
+      right={`${registradas} de ${sessoes.length} registradas`}
+    >
+      {sessoes.map((s) => (
+        <SessaoRow key={s.aula_id_ancora} sessao={s} onGravar={onGravar} />
       ))}
     </Card>
   )
