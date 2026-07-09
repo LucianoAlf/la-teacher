@@ -12,7 +12,7 @@ import { useSemana } from '../../features/agenda/useSemana'
 import { AppFrame } from './AppFrame'
 import { AppNav } from './AppNav'
 
-/** /app/agenda — semana compacta + dia selecionado (reusa app_minha_agenda). */
+/** /app/agenda — semana compacta + dia selecionado (app_minha_agenda_sessao). */
 export default function AgendaPage() {
   const { toggle } = useTheme()
   const { message, visible, show } = useToast()

@@ -21,14 +21,15 @@ O agente **Fábio** tem alma própria (prompt de normalização) e vive no runti
 2. **Dados só via RPCs `app_*`** — o cliente nunca faz `select` direto em tabela.
 3. **Uma porta de escrita pedagógica** — tudo passa por `registrar_aula_fabio`.
 4. **Fábio nunca inventa** — campo não dito = cutucada na Confirmação, jamais preenchimento por dedução.
-5. **Zero financeiro no app do professor** — valor/parcela nunca chegam ao bundle.
+5. **Zero financeiro e zero contato no app do professor** — valor/parcela/telefone/whatsapp nunca chegam ao bundle (a comunicação com pai/aluno será mediada por dentro do app, em fase futura).
 6. **Login por pessoa, carteira por vínculo** — professor multiunidade loga uma vez e alterna unidades.
 
 ## Stack & banco
 
 - **Banco:** Supabase LA Report (`ouqwbbermlzqqvtqwlul`) — 222 tabelas, RLS onipresente. O app **integra** ao existente (não cria banco próprio).
-- **Fundação do Fábio já existente:** RPC `registrar_aula_fabio`, views `vw_fabio_aulas_contexto` / `vw_fabio_carteira_professor`, coluna `aulas_emusys.anotacoes_fabio`.
-- **Migrações deste projeto:** `supabase/migrations/` (001 fundação, 002 motor de registro).
+- **Fundação do Fábio já existente:** RPC `registrar_aula_fabio`, view `vw_fabio_aulas_contexto`, coluna `aulas_emusys.anotacoes_fabio`.
+- **Carteira = jornada canônica:** desde a migração 008, `app_minha_carteira` lê `vw_jornada_professor_atual` (fonte única, régua "Aula X/40"); `vw_fabio_carteira_professor` ficou para a agente Maria, fora do app.
+- **Migrações deste projeto:** `supabase/migrations/` (001–008, espelho comentado do que está aplicado).
 
 ## Como navegar este repositório
 

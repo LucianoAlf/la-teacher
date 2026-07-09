@@ -1,7 +1,3 @@
-// Gerado por: supabase gen types typescript --project-id ouqwbbermlzqqvtqwlul
-// Banco: LA Report. NÃO editar à mão — regenerar após migrações.
-// Espelho de schema; o cliente só acessa dados via RPCs app_* (ver src/lib/api.ts).
-
 export type Json =
   | string
   | number
@@ -1346,6 +1342,324 @@ export type Database = {
           },
         ]
       }
+      aluno_jornada_matricula_disciplina: {
+        Row: {
+          aluno_id: number | null
+          created_at: string
+          curso_id: number | null
+          curso_nome_emusys: string | null
+          data_primeira_aula: string | null
+          data_ultima_aula: string | null
+          dia_semana: string | null
+          emusys_aluno_id: number | null
+          emusys_disciplina_id: number | null
+          emusys_matricula_disciplina_id: number
+          emusys_matricula_id: number | null
+          emusys_professor_id: number | null
+          fonte_ultima_atualizacao: string
+          horario: string | null
+          id: string
+          nr_aulas_contratadas: number | null
+          nr_aulas_futuras: number | null
+          nr_aulas_passadas: number | null
+          payload_snapshot: Json
+          percentual_jornada: number | null
+          professor_id: number | null
+          professor_nome_emusys: string | null
+          proxima_aula_numero: number | null
+          qtd_contratos: number | null
+          status_matricula: string
+          ultima_sincronizacao_emusys: string
+          unidade_id: string
+          updated_at: string
+        }
+        Insert: {
+          aluno_id?: number | null
+          created_at?: string
+          curso_id?: number | null
+          curso_nome_emusys?: string | null
+          data_primeira_aula?: string | null
+          data_ultima_aula?: string | null
+          dia_semana?: string | null
+          emusys_aluno_id?: number | null
+          emusys_disciplina_id?: number | null
+          emusys_matricula_disciplina_id: number
+          emusys_matricula_id?: number | null
+          emusys_professor_id?: number | null
+          fonte_ultima_atualizacao: string
+          horario?: string | null
+          id?: string
+          nr_aulas_contratadas?: number | null
+          nr_aulas_futuras?: number | null
+          nr_aulas_passadas?: number | null
+          payload_snapshot?: Json
+          percentual_jornada?: number | null
+          professor_id?: number | null
+          professor_nome_emusys?: string | null
+          proxima_aula_numero?: number | null
+          qtd_contratos?: number | null
+          status_matricula?: string
+          ultima_sincronizacao_emusys?: string
+          unidade_id: string
+          updated_at?: string
+        }
+        Update: {
+          aluno_id?: number | null
+          created_at?: string
+          curso_id?: number | null
+          curso_nome_emusys?: string | null
+          data_primeira_aula?: string | null
+          data_ultima_aula?: string | null
+          dia_semana?: string | null
+          emusys_aluno_id?: number | null
+          emusys_disciplina_id?: number | null
+          emusys_matricula_disciplina_id?: number
+          emusys_matricula_id?: number | null
+          emusys_professor_id?: number | null
+          fonte_ultima_atualizacao?: string
+          horario?: string | null
+          id?: string
+          nr_aulas_contratadas?: number | null
+          nr_aulas_futuras?: number | null
+          nr_aulas_passadas?: number | null
+          payload_snapshot?: Json
+          percentual_jornada?: number | null
+          professor_id?: number | null
+          professor_nome_emusys?: string | null
+          proxima_aula_numero?: number | null
+          qtd_contratos?: number | null
+          status_matricula?: string
+          ultima_sincronizacao_emusys?: string
+          unidade_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_aluno_sucesso_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_alunos_ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["curso_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fator_demanda_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_completo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_historico"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_mensal"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_por_unidade"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_carteira_resumo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_performance_atual"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_taxa_crescimento_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_dashboard_unidade"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_resumo_alertas"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_historico"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_gestao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_retencao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+        ]
+      }
       aluno_metas: {
         Row: {
           aluno_id: number
@@ -1792,6 +2106,413 @@ export type Database = {
           },
           {
             foreignKeyName: "aluno_presenca_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_retencao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+        ]
+      }
+      aluno_professor_transicoes: {
+        Row: {
+          aluno_id: number | null
+          automacao_log_id: number | null
+          created_at: string
+          curso_anterior_id: number | null
+          curso_id: number | null
+          data_transicao: string
+          descricao_emusys: string | null
+          emusys_matricula_disciplina_id: number
+          emusys_matricula_id: number | null
+          emusys_professor_anterior_id: number | null
+          emusys_professor_novo_id: number | null
+          fonte: string
+          id: string
+          payload_snapshot: Json
+          professor_anterior_id: number | null
+          professor_novo_id: number | null
+          tipo_transicao: string
+          unidade_id: string
+        }
+        Insert: {
+          aluno_id?: number | null
+          automacao_log_id?: number | null
+          created_at?: string
+          curso_anterior_id?: number | null
+          curso_id?: number | null
+          data_transicao?: string
+          descricao_emusys?: string | null
+          emusys_matricula_disciplina_id: number
+          emusys_matricula_id?: number | null
+          emusys_professor_anterior_id?: number | null
+          emusys_professor_novo_id?: number | null
+          fonte?: string
+          id?: string
+          payload_snapshot?: Json
+          professor_anterior_id?: number | null
+          professor_novo_id?: number | null
+          tipo_transicao?: string
+          unidade_id: string
+        }
+        Update: {
+          aluno_id?: number | null
+          automacao_log_id?: number | null
+          created_at?: string
+          curso_anterior_id?: number | null
+          curso_id?: number | null
+          data_transicao?: string
+          descricao_emusys?: string | null
+          emusys_matricula_disciplina_id?: number
+          emusys_matricula_id?: number | null
+          emusys_professor_anterior_id?: number | null
+          emusys_professor_novo_id?: number | null
+          fonte?: string
+          id?: string
+          payload_snapshot?: Json
+          professor_anterior_id?: number | null
+          professor_novo_id?: number | null
+          tipo_transicao?: string
+          unidade_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aluno_professor_transicoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_aluno_sucesso_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_alunos_ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_automacao_log_id_fkey"
+            columns: ["automacao_log_id"]
+            isOneToOne: false
+            referencedRelation: "automacao_log"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_curso_anterior_id_fkey"
+            columns: ["curso_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_curso_anterior_id_fkey"
+            columns: ["curso_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["curso_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["curso_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fator_demanda_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_completo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_historico"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_mensal"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_por_unidade"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_carteira_resumo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_performance_atual"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_anterior_id_fkey"
+            columns: ["professor_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "vw_taxa_crescimento_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fator_demanda_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_completo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_historico"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_mensal"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_por_unidade"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_carteira_resumo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_performance_atual"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_professor_novo_id_fkey"
+            columns: ["professor_novo_id"]
+            isOneToOne: false
+            referencedRelation: "vw_taxa_crescimento_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_dashboard_unidade"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_resumo_alertas"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_historico"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_gestao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_professor_transicoes_unidade_id_fkey"
             columns: ["unidade_id"]
             isOneToOne: false
             referencedRelation: "vw_kpis_retencao_mensal"
@@ -4240,10 +4961,12 @@ export type Database = {
           duracao_minutos: number | null
           emusys_id: number
           id: number
+          matricula_disciplina_id: number | null
           nr_da_aula: number | null
           professor_id: number | null
           professor_nome: string | null
           qtd_alunos: number | null
+          qtd_aulas_contrato: number | null
           sala_nome: string | null
           tipo: string | null
           turma_nome: string | null
@@ -4263,10 +4986,12 @@ export type Database = {
           duracao_minutos?: number | null
           emusys_id: number
           id?: number
+          matricula_disciplina_id?: number | null
           nr_da_aula?: number | null
           professor_id?: number | null
           professor_nome?: string | null
           qtd_alunos?: number | null
+          qtd_aulas_contrato?: number | null
           sala_nome?: string | null
           tipo?: string | null
           turma_nome?: string | null
@@ -4286,10 +5011,12 @@ export type Database = {
           duracao_minutos?: number | null
           emusys_id?: number
           id?: number
+          matricula_disciplina_id?: number | null
           nr_da_aula?: number | null
           professor_id?: number | null
           professor_nome?: string | null
           qtd_alunos?: number | null
+          qtd_aulas_contrato?: number | null
           sala_nome?: string | null
           tipo?: string | null
           turma_nome?: string | null
@@ -18822,6 +19549,341 @@ export type Database = {
           },
         ]
       }
+      professor_passagem_bastao: {
+        Row: {
+          aluno_id: number | null
+          audio_url: string | null
+          created_at: string
+          curso_id: number | null
+          emusys_matricula_disciplina_id: number
+          id: string
+          motivo_dispensa: string | null
+          professor_destino_id: number | null
+          professor_origem_id: number | null
+          respondido_em: string | null
+          resposta_texto: string | null
+          resumo_ia: string | null
+          status: string
+          transcricao: string | null
+          transicao_id: string
+        }
+        Insert: {
+          aluno_id?: number | null
+          audio_url?: string | null
+          created_at?: string
+          curso_id?: number | null
+          emusys_matricula_disciplina_id: number
+          id?: string
+          motivo_dispensa?: string | null
+          professor_destino_id?: number | null
+          professor_origem_id?: number | null
+          respondido_em?: string | null
+          resposta_texto?: string | null
+          resumo_ia?: string | null
+          status?: string
+          transcricao?: string | null
+          transicao_id: string
+        }
+        Update: {
+          aluno_id?: number | null
+          audio_url?: string | null
+          created_at?: string
+          curso_id?: number | null
+          emusys_matricula_disciplina_id?: number
+          id?: string
+          motivo_dispensa?: string | null
+          professor_destino_id?: number | null
+          professor_origem_id?: number | null
+          respondido_em?: string | null
+          resposta_texto?: string | null
+          resumo_ia?: string | null
+          status?: string
+          transcricao?: string | null
+          transicao_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professor_passagem_bastao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_aluno_sucesso_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_alunos_ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["curso_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fator_demanda_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_completo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_historico"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_mensal"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_por_unidade"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_carteira_resumo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_performance_atual"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_destino_id_fkey"
+            columns: ["professor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_taxa_crescimento_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fator_demanda_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_completo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_historico"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_mensal"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_por_unidade"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_carteira_resumo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_performance_atual"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_professor_origem_id_fkey"
+            columns: ["professor_origem_id"]
+            isOneToOne: false
+            referencedRelation: "vw_taxa_crescimento_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "professor_passagem_bastao_transicao_id_fkey"
+            columns: ["transicao_id"]
+            isOneToOne: true
+            referencedRelation: "aluno_professor_transicoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professor_videos: {
         Row: {
           created_at: string | null
@@ -25696,6 +26758,1082 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_jornada_aluno_atual: {
+        Row: {
+          aluno_id: number | null
+          aluno_nome: string | null
+          curso_id: number | null
+          curso_nome: string | null
+          curso_nome_emusys: string | null
+          data_primeira_aula: string | null
+          data_ultima_aula: string | null
+          dia_semana: string | null
+          emusys_aluno_id: number | null
+          emusys_disciplina_id: number | null
+          emusys_matricula_disciplina_id: number | null
+          emusys_matricula_id: number | null
+          emusys_professor_id: number | null
+          fonte_ultima_atualizacao: string | null
+          horario: string | null
+          id: string | null
+          jornada_label: string | null
+          nr_aulas_contratadas: number | null
+          nr_aulas_futuras: number | null
+          nr_aulas_passadas: number | null
+          percentual_jornada: number | null
+          professor_id: number | null
+          professor_nome: string | null
+          professor_nome_emusys: string | null
+          proxima_aula_numero: number | null
+          qtd_contratos: number | null
+          responsavel_nome: string | null
+          responsavel_telefone: string | null
+          status_matricula: string | null
+          telefone: string | null
+          ultima_sincronizacao_emusys: string | null
+          unidade_id: string | null
+          unidade_nome: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_aluno_sucesso_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_alunos_ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["curso_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fator_demanda_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_completo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_historico"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_mensal"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_por_unidade"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_carteira_resumo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_performance_atual"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_taxa_crescimento_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_dashboard_unidade"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_resumo_alertas"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_historico"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_gestao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_retencao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+        ]
+      }
+      vw_jornada_aluno_com_presenca: {
+        Row: {
+          aluno_id: number | null
+          aluno_nome: string | null
+          aulas_com_presenca_registrada: number | null
+          curso_id: number | null
+          curso_nome: string | null
+          curso_nome_emusys: string | null
+          data_primeira_aula: string | null
+          data_ultima_aula: string | null
+          dia_semana: string | null
+          emusys_aluno_id: number | null
+          emusys_disciplina_id: number | null
+          emusys_matricula_disciplina_id: number | null
+          emusys_matricula_id: number | null
+          emusys_professor_id: number | null
+          faltas: number | null
+          fonte_ultima_atualizacao: string | null
+          horario: string | null
+          id: string | null
+          jornada_label: string | null
+          nr_aulas_contratadas: number | null
+          nr_aulas_futuras: number | null
+          nr_aulas_passadas: number | null
+          percentual_jornada: number | null
+          percentual_presenca_contrato: number | null
+          presencas: number | null
+          professor_id: number | null
+          professor_nome: string | null
+          professor_nome_emusys: string | null
+          proxima_aula_numero: number | null
+          qtd_contratos: number | null
+          responsavel_nome: string | null
+          responsavel_telefone: string | null
+          status_matricula: string | null
+          telefone: string | null
+          ultima_aula_registrada: string | null
+          ultima_sincronizacao_emusys: string | null
+          unidade_id: string | null
+          unidade_nome: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_aluno_sucesso_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_alunos_ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["curso_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fator_demanda_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_completo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_historico"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_mensal"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_por_unidade"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_carteira_resumo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_performance_atual"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_taxa_crescimento_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_dashboard_unidade"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_resumo_alertas"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_historico"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_gestao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_retencao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+        ]
+      }
+      vw_jornada_marcos: {
+        Row: {
+          aluno_id: number | null
+          aluno_nome: string | null
+          aulas_com_presenca_registrada: number | null
+          curso_id: number | null
+          curso_nome: string | null
+          curso_nome_emusys: string | null
+          data_primeira_aula: string | null
+          data_ultima_aula: string | null
+          dia_semana: string | null
+          emusys_aluno_id: number | null
+          emusys_disciplina_id: number | null
+          emusys_matricula_disciplina_id: number | null
+          emusys_matricula_id: number | null
+          emusys_professor_id: number | null
+          faltas: number | null
+          fonte_ultima_atualizacao: string | null
+          horario: string | null
+          id: string | null
+          jornada_label: string | null
+          nr_aulas_contratadas: number | null
+          nr_aulas_futuras: number | null
+          nr_aulas_passadas: number | null
+          percentual_jornada: number | null
+          percentual_presenca_contrato: number | null
+          presencas: number | null
+          professor_id: number | null
+          professor_nome: string | null
+          professor_nome_emusys: string | null
+          proxima_aula_numero: number | null
+          qtd_contratos: number | null
+          responsavel_nome: string | null
+          responsavel_telefone: string | null
+          status_matricula: string | null
+          telefone: string | null
+          tipo_marco: string | null
+          ultima_aula_registrada: string | null
+          ultima_sincronizacao_emusys: string | null
+          unidade_id: string | null
+          unidade_nome: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_aluno_sucesso_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_alunos_ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["curso_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fator_demanda_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_completo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_historico"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_mensal"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_por_unidade"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_carteira_resumo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_performance_atual"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_taxa_crescimento_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_dashboard_unidade"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_resumo_alertas"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_historico"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_gestao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_retencao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+        ]
+      }
+      vw_jornada_professor_atual: {
+        Row: {
+          aluno_id: number | null
+          aluno_nome: string | null
+          aulas_com_presenca_registrada: number | null
+          curso_id: number | null
+          curso_nome: string | null
+          curso_nome_emusys: string | null
+          data_primeira_aula: string | null
+          data_ultima_aula: string | null
+          dia_semana: string | null
+          emusys_aluno_id: number | null
+          emusys_disciplina_id: number | null
+          emusys_matricula_disciplina_id: number | null
+          emusys_matricula_id: number | null
+          emusys_professor_id: number | null
+          faltas: number | null
+          fonte_ultima_atualizacao: string | null
+          horario: string | null
+          id: string | null
+          jornada_label: string | null
+          nr_aulas_contratadas: number | null
+          nr_aulas_futuras: number | null
+          nr_aulas_passadas: number | null
+          percentual_jornada: number | null
+          percentual_presenca_contrato: number | null
+          presencas: number | null
+          professor_id: number | null
+          professor_nome: string | null
+          professor_nome_emusys: string | null
+          proxima_aula_numero: number | null
+          qtd_contratos: number | null
+          responsavel_nome: string | null
+          responsavel_telefone: string | null
+          status_matricula: string | null
+          telefone: string | null
+          ultima_aula_registrada: string | null
+          ultima_sincronizacao_emusys: string | null
+          unidade_id: string | null
+          unidade_nome: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_aluno_sucesso_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_alunos_ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["curso_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fator_demanda_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_completo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_historico"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_mensal"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_professor_por_unidade"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_carteira_resumo"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_professores_performance_atual"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "vw_taxa_crescimento_professor"
+            referencedColumns: ["professor_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_dashboard_unidade"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_resumo_alertas"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_historico"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_gestao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "aluno_jornada_matricula_disciplina_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_retencao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+        ]
+      }
       vw_kpis_comercial_historico: {
         Row: {
           ano: number | null
@@ -27730,7 +29868,6 @@ export type Database = {
         Returns: Json
       }
       app_meus_registros: { Args: { p_status?: string }; Returns: Json }
-      app_minha_agenda: { Args: { p_data?: string }; Returns: Json }
       app_minha_agenda_mes: {
         Args: { p_fim?: string; p_inicio?: string }
         Returns: Json
@@ -27913,6 +30050,14 @@ export type Database = {
       }
       deletar_penalidade_fideliza: { Args: { p_id: number }; Returns: Json }
       deletar_penalidade_matriculador: { Args: { p_id: number }; Returns: Json }
+      dispensar_passagem_bastao: {
+        Args: { p_id: string; p_motivo?: string }
+        Returns: {
+          id: string
+          motivo_dispensa: string
+          status: string
+        }[]
+      }
       editar_ocorrencia: {
         Args: {
           p_data_ocorrencia?: string
@@ -27980,6 +30125,7 @@ export type Database = {
       get_candidatos_pesquisa_primeira_aula: {
         Args: {
           p_apenas_ontem?: boolean
+          p_incluir_enviados?: boolean
           p_janela_dias?: number
           p_unidade_id?: string
         }
@@ -27989,7 +30135,9 @@ export type Database = {
           data_matricula: string
           data_primeira_aula: string
           nome: string
+          nota: number
           professor_nome: string
+          status: string
           unidade_id: string
           unidade_nome: string
           whatsapp_jid: string
@@ -28138,6 +30286,7 @@ export type Database = {
         Args: never
         Returns: {
           active: boolean
+          is_http_post: boolean
           jobid: number
           jobname: string
           return_message: string
@@ -28358,6 +30507,108 @@ export type Database = {
           total_rotinas: number
         }[]
       }
+      get_jornada_aluno: {
+        Args: { p_aluno_id: number }
+        Returns: {
+          aluno_id: number | null
+          aluno_nome: string | null
+          aulas_com_presenca_registrada: number | null
+          curso_id: number | null
+          curso_nome: string | null
+          curso_nome_emusys: string | null
+          data_primeira_aula: string | null
+          data_ultima_aula: string | null
+          dia_semana: string | null
+          emusys_aluno_id: number | null
+          emusys_disciplina_id: number | null
+          emusys_matricula_disciplina_id: number | null
+          emusys_matricula_id: number | null
+          emusys_professor_id: number | null
+          faltas: number | null
+          fonte_ultima_atualizacao: string | null
+          horario: string | null
+          id: string | null
+          jornada_label: string | null
+          nr_aulas_contratadas: number | null
+          nr_aulas_futuras: number | null
+          nr_aulas_passadas: number | null
+          percentual_jornada: number | null
+          percentual_presenca_contrato: number | null
+          presencas: number | null
+          professor_id: number | null
+          professor_nome: string | null
+          professor_nome_emusys: string | null
+          proxima_aula_numero: number | null
+          qtd_contratos: number | null
+          responsavel_nome: string | null
+          responsavel_telefone: string | null
+          status_matricula: string | null
+          telefone: string | null
+          ultima_aula_registrada: string | null
+          ultima_sincronizacao_emusys: string | null
+          unidade_id: string | null
+          unidade_nome: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "vw_jornada_aluno_com_presenca"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_jornada_professor: {
+        Args: { p_professor_id: number }
+        Returns: {
+          aluno_id: number | null
+          aluno_nome: string | null
+          aulas_com_presenca_registrada: number | null
+          curso_id: number | null
+          curso_nome: string | null
+          curso_nome_emusys: string | null
+          data_primeira_aula: string | null
+          data_ultima_aula: string | null
+          dia_semana: string | null
+          emusys_aluno_id: number | null
+          emusys_disciplina_id: number | null
+          emusys_matricula_disciplina_id: number | null
+          emusys_matricula_id: number | null
+          emusys_professor_id: number | null
+          faltas: number | null
+          fonte_ultima_atualizacao: string | null
+          horario: string | null
+          id: string | null
+          jornada_label: string | null
+          nr_aulas_contratadas: number | null
+          nr_aulas_futuras: number | null
+          nr_aulas_passadas: number | null
+          percentual_jornada: number | null
+          percentual_presenca_contrato: number | null
+          presencas: number | null
+          professor_id: number | null
+          professor_nome: string | null
+          professor_nome_emusys: string | null
+          proxima_aula_numero: number | null
+          qtd_contratos: number | null
+          responsavel_nome: string | null
+          responsavel_telefone: string | null
+          status_matricula: string | null
+          telefone: string | null
+          ultima_aula_registrada: string | null
+          ultima_sincronizacao_emusys: string | null
+          unidade_id: string | null
+          unidade_nome: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "vw_jornada_professor_atual"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_kpis_alunos_admin_operacional: {
         Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
         Returns: Json
@@ -28541,6 +30792,51 @@ export type Database = {
           total_ocorrencias: number
         }[]
       }
+      get_passagem_bastao_aluno: {
+        Args: { p_aluno_id: number }
+        Returns: {
+          aluno_id: number
+          aluno_nome: string
+          audio_url: string
+          created_at: string
+          curso_id: number
+          curso_nome: string
+          data_transicao: string
+          emusys_matricula_disciplina_id: number
+          id: string
+          motivo_dispensa: string
+          professor_destino_id: number
+          professor_destino_nome: string
+          professor_origem_id: number
+          professor_origem_nome: string
+          respondido_em: string
+          resposta_texto: string
+          resumo_ia: string
+          status: string
+          transcricao: string
+          transicao_id: string
+        }[]
+      }
+      get_passagens_bastao_pendentes: {
+        Args: { p_professor_id: number }
+        Returns: {
+          aluno_id: number
+          aluno_nome: string
+          created_at: string
+          curso_id: number
+          curso_nome: string
+          data_transicao: string
+          descricao_emusys: string
+          emusys_matricula_disciplina_id: number
+          id: string
+          professor_destino_id: number
+          professor_destino_nome: string
+          professor_origem_id: number
+          professor_origem_nome: string
+          status: string
+          transicao_id: string
+        }[]
+      }
       get_programa_fideliza_dados: {
         Args: { p_ano?: number; p_trimestre?: number; p_unidade_id?: string }
         Returns: Json
@@ -28580,6 +30876,7 @@ export type Database = {
           pesquisa_id: string
           professor_nome: string
           respondido_em: string
+          status: string
           unidade_nome: string
           whatsapp_jid: string
         }[]
@@ -28609,6 +30906,19 @@ export type Database = {
           responsavel_apelido: string
           responsavel_nome: string
           rotina_id: string
+        }[]
+      }
+      get_saude_syncs_emusys: {
+        Args: never
+        Returns: {
+          idade_horas: number
+          status_real: string
+          sync_tipo: string
+          tolerancia_horas: number
+          ultima_execucao: string
+          unidade_codigo: string
+          unidade_id: string
+          unidade_nome: string
         }[]
       }
       get_tempo_permanencia: {
@@ -28944,6 +31254,11 @@ export type Database = {
       }
       normalize_phone: { Args: { tel: string }; Returns: string }
       normalize_telefone: { Args: { tel: string }; Returns: string }
+      passagem_bastao_is_admin: { Args: never; Returns: boolean }
+      passagem_bastao_is_professor: {
+        Args: { p_professor_id: number }
+        Returns: boolean
+      }
       pode_enviar_pesquisa_evasao: {
         Args: { p_evasao_id: number }
         Returns: boolean
@@ -29171,6 +31486,14 @@ export type Database = {
           p_valor_id: number
         }
         Returns: Json
+      }
+      responder_passagem_bastao: {
+        Args: { p_audio_url?: string; p_id: string; p_texto?: string }
+        Returns: {
+          id: string
+          respondido_em: string
+          status: string
+        }[]
       }
       restaurar_ocorrencia: {
         Args: {

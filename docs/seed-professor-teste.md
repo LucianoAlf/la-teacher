@@ -63,7 +63,7 @@ where u.auth_user_id = '<AUTH_USER_UID>';
 
 ## Sem vínculo = comportamento esperado
 
-Um usuário do Auth **sem** o passo 3 loga normalmente, mas `app_minha_agenda()` devolve
+Um usuário do Auth **sem** o passo 3 loga normalmente, mas `app_minha_agenda_sessao()` devolve
 `{"erro":"sem_professor_vinculado"}` → o app mostra a tela **VínculoPendente** ("Falta ativar
 seu acesso") com botão **Sair**. Isso é o correto, não um bug.
 

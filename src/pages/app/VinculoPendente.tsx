@@ -4,7 +4,7 @@ import { AppFrame } from './AppFrame'
 
 /**
  * Tela para usuário autenticado mas SEM professor vinculado
- * (app_minha_agenda devolveu {erro:'sem_professor_vinculado'}).
+ * (app_minha_agenda_sessao devolveu {erro:'sem_professor_vinculado'}).
  * Nunca tela branca: dá direção e botão de sair.
  */
 export default function VinculoPendentePage() {

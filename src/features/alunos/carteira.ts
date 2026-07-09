@@ -23,9 +23,9 @@ export function qualidadeLabel(q: string | null | undefined): string | null {
   return QUALIDADE_LABEL[q] ?? 'cadastro incompleto'
 }
 
-/** "Terça · 15h" a partir de dia_aula + horario_aula. */
+/** "Terça · 15h" a partir de dia_aula + horario_aula (canônica manda "Terça-feira"). */
 export function horarioAluno(a: CarteiraAluno): string {
-  const dia = a.dia_aula ?? ''
+  const dia = (a.dia_aula ?? '').replace(/-feira$/i, '')
   const hora = a.horario_aula ? formatHoraBRT(a.horario_aula) : ''
   return [dia, hora].filter(Boolean).join(' · ')
 }

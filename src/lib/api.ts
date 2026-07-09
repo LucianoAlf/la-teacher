@@ -45,15 +45,24 @@ export interface SessaoAula {
   alunos: AlunoSessao[]
 }
 
+/**
+ * Linha da carteira — uma por MATRÍCULA/DISCIPLINA (jornada canônica).
+ * Um aluno com dois cursos aparece duas vezes, cada um com a própria régua.
+ */
 export interface CarteiraAluno {
-  aluno_id: number
+  aluno_id: number | null
   aluno_nome: string
-  aluno_status: string | null
   curso: string | null
-  tipo_matricula: string | null
+  status_matricula: string | null
   dia_aula: string | null
   horario_aula: string | null
-  responsavel: string | null
+  /** Unidade da matrícula (professor pode ser multiunidade). */
+  unidade: string | null
+  /** Posição na jornada — "Aula 20/40". */
+  jornada_label: string | null
+  nr_aulas_passadas: number | null
+  nr_aulas_contratadas: number | null
+  percentual_presenca_contrato: number | null
   qualidade: string | null
 }
 
@@ -67,7 +76,11 @@ export async function minhaAgendaSessao(data?: string): Promise<SessaoAula[] | R
   return (res as unknown as SessaoAula[]) ?? []
 }
 
-/** Carteira (alunos) do professor logado. Nunca retorna dado financeiro. */
+/**
+ * Carteira do professor logado — lê a jornada canônica
+ * (vw_jornada_professor_atual, via porta guardada no banco).
+ * Nunca retorna dado financeiro nem contato (telefone/whatsapp).
+ */
 export async function minhaCarteira(): Promise<CarteiraAluno[] | RpcErro> {
   const { data: res, error } = await supabase.rpc('app_minha_carteira')
   if (error) throw error

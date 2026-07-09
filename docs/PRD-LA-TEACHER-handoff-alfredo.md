@@ -164,7 +164,7 @@ Headers:
 - **Professor-piloto:** Matheus Felipe Lourenço · professor_id **25** · Recreio (emusys 182) + Campo Grande (emusys 897)
 - **Repos:** `LucianoAlf/la-teacher` (app) · `LucianoAlf/fabio-backup` (alma/Hermes) · `LucianoAlf/LAperformanceReport` (LA Report)
 - **Hermes:** VPS LAHQ · webhook adapter porta 8644 · roda GPT-5.5 via Codex · STT nativo
-- **As 11 RPCs no banco:** app_minha_agenda, app_minha_agenda_mes, app_minha_carteira, app_meus_registros, app_enfileirar_audio, app_confirmar_registro, app_registro_completo, app_registros_pendentes, app_atualizar_fatia, **fabio_criar_registro** (a que você usa), registrar_aula_fabio (a porta única de escrita pedagógica).
+- **As 11 RPCs no banco:** app_minha_agenda_sessao (agenda por sessão — a antiga app_minha_agenda foi dropada na migração 008), app_minha_agenda_mes, app_minha_carteira (desde a 008 lê a jornada canônica `vw_jornada_professor_atual`), app_meus_registros, app_enfileirar_audio, app_confirmar_registro, app_registro_completo, app_registros_pendentes, app_atualizar_fatia, **fabio_criar_registro** (a que você usa), registrar_aula_fabio (a porta única de escrita pedagógica).
 
 ---
 

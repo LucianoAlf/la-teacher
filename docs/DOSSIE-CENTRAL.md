@@ -107,9 +107,13 @@ Isso é o **modelo tronco+fatias**, já suportado pelo banco (não precisa refat
 - **001 (Fundação)** ✅ — tabelas `fabio_registros_aula`, `fabio_fila_audios`, `risco_evasao` + `vw_risco_atual` (security_invoker); RPCs `app_minha_agenda`, `app_minha_carteira`, `app_meus_registros`, `app_confirmar_registro`; `fn_professor_do_usuario()`; bucket `fabio-audios`; vínculo `professores.usuario_id`; perfil 'professor'; campos em `farmer_tarefas`; Fábio em `agentes`; RLS.
 - **002 (Motor)** ✅ — `app_enfileirar_audio` (com correção por voz), `fn_fabio_chama_edge` (dispara via Vault), `fn_fabio_retry_fila` + cron `fabio-retry-fila` (5 min), `app_confirmar_registro` v2 **com gravação POR ALUNO** e parâmetro `p_modo`, trigger de disparo, índice de confirmação.
 - **004 (Hugo)** ✅ — `app_minha_agenda_mes` (mês inteiro numa chamada, filtra canceladas).
+- **005 (Confirmação)** ✅ — `app_registro_completo` (com contexto da aula), `app_registros_pendentes`, `app_atualizar_fatia`.
+- **006 (Origem)** ✅ — origem CANAL ('app'/'whatsapp') × CONTEÚDO ('audio'/'texto') traduzida no ponto de chamada da confirmação.
+- **007 (Agenda por sessão)** ✅ — `app_minha_agenda_sessao` (contrato v3; aplicada no banco como `la_teacher_008c`).
+- **008 (Carteira fonte única)** ✅ — `app_minha_carteira` reescrita sobre a **jornada canônica** (`vw_jornada_professor_atual`, porta guardada, sem contato/financeiro) + DROP da `app_minha_agenda` órfã do P3. No banco: `la_teacher_009_carteira_fonte_unica`. Ver `docs/arquitetura-jornada-aluno.md`.
 
-### As 6 RPCs `app_*` (a única via de dados do app)
-`app_minha_agenda` · `app_minha_agenda_mes` · `app_minha_carteira` · `app_meus_registros` · `app_enfileirar_audio` · `app_confirmar_registro`
+### As 9 RPCs `app_*` (a única via de dados do app)
+`app_minha_agenda_sessao` · `app_minha_agenda_mes` · `app_minha_carteira` · `app_meus_registros` · `app_enfileirar_audio` · `app_confirmar_registro` · `app_registro_completo` · `app_registros_pendentes` · `app_atualizar_fatia`
 
 ### Realtime ligado em: `fabio_registros_aula`, `fabio_fila_audios`
 

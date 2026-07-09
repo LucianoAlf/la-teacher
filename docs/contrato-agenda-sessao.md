@@ -61,4 +61,5 @@ linhas para 6 aulas (UX nota 1/10). Além disso, `turma_nome` (ex.: `C_Ter_15`) 
    `aluno_presenca`).
 3. Migração espelhada em `supabase/migrations/007-agenda-por-sessao.sql`
    (aplicada no banco como `la_teacher_008/008b/008c`). A RPC antiga
-   `app_minha_agenda` segue existindo; o app usa somente a de sessão.
+   `app_minha_agenda` (P3) foi **dropada na migração 008** (carteira fonte
+   única) — estava órfã; o app usa somente a de sessão.

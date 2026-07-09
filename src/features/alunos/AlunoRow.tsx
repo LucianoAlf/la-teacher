@@ -15,7 +15,7 @@ export function AlunoRow({ aluno }: { aluno: CarteiraAluno }) {
       <div className="min-w-0 flex-1">
         <b className="block truncate text-sm font-semibold">{aluno.aluno_nome}</b>
         <span className="block truncate text-xs text-text-secondary">
-          {[horario, aluno.tipo_matricula].filter(Boolean).join(' · ')}
+          {[horario, aluno.jornada_label].filter(Boolean).join(' · ')}
         </span>
       </div>
       {qualidade && (
