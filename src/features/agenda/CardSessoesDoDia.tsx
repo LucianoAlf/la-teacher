@@ -1,7 +1,7 @@
 import { Button, Card, EmptyState, Skeleton } from '../../components/ui'
 import type { SessaoAula } from '../../lib/api'
 import { formatDiaCurto, isHoje } from '../../lib/date'
-import { contarSessoesRegistradas } from './sessao'
+import { contarChamadasFeitas } from './sessao'
 import { SessaoRow } from './SessaoRow'
 import type { EstadoSessoes } from './useSessoes'
 
@@ -9,13 +9,13 @@ interface Props {
   data: string
   estado: EstadoSessoes
   onRetry: () => void
-  /** Abrir a gravação da sessão tocada. */
-  onGravar: (sessao: SessaoAula) => void
+  /** Abrir a sessão tocada (chamada). */
+  onAbrir: (sessao: SessaoAula) => void
   titulo?: string
 }
 
 /** Card com as SESSÕES de um dia (skeleton/erro/vazio/lista). Home e Agenda. */
-export function CardSessoesDoDia({ data, estado, onRetry, onGravar, titulo }: Props) {
+export function CardSessoesDoDia({ data, estado, onRetry, onAbrir, titulo }: Props) {
   const tit = titulo ?? (isHoje(data) ? 'Hoje' : formatDiaCurto(data))
 
   if (estado.fase === 'carregando') {
@@ -84,16 +84,16 @@ export function CardSessoesDoDia({ data, estado, onRetry, onGravar, titulo }: Pr
     )
   }
 
-  const registradas = contarSessoesRegistradas(sessoes)
+  const feitas = contarChamadasFeitas(sessoes)
 
   return (
     <Card
       title={tit}
       icon="fa-solid fa-calendar-day"
-      right={`${registradas} de ${sessoes.length} registradas`}
+      right={`${feitas} de ${sessoes.length} chamadas`}
     >
       {sessoes.map((s) => (
-        <SessaoRow key={s.aula_id_ancora} sessao={s} onGravar={onGravar} />
+        <SessaoRow key={s.aula_id_ancora} sessao={s} onAbrir={onAbrir} />
       ))}
     </Card>
   )

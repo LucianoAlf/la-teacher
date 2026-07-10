@@ -55,6 +55,17 @@ export function formatHoraBRT(time: string | null | undefined): string {
   return mm === '00' ? `${Number(h)}h` : `${Number(h)}:${mm}`
 }
 
+/** Timestamp ISO (timestamptz) → data 'YYYY-MM-DD' em BRT. */
+export function dataBRTDoTimestamp(iso: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(iso))
+}
+
+/** Timestamp ISO (timestamptz) → "HH:MM" em BRT. */
+export function formatHoraTimestampBRT(iso: string | null | undefined): string {
+  if (!iso) return '--'
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
+}
+
 export function isHoje(iso: string): boolean {
   return iso === hojeBRT()
 }

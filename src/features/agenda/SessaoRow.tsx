@@ -6,36 +6,42 @@ import { horaSessao, statusSessao, subtituloSessao, tituloSessao } from './sessa
 interface Props {
   sessao: SessaoAula
   now?: Date
-  /** Abrir a gravação desta sessão (o áudio vai pra aula_id_ancora). */
-  onGravar?: (sessao: SessaoAula) => void
+  /** Abrir a sessão (Home/Agenda → chamada; picker de gravação → gravador). */
+  onAbrir?: (sessao: SessaoAula) => void
 }
 
 /** Uma SESSÃO = uma linha: turma agrupada com nomes, individual com a pessoa. */
-export function SessaoRow({ sessao, now = new Date(), onGravar }: Props) {
+export function SessaoRow({ sessao, now = new Date(), onAbrir }: Props) {
   const status = statusSessao(sessao, now)
   const parcial = sessao.n_registradas > 0 && sessao.n_registradas < sessao.n_alunos
 
   let dot: AulaStatus | undefined
   let badge: ReactNode
 
-  if (status === 'registrada') {
+  if (status === 'chamada_feita') {
     dot = 'ok'
     badge = (
       <Badge variant="ok" icon="fa-solid fa-check">
-        Registrada
+        Chamada feita
       </Badge>
     )
   } else if (status === 'agora') {
     dot = 'now'
     badge = (
-      <Badge variant="brand" icon="fa-solid fa-microphone">
-        Registrar
+      <Badge variant="brand" icon="fa-solid fa-list-check">
+        Fazer chamada
       </Badge>
     )
   } else if (status === 'pendente') {
     badge = (
       <Badge variant="warn" icon="fa-solid fa-clock">
-        {parcial ? `${sessao.n_registradas} de ${sessao.n_alunos}` : 'Sem registro'}
+        {parcial ? `${sessao.n_registradas} de ${sessao.n_alunos}` : 'Sem chamada'}
+      </Badge>
+    )
+  } else if (status === 'perdida') {
+    badge = (
+      <Badge variant="info" icon="fa-solid fa-lock">
+        Janela encerrada
       </Badge>
     )
   } else if (status === 'faltaram') {
@@ -48,17 +54,14 @@ export function SessaoRow({ sessao, now = new Date(), onGravar }: Props) {
     dot = 'next'
   }
 
-  // registrada/faltaram: nada a gravar (ausente não recebe conteúdo — Alma)
-  const clicavel = status !== 'registrada' && status !== 'faltaram' && onGravar ? () => onGravar(sessao) : undefined
-
   return (
     <AulaRow
       hora={horaSessao(sessao)}
       titulo={tituloSessao(sessao)}
-      detalhe={subtituloSessao(sessao, now)}
+      detalhe={subtituloSessao(sessao)}
       badge={badge}
       status={dot}
-      onClick={clicavel}
+      onClick={onAbrir ? () => onAbrir(sessao) : undefined}
     />
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { isSemVinculo, minhaAgendaSessao } from '../../lib/api'
 import { diasDaSemana } from '../../lib/date'
+import { agruparSessoes } from './sessao'
 
 /** Mapa data(YYYY-MM-DD) → nº de SESSÕES, para a strip da semana. */
 export type ContagemSemana = Record<string, number>
@@ -19,7 +20,7 @@ export function useSemana(dataRef: string) {
     Promise.all(
       dias.map((d) =>
         minhaAgendaSessao(d)
-          .then((res) => (isSemVinculo(res) ? 0 : res.length))
+          .then((res) => (isSemVinculo(res) ? 0 : agruparSessoes(res).length))
           .catch(() => 0),
       ),
     ).then((totais) => {

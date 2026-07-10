@@ -29,11 +29,12 @@ export default function GravarAulaPage() {
 function EscolherAula() {
   const navigate = useNavigate()
   const { estado } = useSessoes(hojeBRT())
-  const sessoes = estado.fase === 'ok' ? estado.sessoes.filter((s) => statusSessao(s) !== 'registrada') : []
+  // aula onde todo mundo faltou não recebe conteúdo (Alma); o resto pode gravar
+  const sessoes = estado.fase === 'ok' ? estado.sessoes.filter((s) => statusSessao(s) !== 'faltaram') : []
 
   return (
     <AppFrame>
-      <ScreenHeader title="Registrar qual aula?" subtitle="Aulas de hoje sem registro" onBack={() => navigate(-1)} />
+      <ScreenHeader title="Registrar qual aula?" subtitle="Aulas de hoje" onBack={() => navigate(-1)} />
       <div className="flex-1 overflow-y-auto px-4 pb-8 pt-1">
         {estado.fase === 'carregando' && (
           <div className="space-y-3 py-2">
@@ -46,7 +47,7 @@ function EscolherAula() {
           <EmptyState
             icon="fa-solid fa-music"
             title="Nada pra registrar hoje 🎵"
-            description="Nenhuma aula de hoje está sem registro. Quer gravar uma aula de outro dia? Acha ela na agenda."
+            description="Nenhuma aula de hoje pra gravar. Quer registrar uma aula de outro dia? Acha ela na agenda."
             action={
               <Button size="sm" variant="ghost" onClick={() => navigate('/app/agenda')}>
                 <i className="fa-solid fa-calendar" aria-hidden="true" /> Abrir agenda
@@ -60,7 +61,7 @@ function EscolherAula() {
               <SessaoRow
                 key={s.aula_id_ancora}
                 sessao={s}
-                onGravar={(sessao) => navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })}
+                onAbrir={(sessao) => navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })}
               />
             ))}
           </Card>

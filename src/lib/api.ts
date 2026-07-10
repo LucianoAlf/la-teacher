@@ -15,19 +15,27 @@ export function isSemVinculo(v: unknown): v is RpcErro {
   return typeof v === 'object' && v !== null && (v as RpcErro).erro === SEM_VINCULO
 }
 
-// ---- Agenda por SESSÃO (contrato v3 — app_minha_agenda_sessao) ----
-// 1 sessão = 1 aula real. Turma agrupada com alunos nomeados; cada aluno
-// aponta pra própria aula individual (aula_id_alvo) — é nela que a fatia
-// do Fábio grava (nunca na âncora, senão o texto vaza entre alunos).
+// ---- Agenda por SESSÃO (contrato v4 — app_minha_agenda_sessao) ----
+// O banco devolve 1 sessão POR AULA CRUA do espelho, com o roster embutido
+// (aula_alunos_emusys) + presença lançada + justificativa administrativa.
+// O agrupamento "1 aula real = 1 linha" (regra do contrato v3) é refeito no
+// cliente por agruparSessoes() — ver src/features/agenda/sessao.ts.
 
 export interface AlunoSessao {
-  aluno_id: number
+  /** null = aluno do roster ainda NÃO conciliado (bloqueia a chamada). */
+  aluno_id: number | null
   nome: string
-  /** Aula individual do aluno — alvo da gravação da fatia dele. */
-  aula_id_alvo: number
-  /** Presença crua ('presente'|'ausente'). Em aula futura, 'ausente' = ainda não lançada, NÃO "faltou". */
-  presenca: string
+  /** Presença lançada. 'a_confirmar' = chamada ainda não feita. */
+  presenca: 'presente' | 'falta' | 'a_confirmar'
+  /** true = presença JÁ lançada pra este aluno (não é anotação do Fábio). */
   tem_registro: boolean
+  /** Falta justificada pela coordenação (aluno_presenca_administrativo). */
+  justificada: boolean
+  /**
+   * Aula individual paralela do aluno (alvo da fatia do Fábio — contrato v3).
+   * Reconstruído no CLIENTE por agruparSessoes(); ausente nas sessões cruas.
+   */
+  aula_id_alvo?: number
 }
 
 export interface SessaoAula {
@@ -38,11 +46,22 @@ export interface SessaoAula {
   curso: string | null
   turma_nome: string | null
   tipo: 'turma' | 'individual'
-  /** A aula da sessão — o áudio da gravação é enfileirado com este id. */
+  /** A aula da sessão — âncora do áudio da gravação e da chamada. */
   aula_id_ancora: number
   n_alunos: number
+  /** Nº de alunos com presença já lançada. */
   n_registradas: number
+  /** true = há aluno do roster sem conciliação (chamada bloqueada no banco). */
+  roster_incompleto: boolean
   alunos: AlunoSessao[]
+  /** Aulas cruas colapsadas nesta linha (enriquecido por agruparSessoes). */
+  aulas_agrupadas?: number[]
+  /**
+   * Aula que RECEBE a chamada — o banco só aceita na aula de TURMA do slot
+   * ('chamada_somente_na_aula_ancora'). null = sem turma paralela (individual
+   * avulsa): sem porta de chamada pelo app. Enriquecido por agruparSessoes.
+   */
+  aula_id_chamada?: number | null
 }
 
 /**
@@ -182,6 +201,75 @@ export async function atualizarFatia(
   })
   if (error) throw error
   return res as unknown as RegistroRow
+}
+
+// ---------------------------------------------------------------------------
+// MVP dia 21 · chamada (presença em lote) + ponto
+// ---------------------------------------------------------------------------
+
+export interface ResultadoChamada {
+  aula_id: number
+  total_roster: number
+  inseridos: number
+  ignorados_first_write_wins: number
+  ja_havia_registros: boolean
+  /** true = alguém já tinha enviado a chamada desta aula (nada foi gravado). */
+  chamada_ja_enviada: boolean
+}
+
+/** Códigos que a RPC de chamada levanta como exceção (message do PostgREST). */
+export const ERROS_CHAMADA = [
+  'sem_professor_vinculado',
+  'aula_nao_pertence_ao_professor',
+  'aula_cancelada',
+  'chamada_ainda_nao_disponivel',
+  'janela_de_chamada_encerrada',
+  'roster_nao_sincronizado',
+  'roster_incompleto',
+  'aluno_ausente_fora_do_roster',
+  'chamada_somente_na_aula_ancora',
+] as const
+export type ErroChamada = (typeof ERROS_CHAMADA)[number]
+
+/**
+ * Envia a chamada da aula em lote: TODOS os alunos do roster viram 'presente',
+ * exceto os ids em `ausentes` (viram 'falta'). First-write-wins no banco —
+ * depois de enviada, correção é da coordenação, não do app.
+ */
+export async function registrarPresencas(
+  aulaId: number,
+  ausentes: number[],
+): Promise<{ ok: true; resultado: ResultadoChamada } | { ok: false; erro: ErroChamada | 'desconhecido' }> {
+  const { data: res, error } = await supabase.rpc('app_registrar_presencas_aula', {
+    p_aula_emusys_id: aulaId,
+    p_alunos_ausentes: ausentes,
+  })
+  if (error) {
+    const conhecido = ERROS_CHAMADA.find((c) => error.message.includes(c))
+    return { ok: false, erro: conhecido ?? 'desconhecido' }
+  }
+  return { ok: true, resultado: res as unknown as ResultadoChamada }
+}
+
+/** Um dia de ponto derivado da presença (app_meu_ponto). */
+export interface PontoDia {
+  data_aula: string
+  unidades_ids: string[] | null
+  inicio_creditado: string | null
+  fim_creditado: string | null
+  minutos_creditados: number
+  aulas_creditadas: number
+  pontas_confirmadas: number
+}
+
+/** Ponto do professor logado no intervalo (só leitura; horas nascem da chamada). */
+export async function meuPonto(inicio: string, fim: string): Promise<PontoDia[]> {
+  const { data: res, error } = await supabase.rpc('app_meu_ponto', {
+    p_data_inicio: inicio,
+    p_data_fim: fim,
+  })
+  if (error) throw error
+  return (res as unknown as PontoDia[]) ?? []
 }
 
 export interface EnfileirarResultado {

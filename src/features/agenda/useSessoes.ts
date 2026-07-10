@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { isSemVinculo, minhaAgendaSessao, type SessaoAula } from '../../lib/api'
+import { agruparSessoes } from './sessao'
 
 export type EstadoSessoes =
   | { fase: 'carregando' }
@@ -21,7 +22,7 @@ export function useSessoes(data: string) {
       .then((res) => {
         if (!vivo) return
         if (isSemVinculo(res)) setEstado({ fase: 'sem_vinculo' })
-        else setEstado({ fase: 'ok', sessoes: res })
+        else setEstado({ fase: 'ok', sessoes: agruparSessoes(res) })
       })
       .catch(() => vivo && setEstado({ fase: 'erro' }))
     return () => {

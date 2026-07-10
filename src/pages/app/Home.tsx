@@ -4,7 +4,8 @@ import { Card, EmptyState, FabioCard, Skeleton, Toast, useToast } from '../../co
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../lib/theme'
 import { formatDiaCurto, hojeBRT } from '../../lib/date'
-import { registrosPendentes, type RegistroRow, type SessaoAula } from '../../lib/api'
+import { meuPonto, registrosPendentes, type RegistroRow, type SessaoAula } from '../../lib/api'
+import { fmtMinutos } from './Ponto'
 import { SessaoRow } from '../../features/agenda/SessaoRow'
 import { CardSessoesDoDia } from '../../features/agenda/CardSessoesDoDia'
 import { DateNav } from '../../features/agenda/DateNav'
@@ -31,8 +32,8 @@ export default function HomePage() {
 
   const { estado, recarregar } = useSessoes(data)
   const filaOffline = useFilaOfflineCount()
-  const abrirGravacao = (sessao: SessaoAula) =>
-    navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
+  const abrirChamada = (sessao: SessaoAula) =>
+    navigate(`/app/chamada/${sessao.aula_id_ancora}`, { state: { sessao } })
   const nome = primeiroNome(
     session?.user.email,
     (session?.user.user_metadata?.name as string | undefined) ?? undefined,
@@ -89,11 +90,14 @@ export default function HomePage() {
 
         {/* 3 · Aulas do dia (sessões) */}
         <div className="mb-3">
-          <CardSessoesDoDia data={data} estado={estado} onRetry={recarregar} onGravar={abrirGravacao} />
+          <CardSessoesDoDia data={data} estado={estado} onRetry={recarregar} onAbrir={abrirChamada} />
         </div>
 
-        {/* 4 · Pendências */}
-        <PendenciasCard onGravar={abrirGravacao} />
+        {/* 4 · Chamadas pendentes de ontem */}
+        <PendenciasCard onAbrir={abrirChamada} />
+
+        {/* 5 · Meu ponto (atalho) */}
+        <PontoHojeCard onAbrir={() => navigate('/app/ponto')} />
       </div>
 
       <AppNav onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')} />
@@ -144,7 +148,42 @@ function AguardandoConfirmacao({ onAbrir }: { onAbrir: (registroId: string) => v
   )
 }
 
-function PendenciasCard({ onGravar }: { onGravar: (sessao: SessaoAula) => void }) {
+/** Hoje até agora: horas creditadas pela chamada + atalho pro ponto completo. */
+function PontoHojeCard({ onAbrir }: { onAbrir: () => void }) {
+  const [minutos, setMinutos] = useState<number | null>(null)
+
+  useEffect(() => {
+    let vivo = true
+    const hoje = hojeBRT()
+    meuPonto(hoje, hoje)
+      .then((dias) => vivo && setMinutos(dias.reduce((n, d) => n + d.minutos_creditados, 0)))
+      .catch(() => {}) // atalho é bônus — nunca quebra a Home
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  return (
+    <button
+      type="button"
+      onClick={onAbrir}
+      className="mt-3 flex w-full items-center gap-3 rounded-lg border border-border-subtle bg-bg-surface px-[14px] py-[13px] text-left"
+    >
+      <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-md bg-brand-soft text-base text-brand-text">
+        <i className="fa-solid fa-stopwatch" aria-hidden="true" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <b className="block text-sm">Meu ponto</b>
+        <span className="block truncate text-xs text-text-secondary">
+          {minutos == null ? 'horas creditadas pelas chamadas' : minutos > 0 ? `hoje: ${fmtMinutos(minutos)} creditadas` : 'sem horas creditadas hoje ainda'}
+        </span>
+      </div>
+      <i className="fa-solid fa-chevron-right text-[11px] text-text-muted" aria-hidden="true" />
+    </button>
+  )
+}
+
+function PendenciasCard({ onAbrir }: { onAbrir: (sessao: SessaoAula) => void }) {
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'erro'>('carregando')
   const [pend, setPend] = useState<Pendencias | null>(null)
 
@@ -180,20 +219,20 @@ function PendenciasCard({ onGravar }: { onGravar: (sessao: SessaoAula) => void }
         <EmptyState
           icon="fa-solid fa-mug-hot"
           title="Tudo em dia! 🎉"
-          description="Nenhuma aula sem registro por aqui. Quando terminar uma aula, ela aparece pra você registrar."
+          description="Nenhuma chamada pendente de ontem. As de hoje aparecem no card acima."
         />
       </Card>
     )
   }
 
   return (
-    <Card title="Pendências" icon="fa-solid fa-bell" right={formatDiaCurto(pend.data)}>
+    <Card title="Chamadas pendentes" icon="fa-solid fa-bell" right={formatDiaCurto(pend.data)}>
       {pend.sessoes.map((s) => (
-        <SessaoRow key={s.aula_id_ancora} sessao={s} onGravar={onGravar} />
+        <SessaoRow key={s.aula_id_ancora} sessao={s} onAbrir={onAbrir} />
       ))}
       <p className="mt-[9px] flex items-start gap-2 text-[12.5px] leading-relaxed text-text-secondary">
-        <i className="fa-solid fa-robot mt-[3px] text-brand-text" aria-hidden="true" />
-        <span>Me manda um áudio de 30s dessas aulas que eu monto o registro pra você 😉</span>
+        <i className="fa-solid fa-clock mt-[3px] text-brand-text" aria-hidden="true" />
+        <span>A chamada fecha 24h depois da aula — depois disso, só a coordenação lança. ⏳</span>
       </p>
     </Card>
   )

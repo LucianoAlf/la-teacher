@@ -7,6 +7,8 @@ import AlunosPage from './pages/app/Alunos'
 import GravarAulaPage from './features/registro/GravarAula'
 import ProcessandoPage from './features/registro/Processando'
 import ConfirmarPage from './features/registro/Confirmar'
+import ChamadaPage from './features/chamada/Chamada'
+import PontoPage from './pages/app/Ponto'
 import { RequireProfessor } from './pages/app/RequireProfessor'
 import { useAuth } from './lib/auth'
 
@@ -28,6 +30,8 @@ export const router = createBrowserRouter(
         { path: '/app', element: <HomePage /> },
         { path: '/app/agenda', element: <AgendaPage /> },
         { path: '/app/alunos', element: <AlunosPage /> },
+        { path: '/app/chamada/:aulaId', element: <ChamadaPage /> },
+        { path: '/app/ponto', element: <PontoPage /> },
         { path: '/app/gravar', element: <GravarAulaPage /> },
         { path: '/app/gravar/:aulaId', element: <GravarAulaPage /> },
         { path: '/app/processando/:audioId', element: <ProcessandoPage /> },

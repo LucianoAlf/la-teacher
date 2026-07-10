@@ -112,8 +112,8 @@ Isso é o **modelo tronco+fatias**, já suportado pelo banco (não precisa refat
 - **007 (Agenda por sessão)** ✅ — `app_minha_agenda_sessao` (contrato v3; aplicada no banco como `la_teacher_008c`).
 - **008 (Carteira fonte única)** ✅ — `app_minha_carteira` reescrita sobre a **jornada canônica** (`vw_jornada_professor_atual`, porta guardada, sem contato/financeiro) + DROP da `app_minha_agenda` órfã do P3. No banco: `la_teacher_009_carteira_fonte_unica`. Ver `docs/arquitetura-jornada-aluno.md`.
 
-### As 9 RPCs `app_*` (a única via de dados do app)
-`app_minha_agenda_sessao` · `app_minha_agenda_mes` · `app_minha_carteira` · `app_meus_registros` · `app_enfileirar_audio` · `app_confirmar_registro` · `app_registro_completo` · `app_registros_pendentes` · `app_atualizar_fatia`
+### As 13 RPCs `app_*` (a única via de dados do app)
+`app_minha_agenda_sessao` (v4: roster embutido + justificada; agrupamento v3 refeito no cliente) · `app_minha_agenda_mes` · `app_minha_carteira` · `app_meus_registros` · `app_enfileirar_audio` · `app_confirmar_registro` · `app_registro_completo` · `app_registros_pendentes` · `app_atualizar_fatia` · **MVP dia 21 (lado banco = Claude Web):** `app_registrar_presencas_aula` (chamada em lote, SÓ na aula de turma/âncora, first-write-wins, janela −15min/+24h) · `app_meu_ponto` (só leitura) · `app_responder_confirmacao_ponto` · `app_propor_disponibilidade`
 
 ### Realtime ligado em: `fabio_registros_aula`, `fabio_fila_audios`
 
