@@ -4,7 +4,7 @@ import { Card, EmptyState, FabioCard, Skeleton, Toast, useToast } from '../../co
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../lib/theme'
 import { formatDiaCurto, hojeBRT } from '../../lib/date'
-import { meuPonto, registrosPendentes, type RegistroRow, type SessaoAula } from '../../lib/api'
+import { meuPonto, registrosPendentes, type PontoDia, type RegistroRow, type SessaoAula } from '../../lib/api'
 import { fmtMinutos } from './Ponto'
 import { SessaoRow } from '../../features/agenda/SessaoRow'
 import { CardSessoesDoDia } from '../../features/agenda/CardSessoesDoDia'
@@ -96,7 +96,7 @@ export default function HomePage() {
         {/* 4 · Chamadas pendentes de ontem */}
         <PendenciasCard onAbrir={abrirChamada} />
 
-        {/* 5 · Meu ponto (atalho) */}
+        {/* 5 · Meu dia (atalho pra semana) */}
         <PontoHojeCard onAbrir={() => navigate('/app/ponto')} />
       </div>
 
@@ -148,15 +148,16 @@ function AguardandoConfirmacao({ onAbrir }: { onAbrir: (registroId: string) => v
   )
 }
 
-/** Hoje até agora: horas creditadas pela chamada + atalho pro ponto completo. */
+/** Hoje até agora: o que o professor já deu — atalho pra semana completa. */
 function PontoHojeCard({ onAbrir }: { onAbrir: () => void }) {
-  const [minutos, setMinutos] = useState<number | null>(null)
+  // undefined = ainda carregando; null = carregou e não tem aula hoje.
+  const [dia, setDia] = useState<PontoDia | null | undefined>(undefined)
 
   useEffect(() => {
     let vivo = true
     const hoje = hojeBRT()
     meuPonto(hoje, hoje)
-      .then((dias) => vivo && setMinutos(dias.reduce((n, d) => n + d.minutos_creditados, 0)))
+      .then((dias) => vivo && setDia(dias[0] ?? null))
       .catch(() => {}) // atalho é bônus — nunca quebra a Home
     return () => {
       vivo = false
@@ -170,12 +171,16 @@ function PontoHojeCard({ onAbrir }: { onAbrir: () => void }) {
       className="mt-3 flex w-full items-center gap-3 rounded-lg border border-border-subtle bg-bg-surface px-[14px] py-[13px] text-left"
     >
       <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-md bg-brand-soft text-base text-brand-text">
-        <i className="fa-solid fa-stopwatch" aria-hidden="true" />
+        <i className="fa-solid fa-calendar-check" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <b className="block text-sm">Meu ponto</b>
+        <b className="block text-sm">Meu dia</b>
         <span className="block truncate text-xs text-text-secondary">
-          {minutos == null ? 'horas creditadas pelas chamadas' : minutos > 0 ? `hoje: ${fmtMinutos(minutos)} creditadas` : 'sem horas creditadas hoje ainda'}
+          {dia === undefined
+            ? 'suas aulas dadas hoje'
+            : dia && dia.aulas_creditadas > 0
+              ? `${dia.aulas_creditadas} ${dia.aulas_creditadas === 1 ? 'aula dada' : 'aulas dadas'} hoje · ${fmtMinutos(dia.minutos_creditados)}`
+              : 'nenhuma aula registrada hoje ainda'}
         </span>
       </div>
       <i className="fa-solid fa-chevron-right text-[11px] text-text-muted" aria-hidden="true" />

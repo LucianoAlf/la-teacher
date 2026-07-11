@@ -48,8 +48,8 @@ export default function PontoPage() {
   return (
     <AppFrame>
       <ScreenHeader
-        title="Meu ponto"
-        subtitle="Horas creditadas pelas chamadas — só leitura"
+        title="Minha semana"
+        subtitle="Suas aulas dadas, dia a dia — só leitura"
         onBack={() => navigate(-1)}
       />
 
@@ -107,14 +107,14 @@ export default function PontoPage() {
 
         {estado.fase === 'ok' && estado.dias.length === 0 && (
           <EmptyState
-            icon="fa-solid fa-stopwatch"
-            title="Sem horas nesta semana"
-            description="As horas do ponto nascem das chamadas feitas nas aulas. Fez a chamada, a hora aparece aqui."
+            icon="fa-solid fa-calendar-check"
+            title="Sem aulas nesta semana"
+            description="Os dias aparecem aqui conforme você faz a chamada nas aulas."
           />
         )}
 
         {estado.fase === 'ok' && estado.dias.length > 0 && (
-          <Card title="Semana" icon="fa-solid fa-stopwatch" right={fmtMinutos(total)}>
+          <Card title="Semana" icon="fa-solid fa-calendar-check" right={fmtMinutos(total)}>
             {estado.dias.map((d) => (
               <div key={d.data_aula} className="flex items-center gap-3 border-b border-border-subtle px-1 py-3 last:border-b-0">
                 <span className="w-[74px] flex-none text-[12.5px] font-bold text-text-secondary">
@@ -134,8 +134,8 @@ export default function PontoPage() {
         <p className="mt-3 flex items-start gap-2 text-[12px] leading-relaxed text-text-secondary">
           <i className="fa-solid fa-circle-info mt-[2px] text-brand-text" aria-hidden="true" />
           <span>
-            O ponto é derivado das presenças das suas aulas — aqui é <b>só leitura</b>. Achou divergência? Fala com a
-            coordenação.
+            Os dias aqui nascem da chamada que você faz nas aulas — é <b>só leitura</b>. Achou divergência? Fala com
+            a coordenação.
           </span>
         </p>
       </div>
