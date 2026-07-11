@@ -23,11 +23,29 @@ function cabecalho(aula: AulaContexto | null): string {
 /** Bloco comum da turma, com rótulos universais e campos verbatim. */
 export function blocoComum(troncoCampos: Record<string, unknown>): string {
   const linhas: string[] = []
-  const atividades = str(troncoCampos.atividades)
-  const objetivo = str(troncoCampos.objetivo)
-  if (atividades) linhas.push(`Atividades: ${atividades}`)
-  if (objetivo) linhas.push(`Objetivo trabalhado: ${objetivo}`)
+  const add = (rotulo: string, chave: string) => {
+    const v = str(troncoCampos[chave])
+    if (v) linhas.push(`${rotulo}: ${v}`)
+  }
+  // TODO campo de narrativa do professor entra no texto gravado — não só 3 fixos.
+  add('Atividades', 'atividades')
+  add('Objetivo trabalhado', 'objetivo')
+  add('Materiais', 'materiais')
+  add('Repertório', 'repertorio')
+  add('Observações', 'obs_gerais')
   return linhas.join('\n')
+}
+
+/** Eixos (classificação do Fábio) em rótulos amigáveis — aceita array, CSV ou CamelCase. */
+export function eixosLista(v: unknown): string[] {
+  const bruto: string[] = Array.isArray(v)
+    ? v.map((x) => String(x))
+    : typeof v === 'string' && v.trim()
+      ? /[,;]/.test(v)
+        ? v.split(/[,;]/)
+        : v.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/\s+/)
+      : []
+  return bruto.map((s) => s.trim()).filter(Boolean)
 }
 
 /** Texto final de UMA fatia: cabeçalho + bloco comum + bloco do aluno + dever. */

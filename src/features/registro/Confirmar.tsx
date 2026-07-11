@@ -14,7 +14,15 @@ import { cx } from '../../lib/cx'
 import { formatDiaCurto, formatHoraBRT } from '../../lib/date'
 import { AppFrame } from '../../pages/app/AppFrame'
 import { CampoEditavel } from './CampoEditavel'
-import { presencaDaFatia, textoFatia, textoTronco } from './texto'
+import { eixosLista, presencaDaFatia, textoFatia, textoTronco } from './texto'
+
+// Campos extras do tronco (narrativa do professor) — mostrados só quando têm
+// conteúdo, pra não poluir. Nenhum campo preenchido fica escondido.
+const EXTRAS_TRONCO: Array<{ chave: string; label: string; icon: string; cutucada: string }> = [
+  { chave: 'materiais', label: 'Materiais', icon: 'fa-solid fa-guitar', cutucada: 'Materiais usados na aula? (opcional)' },
+  { chave: 'repertorio', label: 'Repertório', icon: 'fa-solid fa-list-ol', cutucada: 'Repertório trabalhado? (opcional)' },
+  { chave: 'marco_ref', label: 'Marco de referência', icon: 'fa-solid fa-flag', cutucada: 'Algum marco de referência? (opcional)' },
+]
 
 type Fase = 'carregando' | 'erro' | 'nao_encontrado' | 'ok' | 'confirmando' | 'sucesso'
 
@@ -109,6 +117,12 @@ export default function ConfirmarPage() {
         show('Algumas fatias precisam de atenção 👇')
         return
       }
+      if (res.gravadas === 0) {
+        // sucesso falso: registro sem conteúdo gravável (ex.: turma sem fatias)
+        setFase('ok')
+        show('Nada foi gravado — este registro não tem conteúdo por aluno. Fala com a coordenação ou regrave.')
+        return
+      }
       setSucesso(res)
       setFase('sucesso')
     } catch {
@@ -167,6 +181,7 @@ export default function ConfirmarPage() {
   }
 
   const presentes = fatias.filter((f) => presencaDaFatia(f) === 'presente')
+  const temFatias = fatias.length > 0
   const sub = [aula?.curso, aula?.turma, aula?.data_aula && formatDiaCurto(aula.data_aula), aula?.hora && formatHoraBRT(aula.hora), `Molde ${tronco.molde}`]
     .filter(Boolean)
     .join(' · ')
@@ -225,6 +240,23 @@ export default function ConfirmarPage() {
             onSave={(v) => void salvarCampoTronco('objetivo', v)}
           />
           <CampoEditavel
+            label="Observações"
+            icon="fa-solid fa-comment-dots"
+            value={(tronco.campos.obs_gerais as string | null) ?? null}
+            cutucada="Alguma observação geral da aula? (ex.: o que fazer na próxima) (opcional)"
+            onSave={(v) => void salvarCampoTronco('obs_gerais', v)}
+          />
+          {EXTRAS_TRONCO.filter((e) => (tronco.campos[e.chave] as string | null)?.trim()).map((e) => (
+            <CampoEditavel
+              key={e.chave}
+              label={e.label}
+              icon={e.icon}
+              value={(tronco.campos[e.chave] as string | null) ?? null}
+              cutucada={e.cutucada}
+              onSave={(v) => void salvarCampoTronco(e.chave, v)}
+            />
+          ))}
+          <CampoEditavel
             label="Dever de casa"
             icon="fa-solid fa-house"
             value={(tronco.campos.dever_casa as string | null) ?? null}
@@ -232,13 +264,30 @@ export default function ConfirmarPage() {
             dever
             onSave={(v) => void salvarCampoTronco('dever_casa', v)}
           />
+          {eixosLista(tronco.campos.eixos).length > 0 && (
+            <div className="border-t border-border-subtle px-[14px] py-[11px]">
+              <span className="mb-[6px] flex items-center gap-[7px] text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
+                <i className="fa-solid fa-layer-group text-[10px] text-brand-text" aria-hidden="true" /> Eixos ·
+                classificação do Fábio
+              </span>
+              <div className="flex flex-wrap gap-[6px]">
+                {eixosLista(tronco.campos.eixos).map((e) => (
+                  <Badge key={e} variant="brand">
+                    {e}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* FATIAS — um card por aluno */}
-        <div className="mx-4 mb-2 flex items-center gap-2 text-[12.5px] font-bold uppercase tracking-[.5px] text-text-secondary">
-          <i className="fa-solid fa-user-group text-brand-text" aria-hidden="true" />
-          Fatias por aluno · {fatias.length}
-        </div>
+        {/* FATIAS — um card por aluno (só quando há) */}
+        {temFatias && (
+          <div className="mx-4 mb-2 flex items-center gap-2 text-[12.5px] font-bold uppercase tracking-[.5px] text-text-secondary">
+            <i className="fa-solid fa-user-group text-brand-text" aria-hidden="true" />
+            Fatias por aluno · {fatias.length}
+          </div>
+        )}
         <div className="mx-4 space-y-[9px]">
           {fatias.map((f) => {
             const nome = (f.campos.aluno_nome as string) ?? 'Aluno'
@@ -281,7 +330,15 @@ export default function ConfirmarPage() {
           })}
         </div>
 
-        {/* PREVIEW — o que será gravado por aluno */}
+        {!temFatias && (
+          <div className="mx-4 rounded-md border border-border-subtle bg-bg-inset px-3 py-[10px] text-[12.5px] leading-relaxed text-text-secondary">
+            <i className="fa-solid fa-circle-info text-brand-text" aria-hidden="true" /> Esta aula não tem observações
+            por aluno separadas — o texto abaixo é o que será gravado. (Se era pra ter aluno individual, fala com a
+            coordenação.)
+          </div>
+        )}
+
+        {/* PREVIEW — o texto final que será gravado */}
         <div className="mx-4 mt-3">
           <button
             type="button"
@@ -289,20 +346,32 @@ export default function ConfirmarPage() {
             onClick={() => setVerTextoFinal((v) => !v)}
           >
             <i className={cx('fa-solid fa-chevron-down transition-transform', verTextoFinal && 'rotate-180')} aria-hidden="true" />
-            {verTextoFinal ? 'Esconder texto final' : 'Ver o texto final que será gravado (por aluno)'}
+            {verTextoFinal
+              ? 'Esconder texto final'
+              : temFatias
+                ? 'Ver o texto final que será gravado (por aluno)'
+                : 'Ver o texto final que será gravado'}
           </button>
           {verTextoFinal && (
             <div className="mt-2 space-y-2">
-              {presentes.map((f) => (
-                <div key={f.id} className="rounded-md border border-border-subtle bg-bg-inset px-3 py-[10px]">
-                  <div className="mb-1 text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
-                    aula do(a) {(f.campos.aluno_nome as string) ?? 'aluno'}
+              {temFatias ? (
+                presentes.map((f) => (
+                  <div key={f.id} className="rounded-md border border-border-subtle bg-bg-inset px-3 py-[10px]">
+                    <div className="mb-1 text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
+                      aula do(a) {(f.campos.aluno_nome as string) ?? 'aluno'}
+                    </div>
+                    <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-text-primary">
+                      {textoFatia(aula, tronco.campos, f.campos)}
+                    </pre>
                   </div>
+                ))
+              ) : (
+                <div className="rounded-md border border-border-subtle bg-bg-inset px-3 py-[10px]">
                   <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-text-primary">
-                    {textoFatia(aula, tronco.campos, f.campos)}
+                    {textoTronco(aula, tronco.campos)}
                   </pre>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
