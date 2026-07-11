@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Badge, Button, Card, EmptyState, ScreenHeader, Skeleton } from '../../components/ui'
+import { AudioPlayer, Badge, Button, Card, EmptyState, ScreenHeader, Skeleton } from '../../components/ui'
 import type { SessaoAula } from '../../lib/api'
 import { hojeBRT } from '../../lib/date'
 import { horaSessao, statusSessao, subtituloSessao, tituloSessao } from '../agenda/sessao'
@@ -229,7 +229,7 @@ function Gravador({ aulaId }: { aulaId: number }) {
               <b className="block text-[17px]">Gravado — {fmt(rec.segundos)}</b>
               <span className="text-[12.5px] text-text-secondary">Confere se ficou bom antes de mandar 👇</span>
             </div>
-            {previewUrl && <audio controls src={previewUrl} className="w-full max-w-[300px]" />}
+            {previewUrl && <AudioPlayer src={previewUrl} className="w-full max-w-[320px]" />}
             <div className="flex w-full max-w-[300px] flex-col gap-2">
               <Button block onClick={() => void enviar()}>
                 <i className="fa-solid fa-paper-plane" aria-hidden="true" /> Enviar pro Fábio
