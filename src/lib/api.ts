@@ -181,6 +181,29 @@ export async function registroCompleto(registroId: string): Promise<RegistroComp
   return obj
 }
 
+/** Status do áudio na fila do Fábio (fabio_fila_audios) — só o do próprio professor. */
+export type StatusFila = 'pendente' | 'transcrevendo' | 'transcrito' | 'normalizado' | 'erro'
+
+export interface StatusAudioFila {
+  audio_id: string
+  status: StatusFila
+  tentativas: number
+  tem_erro: boolean
+  criado_em: string
+  atualizado_em: string
+}
+
+/**
+ * Acompanha o processamento de UM áudio (app_status_audio_fila, guardada).
+ * Devolve null se o áudio não é do professor logado ou não existe.
+ */
+export async function statusAudioFila(audioId: string): Promise<StatusAudioFila | null> {
+  const { data, error } = await supabase.rpc('app_status_audio_fila', { p_audio_id: audioId })
+  if (error) throw error
+  const linhas = data as unknown as StatusAudioFila[]
+  return linhas?.[0] ?? null
+}
+
 /** Registros (troncos) do professor aguardando confirmação, mais recentes primeiro. */
 export async function registrosPendentes(): Promise<RegistroRow[]> {
   const { data: res, error } = await supabase.rpc('app_registros_pendentes')

@@ -1,64 +1,83 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Button, ScreenHeader } from '../../components/ui'
-import { registrosPendentes } from '../../lib/api'
+import { registrosPendentes, statusAudioFila, type StatusFila } from '../../lib/api'
+import { cx } from '../../lib/cx'
 import { AppFrame } from '../../pages/app/AppFrame'
 
 const INTERVALO_MS = 3_000
 const AVISO_DEMORA_MS = 90_000
 
+// Passos visuais mapeados nos valores REAIS de fabio_fila_audios.status
+// (constraint: pendente → transcrevendo → transcrito → normalizado → erro).
+const PASSOS: Array<{ chave: string; rotulo: string; feitoQuando: StatusFila[] }> = [
+  { chave: 'fila', rotulo: 'Na fila do Fábio', feitoQuando: ['transcrevendo', 'transcrito', 'normalizado'] },
+  { chave: 'stt', rotulo: 'Transcrevendo seu áudio', feitoQuando: ['transcrito', 'normalizado'] },
+  { chave: 'molde', rotulo: 'Organizando por aluno — tronco + fatias', feitoQuando: ['normalizado'] },
+]
+
 /**
  * /app/processando/:audioId — o app entregou o áudio; o Fábio (Hermes, fora do
- * app) transcreve e monta o relatório. Esta tela ACOMPANHA o progresso real por
- * polling de app_registros_pendentes (RPC guardada) casando pelo audio_id — e,
- * quando o relatório fica pronto (status aguardando_confirmacao), leva direto
- * pra tela de revisão/confirmação. Sem simular passos que não pode observar.
- *
- * Nota (reportado ao Claude Web): pra mostrar as sub-etapas reais da fila
- * (transcrevendo/normalizando) e um estado de ERRO explícito, falta uma RPC
- * guardada de leitura do status em fabio_fila_audios. Sem ela, o app só observa
- * "recebido" e "relatório pronto"; o resto é coberto por um aviso de tempo.
+ * app) transcreve e monta o relatório. Esta tela ACOMPANHA o status real:
+ *  · app_status_audio_fila(audioId) → move as 3 etapas e detecta erro;
+ *  · app_registros_pendentes (casa pelo audio_id) → quando o relatório fica
+ *    pronto, leva direto pra tela de revisão/confirmação.
+ * Ambas guardadas; nada de simular progresso.
  */
 export default function ProcessandoPage() {
   const { audioId } = useParams()
   const navigate = useNavigate()
   const { state } = useLocation() as { state?: { aulaLabel?: string } }
+  const [status, setStatus] = useState<StatusFila>('pendente')
+  const [erro, setErro] = useState(false)
   const [demorando, setDemorando] = useState(false)
   const jaNavegou = useRef(false)
 
-  // Polling do relatório pronto (casa pelo audio_id desta gravação).
   useEffect(() => {
     if (!audioId) return
-    let vivo = true
+    let parar = false
     let timer: number | undefined
 
     const checar = async () => {
-      try {
-        const pendentes = await registrosPendentes()
-        const meu = pendentes.find((r) => r.audio_id === audioId && r.parent_id == null)
-        if (meu && vivo && !jaNavegou.current) {
-          jaNavegou.current = true
-          navigate(`/app/confirmar/${meu.id}`, { replace: true })
+      if (parar || jaNavegou.current) return
+      // relatório pronto? (sinal autoritativo — traz o id pra navegar)
+      const [st, pend] = await Promise.all([
+        statusAudioFila(audioId).catch(() => null),
+        registrosPendentes().catch(() => []),
+      ])
+      const meu = pend.find((r) => r.audio_id === audioId && r.parent_id == null)
+      if (meu && !jaNavegou.current) {
+        jaNavegou.current = true
+        navigate(`/app/confirmar/${meu.id}`, { replace: true })
+        return
+      }
+      if (st) {
+        setStatus(st.status)
+        if (st.tem_erro || st.status === 'erro') {
+          setErro(true)
+          parar = true
           return
         }
-      } catch {
-        // rede instável: ignora e tenta de novo no próximo ciclo
       }
-      if (vivo && !jaNavegou.current) timer = window.setTimeout(checar, INTERVALO_MS)
+      if (!parar && !jaNavegou.current) timer = window.setTimeout(checar, INTERVALO_MS)
     }
 
     void checar()
     return () => {
-      vivo = false
+      parar = true
       if (timer) window.clearTimeout(timer)
     }
   }, [audioId, navigate])
 
-  // Se demorar mais que o normal, tranquiliza (mas segue observando).
+  // Se ficar parado na fila além do normal, tranquiliza (mas segue observando).
   useEffect(() => {
+    if (status !== 'pendente' || erro) {
+      setDemorando(false)
+      return
+    }
     const t = window.setTimeout(() => setDemorando(true), AVISO_DEMORA_MS)
     return () => window.clearTimeout(t)
-  }, [])
+  }, [status, erro])
 
   return (
     <AppFrame>
@@ -72,21 +91,56 @@ export default function ProcessandoPage() {
         <div>
           <b className="block text-lg">O Fábio está montando seu relatório… 🎼</b>
           <p className="mt-1 text-[13px] text-text-secondary">
-            Pode sair — sua gravação está guardada e nada se perde. Levo cerca de 1 minuto.
+            Pode sair — sua gravação está guardada e nada se perde.
           </p>
         </div>
 
-        <div className="flex items-center gap-[10px] text-sm text-text-primary">
-          <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border-2 border-brand text-[11px] text-brand-text">
-            <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
-          </span>
-          Transcrevendo e organizando por aluno
-        </div>
+        {erro ? (
+          <div className="flex max-w-[300px] flex-col items-center gap-2 rounded-md border border-border-subtle bg-danger-soft px-4 py-3 text-[13px] font-semibold text-danger-text">
+            <span>
+              <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" /> Deu um tropeço no processamento.
+            </span>
+            <span className="font-normal text-text-secondary">
+              O sistema tenta de novo sozinho em alguns minutos — não precisa reenviar. Se persistir, fala com a
+              coordenação.
+            </span>
+          </div>
+        ) : (
+          <div className="flex w-full max-w-[300px] flex-col gap-[13px] text-left">
+            {PASSOS.map((p, i) => {
+              const feito = p.feitoQuando.includes(status)
+              const fazendo = !feito && (i === 0 ? status === 'pendente' : PASSOS[i - 1].feitoQuando.includes(status))
+              return (
+                <div
+                  key={p.chave}
+                  className={cx(
+                    'flex items-center gap-[11px] text-sm',
+                    feito ? 'text-text-secondary' : fazendo ? 'text-text-primary' : 'text-text-muted',
+                  )}
+                >
+                  <span
+                    className={cx(
+                      'flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border-2 text-[11px]',
+                      feito
+                        ? 'border-success bg-success-soft text-success-text'
+                        : fazendo
+                          ? 'border-brand text-brand-text'
+                          : 'border-border-strong text-transparent',
+                    )}
+                  >
+                    <i className={feito ? 'fa-solid fa-check' : 'fa-solid fa-spinner fa-spin'} aria-hidden="true" />
+                  </span>
+                  {p.rotulo}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
-        {demorando && (
+        {demorando && !erro && (
           <p className="max-w-[300px] text-[12px] leading-relaxed text-text-muted">
-            <i className="fa-solid fa-circle-info" aria-hidden="true" /> Está levando um pouco mais que o normal —
-            seu áudio está seguro. Pode voltar à Home: assim que ficar pronto, o relatório aparece em
+            <i className="fa-solid fa-circle-info" aria-hidden="true" /> Está levando um pouco mais que o normal — seu
+            áudio está seguro. Pode voltar à Home: assim que ficar pronto, o relatório aparece em
             <b> aguardando confirmação</b> pra você revisar.
           </p>
         )}

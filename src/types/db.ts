@@ -30538,6 +30538,131 @@ export type Database = {
           },
         ]
       }
+      vw_risco_evasao_atual: {
+        Row: {
+          aluno_id: number | null
+          calculado_em: string | null
+          faixa: string | null
+          fatores: Json | null
+          modelo_versao: string | null
+          probabilidade: number | null
+          unidade_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risco_evasao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_aluno_sucesso_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_alunos_ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fabio_carteira_professor"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_aniversariantes_hoje"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_inadimplentes"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_novos_matriculados"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_renovacoes_proximas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_dashboard_unidade"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_farmer_resumo_alertas"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_historico"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_comercial_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_gestao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+          {
+            foreignKeyName: "risco_evasao_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "vw_kpis_retencao_mensal"
+            referencedColumns: ["unidade_id"]
+          },
+        ]
+      }
       vw_sazonalidade: {
         Row: {
           ano: number | null
@@ -31386,6 +31511,23 @@ export type Database = {
       }
       app_minha_agenda_sessao: { Args: { p_data?: string }; Returns: Json }
       app_minha_carteira: { Args: never; Returns: Json }
+      app_minha_disponibilidade: {
+        Args: never
+        Returns: {
+          disponibilidade: Json
+          disponibilidade_proposta: Json
+          emusys_id: number
+          last_seen_em: string
+          professor_id: number
+          professor_nome: string
+          professores_unidade_id: number
+          proposta_ativa_id: string
+          proposta_status: string
+          unidade_id: string
+          unidade_nome: string
+          validacao_status: string
+        }[]
+      }
       app_propor_disponibilidade: {
         Args: { p_disponibilidade: Json; p_unidade_id: string }
         Returns: {
@@ -31422,6 +31564,17 @@ export type Database = {
       app_responder_confirmacao_ponto: {
         Args: { p_aula_emusys_id: number; p_estava_presente: boolean }
         Returns: Json
+      }
+      app_status_audio_fila: {
+        Args: { p_audio_id: string }
+        Returns: {
+          atualizado_em: string
+          audio_id: string
+          criado_em: string
+          status: string
+          tem_erro: boolean
+          tentativas: number
+        }[]
       }
       assert_competencia_aberta: {
         Args: { p_ano: number; p_mes: number; p_unidade_id: string }
@@ -31569,6 +31722,21 @@ export type Database = {
         Args: { p_ano: number; p_mes: number }
         Returns: string
       }
+      converter_renovacao_pendente_em_nao_renovacao: {
+        Args: {
+          p_agente_comercial?: string
+          p_data?: string
+          p_emusys_matricula_id?: string
+          p_motivo?: string
+          p_motivo_saida_id?: number
+          p_movimentacao_id: number
+          p_observacoes?: string
+          p_origem?: string
+          p_tempo_permanencia_meses?: number
+          p_valor_parcela?: number
+        }
+        Returns: Json
+      }
       criar_checklist_from_template: {
         Args: {
           p_colaborador_id: number
@@ -31637,6 +31805,35 @@ export type Database = {
         Returns: Json
       }
       fabio_criar_registro: { Args: { p_payload: Json }; Returns: Json }
+      features_churn_alunos_ativos: {
+        Args: never
+        Returns: {
+          aluno_id: number
+          anamnese_preenchida: string
+          canal_origem_nome: string
+          classificacao: string
+          dia_vencimento: number
+          dias_desde_renovacao: number
+          dias_desde_ultima_aula: number
+          forma_pagamento_nome: string
+          idade_atual: number
+          is_aluno_retorno: string
+          is_segundo_curso: string
+          modalidade: string
+          numero_renovacoes: number
+          nunca_renovou: number
+          pct_desconto: number
+          status_pagamento: string
+          taxa_presenca_30d: number
+          taxa_presenca_60d: number
+          taxa_presenca_geral: number
+          tempo_permanencia_meses: number
+          tipo_aluno: string
+          tipo_matricula_nome: string
+          unidade_id: string
+          valor_parcela: number
+        }[]
+      }
       fechar_competencia: {
         Args: {
           p_ano: number
