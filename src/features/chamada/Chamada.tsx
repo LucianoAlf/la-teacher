@@ -18,6 +18,7 @@ import {
   primeiroNome,
   tituloSessao,
 } from '../agenda/sessao'
+import { SOMENTE_LEITURA } from '../../lib/config'
 import { useSessaoDaAula } from './useSessaoDaAula'
 
 const ERRO_TEXTO: Record<ErroChamada | 'desconhecido', string> = {
@@ -30,6 +31,7 @@ const ERRO_TEXTO: Record<ErroChamada | 'desconhecido', string> = {
   roster_incompleto: 'Tem aluno sem cadastro conciliado nesta aula — bloqueei pra não gravar chamada parcial.',
   aluno_ausente_fora_do_roster: 'A lista de alunos mudou desde que você abriu. Recarrega e confere de novo.',
   chamada_somente_na_aula_ancora: 'A chamada desta aula grava pela aula de turma. Abre ela pela agenda e tenta de novo.',
+  somente_leitura: 'Ambiente de demonstração (somente leitura) — a chamada não grava aqui.',
   desconhecido: 'Deu um problema ao enviar. Confere a conexão e tenta de novo.',
 }
 
@@ -249,13 +251,19 @@ function Conteudo({ sessao, onRecarregar }: { sessao: SessaoAula; onRecarregar: 
     setFase('sucesso')
   }
 
-  const interativa = !enviada && !semRoster && naoConciliados.length === 0 && janela === 'aberta' && !semPortaChamada
+  const interativa =
+    !enviada && !semRoster && naoConciliados.length === 0 && janela === 'aberta' && !semPortaChamada && !SOMENTE_LEITURA
 
   return (
     <div className="flex flex-1 flex-col">
       <ContextoAula sessao={sessao} />
 
       {/* Avisos de estado (sempre honestos, nunca tela branca) */}
+      {SOMENTE_LEITURA && !enviada && (
+        <Aviso icone="fa-solid fa-eye" tom="info">
+          Ambiente de <b>demonstração</b> — você navega e confere a lista, mas a chamada <b>não grava</b> aqui.
+        </Aviso>
+      )}
       {enviada && (
         <Aviso icone="fa-solid fa-lock">
           Chamada já registrada. O app não edita presença depois de enviada — <b>correção é com a coordenação</b>.

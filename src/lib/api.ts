@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { SOMENTE_LEITURA } from './config'
 
 /**
  * Camada de dados do app: SOMENTE wrappers das RPCs app_*.
@@ -228,6 +229,7 @@ export const ERROS_CHAMADA = [
   'roster_incompleto',
   'aluno_ausente_fora_do_roster',
   'chamada_somente_na_aula_ancora',
+  'somente_leitura',
 ] as const
 export type ErroChamada = (typeof ERROS_CHAMADA)[number]
 
@@ -240,6 +242,8 @@ export async function registrarPresencas(
   aulaId: number,
   ausentes: number[],
 ): Promise<{ ok: true; resultado: ResultadoChamada } | { ok: false; erro: ErroChamada | 'desconhecido' }> {
+  // Trava de segurança: em modo demonstração a chamada não grava em produção.
+  if (SOMENTE_LEITURA) return { ok: false, erro: 'somente_leitura' }
   const { data: res, error } = await supabase.rpc('app_registrar_presencas_aula', {
     p_aula_emusys_id: aulaId,
     p_alunos_ausentes: ausentes,

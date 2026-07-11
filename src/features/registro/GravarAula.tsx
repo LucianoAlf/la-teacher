@@ -9,6 +9,7 @@ import { useSessoes } from '../agenda/useSessoes'
 import { AppFrame } from '../../pages/app/AppFrame'
 import { enviarAudio } from './uploadAudio'
 import { useRecorder, LIMITE_SEGUNDOS } from './useRecorder'
+import { SOMENTE_LEITURA } from '../../lib/config'
 
 function fmt(seg: number): string {
   const m = Math.floor(seg / 60)
@@ -82,7 +83,7 @@ function EscolherAula() {
 // Gravador
 // ---------------------------------------------------------------------------
 
-type FaseEnvio = 'nao_enviado' | 'enviando' | 'fila_offline' | 'erro_envio'
+type FaseEnvio = 'nao_enviado' | 'enviando' | 'fila_offline' | 'erro_envio' | 'somente_leitura'
 
 function Gravador({ aulaId }: { aulaId: number }) {
   const navigate = useNavigate()
@@ -100,6 +101,11 @@ function Gravador({ aulaId }: { aulaId: number }) {
 
   async function enviar() {
     if (!rec.blob) return
+    // Ambiente de demonstração: não sobe áudio pra produção.
+    if (SOMENTE_LEITURA) {
+      setEnvio('somente_leitura')
+      return
+    }
     setEnvio('enviando')
     const r = await enviarAudio({
       aulaId,
@@ -246,6 +252,19 @@ function Gravador({ aulaId }: { aulaId: number }) {
             icon="fa-solid fa-cloud-arrow-up"
             title="Guardei sua gravação 💾"
             description="Sem conexão agora. O áudio está na fila local e sobe sozinho assim que a internet voltar — pode seguir o dia."
+            action={
+              <Button size="sm" variant="ghost" onClick={() => navigate('/app')}>
+                Voltar ao início
+              </Button>
+            }
+          />
+        )}
+
+        {envio === 'somente_leitura' && (
+          <EmptyState
+            icon="fa-solid fa-eye"
+            title="Ambiente de demonstração"
+            description="Aqui você pode gravar e ouvir, mas o áudio não é enviado pro Fábio (modo somente leitura, pra não gravar em produção)."
             action={
               <Button size="sm" variant="ghost" onClick={() => navigate('/app')}>
                 Voltar ao início
