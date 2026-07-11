@@ -139,8 +139,8 @@
 [data-theme="dark"]{
   --toast-bg:var(--ink-800);
   --toast-text:var(--white-off);
-  --fabio-fill:var(--bg-surface);     /* miolo = cor do nav (recorte, some no fundo) */
-  --fabio-traco:currentColor;         /* traço segue a aba — igual aos outros ícones */
+  --fabio-fill:currentColor;          /* miolo = cor da aba — igual aos outros ícones */
+  --fabio-traco:var(--bg-surface);    /* contorno = cor do nav (recorte nos detalhes) */
   --avatar-grad:linear-gradient(135deg,var(--teal-500),var(--teal-700));
   --avatar-fg:var(--white-off);
   --on-danger:var(--white-off);
@@ -150,8 +150,8 @@
 [data-theme="light"]{
   --toast-bg:#0F1D19;
   --toast-text:var(--white-off);
-  --fabio-fill:var(--bg-surface);     /* miolo = cor do nav (recorte, some no fundo) */
-  --fabio-traco:currentColor;         /* traço segue a aba — igual aos outros ícones */
+  --fabio-fill:currentColor;          /* miolo = cor da aba — igual aos outros ícones */
+  --fabio-traco:var(--bg-surface);    /* contorno = cor do nav (recorte nos detalhes) */
   --avatar-grad:linear-gradient(135deg,var(--teal-500),var(--teal-700));
   --avatar-fg:var(--white-off);
   --on-danger:var(--white-off);
