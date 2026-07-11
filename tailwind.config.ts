@@ -19,10 +19,11 @@ export default {
         danger: 'var(--danger)', 'danger-text': 'var(--danger-text)', 'danger-soft': 'var(--danger-soft)',
         warning: 'var(--warning)', 'warning-text': 'var(--warning-text)', 'warning-soft': 'var(--warning-soft)',
         info: 'var(--info)', 'info-text': 'var(--info-text)', 'info-soft': 'var(--info-soft)',
+        'la-pink': 'var(--la-pink)',
       },
       borderRadius: { sm: 'var(--r-sm)', md: 'var(--r-md)', lg: 'var(--r-lg)', xl: 'var(--r-xl)', full: 'var(--r-full)' },
       boxShadow: { card: 'var(--shadow-card)', fab: 'var(--shadow-fab)' },
-      fontFamily: { sans: 'var(--font)', mono: 'var(--mono)' },
+      fontFamily: { sans: 'var(--font)', mono: 'var(--mono)', brand: 'var(--font-brand)' },
       keyframes: {
         // pulso do dot "agora" (protótipo golden-path) — só opacidade, sem cor
         'pulse-soft': { '0%,100%': { opacity: '1' }, '50%': { opacity: '.45' } },

@@ -45,6 +45,23 @@
 
   --font:'Inter',-apple-system,sans-serif;
   --mono:ui-monospace,'SF Mono','Cascadia Code',Menlo,monospace;
+
+  /* Marca LA (família) — rosa da casa */
+  --la-pink:#E91451; --la-pink-shade:#B01545; --la-pink-deep:#740A28; --la-pink-light:#F06292;
+  --la-pink-rgb:233 20 81;
+  --font-brand:'Prompt',var(--font);
+
+  /* Tela de login — capa da marca (dark FIXO, independe do tema) */
+  --login-bg:var(--ink-950);
+  --login-input-bg:var(--ink-800);
+  --login-input-border:var(--ink-700);
+  --login-text:var(--white-off);
+  --login-text-muted:#9E9E9E;
+  --login-dots:rgb(var(--la-pink-rgb) / .20);
+  --login-glow:rgb(var(--la-pink-rgb) / .28);
+  --login-watermark:rgba(245,245,245,.05);
+  --login-danger:var(--red-400);
+  --login-danger-soft:rgba(239,68,68,.12);
 }
 
 /* ---------- 2. TOKENS SEMÂNTICOS — DARK (tema padrão) ---------- */
