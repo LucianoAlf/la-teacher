@@ -52,7 +52,10 @@ export default function AlunosPage() {
         />
       </div>
 
-      <AppNav onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')} />
+      <AppNav
+        onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')}
+        onMais={() => show('Mais ferramentas chegam em breve 🧰')}
+      />
       <Toast message={message} visible={visible} />
     </AppFrame>
   )

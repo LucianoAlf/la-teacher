@@ -70,7 +70,10 @@ export default function HomePage() {
         <PontoHojeCard onAbrir={() => navigate('/app/ponto')} />
       </div>
 
-      <AppNav onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')} />
+      <AppNav
+        onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')}
+        onMais={() => show('Mais ferramentas chegam em breve 🧰')}
+      />
       <Toast message={message} visible={visible} />
     </AppFrame>
   )

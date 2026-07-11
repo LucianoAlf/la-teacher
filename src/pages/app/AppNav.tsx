@@ -1,11 +1,13 @@
+import type { CSSProperties } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Fab, FabioIcon, TabBar } from '../../components/ui'
 
+/** Abas planas (4) + vão central pro Fábio herói. */
 const TABS = [
   { id: 'inicio', label: 'Início', icon: 'fa-solid fa-house' },
   { id: 'alunos', label: 'Alunos', icon: 'fa-solid fa-user-group' },
   { id: 'agenda', label: 'Agenda', icon: 'fa-solid fa-calendar' },
-  { id: 'fabio', label: 'Fábio', node: <FabioIcon className="h-[22px] w-[22px]" /> },
+  { id: 'mais', label: 'Mais', icon: 'fa-solid fa-ellipsis' },
 ]
 
 const ROTA: Record<string, string> = {
@@ -14,13 +16,25 @@ const ROTA: Record<string, string> = {
   agenda: '/app/agenda',
 }
 
+/** Cores do Fábio dentro da bolota teal (silhueta clara + detalhe escuro). */
+const FABIO_HERO_VARS = {
+  '--fabio-fill': 'var(--fabio-hero-fill)',
+  '--fabio-traco': 'var(--fabio-hero-traco)',
+} as CSSProperties
+
 interface Props {
-  /** Toque na aba Fábio (chat é do Sprint 4). */
+  /** Toque no Fábio herói (chat é do Sprint 4). */
   onFabio: () => void
+  /** Toque em "Mais" (ferramentas futuras). */
+  onMais: () => void
 }
 
-/** TabBar + FAB do app; o FAB de microfone abre a gravação (P5). */
-export function AppNav({ onFabio }: Props) {
+/**
+ * Navegação inferior do app (Fase 3): 4 abas planas com o Fábio HERÓI na bolota
+ * central (o coração — chat/dual-channel) e o microfone como FAB flutuante à
+ * direita (ação de gravar aula, estilo LA Organizer).
+ */
+export function AppNav({ onFabio, onMais }: Props) {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const ativo = pathname.startsWith('/app/alunos')
@@ -35,11 +49,22 @@ export function AppNav({ onFabio }: Props) {
         items={TABS}
         activeId={ativo}
         onSelect={(id) => {
-          if (id === 'fabio') onFabio()
-          else if (ROTA[id]) nav(ROTA[id])
+          if (ROTA[id]) nav(ROTA[id])
+          else if (id === 'mais') onMais()
         }}
       />
-      <Fab onClick={() => nav('/app/gravar')} />
+
+      {/* Fábio herói — bolota central (o produto: chat espelhado no WhatsApp) */}
+      <Fab
+        placement="center"
+        label="Fábio — seu assistente"
+        node={<FabioIcon className="h-[32px] w-[32px]" />}
+        style={FABIO_HERO_VARS}
+        onClick={onFabio}
+      />
+
+      {/* Microfone — FAB flutuante à direita (gravar aula) */}
+      <Fab placement="right" icon="fa-solid fa-microphone" label="Registrar por voz" onClick={() => nav('/app/gravar')} />
     </>
   )
 }
