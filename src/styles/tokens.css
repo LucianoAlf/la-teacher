@@ -139,6 +139,8 @@
 [data-theme="dark"]{
   --toast-bg:var(--ink-800);
   --toast-text:var(--white-off);
+  --fabio-fill:var(--slate-400);      /* miolo cinza do ícone do Fábio (nav) */
+  --fabio-traco:var(--teal-400);      /* contorno teal claro — lê no nav escuro */
   --avatar-grad:linear-gradient(135deg,var(--teal-500),var(--teal-700));
   --avatar-fg:var(--white-off);
   --on-danger:var(--white-off);
@@ -148,6 +150,8 @@
 [data-theme="light"]{
   --toast-bg:#0F1D19;
   --toast-text:var(--white-off);
+  --fabio-fill:var(--slate-400);      /* miolo cinza do ícone do Fábio (nav) */
+  --fabio-traco:var(--teal-700);      /* contorno teal escuro — como no desenho do Alf */
   --avatar-grad:linear-gradient(135deg,var(--teal-500),var(--teal-700));
   --avatar-fg:var(--white-off);
   --on-danger:var(--white-off);
