@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { ListPlus } from 'lucide-react'
 import { Fab, FabioIcon, TabBar } from '../../components/ui'
 
 /** Abas planas (4) + vão central pro Fábio herói. */
@@ -7,7 +8,9 @@ const TABS = [
   { id: 'inicio', label: 'Início', icon: 'fa-solid fa-house' },
   { id: 'alunos', label: 'Alunos', icon: 'fa-solid fa-user-group' },
   { id: 'agenda', label: 'Agenda', icon: 'fa-solid fa-calendar' },
-  { id: 'mais', label: 'Mais', icon: 'fa-solid fa-ellipsis' },
+  // "Mais" = abrir as telas/ferramentas futuras (não "opções desta tela"),
+  // por isso list-plus do Lucide, não o "•••".
+  { id: 'mais', label: 'Mais', node: <ListPlus size={19} aria-hidden="true" /> },
 ]
 
 const ROTA: Record<string, string> = {
@@ -63,8 +66,15 @@ export function AppNav({ onFabio, onMais }: Props) {
         onClick={onFabio}
       />
 
-      {/* Microfone — FAB flutuante à direita (gravar aula) */}
-      <Fab placement="right" icon="fa-solid fa-microphone" label="Registrar por voz" onClick={() => nav('/app/gravar')} />
+      {/* Microfone — FAB utilitário flutuante à direita (gravar aula); fundo
+          neutro + ícone teal pra não competir com o Fábio herói. */}
+      <Fab
+        placement="right"
+        variant="secondary"
+        icon="fa-solid fa-microphone"
+        label="Registrar por voz"
+        onClick={() => nav('/app/gravar')}
+      />
     </>
   )
 }

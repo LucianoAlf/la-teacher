@@ -13,11 +13,23 @@ export interface FabProps extends ButtonHTMLAttributes<HTMLButtonElement> {
    *  · 'right'  = FAB flutuante no canto direito, acima da barra (utilitário).
    */
   placement?: 'center' | 'right'
+  /**
+   * Peso visual:
+   *  · 'primary'   = bolota teal cheia (o herói — Fábio);
+   *  · 'secondary' = fundo neutro + ícone teal (utilitário — microfone),
+   *    pra não competir com o herói.
+   */
+  variant?: 'primary' | 'secondary'
 }
 
 const PLACEMENT: Record<'center' | 'right', string> = {
   center: 'bottom-[30px] left-1/2 -translate-x-1/2 h-[64px] w-[64px] text-[23px]',
-  right: 'bottom-[88px] right-4 h-[54px] w-[54px] text-[19px]',
+  right: 'bottom-[104px] right-[14px] h-[52px] w-[52px] text-[18px]',
+}
+
+const VARIANT: Record<'primary' | 'secondary', string> = {
+  primary: 'border-4 border-solid border-bg-app bg-brand text-on-brand shadow-fab',
+  secondary: 'border border-border-subtle bg-bg-surface text-brand-text shadow-fab',
 }
 
 /**
@@ -30,6 +42,7 @@ export function Fab({
   node,
   label = 'Registrar por voz',
   placement = 'center',
+  variant = 'primary',
   className,
   ...rest
 }: FabProps) {
@@ -37,8 +50,9 @@ export function Fab({
     <button
       aria-label={label}
       className={cx(
-        'absolute z-50 flex items-center justify-center rounded-full border-4 border-solid border-bg-app bg-brand text-on-brand shadow-fab transition-transform duration-100 active:scale-[.93]',
+        'absolute z-50 flex items-center justify-center rounded-full transition-transform duration-100 active:scale-[.93]',
         PLACEMENT[placement],
+        VARIANT[variant],
         className,
       )}
       {...rest}
