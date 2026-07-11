@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react'
-import { Button, Card, EmptyState, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
-import { useTheme } from '../../lib/theme'
+import { Button, Card, EmptyState, Skeleton, Toast, useToast } from '../../components/ui'
 import { useCarteira } from '../../features/alunos/useCarteira'
 import { agruparPorCurso, normalizar } from '../../features/alunos/carteira'
 import { AlunoRow } from '../../features/alunos/AlunoRow'
 import { AppFrame } from './AppFrame'
+import { AppHeader } from './AppHeader'
 import { AppNav } from './AppNav'
 
 /** /app/alunos — carteira do professor, busca por nome, agrupada por curso. */
 export default function AlunosPage() {
-  const { toggle } = useTheme()
   const { message, visible, show } = useToast()
   const { estado, recarregar } = useCarteira()
   const [busca, setBusca] = useState('')
@@ -25,15 +24,7 @@ export default function AlunosPage() {
 
   return (
     <AppFrame>
-      <ScreenHeader
-        title="Alunos"
-        subtitle={estado.fase === 'ok' ? `${estado.alunos.length} na sua carteira` : 'Sua carteira'}
-        right={
-          <Button variant="ghost" size="sm" onClick={toggle}>
-            <i className="fa-solid fa-circle-half-stroke" aria-hidden="true" /> Tema
-          </Button>
-        }
-      />
+      <AppHeader />
 
       <div className="flex-1 overflow-y-auto px-4 pb-24 pt-1">
         {/* Busca */}

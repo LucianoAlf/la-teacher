@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Moon, Sun } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../lib/theme'
 import { supabase } from '../../lib/supabase'
@@ -55,7 +56,7 @@ export function AppHeader() {
         className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full border border-border-subtle bg-bg-surface text-text-secondary"
         onClick={toggle}
       >
-        <i className={theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon'} aria-hidden="true" />
+        {theme === 'dark' ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
       </button>
 
       {/* Foto do professor + menu */}
