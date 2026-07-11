@@ -9,6 +9,7 @@ import ProcessandoPage from './features/registro/Processando'
 import ConfirmarPage from './features/registro/Confirmar'
 import ChamadaPage from './features/chamada/Chamada'
 import PontoPage from './pages/app/Ponto'
+import PerfilPage from './pages/app/Perfil'
 import { RequireProfessor } from './pages/app/RequireProfessor'
 import { useAuth } from './lib/auth'
 
@@ -32,6 +33,7 @@ export const router = createBrowserRouter(
         { path: '/app/alunos', element: <AlunosPage /> },
         { path: '/app/chamada/:aulaId', element: <ChamadaPage /> },
         { path: '/app/ponto', element: <PontoPage /> },
+        { path: '/app/perfil', element: <PerfilPage /> },
         { path: '/app/gravar', element: <GravarAulaPage /> },
         { path: '/app/gravar/:aulaId', element: <GravarAulaPage /> },
         { path: '/app/processando/:audioId', element: <ProcessandoPage /> },

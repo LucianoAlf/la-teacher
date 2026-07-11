@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, EmptyState, FabioCard, Skeleton, Toast, useToast } from '../../components/ui'
-import { useAuth } from '../../lib/auth'
-import { useTheme } from '../../lib/theme'
+import { AppHeader } from './AppHeader'
 import { formatDiaCurto, hojeBRT } from '../../lib/date'
 import { meuPonto, registrosPendentes, type PontoDia, type RegistroRow, type SessaoAula } from '../../lib/api'
 import { fmtMinutos } from './Ponto'
@@ -15,17 +14,8 @@ import { useFilaOfflineCount } from '../../features/registro/filaOffline'
 import { AppFrame } from './AppFrame'
 import { AppNav } from './AppNav'
 
-function primeiroNome(email?: string, nome?: string): string {
-  if (nome) return nome.split(' ')[0]
-  if (!email) return 'professor'
-  const local = email.split('@')[0].split(/[._-]/)[0]
-  return local.charAt(0).toUpperCase() + local.slice(1)
-}
-
 /** /app — Home do professor (tela 1 do protótipo) com dados vivos do LA Report. */
 export default function HomePage() {
-  const { session } = useAuth()
-  const { toggle } = useTheme()
   const { message, visible, show } = useToast()
   const navigate = useNavigate()
   const [data, setData] = useState<string>(hojeBRT())
@@ -34,31 +24,11 @@ export default function HomePage() {
   const filaOffline = useFilaOfflineCount()
   const abrirChamada = (sessao: SessaoAula) =>
     navigate(`/app/chamada/${sessao.aula_id_ancora}`, { state: { sessao } })
-  const nome = primeiroNome(
-    session?.user.email,
-    (session?.user.user_metadata?.name as string | undefined) ?? undefined,
-  )
 
   return (
     <AppFrame>
-      {/* 1 · Header: saudação + tema */}
-      <header className="flex items-center gap-3 px-4 pb-1 pt-[14px]">
-        <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[var(--avatar-grad)] text-[15px] font-extrabold text-[color:var(--avatar-fg)]">
-          {nome.charAt(0).toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <b className="block text-xl font-extrabold tracking-[-.3px]">E aí, {nome}! 👋</b>
-          <span className="block truncate text-[12.5px] text-text-secondary">{session?.user.email}</span>
-        </div>
-        <button
-          type="button"
-          aria-label="Alternar tema"
-          className="ml-auto flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full border border-border-subtle bg-bg-surface text-text-secondary"
-          onClick={toggle}
-        >
-          <i className="fa-solid fa-circle-half-stroke" aria-hidden="true" />
-        </button>
-      </header>
+      {/* 1 · Header da família LA (avatar Fábio · saudação · tema · perfil) */}
+      <AppHeader />
 
       <div className="flex-1 overflow-y-auto px-4 pb-24 pt-2">
         {/* Áudios aguardando conexão (fila offline) */}
