@@ -1,11 +1,13 @@
-import { Fragment } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { cx } from '../../lib/cx'
 
 export interface TabItem {
   id: string
   label: string
-  /** Classe de ícone (ex.: "fa-solid fa-house"). */
-  icon: string
+  /** Classe de ícone FontAwesome (ex.: "fa-solid fa-house"). */
+  icon?: string
+  /** Ícone custom (SVG) — tem prioridade sobre `icon`. Deve usar currentColor. */
+  node?: ReactNode
 }
 
 export interface TabBarProps {
@@ -33,7 +35,11 @@ export function TabBar({ items, activeId, onSelect, fabGap = true }: TabBarProps
             onClick={() => onSelect(item.id)}
             aria-current={item.id === activeId ? 'page' : undefined}
           >
-            <i className={cx(item.icon, 'text-[17px]')} aria-hidden="true" />
+            {item.node ? (
+              <span className="flex h-[21px] items-center justify-center">{item.node}</span>
+            ) : (
+              <i className={cx(item.icon, 'text-[17px]')} aria-hidden="true" />
+            )}
             {item.label}
           </button>
           {i === gapAfter && <span className="flex-1" aria-hidden="true" />}

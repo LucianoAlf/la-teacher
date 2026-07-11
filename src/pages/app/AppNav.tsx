@@ -1,11 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Fab, TabBar } from '../../components/ui'
+import { Fab, FabioIcon, TabBar } from '../../components/ui'
 
 const TABS = [
   { id: 'inicio', label: 'Início', icon: 'fa-solid fa-house' },
   { id: 'alunos', label: 'Alunos', icon: 'fa-solid fa-user-group' },
   { id: 'agenda', label: 'Agenda', icon: 'fa-solid fa-calendar' },
-  { id: 'fabio', label: 'Fábio', icon: 'fa-solid fa-robot' },
+  { id: 'fabio', label: 'Fábio', node: <FabioIcon className="h-[22px] w-[22px]" /> },
 ]
 
 const ROTA: Record<string, string> = {
