@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Moon, Sun } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
@@ -31,6 +31,19 @@ export function AppHeader() {
 
   const [menu, setMenu] = useState(false)
   const [modalSenha, setModalSenha] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Fecha ao tocar/clicar fora — sem backdrop `fixed`, que em telas reais
+  // (iOS Safari) fica preso pela dupla `overflow-hidden` do AppFrame e rouba
+  // o toque dos itens do menu (bug real reportado pelo Alf, 11/07).
+  useEffect(() => {
+    if (!menu) return
+    function fechar(e: PointerEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(false)
+    }
+    document.addEventListener('pointerdown', fechar)
+    return () => document.removeEventListener('pointerdown', fechar)
+  }, [menu])
 
   const nomeCompleto = (session?.user.user_metadata?.name as string | undefined) ?? undefined
   const nome = primeiroNome(session?.user.email, nomeCompleto)
@@ -60,7 +73,7 @@ export function AppHeader() {
       </button>
 
       {/* Foto do professor + menu */}
-      <div className="relative flex-none">
+      <div ref={menuRef} className="relative flex-none">
         <button
           type="button"
           aria-label="Menu do perfil"
@@ -72,38 +85,29 @@ export function AppHeader() {
         </button>
 
         {menu && (
-          <>
-            {/* backdrop pra fechar ao tocar fora */}
-            <button
-              type="button"
-              aria-label="Fechar menu"
-              className="fixed inset-0 z-40 cursor-default bg-transparent"
-              onClick={() => setMenu(false)}
-            />
-            <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[224px] overflow-hidden rounded-xl border border-border-subtle bg-bg-surface shadow-fab">
-              {/* cabeçalho do menu */}
-              <div className="flex items-center gap-[10px] border-b border-border-subtle px-[14px] py-3">
-                <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[var(--avatar-grad)] text-sm font-extrabold text-[color:var(--avatar-fg)]">
-                  {inicial}
-                </div>
-                <div className="min-w-0">
-                  <b className="block truncate text-sm">{nomeCompleto ?? nome}</b>
-                  <span className="block text-[12px] text-text-secondary">Professor</span>
-                </div>
+          <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[224px] overflow-hidden rounded-xl border border-border-subtle bg-bg-surface shadow-fab">
+            {/* cabeçalho do menu */}
+            <div className="flex items-center gap-[10px] border-b border-border-subtle px-[14px] py-3">
+              <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[var(--avatar-grad)] text-sm font-extrabold text-[color:var(--avatar-fg)]">
+                {inicial}
               </div>
-
-              <MenuItem icon="fa-camera" label="Trocar foto" onClick={() => { setMenu(false); show('Trocar foto chega em breve 📸') }} />
-              <MenuItem icon="fa-lock" label="Mudar senha" onClick={() => { setMenu(false); setModalSenha(true) }} />
-              <MenuItem icon="fa-user" label="Perfil" onClick={() => { setMenu(false); navigate('/app/perfil') }} />
-              <MenuItem icon="fa-gear" label="Configurações" onClick={() => { setMenu(false); show('Configurações chega em breve ⚙️') }} />
-              <MenuItem
-                icon="fa-arrow-right-from-bracket"
-                label="Sair"
-                danger
-                onClick={() => { setMenu(false); void signOut() }}
-              />
+              <div className="min-w-0">
+                <b className="block truncate text-sm">{nomeCompleto ?? nome}</b>
+                <span className="block text-[12px] text-text-secondary">Professor</span>
+              </div>
             </div>
-          </>
+
+            <MenuItem icon="fa-camera" label="Trocar foto" onClick={() => { setMenu(false); show('Trocar foto chega em breve 📸') }} />
+            <MenuItem icon="fa-lock" label="Mudar senha" onClick={() => { setMenu(false); setModalSenha(true) }} />
+            <MenuItem icon="fa-user" label="Perfil" onClick={() => { setMenu(false); navigate('/app/perfil') }} />
+            <MenuItem icon="fa-gear" label="Configurações" onClick={() => { setMenu(false); show('Configurações chega em breve ⚙️') }} />
+            <MenuItem
+              icon="fa-arrow-right-from-bracket"
+              label="Sair"
+              danger
+              onClick={() => { setMenu(false); void signOut() }}
+            />
+          </div>
         )}
       </div>
 
