@@ -36,7 +36,7 @@ export default function AgendaPage() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto pb-32">
+      <div className="flex-1 overflow-y-auto pb-24">
         <SemanaStrip dias={dias} contagem={contagem} selecionado={data} onSelect={setData} />
 
         <div className="mx-4 mb-2 overflow-hidden rounded-lg border border-border-subtle bg-bg-surface">
