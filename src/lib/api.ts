@@ -148,6 +148,8 @@ export interface RegistroRow {
   aula_id: number | null
   aluno_id: number | null
   parent_id: string | null
+  /** Áudio de origem (fabio_fila_audios.id) — casa a Processando com o registro pronto. */
+  audio_id: string | null
   molde: 'A' | 'B' | 'C'
   campos: Record<string, unknown>
   texto_consolidado: string | null

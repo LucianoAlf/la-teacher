@@ -1,68 +1,64 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Button, ScreenHeader } from '../../components/ui'
-import { supabase } from '../../lib/supabase'
-import { cx } from '../../lib/cx'
+import { registrosPendentes } from '../../lib/api'
 import { AppFrame } from '../../pages/app/AppFrame'
 
-type StatusFila = 'pendente' | 'transcrevendo' | 'transcrito' | 'normalizado' | 'erro'
-
-const PASSOS: Array<{ chave: string; rotulo: string; feitoQuando: StatusFila[] }> = [
-  { chave: 'fila', rotulo: 'Na fila do Fábio', feitoQuando: ['transcrevendo', 'transcrito', 'normalizado'] },
-  { chave: 'stt', rotulo: 'Transcrevendo seu áudio', feitoQuando: ['transcrito', 'normalizado'] },
-  { chave: 'molde', rotulo: 'Separando por aluno — tronco + fatias', feitoQuando: ['normalizado'] },
-]
+const INTERVALO_MS = 3_000
+const AVISO_DEMORA_MS = 90_000
 
 /**
- * /app/processando/:audioId — o app já entregou o áudio; daqui em diante o
- * trabalho é do Fábio (Hermes, fora do app). Esta tela só OBSERVA a fila via
- * Realtime — nada de simulação de progresso.
+ * /app/processando/:audioId — o app entregou o áudio; o Fábio (Hermes, fora do
+ * app) transcreve e monta o relatório. Esta tela ACOMPANHA o progresso real por
+ * polling de app_registros_pendentes (RPC guardada) casando pelo audio_id — e,
+ * quando o relatório fica pronto (status aguardando_confirmacao), leva direto
+ * pra tela de revisão/confirmação. Sem simular passos que não pode observar.
+ *
+ * Nota (reportado ao Claude Web): pra mostrar as sub-etapas reais da fila
+ * (transcrevendo/normalizando) e um estado de ERRO explícito, falta uma RPC
+ * guardada de leitura do status em fabio_fila_audios. Sem ela, o app só observa
+ * "recebido" e "relatório pronto"; o resto é coberto por um aviso de tempo.
  */
 export default function ProcessandoPage() {
   const { audioId } = useParams()
   const navigate = useNavigate()
   const { state } = useLocation() as { state?: { aulaLabel?: string } }
-  const [status, setStatus] = useState<StatusFila>('pendente')
   const [demorando, setDemorando] = useState(false)
+  const jaNavegou = useRef(false)
 
-  // Realtime: status do áudio na fila + surgimento do registro estruturado
+  // Polling do relatório pronto (casa pelo audio_id desta gravação).
   useEffect(() => {
     if (!audioId) return
-    const canal = supabase
-      .channel(`fabio-audio-${audioId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'fabio_fila_audios', filter: `id=eq.${audioId}` },
-        (payload) => {
-          const novo = (payload.new as { status?: StatusFila }).status
-          if (novo) setStatus(novo)
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'fabio_registros_aula', filter: `audio_id=eq.${audioId}` },
-        (payload) => {
-          const reg = payload.new as { id?: string; parent_id?: string | null; status?: string }
-          if (reg.id && reg.parent_id == null && reg.status === 'aguardando_confirmacao') {
-            navigate(`/app/confirmar/${reg.id}`, { replace: true })
-          }
-        },
-      )
-      .subscribe()
+    let vivo = true
+    let timer: number | undefined
+
+    const checar = async () => {
+      try {
+        const pendentes = await registrosPendentes()
+        const meu = pendentes.find((r) => r.audio_id === audioId && r.parent_id == null)
+        if (meu && vivo && !jaNavegou.current) {
+          jaNavegou.current = true
+          navigate(`/app/confirmar/${meu.id}`, { replace: true })
+          return
+        }
+      } catch {
+        // rede instável: ignora e tenta de novo no próximo ciclo
+      }
+      if (vivo && !jaNavegou.current) timer = window.setTimeout(checar, INTERVALO_MS)
+    }
+
+    void checar()
     return () => {
-      void supabase.removeChannel(canal)
+      vivo = false
+      if (timer) window.clearTimeout(timer)
     }
   }, [audioId, navigate])
 
-  // Honestidade: motor ainda em configuração → avisar se ficar parado na fila
+  // Se demorar mais que o normal, tranquiliza (mas segue observando).
   useEffect(() => {
-    if (status !== 'pendente') {
-      setDemorando(false)
-      return
-    }
-    const t = window.setTimeout(() => setDemorando(true), 30_000)
+    const t = window.setTimeout(() => setDemorando(true), AVISO_DEMORA_MS)
     return () => window.clearTimeout(t)
-  }, [status])
+  }, [])
 
   return (
     <AppFrame>
@@ -74,56 +70,24 @@ export default function ProcessandoPage() {
         </div>
 
         <div>
-          <b className="block text-lg">O Fábio está ouvindo sua aula… 🎼</b>
-          <p className="mt-1 text-[13px] text-text-secondary">Pode sair — sua gravação está guardada e nada se perde.</p>
+          <b className="block text-lg">O Fábio está montando seu relatório… 🎼</b>
+          <p className="mt-1 text-[13px] text-text-secondary">
+            Pode sair — sua gravação está guardada e nada se perde. Levo cerca de 1 minuto.
+          </p>
         </div>
 
-        {status === 'erro' ? (
-          <div className="flex max-w-[300px] flex-col items-center gap-2 rounded-md border border-border-subtle bg-danger-soft px-4 py-3 text-[13px] font-semibold text-danger-text">
-            <span>
-              <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" /> Deu um tropeço no processamento.
-            </span>
-            <span className="font-normal text-text-secondary">
-              O sistema tenta de novo sozinho em alguns minutos — não precisa reenviar.
-            </span>
-          </div>
-        ) : (
-          <div className="flex w-full max-w-[300px] flex-col gap-[13px] text-left">
-            {PASSOS.map((p, i) => {
-              const feito = p.feitoQuando.includes(status)
-              const fazendo = !feito && (i === 0 ? status === 'pendente' : PASSOS[i - 1].feitoQuando.includes(status))
-              return (
-                <div
-                  key={p.chave}
-                  className={cx(
-                    'flex items-center gap-[11px] text-sm',
-                    feito ? 'text-text-secondary' : fazendo ? 'text-text-primary' : 'text-text-muted',
-                  )}
-                >
-                  <span
-                    className={cx(
-                      'flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border-2 text-[11px]',
-                      feito
-                        ? 'border-success bg-success-soft text-success-text'
-                        : fazendo
-                          ? 'border-brand text-brand-text'
-                          : 'border-border-strong text-transparent',
-                    )}
-                  >
-                    <i className={feito ? 'fa-solid fa-check' : 'fa-solid fa-spinner fa-spin'} aria-hidden="true" />
-                  </span>
-                  {p.rotulo}
-                </div>
-              )
-            })}
-          </div>
-        )}
+        <div className="flex items-center gap-[10px] text-sm text-text-primary">
+          <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border-2 border-brand text-[11px] text-brand-text">
+            <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
+          </span>
+          Transcrevendo e organizando por aluno
+        </div>
 
-        {demorando && status === 'pendente' && (
+        {demorando && (
           <p className="max-w-[300px] text-[12px] leading-relaxed text-text-muted">
-            <i className="fa-solid fa-circle-info" aria-hidden="true" /> Aguardando o Fábio — o motor de
-            processamento ainda está em configuração. Seu áudio está seguro na fila e será processado
-            assim que ele ligar.
+            <i className="fa-solid fa-circle-info" aria-hidden="true" /> Está levando um pouco mais que o normal —
+            seu áudio está seguro. Pode voltar à Home: assim que ficar pronto, o relatório aparece em
+            <b> aguardando confirmação</b> pra você revisar.
           </p>
         )}
 
