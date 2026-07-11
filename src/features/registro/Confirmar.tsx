@@ -14,7 +14,7 @@ import { cx } from '../../lib/cx'
 import { formatDiaCurto, formatHoraBRT } from '../../lib/date'
 import { AppFrame } from '../../pages/app/AppFrame'
 import { CampoEditavel } from './CampoEditavel'
-import { eixosLista, presencaDaFatia, textoFatia, textoTronco } from './texto'
+import { presencaDaFatia, textoFatia, textoTronco } from './texto'
 
 // Campos extras do tronco (narrativa do professor) — mostrados só quando têm
 // conteúdo, pra não poluir. Nenhum campo preenchido fica escondido.
@@ -264,21 +264,8 @@ export default function ConfirmarPage() {
             dever
             onSave={(v) => void salvarCampoTronco('dever_casa', v)}
           />
-          {eixosLista(tronco.campos.eixos).length > 0 && (
-            <div className="border-t border-border-subtle px-[14px] py-[11px]">
-              <span className="mb-[6px] flex items-center gap-[7px] text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
-                <i className="fa-solid fa-layer-group text-[10px] text-brand-text" aria-hidden="true" /> Eixos ·
-                classificação do Fábio
-              </span>
-              <div className="flex flex-wrap gap-[6px]">
-                {eixosLista(tronco.campos.eixos).map((e) => (
-                  <Badge key={e} variant="brand">
-                    {e}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* eixos NÃO é exibido: é classificação de sistema (fica em campos.eixos,
+              gravado no backend, nunca renderizado pro professor — decisão do Alf). */}
         </div>
 
         {/* FATIAS — um card por aluno (só quando há) */}
