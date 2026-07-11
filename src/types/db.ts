@@ -20999,6 +20999,7 @@ export type Database = {
       professores: {
         Row: {
           ativo: boolean | null
+          bio: string | null
           comissao_percentual: number | null
           created_at: string | null
           data_admissao: string | null
@@ -21008,6 +21009,7 @@ export type Database = {
           media_alunos_turma: number | null
           nome: string
           nome_normalizado: string | null
+          nome_preferido: string | null
           nps_medio: number | null
           observacoes: string | null
           telefone_whatsapp: string | null
@@ -21016,6 +21018,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean | null
+          bio?: string | null
           comissao_percentual?: number | null
           created_at?: string | null
           data_admissao?: string | null
@@ -21025,6 +21028,7 @@ export type Database = {
           media_alunos_turma?: number | null
           nome: string
           nome_normalizado?: string | null
+          nome_preferido?: string | null
           nps_medio?: number | null
           observacoes?: string | null
           telefone_whatsapp?: string | null
@@ -21033,6 +21037,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean | null
+          bio?: string | null
           comissao_percentual?: number | null
           created_at?: string | null
           data_admissao?: string | null
@@ -21042,6 +21047,7 @@ export type Database = {
           media_alunos_turma?: number | null
           nome?: string
           nome_normalizado?: string | null
+          nome_preferido?: string | null
           nps_medio?: number | null
           observacoes?: string | null
           telefone_whatsapp?: string | null
@@ -27146,63 +27152,63 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "aluno_presenca_aluno_id_fkey"
+            foreignKeyName: "aula_alunos_emusys_aluno_id_fkey"
             columns: ["aluno_id"]
             isOneToOne: false
             referencedRelation: "alunos"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "aluno_presenca_aluno_id_fkey"
+            foreignKeyName: "aula_alunos_emusys_aluno_id_fkey"
             columns: ["aluno_id"]
             isOneToOne: false
             referencedRelation: "vw_aluno_sucesso_lista"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "aluno_presenca_aluno_id_fkey"
+            foreignKeyName: "aula_alunos_emusys_aluno_id_fkey"
             columns: ["aluno_id"]
             isOneToOne: false
             referencedRelation: "vw_alunos_ativos"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "aluno_presenca_aluno_id_fkey"
+            foreignKeyName: "aula_alunos_emusys_aluno_id_fkey"
             columns: ["aluno_id"]
             isOneToOne: false
             referencedRelation: "vw_fabio_carteira_professor"
             referencedColumns: ["aluno_id"]
           },
           {
-            foreignKeyName: "aluno_presenca_aluno_id_fkey"
+            foreignKeyName: "aula_alunos_emusys_aluno_id_fkey"
             columns: ["aluno_id"]
             isOneToOne: false
             referencedRelation: "vw_farmer_aniversariantes_hoje"
             referencedColumns: ["aluno_id"]
           },
           {
-            foreignKeyName: "aluno_presenca_aluno_id_fkey"
+            foreignKeyName: "aula_alunos_emusys_aluno_id_fkey"
             columns: ["aluno_id"]
             isOneToOne: false
             referencedRelation: "vw_farmer_inadimplentes"
             referencedColumns: ["aluno_id"]
           },
           {
-            foreignKeyName: "aluno_presenca_aluno_id_fkey"
+            foreignKeyName: "aula_alunos_emusys_aluno_id_fkey"
             columns: ["aluno_id"]
             isOneToOne: false
             referencedRelation: "vw_farmer_novos_matriculados"
             referencedColumns: ["aluno_id"]
           },
           {
-            foreignKeyName: "aluno_presenca_aluno_id_fkey"
+            foreignKeyName: "aula_alunos_emusys_aluno_id_fkey"
             columns: ["aluno_id"]
             isOneToOne: false
             referencedRelation: "vw_farmer_renovacoes_proximas"
             referencedColumns: ["aluno_id"]
           },
           {
-            foreignKeyName: "aluno_presenca_aluno_id_fkey"
+            foreignKeyName: "aula_alunos_emusys_aluno_id_fkey"
             columns: ["aluno_id"]
             isOneToOne: false
             referencedRelation: "vw_renovacoes_proximas"
@@ -31479,6 +31485,10 @@ export type Database = {
         Args: { p_campos?: Json; p_id: string; p_texto?: string }
         Returns: Json
       }
+      app_atualizar_perfil: {
+        Args: { p_bio?: string; p_nome_preferido?: string }
+        Returns: Json
+      }
       app_confirmar_registro: {
         Args: { p_modo?: string; p_registro_id: string }
         Returns: Json
@@ -31491,6 +31501,19 @@ export type Database = {
           p_storage_path: string
         }
         Returns: Json
+      }
+      app_meu_perfil: {
+        Args: never
+        Returns: {
+          bio: string
+          email: string
+          foto_url: string
+          nome: string
+          nome_preferido: string
+          professor_id: number
+          telefone_whatsapp: string
+          unidades: string
+        }[]
       }
       app_meu_ponto: {
         Args: { p_data_fim?: string; p_data_inicio?: string }
@@ -32052,6 +32075,14 @@ export type Database = {
         Args: { p_ano: number; p_mes: number; p_unidade_id: string }
         Returns: Json
       }
+      get_dados_relatorio_coordenacao_legado_20260711: {
+        Args: { p_ano: number; p_mes: number; p_unidade_id: string }
+        Returns: Json
+      }
+      get_dados_relatorio_coordenacao_pre_totais_20260711: {
+        Args: { p_ano: number; p_mes: number; p_unidade_id: string }
+        Returns: Json
+      }
       get_dados_relatorio_gerencial: {
         Args: { p_ano?: number; p_mes?: number; p_unidade_id?: string }
         Returns: Json
@@ -32483,6 +32514,84 @@ export type Database = {
           taxa_renovacao: number
           ticket_medio: number
           total_turmas: number
+          unidade_id: string
+        }[]
+      }
+      get_kpis_professor_periodo_canonico: {
+        Args: {
+          p_ano: number
+          p_data_fim?: string
+          p_data_inicio?: string
+          p_mes: number
+          p_unidade_id?: string
+        }
+        Returns: {
+          alunos_via_turmas: number
+          ano: number
+          carteira_alunos: number
+          evasoes: number
+          experimentais: number
+          experimentais_agendadas: number
+          experimentais_faltas: number
+          matriculas: number
+          matriculas_diretas: number
+          matriculas_pos_exp: number
+          media_alunos_turma: number
+          media_presenca: number
+          mes: number
+          mrr_carteira: number
+          mrr_perdido: number
+          nao_renovacoes: number
+          nps_medio: number
+          professor_id: number
+          professor_nome: string
+          renovacoes: number
+          taxa_cancelamento: number
+          taxa_conversao: number
+          taxa_faltas: number
+          taxa_renovacao: number
+          ticket_medio: number
+          total_turmas: number
+          turmas_elegiveis_media: number
+          unidade_id: string
+        }[]
+      }
+      get_kpis_professor_periodo_canonico_base_20260711: {
+        Args: {
+          p_ano: number
+          p_data_fim?: string
+          p_data_inicio?: string
+          p_mes: number
+          p_unidade_id?: string
+        }
+        Returns: {
+          alunos_via_turmas: number
+          ano: number
+          carteira_alunos: number
+          evasoes: number
+          experimentais: number
+          experimentais_agendadas: number
+          experimentais_faltas: number
+          matriculas: number
+          matriculas_diretas: number
+          matriculas_pos_exp: number
+          media_alunos_turma: number
+          media_presenca: number
+          mes: number
+          mrr_carteira: number
+          mrr_perdido: number
+          nao_renovacoes: number
+          nps_medio: number
+          professor_id: number
+          professor_nome: string
+          renovacoes: number
+          taxa_cancelamento: number
+          taxa_conversao: number
+          taxa_faltas: number
+          taxa_renovacao: number
+          ticket_medio: number
+          total_turmas: number
+          turmas_elegiveis_media: number
           unidade_id: string
         }[]
       }

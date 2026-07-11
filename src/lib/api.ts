@@ -301,6 +301,53 @@ export async function meuPonto(inicio: string, fim: string): Promise<PontoDia[]>
   return (res as unknown as PontoDia[]) ?? []
 }
 
+// ---------------------------------------------------------------------------
+// Perfil do professor (header interno + tela "Meu perfil")
+// ---------------------------------------------------------------------------
+
+/** Perfil do professor logado, como a RPC guardada devolve (app_meu_perfil). */
+export interface MeuPerfil {
+  professor_id: number
+  nome: string
+  /** Como o Fábio deve chamar o professor — editável, null se ainda não preenchido. */
+  nome_preferido: string | null
+  /** O que o Fábio deve saber sobre o professor — editável, null se ainda não preenchido. */
+  bio: string | null
+  email: string | null
+  telefone_whatsapp: string | null
+  foto_url: string | null
+  unidades: string | null
+}
+
+/**
+ * Perfil do professor logado (app_meu_perfil) — nome, contato, foto e unidades.
+ * Devolve null se o usuário logado não tem professor vinculado (0 linhas).
+ */
+export async function meuPerfil(): Promise<MeuPerfil | null> {
+  const { data: res, error } = await supabase.rpc('app_meu_perfil')
+  if (error) throw error
+  const linhas = res as unknown as MeuPerfil[]
+  return linhas?.[0] ?? null
+}
+
+/**
+ * Atualiza nome_preferido/bio do professor logado (app_atualizar_perfil).
+ * Só a própria linha, só esses 2 campos. A RPC trata null como "não mexe" —
+ * por isso aqui sempre manda string (mesmo vazia, pra limpar de verdade um
+ * campo apagado na tela). LANÇA exceção em erro.
+ */
+export async function atualizarPerfil(
+  nomePreferido: string,
+  bio: string,
+): Promise<{ ok: true; professor_id: number }> {
+  const { data: res, error } = await supabase.rpc('app_atualizar_perfil', {
+    p_nome_preferido: nomePreferido,
+    p_bio: bio,
+  })
+  if (error) throw error
+  return res as unknown as { ok: true; professor_id: number }
+}
+
 export interface EnfileirarResultado {
   audio_id: string
   status: 'pendente'
