@@ -4,6 +4,7 @@ import { Moon, Sun } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../lib/theme'
 import { supabase } from '../../lib/supabase'
+import { meuPerfil } from '../../lib/api'
 import { Toast, useToast } from '../../components/ui'
 
 function primeiroNome(email?: string, nome?: string): string {
@@ -31,7 +32,21 @@ export function AppHeader() {
 
   const [menu, setMenu] = useState(false)
   const [modalSenha, setModalSenha] = useState(false)
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Foto real do professor (mesma do Meu perfil) — a sessão só tem e-mail/nome.
+  useEffect(() => {
+    let vivo = true
+    meuPerfil()
+      .then((perfil) => {
+        if (vivo) setFotoUrl(perfil?.foto_url ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      vivo = false
+    }
+  }, [])
 
   // Fecha ao tocar/clicar fora — sem backdrop `fixed`, que em telas reais
   // (iOS Safari) fica preso pela dupla `overflow-hidden` do AppFrame e rouba
@@ -78,18 +93,18 @@ export function AppHeader() {
           type="button"
           aria-label="Menu do perfil"
           aria-expanded={menu}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--avatar-grad)] text-[15px] font-extrabold text-[color:var(--avatar-fg)]"
+          className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full bg-[var(--avatar-grad)] text-[15px] font-extrabold text-[color:var(--avatar-fg)]"
           onClick={() => setMenu((v) => !v)}
         >
-          {inicial}
+          {fotoUrl ? <img src={fotoUrl} alt={nome} className="h-full w-full object-cover" /> : inicial}
         </button>
 
         {menu && (
           <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[224px] overflow-hidden rounded-xl border border-border-subtle bg-bg-surface shadow-fab">
             {/* cabeçalho do menu */}
             <div className="flex items-center gap-[10px] border-b border-border-subtle px-[14px] py-3">
-              <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[var(--avatar-grad)] text-sm font-extrabold text-[color:var(--avatar-fg)]">
-                {inicial}
+              <div className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full bg-[var(--avatar-grad)] text-sm font-extrabold text-[color:var(--avatar-fg)]">
+                {fotoUrl ? <img src={fotoUrl} alt={nome} className="h-full w-full object-cover" /> : inicial}
               </div>
               <div className="min-w-0">
                 <b className="block truncate text-sm">{nomeCompleto ?? nome}</b>
