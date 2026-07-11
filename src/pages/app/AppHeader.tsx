@@ -53,10 +53,10 @@ export function AppHeader() {
       <button
         type="button"
         aria-label={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-        className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full border border-border-subtle bg-bg-surface text-text-secondary"
+        className="flex h-8 w-8 flex-none items-center justify-center rounded-full border border-border-subtle bg-bg-surface text-text-secondary transition-colors hover:bg-bg-hover"
         onClick={toggle}
       >
-        {theme === 'dark' ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
+        {theme === 'dark' ? <Sun size={14} aria-hidden="true" /> : <Moon size={14} aria-hidden="true" />}
       </button>
 
       {/* Foto do professor + menu */}
