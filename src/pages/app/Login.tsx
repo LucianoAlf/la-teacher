@@ -67,12 +67,10 @@ export default function LoginPage() {
 
           <div className="relative">
             <img
-              src="/brand/fabio-avatar.png"
+              src="/brand/fabio-avatar.svg"
               alt="Fábio"
-              width={94}
-              height={94}
-              className="mx-auto h-[94px] w-[94px] rounded-full"
-              style={{ filter: 'drop-shadow(0 0 26px var(--login-glow))' }}
+              className="mx-auto h-auto w-[120px]"
+              style={{ filter: 'drop-shadow(0 0 24px var(--login-glow))' }}
             />
             <h1 className="mt-4 font-brand text-[32px] font-black leading-none tracking-[-.5px]">
               <span className="text-la-pink">LA</span> <span style={{ color: 'var(--login-text)' }}>Teacher</span>
