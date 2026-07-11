@@ -142,7 +142,7 @@ function LinhaAluno({
   return (
     <button
       type="button"
-      disabled={modo === 'leitura'}
+      disabled={!onToggle}
       onClick={onToggle}
       className="flex w-full items-center gap-3 border-b border-border-subtle px-4 py-3 text-left last:border-b-0 disabled:cursor-default"
     >
@@ -308,9 +308,11 @@ function Conteudo({ sessao, onRecarregar }: { sessao: SessaoAula; onRecarregar: 
             <LinhaAluno
               key={a.aluno_id ?? `nc-${i}`}
               aluno={a}
-              modo={interativa && fase === 'lista' ? 'interativa' : 'leitura'}
+              // enquanto o professor marca (lista OU confirmação), o badge vem
+              // do que ele marcou (ausentes); só lê o banco em tela read-only.
+              modo={interativa ? 'interativa' : 'leitura'}
               ausente={a.aluno_id != null && ausentes.has(a.aluno_id)}
-              onToggle={a.aluno_id != null ? () => toggle(a.aluno_id!) : undefined}
+              onToggle={interativa && fase === 'lista' && a.aluno_id != null ? () => toggle(a.aluno_id!) : undefined}
             />
           ))}
         </div>
