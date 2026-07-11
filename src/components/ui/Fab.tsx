@@ -24,7 +24,7 @@ export interface FabProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const PLACEMENT: Record<'center' | 'right', string> = {
   center: 'bottom-[30px] left-1/2 -translate-x-1/2 h-[64px] w-[64px] text-[23px]',
-  right: 'bottom-[104px] right-[14px] h-[52px] w-[52px] text-[18px]',
+  right: 'bottom-[100px] right-[16px] h-[64px] w-[64px] text-[23px]',
 }
 
 const VARIANT: Record<'primary' | 'secondary', string> = {

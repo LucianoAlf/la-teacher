@@ -9,7 +9,7 @@ const TABS = [
   { id: 'alunos', label: 'Alunos', icon: 'fa-solid fa-user-group' },
   { id: 'agenda', label: 'Agenda', icon: 'fa-solid fa-calendar' },
   // "Mais" = abrir as telas/ferramentas futuras (não "opções desta tela"),
-  // por isso list-plus do Lucide, não o "•••".
+  // por isso o list-plus nativo do Lucide, não o "•••".
   { id: 'mais', label: 'Mais', node: <ListPlus size={19} aria-hidden="true" /> },
 ]
 
