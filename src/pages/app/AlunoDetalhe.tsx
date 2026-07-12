@@ -116,14 +116,14 @@ export function FichaConteudo({
   onGravar: (s: SessaoAula) => void
 }) {
   return (
-    <>
+    <div className="flex flex-col gap-4">
       <Identidade perfil={ficha.perfil} />
       <GravarHoje carregando={sessaoCarregando} sessao={sessaoGravavel} onGravar={onGravar} />
       <Responsaveis lista={ficha.responsaveis} />
       <Jornada jornada={ficha.minha_jornada} outros={ficha.outros_cursos} />
       <Presenca lista={ficha.presenca_recente} />
       <Historico lista={ficha.historico_pedagogico} />
-    </>
+    </div>
   )
 }
 
@@ -197,7 +197,7 @@ function Identidade({ perfil }: { perfil: AlunoFichaPerfil }) {
   const aniversario = aniversarioProximo(perfil.data_nascimento)
 
   return (
-    <div className="mb-3 flex flex-col items-center gap-2 rounded-lg border border-border-subtle bg-bg-surface px-4 py-6">
+    <div className="flex flex-col items-center gap-2 rounded-lg border border-border-subtle bg-bg-surface px-4 py-6">
       {perfil.foto_url ? (
         <img
           src={perfil.foto_url}
@@ -249,7 +249,7 @@ function GravarHoje({
 }) {
   if (carregando) {
     return (
-      <div className="mb-3 flex items-center gap-3 rounded-lg border border-border-subtle bg-bg-surface px-4 py-[14px]">
+      <div className="flex items-center gap-3 rounded-lg border border-border-subtle bg-bg-surface px-4 py-[14px]">
         <Skeleton className="h-9 w-9 rounded-full" />
         <Skeleton className="h-4 w-40" />
       </div>
@@ -258,7 +258,7 @@ function GravarHoje({
 
   if (sessao) {
     return (
-      <div className="mb-3 rounded-lg border border-[color:var(--brand-border)] bg-brand-soft px-4 py-4">
+      <div className="rounded-lg border border-[color:var(--brand-border)] bg-brand-soft px-4 py-4">
         <div className="mb-3 flex items-center gap-[11px]">
           <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-md bg-brand text-base text-on-brand">
             <i className="fa-solid fa-microphone" aria-hidden="true" />
@@ -278,7 +278,7 @@ function GravarHoje({
   }
 
   return (
-    <div className="mb-3 flex items-start gap-3 rounded-lg border border-border-subtle bg-bg-surface px-4 py-[14px]">
+    <div className="flex items-start gap-3 rounded-lg border border-border-subtle bg-bg-surface px-4 py-[14px]">
       <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-bg-inset text-text-muted">
         <i className="fa-solid fa-microphone-slash" aria-hidden="true" />
       </div>
@@ -404,7 +404,43 @@ function Presenca({ lista }: { lista: AlunoFichaPresenca[] }) {
   )
 }
 
+function RegistroItem({ r, primeiro }: { r: AlunoFichaRegistro; primeiro?: boolean }) {
+  return (
+    <div className={cx('py-3', !primeiro && 'border-t border-border-subtle')}>
+      <div className="mb-1 flex items-center gap-2">
+        <span className="text-[12px] text-text-secondary">
+          {dataCurta(r.data)}
+          {r.curso ? ` · ${r.curso}` : ''}
+        </span>
+        {primeiro && (
+          <span className="rounded-full bg-brand-soft px-2 py-[1px] text-[10px] font-bold uppercase tracking-[.4px] text-brand-text">
+            última aula
+          </span>
+        )}
+        {r.origem === 'fabio' && (
+          <i
+            className="fa-solid fa-wand-magic-sparkles text-[11px] text-brand-text"
+            title="Registro do Fábio"
+            aria-label="Registro do Fábio"
+          />
+        )}
+        <span
+          className={cx(
+            'ml-auto rounded-full px-2 py-[1px] text-[11px] font-semibold',
+            r.foi_voce ? 'bg-brand-soft text-brand-text' : 'bg-bg-inset text-text-secondary',
+          )}
+        >
+          {r.foi_voce ? 'você' : 'prof. anterior'}
+        </span>
+      </div>
+      <p className="whitespace-pre-line text-[13px] leading-relaxed text-text-primary">{r.texto ?? '—'}</p>
+    </div>
+  )
+}
+
 function Historico({ lista }: { lista: AlunoFichaRegistro[] }) {
+  const [aberto, setAberto] = useState(false)
+
   if (lista.length === 0) {
     return (
       <Card title="Histórico pedagógico" icon="fa-solid fa-clock-rotate-left">
@@ -417,34 +453,34 @@ function Historico({ lista }: { lista: AlunoFichaRegistro[] }) {
     )
   }
 
+  const [ultima, ...anteriores] = lista
+
   return (
-    <Card title="Histórico pedagógico" icon="fa-solid fa-clock-rotate-left">
-      {lista.map((r, i) => (
-        <div key={`${r.data}-${i}`} className="border-b border-border-subtle py-3 last:border-b-0">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="text-[12px] text-text-secondary">
-              {dataCurta(r.data)}
-              {r.curso ? ` · ${r.curso}` : ''}
-            </span>
-            {r.origem === 'fabio' && (
-              <i
-                className="fa-solid fa-wand-magic-sparkles text-[11px] text-brand-text"
-                title="Registro do Fábio"
-                aria-label="Registro do Fábio"
-              />
-            )}
-            <span
-              className={cx(
-                'ml-auto rounded-full px-2 py-[1px] text-[11px] font-semibold',
-                r.foi_voce ? 'bg-brand-soft text-brand-text' : 'bg-bg-inset text-text-secondary',
-              )}
-            >
-              {r.foi_voce ? 'você' : 'prof. anterior'}
-            </span>
-          </div>
-          <p className="whitespace-pre-line text-[13px] leading-relaxed text-text-primary">{r.texto ?? '—'}</p>
-        </div>
-      ))}
+    <Card
+      title="Histórico pedagógico"
+      icon="fa-solid fa-clock-rotate-left"
+      right={lista.length > 1 ? `${lista.length} aulas` : undefined}
+    >
+      <RegistroItem r={ultima} primeiro />
+
+      {aberto && anteriores.map((r, i) => <RegistroItem key={`${r.data}-${i}`} r={r} />)}
+
+      {anteriores.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setAberto((v) => !v)}
+          aria-expanded={aberto}
+          className="mt-1 flex w-full items-center justify-center gap-2 border-t border-border-subtle pt-3 text-[13px] font-semibold text-brand-text"
+        >
+          {aberto
+            ? 'Mostrar só a última'
+            : `Ver ${anteriores.length} ${anteriores.length === 1 ? 'aula anterior' : 'aulas anteriores'}`}
+          <i
+            className={cx('fa-solid fa-chevron-down text-[11px] transition-transform', aberto && 'rotate-180')}
+            aria-hidden="true"
+          />
+        </button>
+      )}
     </Card>
   )
 }
