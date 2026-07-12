@@ -4,10 +4,13 @@ import { Badge, Button, EmptyState, Fatia, ScreenHeader, Skeleton, Toast, useToa
 import {
   atualizarFatia,
   confirmarRegistro,
+  ErroEscolhaModo,
   registroCompleto,
   type AulaContexto,
   type ConfirmacaoResultado,
+  type ModoRegistro,
   type PendenciaConfirmacao,
+  type RegistroJaFeito,
   type RegistroRow,
 } from '../../lib/api'
 import { cx } from '../../lib/cx'
@@ -43,6 +46,9 @@ export default function ConfirmarPage() {
   const [pendencias, setPendencias] = useState<PendenciaConfirmacao[]>([])
   const [sucesso, setSucesso] = useState<ConfirmacaoResultado | null>(null)
   const [verTextoFinal, setVerTextoFinal] = useState(false)
+  // Prontuário: esta aula já tem relatório? (o banco recusa 'novo' sobre texto existente)
+  const [jaReg, setJaReg] = useState<{ ja: boolean; itens: RegistroJaFeito[] }>({ ja: false, itens: [] })
+  const [escolhendoModo, setEscolhendoModo] = useState(false)
 
   const carregar = useCallback(() => {
     if (!registroId) return
@@ -56,6 +62,7 @@ export default function ConfirmarPage() {
         setTronco(res.tronco)
         setFatias(res.fatias)
         setAula(res.aula)
+        setJaReg({ ja: res.aula_ja_registrada === true, itens: res.ja_registrados ?? [] })
         setFase('ok')
       })
       .catch(() => setFase('erro'))
@@ -99,8 +106,9 @@ export default function ConfirmarPage() {
 
   // ---- confirmar e gravar (por aluno) ----
 
-  async function confirmar() {
+  async function confirmar(modo: ModoRegistro) {
     if (!tronco) return
+    setEscolhendoModo(false)
     setFase('confirmando')
     setPendencias([])
     try {
@@ -110,7 +118,7 @@ export default function ConfirmarPage() {
       for (const f of fatias.filter((f) => presencaDaFatia(f) === 'presente')) {
         await atualizarFatia(f.id, textoFatia(aula, tronco.campos, f.campos), null)
       }
-      const res = await confirmarRegistro(tronco.id)
+      const res = await confirmarRegistro(tronco.id, modo)
       if (res.pendencias.length > 0) {
         setPendencias(res.pendencias)
         setFase('ok')
@@ -125,8 +133,17 @@ export default function ConfirmarPage() {
       }
       setSucesso(res)
       setFase('sucesso')
-    } catch {
+    } catch (e) {
       setFase('ok')
+      // Defesa em profundidade: se o banco RECUSOU 'novo' sobre texto existente
+      // (registro_ja_existe_escolha_modo), abre a escolha em vez de falhar seco —
+      // nada é perdido, o professor decide substituir ou complementar.
+      if (e instanceof ErroEscolhaModo) {
+        setJaReg((r) => ({ ...r, ja: true }))
+        setEscolhendoModo(true)
+        show('Esta aula já tem relatório — escolha substituir ou complementar 👇')
+        return
+      }
       show('Não consegui confirmar — tenta de novo')
     }
   }
@@ -196,6 +213,19 @@ export default function ConfirmarPage() {
           <i className="fa-solid fa-robot" aria-hidden="true" />
           Fábio organizou seu áudio — confira e confirme. Eu nunca invento: campo vazio é convite ✋
         </div>
+
+        {/* prontuário: esta aula já tem relatório → confirmar exige escolher */}
+        {jaReg.ja && (
+          <div className="mx-4 mb-3 rounded-md border border-border-subtle bg-warning-soft px-3 py-[10px] text-[12.5px] leading-relaxed text-warning-text">
+            <b className="mb-1 flex items-center gap-1.5">
+              <i className="fa-solid fa-clipboard-check" aria-hidden="true" /> Esta aula já tem relatório
+            </b>
+            <span>
+              Ao confirmar, você escolhe <b>substituir</b> (apaga o anterior) ou <b>complementar</b> (anexa ao que já
+              existe). Nada é apagado sem você mandar. ✋
+            </span>
+          </div>
+        )}
 
         {/* pendências da tentativa de confirmação */}
         {pendencias.length > 0 && (
@@ -378,7 +408,11 @@ export default function ConfirmarPage() {
         >
           <i className="fa-solid fa-microphone" aria-hidden="true" /> Corrigir por voz
         </Button>
-        <Button className="flex-1" disabled={fase === 'confirmando'} onClick={() => void confirmar()}>
+        <Button
+          className="flex-1"
+          disabled={fase === 'confirmando'}
+          onClick={() => (jaReg.ja ? setEscolhendoModo(true) : void confirmar('novo'))}
+        >
           {fase === 'confirmando' ? (
             <>
               <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Gravando…
@@ -390,6 +424,38 @@ export default function ConfirmarPage() {
           )}
         </Button>
       </div>
+
+      {escolhendoModo && (
+        <div
+          className="absolute inset-0 z-50 flex items-end"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Substituir ou complementar o relatório"
+        >
+          <button className="absolute inset-0 bg-black/50" aria-label="Fechar" onClick={() => setEscolhendoModo(false)} />
+          <div className="relative w-full rounded-t-2xl border-t border-border-subtle bg-bg-surface p-5 pb-[calc(20px+env(safe-area-inset-bottom))]">
+            <b className="block text-[15px]">Esta aula já tem relatório</b>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-text-secondary">
+              O que fazer com o que já está gravado
+              {jaReg.itens.length > 0
+                ? ` (${jaReg.itens.map((i) => (i.aluno_nome ?? '').split(' ')[0]).filter(Boolean).join(', ')})`
+                : ''}
+              ? Nada acontece até você escolher.
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <Button block onClick={() => void confirmar('complementar')}>
+                <i className="fa-solid fa-plus" aria-hidden="true" /> Complementar — anexa ao anterior
+              </Button>
+              <Button block variant="ghost" onClick={() => void confirmar('substituir')}>
+                <i className="fa-solid fa-arrows-rotate" aria-hidden="true" /> Substituir — apaga e regrava
+              </Button>
+              <Button block variant="ghost" onClick={() => setEscolhendoModo(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Toast message={message} visible={visible} />
     </AppFrame>

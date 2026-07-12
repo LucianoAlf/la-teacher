@@ -134,13 +134,36 @@ export interface ConfirmacaoResultado {
   pendencias: PendenciaConfirmacao[]
 }
 
+export type ModoRegistro = 'novo' | 'substituir' | 'complementar'
+
+/** A trava do banco: registrar_aula_fabio RECUSA 'novo' sobre texto já existente. */
+export const ERRO_ESCOLHA_MODO = 'registro_ja_existe_escolha_modo'
+export class ErroEscolhaModo extends Error {
+  constructor() {
+    super(ERRO_ESCOLHA_MODO)
+    this.name = 'ErroEscolhaModo'
+  }
+}
+
 /**
  * Confirma um registro → grava POR ALUNO via porta única registrar_aula_fabio
- * (fatias presentes com texto; ausentes são puladas). LANÇA exceção em erro.
+ * (fatias presentes com texto; ausentes são puladas). O `modo` decide o que fazer
+ * quando a aula JÁ tem relatório: 'substituir' apaga o anterior, 'complementar'
+ * anexa. O banco RECUSA 'novo' sobre texto existente (fail-safe: erro, não perda) —
+ * traduzido aqui em `ErroEscolhaModo` pra tela mostrar a escolha. LANÇA em erro.
  */
-export async function confirmarRegistro(registroId: string): Promise<ConfirmacaoResultado> {
-  const { data: res, error } = await supabase.rpc('app_confirmar_registro', { p_registro_id: registroId })
-  if (error) throw error
+export async function confirmarRegistro(
+  registroId: string,
+  modo: ModoRegistro = 'novo',
+): Promise<ConfirmacaoResultado> {
+  const { data: res, error } = await supabase.rpc('app_confirmar_registro', {
+    p_registro_id: registroId,
+    p_modo: modo,
+  })
+  if (error) {
+    if (error.message.includes(ERRO_ESCOLHA_MODO)) throw new ErroEscolhaModo()
+    throw error
+  }
   return res as unknown as ConfirmacaoResultado
 }
 
@@ -183,10 +206,28 @@ export interface AulaContexto {
   tipo: string | null
 }
 
+/** Relatório JÁ existente nesta aula (o prontuário atual, prévia do que seria sobrescrito). */
+export interface RegistroJaFeito {
+  aluno_id: number | null
+  aluno_nome: string | null
+  aula_id: number | null
+  registrado_em: string | null
+  previa: string | null
+}
+
 export interface RegistroCompleto {
   tronco: RegistroRow
   fatias: RegistroRow[]
   aula: AulaContexto | null
+  /** true = esta aula JÁ tem relatório confirmado (o prontuário do aluno). */
+  aula_ja_registrada?: boolean
+  ja_registrados?: RegistroJaFeito[]
+  /**
+   * O que o banco exige na confirmação: 'novo' = grava direto; qualquer outra
+   * coisa ('substituir|complementar') = o professor PRECISA escolher — a RPC
+   * recusa 'novo' sobre texto existente pra nunca destruir em silêncio.
+   */
+  modo_exigido?: string
 }
 
 /** Tronco + fatias + contexto da aula. Erros da RPC: sem_professor | nao_encontrado. */
