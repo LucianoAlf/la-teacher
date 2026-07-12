@@ -293,7 +293,12 @@ function GravarHoje({
 }
 
 function Responsaveis({ lista }: { lista: AlunoFicha['responsaveis'] }) {
-  const ordenada = [...lista].sort((a, b) => Number(b.principal) - Number(a.principal))
+  // O aluno_contatos inclui um contato "próprio" (o próprio aluno) — não é
+  // responsável; some do bloco. Sobram só os responsáveis de verdade.
+  const norm = (s: string | null) => (s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
+  const ordenada = lista
+    .filter((r) => norm(r.parentesco) !== 'proprio')
+    .sort((a, b) => Number(b.principal) - Number(a.principal))
   if (ordenada.length === 0) return null
   return (
     <Card title="Responsável" icon="fa-solid fa-user-shield">
