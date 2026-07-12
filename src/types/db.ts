@@ -31481,6 +31481,7 @@ export type Database = {
         }
         Returns: Json
       }
+      app_aluno_ficha: { Args: { p_aluno_id: number }; Returns: Json }
       app_atualizar_fatia: {
         Args: { p_campos?: Json; p_id: string; p_texto?: string }
         Returns: Json
@@ -31496,8 +31497,8 @@ export type Database = {
       app_enfileirar_audio: {
         Args: {
           p_aula_id: number
-          p_duracao_segundos?: number
-          p_registro_id?: string
+          p_duracao_segundos: number
+          p_registro_id: string
           p_storage_path: string
         }
         Returns: Json
@@ -31882,7 +31883,15 @@ export type Database = {
       }
       fn_fabio_chama_edge: { Args: { p_audio_id: string }; Returns: undefined }
       fn_fabio_retry_fila: { Args: never; Returns: number }
+      fn_pode_ler_aluno_pedagogico: {
+        Args: { p_aluno_id: number }
+        Returns: boolean
+      }
       fn_professor_do_usuario: { Args: never; Returns: number }
+      fn_usuario_atual_tem_permissao: {
+        Args: { p_codigo_permissao: string; p_unidade_id?: string }
+        Returns: boolean
+      }
       get_analise_pesquisas: {
         Args: {
           p_data_fim?: string
@@ -32262,6 +32271,20 @@ export type Database = {
         Returns: Json
       }
       get_historico_pedagogico_aluno: {
+        Args: { p_aluno_id: number }
+        Returns: {
+          anotacoes: string
+          curso_nome: string
+          data_aula: string
+          horario_aula: string
+          professor_nome: string
+          status: string
+          tipo: string
+          turma_nome: string
+          unidade_nome: string
+        }[]
+      }
+      get_historico_pedagogico_aluno_interno_20260712: {
         Args: { p_aluno_id: number }
         Returns: {
           anotacoes: string
@@ -32711,6 +32734,14 @@ export type Database = {
         }[]
       }
       get_relatorio_pedagogico_aluno: {
+        Args: {
+          p_aluno_id: number
+          p_data_fim?: string
+          p_data_inicio?: string
+        }
+        Returns: Json
+      }
+      get_relatorio_pedagogico_aluno_interno_20260712: {
         Args: {
           p_aluno_id: number
           p_data_fim?: string

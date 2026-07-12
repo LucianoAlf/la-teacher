@@ -302,6 +302,91 @@ export async function meuPonto(inicio: string, fim: string): Promise<PontoDia[]>
 }
 
 // ---------------------------------------------------------------------------
+// Ficha do aluno (tela /app/aluno/:id) — app_aluno_ficha
+// ---------------------------------------------------------------------------
+
+export interface AlunoFichaPerfil {
+  aluno_id: number
+  nome: string
+  foto_url: string | null
+  idade: number | null
+  data_nascimento: string | null
+  /** LAMK = Kids · EMLA = School. */
+  classificacao: string | null
+  modalidade: string | null
+  unidade: string | null
+  data_matricula: string | null
+  meses_de_casa: number | null
+  status: string | null
+  is_retorno: boolean | null
+  is_segundo_curso: boolean | null
+}
+
+export interface AlunoFichaJornada {
+  curso: string | null
+  aula_atual: number | null
+  aulas_contratadas: number | null
+  aulas_realizadas: number | null
+  jornada_label: string | null
+  dia_aula: string | null
+  horario: string | null
+  status_matricula: string | null
+  percentual: number | null
+}
+
+export interface AlunoFichaOutroCurso {
+  curso: string | null
+  professor: string | null
+}
+
+export interface AlunoFichaResponsavel {
+  nome: string | null
+  parentesco: string | null
+  principal: boolean | null
+}
+
+export interface AlunoFichaPresenca {
+  data: string
+  status: string | null
+  curso: string | null
+}
+
+export interface AlunoFichaRegistro {
+  data: string
+  curso: string | null
+  texto: string | null
+  /** 'fabio' = registro do Fábio; 'emusys' = anotação legada do Emusys. */
+  origem: 'fabio' | 'emusys'
+  /** true = foi este professor que escreveu; false = professor anterior do mesmo curso. */
+  foi_voce: boolean
+}
+
+export interface AlunoFicha {
+  perfil: AlunoFichaPerfil
+  minha_jornada: AlunoFichaJornada[]
+  outros_cursos: AlunoFichaOutroCurso[]
+  responsaveis: AlunoFichaResponsavel[]
+  presenca_recente: AlunoFichaPresenca[]
+  historico_pedagogico: AlunoFichaRegistro[]
+}
+
+/** A RPC recusa aluno que não é da carteira do professor logado. */
+export const FORA_DA_CARTEIRA = 'aluno_fora_da_sua_carteira' as const
+
+/**
+ * Ficha completa do aluno (app_aluno_ficha) — scoped ao professor logado.
+ * Devolve FORA_DA_CARTEIRA se o aluno não é da carteira. LANÇA em erro de rede.
+ */
+export async function alunoFicha(alunoId: number): Promise<AlunoFicha | typeof FORA_DA_CARTEIRA> {
+  const { data: res, error } = await supabase.rpc('app_aluno_ficha', { p_aluno_id: alunoId })
+  if (error) {
+    if (error.message.includes(FORA_DA_CARTEIRA)) return FORA_DA_CARTEIRA
+    throw error
+  }
+  return res as unknown as AlunoFicha
+}
+
+// ---------------------------------------------------------------------------
 // Perfil do professor (header interno + tela "Meu perfil")
 // ---------------------------------------------------------------------------
 
@@ -394,7 +479,10 @@ export async function enfileirarAudio(
     p_aula_id: aulaId,
     p_storage_path: storagePath,
     p_duracao_segundos: duracaoSegundos,
-    ...(registroId ? { p_registro_id: registroId } : {}),
+    // A RPC perdeu o DEFAULT NULL nos parâmetros — todos são obrigatórios agora.
+    // Sempre mandar a chave (null quando NÃO é correção por voz); cast porque o
+    // tipo gerado marca p_registro_id como string.
+    p_registro_id: registroId as unknown as string,
   })
   if (error) {
     const conhecido = ERROS_GRAVACAO.find((c) => error.message.includes(c))
