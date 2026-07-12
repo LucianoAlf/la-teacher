@@ -18,12 +18,15 @@ export default defineConfig({
   plugins: [
     react(),
     ogBaseUrl(),
-    // PWA instalável: service worker (precache do shell + auto-update) que destrava
-    // o convite de instalação no Android. O manifest é o nosso (public/manifest.webmanifest),
-    // por isso manifest:false — o plugin cuida só do service worker + registro.
+    // PWA instalável: service worker (precache do shell) que destrava o convite de
+    // instalação no Android. registerType:'prompt' — a versão nova NÃO se aplica
+    // sozinha (evita janela de código velho servido enquanto atualiza): o app avisa
+    // e o professor toca "Atualizar" (updateServiceWorker no AtualizacaoDisponivel).
+    // injectRegister:false — o registro é feito pelo hook useRegisterSW. O manifest
+    // é o nosso (public/manifest.webmanifest), por isso manifest:false.
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      registerType: 'prompt',
+      injectRegister: false,
       manifest: false,
       includeAssets: ['icons/*.png', 'icons/*.svg', 'og-image.png'],
       workbox: {
@@ -31,8 +34,6 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/icons\//, /\.webmanifest$/],
         cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
       },
       devOptions: { enabled: false },
     }),

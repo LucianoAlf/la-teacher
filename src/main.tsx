@@ -7,6 +7,7 @@ import './styles/tailwind.css'
 import { router } from './routes'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider, aplicarTemaInicial } from './lib/theme'
+import { AtualizacaoDisponivel } from './features/pwa/AtualizacaoDisponivel'
 // Efeito de boot: captura o beforeinstallprompt cedo (antes de qualquer tela).
 import './features/pwa/installState'
 
@@ -18,6 +19,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ThemeProvider>
       <AuthProvider>
         <RouterProvider router={router} future={{ v7_startTransition: true }} />
+        <AtualizacaoDisponivel />
       </AuthProvider>
     </ThemeProvider>
   </React.StrictMode>,
