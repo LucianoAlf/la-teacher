@@ -10,6 +10,7 @@ import ConfirmarPage from './features/registro/Confirmar'
 import ChamadaPage from './features/chamada/Chamada'
 import PontoPage from './pages/app/Ponto'
 import PerfilPage from './pages/app/Perfil'
+import AlunoDetalhePage from './pages/app/AlunoDetalhe'
 import { RequireProfessor } from './pages/app/RequireProfessor'
 import { useAuth } from './lib/auth'
 
@@ -31,6 +32,7 @@ export const router = createBrowserRouter(
         { path: '/app', element: <HomePage /> },
         { path: '/app/agenda', element: <AgendaPage /> },
         { path: '/app/alunos', element: <AlunosPage /> },
+        { path: '/app/aluno/:alunoId', element: <AlunoDetalhePage /> },
         { path: '/app/chamada/:aulaId', element: <ChamadaPage /> },
         { path: '/app/ponto', element: <PontoPage /> },
         { path: '/app/perfil', element: <PerfilPage /> },

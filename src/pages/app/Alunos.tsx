@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button, Card, EmptyState, Skeleton, Toast, useToast } from '../../components/ui'
 import { useCarteira } from '../../features/alunos/useCarteira'
 import { agruparPorCurso, normalizar } from '../../features/alunos/carteira'
 import { AlunoRow } from '../../features/alunos/AlunoRow'
+import type { CarteiraAluno } from '../../lib/api'
 import { AppFrame } from './AppFrame'
 import { AppHeader } from './AppHeader'
 import { AppNav } from './AppNav'
@@ -10,8 +12,12 @@ import { AppNav } from './AppNav'
 /** /app/alunos — carteira do professor, busca por nome, agrupada por curso. */
 export default function AlunosPage() {
   const { message, visible, show } = useToast()
+  const navigate = useNavigate()
   const { estado, recarregar } = useCarteira()
   const [busca, setBusca] = useState('')
+
+  const abrirAluno = (aluno: CarteiraAluno) =>
+    navigate(`/app/aluno/${aluno.aluno_id}`, { state: { aluno } })
 
   const alunos = estado.fase === 'ok' ? estado.alunos : []
   const grupos = useMemo(() => {
@@ -49,6 +55,7 @@ export default function AlunosPage() {
           totalFiltrado={totalFiltrado}
           onRetry={recarregar}
           onLimparBusca={() => setBusca('')}
+          onAbrirAluno={abrirAluno}
         />
       </div>
 
@@ -70,6 +77,7 @@ function ConteudoCarteira({
   totalFiltrado,
   onRetry,
   onLimparBusca,
+  onAbrirAluno,
 }: {
   fase: ReturnType<typeof useCarteira>['estado']['fase']
   grupos: ReturnType<typeof agruparPorCurso>
@@ -77,6 +85,7 @@ function ConteudoCarteira({
   totalFiltrado: number
   onRetry: () => void
   onLimparBusca: () => void
+  onAbrirAluno: (aluno: CarteiraAluno) => void
 }) {
   if (fase === 'carregando') {
     return (
@@ -151,7 +160,7 @@ function ConteudoCarteira({
       {grupos.map((g) => (
         <Card key={g.curso} title={g.curso} icon="fa-solid fa-graduation-cap" right={`${g.alunos.length}`}>
           {g.alunos.map((a, i) => (
-            <AlunoRow key={`${a.aluno_id}-${a.curso}-${i}`} aluno={a} />
+            <AlunoRow key={`${a.aluno_id}-${a.curso}-${i}`} aluno={a} onAbrir={onAbrirAluno} />
           ))}
         </Card>
       ))}
