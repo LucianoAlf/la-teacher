@@ -22,6 +22,8 @@ export default function AgendaPage() {
   const { dias, contagem } = useSemana(data)
   const abrirChamada = (sessao: SessaoAula) =>
     navigate(`/app/chamada/${sessao.aula_id_ancora}`, { state: { sessao } })
+  const gravarAula = (sessao: SessaoAula) =>
+    navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
 
   return (
     <AppFrame>
@@ -35,7 +37,13 @@ export default function AgendaPage() {
         </div>
 
         <div className="px-4">
-          <CardSessoesDoDia data={data} estado={estado} onRetry={recarregar} onAbrir={abrirChamada} />
+          <CardSessoesDoDia
+            data={data}
+            estado={estado}
+            onRetry={recarregar}
+            onAbrir={abrirChamada}
+            onGravar={gravarAula}
+          />
         </div>
       </div>
 

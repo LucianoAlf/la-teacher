@@ -20,11 +20,13 @@ export interface AulaRowProps {
   badge?: ReactNode
   /** Dot de status à direita: registrada (ok) / agora (now) / futura (next). */
   status?: AulaStatus
+  /** Ação no fim da linha (ex.: botão de gravar). Substitui o dot quando presente. */
+  action?: ReactNode
   onClick?: () => void
 }
 
 /** Linha de aula da Home/Agenda (protótipo .aula). */
-export function AulaRow({ hora, titulo, detalhe, badge, status, onClick }: AulaRowProps) {
+export function AulaRow({ hora, titulo, detalhe, badge, status, action, onClick }: AulaRowProps) {
   return (
     <div
       className={cx(
@@ -41,9 +43,11 @@ export function AulaRow({ hora, titulo, detalhe, badge, status, onClick }: AulaR
         {detalhe && <span className="text-xs text-text-secondary">{detalhe}</span>}
       </div>
       {badge}
-      {status && (
-        <span className={cx('h-[9px] w-[9px] flex-none rounded-full', DOT_CLASS[status])} aria-hidden="true" />
-      )}
+      {action
+        ? action
+        : status && (
+            <span className={cx('h-[9px] w-[9px] flex-none rounded-full', DOT_CLASS[status])} aria-hidden="true" />
+          )}
     </div>
   )
 }

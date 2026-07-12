@@ -135,6 +135,20 @@ export function statusSessao(s: SessaoAula, now: Date = new Date()): StatusSessa
   return janelaChamada(s, now) === 'encerrada' ? 'perdida' : 'pendente'
 }
 
+/**
+ * Pode gravar a aula AGORA? Regra de janela do CLIENTE — a RPC de gravação
+ * (app_enfileirar_audio) NÃO valida horário (só a de chamada valida), então a
+ * trava é aqui: grava-se a partir do momento em que a aula começa até 24h depois
+ * (mesma janela da chamada), exceto se todo mundo faltou (Alma: sem conteúdo).
+ *  · 'futura'  → nada aconteceu ainda, nada pra registrar;
+ *  · 'faltaram'→ ninguém veio, não há conteúdo;
+ *  · 'perdida' → passou das 24h, é assunto da coordenação.
+ */
+export function podeGravar(s: SessaoAula, now: Date = new Date()): boolean {
+  const st = statusSessao(s, now)
+  return st === 'agora' || st === 'pendente' || st === 'chamada_feita'
+}
+
 // ---------------------------------------------------------------------------
 // Textos
 // ---------------------------------------------------------------------------
