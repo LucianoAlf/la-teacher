@@ -50,7 +50,7 @@ export default function HomePage() {
           <FabioCard tag="em breve">
             <p>Seu copiloto chega no próximo sprint 🎙️</p>
             <p className="text-text-secondary">
-              Aqui vão entrar o briefing pré-aula e os toques sobre cada aluno — direto da cabeça do Fábio.
+              Aqui vão entrar o briefing pré-aula e os toques sobre cada aluno.
             </p>
           </FabioCard>
         </div>
