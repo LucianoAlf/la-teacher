@@ -7,6 +7,8 @@ import './styles/tailwind.css'
 import { router } from './routes'
 import { AuthProvider } from './lib/auth'
 import { ThemeProvider, aplicarTemaInicial } from './lib/theme'
+// Efeito de boot: captura o beforeinstallprompt cedo (antes de qualquer tela).
+import './features/pwa/installState'
 
 // aplica o tema salvo antes do primeiro render (sem flash, vale em toda rota)
 aplicarTemaInicial()
