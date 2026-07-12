@@ -74,7 +74,7 @@ export default function HomePage() {
         {/* 4 · Chamadas pendentes de ontem */}
         <PendenciasCard onAbrir={abrirChamada} onGravar={gravarAula} />
 
-        {/* 5 · Meu dia (atalho pra semana) */}
+        {/* 5 · Minha semana (isca: o que já foi dado hoje) */}
         <PontoHojeCard onAbrir={() => navigate('/app/ponto')} />
       </div>
 
@@ -129,7 +129,10 @@ function AguardandoConfirmacao({ onAbrir }: { onAbrir: (registroId: string) => v
   )
 }
 
-/** Hoje até agora: o que o professor já deu — atalho pra semana completa. */
+/**
+ * Atalho pra "Minha semana": mostra hoje (o que já foi dado) como isca, mas o
+ * título casa com o destino — evita abrir "Meu dia" e cair numa tela de semana.
+ */
 function PontoHojeCard({ onAbrir }: { onAbrir: () => void }) {
   // undefined = ainda carregando; null = carregou e não tem aula hoje.
   const [dia, setDia] = useState<PontoDia | null | undefined>(undefined)
@@ -155,7 +158,7 @@ function PontoHojeCard({ onAbrir }: { onAbrir: () => void }) {
         <i className="fa-solid fa-calendar-check" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <b className="block text-sm">Meu dia</b>
+        <b className="block text-sm">Minha semana</b>
         <span className="block truncate text-xs text-text-secondary">
           {dia === undefined
             ? 'suas aulas dadas hoje'
