@@ -182,9 +182,8 @@ function Gravador({ aulaId }: { aulaId: number }) {
         <div className="mx-4 mt-2 flex items-start gap-2 rounded-md border border-border-subtle bg-warning-soft px-3 py-[10px] text-[12.5px] leading-relaxed text-warning-text">
           <i className="fa-solid fa-triangle-exclamation mt-[2px]" aria-hidden="true" />
           <span>
-            Esta aula <b>já tem relatório do Fábio</b>. Gravar e confirmar de novo <b>substitui</b> o anterior —
-            regrave só se for pra refazer mesmo. Pra ajustar sem apagar, use <b>“Corrigir por voz”</b> na tela de
-            confirmação.
+            Esta aula <b>já tem relatório do Fábio</b>. Se gravar de novo, na hora de confirmar eu te pergunto:{' '}
+            <b>complementar</b> (anexa) ou <b>substituir</b> (troca). <b>Nada é apagado sem você escolher.</b> ✋
           </span>
         </div>
       )}

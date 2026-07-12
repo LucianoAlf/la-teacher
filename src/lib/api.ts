@@ -161,7 +161,10 @@ export async function confirmarRegistro(
     p_modo: modo,
   })
   if (error) {
-    if (error.message.includes(ERRO_ESCOLHA_MODO)) throw new ErroEscolhaModo()
+    // A trava pode chegar no message, code, details ou hint — depende de como o
+    // PostgREST embrulha o RAISE. Checa todos pra não cair no toast genérico.
+    const bruto = [error.message, error.code, error.details, error.hint].filter(Boolean).join(' ')
+    if (bruto.includes(ERRO_ESCOLHA_MODO)) throw new ErroEscolhaModo()
     throw error
   }
   return res as unknown as ConfirmacaoResultado
