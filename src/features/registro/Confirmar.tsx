@@ -205,7 +205,7 @@ export default function ConfirmarPage() {
             </b>
             <ul className="list-inside list-disc text-text-secondary">
               {pendencias.map((p) => {
-                const nome = (fatias.find((f) => f.id === p.fatia_id)?.campos.aluno_nome as string) ?? 'Aluno'
+                const nome = (fatias.find((f) => f.id === p.fatia_id)?.aluno_nome as string | null) ?? 'Aluno'
                 return (
                   <li key={p.fatia_id}>
                     {nome}: {p.motivo === 'sem texto' ? 'sem conteúdo pra gravar' : p.motivo}
@@ -277,14 +277,19 @@ export default function ConfirmarPage() {
         )}
         <div className="mx-4 space-y-[9px]">
           {fatias.map((f) => {
-            const nome = (f.campos.aluno_nome as string) ?? 'Aluno'
+            // Nome completo no header (controle de qualidade do fatiamento — o
+            // professor precisa ver de quem é a fatia); primeiro nome + foto nas
+            // cutucadas e no avatar. Tudo vem da RPC por fatia (não de campos).
+            const nomeCompleto = (f.aluno_nome as string | null) ?? 'Aluno'
+            const primeiro = (f.aluno_primeiro_nome as string | null) ?? nomeCompleto
+            const foto = (f.aluno_foto_url as string | null) ?? null
             const ausente = presencaDaFatia(f) === 'ausente'
             return (
               <div key={f.id} className={cx(ausente && 'opacity-60')}>
-                <Fatia nome={nome} presenca={ausente ? 'faltou' : 'presente'} defaultOpen={!ausente}>
+                <Fatia nome={nomeCompleto} fotoUrl={foto} presenca={ausente ? 'faltou' : 'presente'} defaultOpen={!ausente}>
                   {ausente ? (
                     <p className="px-[14px] py-[11px] text-sm text-text-secondary">
-                      Ausente — nada será gravado pra {nome}. Nada foi inventado. ✋
+                      Ausente — nada será gravado pra {primeiro}. Nada foi inventado. ✋
                     </p>
                   ) : (
                     <>
@@ -292,21 +297,21 @@ export default function ConfirmarPage() {
                         label="Progresso"
                         icon="fa-solid fa-arrow-trend-up"
                         value={(f.campos.progresso as string | null) ?? null}
-                        cutucada={`Não ouvi o progresso de ${nome} no áudio — toque pra completar (eu nunca invento ✋)`}
+                        cutucada={`Não ouvi o progresso de ${primeiro} no áudio — toque pra completar (eu nunca invento ✋)`}
                         onSave={(v) => void salvarCampoFatia(f.id, 'progresso', v)}
                       />
                       <CampoEditavel
                         label="Próximo passo"
                         icon="fa-solid fa-route"
                         value={(f.campos.proximo_passo as string | null) ?? null}
-                        cutucada={`Quer adicionar um próximo passo pra ${nome}? (opcional)`}
+                        cutucada={`Quer adicionar um próximo passo pra ${primeiro}? (opcional)`}
                         onSave={(v) => void salvarCampoFatia(f.id, 'proximo_passo', v)}
                       />
                       <CampoEditavel
                         label="Observação"
                         icon="fa-solid fa-eye"
                         value={(f.campos.observacao as string | null) ?? null}
-                        cutucada={`Alguma observação sobre ${nome}? (opcional)`}
+                        cutucada={`Alguma observação sobre ${primeiro}? (opcional)`}
                         onSave={(v) => void salvarCampoFatia(f.id, 'observacao', v)}
                       />
                     </>
@@ -345,7 +350,7 @@ export default function ConfirmarPage() {
                 presentes.map((f) => (
                   <div key={f.id} className="rounded-md border border-border-subtle bg-bg-inset px-3 py-[10px]">
                     <div className="mb-1 text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
-                      aula do(a) {(f.campos.aluno_nome as string) ?? 'aluno'}
+                      aula do(a) {(f.aluno_nome as string | null) ?? 'aluno'}
                     </div>
                     <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-text-primary">
                       {textoFatia(aula, tronco.campos, f.campos)}

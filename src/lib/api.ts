@@ -162,6 +162,16 @@ export interface RegistroRow {
   status: string
   origem: string
   criado_em: string
+  /**
+   * Enriquecimento POR FATIA (app_registro_completo) — nome e foto do aluno.
+   * É o controle de qualidade humano do fatiamento: sem o nome na tela o
+   * professor não percebe se o Fábio trocou os alunos. Ausente no tronco.
+   */
+  aluno_nome?: string | null
+  aluno_primeiro_nome?: string | null
+  aluno_foto_url?: string | null
+  /** Aula individual paralela do aluno — onde a fatia dele é gravada. */
+  aula_id_alvo?: number | null
   [k: string]: unknown
 }
 

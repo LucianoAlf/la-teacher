@@ -7,6 +7,8 @@ export interface FatiaProps {
   nome: string
   /** Inicial do avatar (default: primeira letra do nome). */
   inicial?: string
+  /** Foto do aluno — quando presente, vira o avatar (fallback: inicial). */
+  fotoUrl?: string | null
   presenca?: 'presente' | 'faltou'
   defaultOpen?: boolean
   /** Corpo do accordion — FieldCards, sugestões etc. */
@@ -14,7 +16,7 @@ export interface FatiaProps {
 }
 
 /** Accordion por aluno da tela de Confirmação (protótipo .fatia). */
-export function Fatia({ nome, inicial, presenca = 'presente', defaultOpen = false, children }: FatiaProps) {
+export function Fatia({ nome, inicial, fotoUrl, presenca = 'presente', defaultOpen = false, children }: FatiaProps) {
   const [open, setOpen] = useState(defaultOpen)
   const faltou = presenca === 'faltou'
 
@@ -26,14 +28,25 @@ export function Fatia({ nome, inicial, presenca = 'presente', defaultOpen = fals
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
-        <span
-          className={cx(
-            'flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full text-[13px] font-extrabold',
-            faltou ? 'bg-danger-soft text-danger-text' : 'bg-brand-soft text-brand-text',
-          )}
-        >
-          {inicial ?? nome.charAt(0).toUpperCase()}
-        </span>
+        {fotoUrl ? (
+          <img
+            src={fotoUrl}
+            alt=""
+            className="h-[34px] w-[34px] flex-none rounded-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        ) : (
+          <span
+            className={cx(
+              'flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full text-[13px] font-extrabold',
+              faltou ? 'bg-danger-soft text-danger-text' : 'bg-brand-soft text-brand-text',
+            )}
+          >
+            {inicial ?? nome.charAt(0).toUpperCase()}
+          </span>
+        )}
         <b className="flex-1 text-[14.5px]">{nome}</b>
         <Badge variant={faltou ? 'danger' : 'ok'}>{presenca}</Badge>
         <i
