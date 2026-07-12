@@ -29,7 +29,7 @@ export default function AgendaPage() {
     <AppFrame>
       <AppHeader />
 
-      <div className="flex-1 overflow-y-auto pb-24">
+      <div className="flex-1 overflow-y-auto pb-[calc(96px_+_env(safe-area-inset-bottom))]">
         <SemanaStrip dias={dias} contagem={contagem} selecionado={data} onSelect={setData} />
 
         <div className="mx-4 mb-2 overflow-hidden rounded-lg border border-border-subtle bg-bg-surface">

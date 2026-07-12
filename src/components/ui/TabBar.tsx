@@ -23,7 +23,7 @@ export function TabBar({ items, activeId, onSelect, fabGap = true }: TabBarProps
   const gapAfter = fabGap ? Math.ceil(items.length / 2) - 1 : -1
 
   return (
-    <nav className="absolute inset-x-0 bottom-0 z-40 flex h-[72px] items-stretch border-t border-border-subtle bg-bg-surface pb-[env(safe-area-inset-bottom)]">
+    <nav className="absolute inset-x-0 bottom-0 z-40 flex h-[calc(72px_+_env(safe-area-inset-bottom))] items-stretch border-t border-border-subtle bg-bg-surface pb-[env(safe-area-inset-bottom)]">
       {items.map((item, i) => (
         <Fragment key={item.id}>
           <button

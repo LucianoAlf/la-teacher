@@ -32,7 +32,7 @@ export default function AlunosPage() {
     <AppFrame>
       <AppHeader />
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-1">
+      <div className="flex-1 overflow-y-auto px-4 pb-[calc(96px_+_env(safe-area-inset-bottom))] pt-1">
         {/* Busca */}
         <div className="relative mb-3">
           <i
