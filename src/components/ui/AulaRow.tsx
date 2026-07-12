@@ -40,7 +40,7 @@ export function AulaRow({ hora, titulo, detalhe, badge, status, action, onClick 
       </span>
       <div className="min-w-0 flex-1">
         <b className="block truncate text-sm font-semibold">{titulo}</b>
-        {detalhe && <span className="text-xs text-text-secondary">{detalhe}</span>}
+        {detalhe && <span className="block truncate text-xs text-text-secondary">{detalhe}</span>}
       </div>
       {badge}
       {action

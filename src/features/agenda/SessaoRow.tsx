@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { SessaoAula } from '../../lib/api'
-import { AulaRow, Badge, type AulaStatus } from '../../components/ui'
+import { AulaRow, Badge } from '../../components/ui'
 import { cx } from '../../lib/cx'
 import { aulaRegistrada, horaSessao, podeGravar, statusSessao, subtituloSessao, tituloSessao } from './sessao'
 
@@ -13,50 +13,59 @@ interface Props {
   onGravar?: (sessao: SessaoAula) => void
 }
 
-/** Uma SESSÃO = uma linha: turma agrupada com nomes, individual com a pessoa. */
+/**
+ * Uma SESSÃO = uma linha. Mostra DOIS estados no mesmo peso visual, lidos de
+ * relance sem tocar: CHAMADA (operacional, reversível) e REGISTRO (o prontuário
+ * do aluno — o que o professor pode destruir sem querer, então grita igual).
+ * Verde = feito, âmbar = falta. Só a partir do momento em que a aula começa.
+ */
 export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props) {
   const status = statusSessao(sessao, now)
   const parcial = sessao.n_registradas > 0 && sessao.n_registradas < sessao.n_alunos
   const mostrarGravar = onGravar != null && podeGravar(sessao, now)
   const registrada = aulaRegistrada(sessao)
+  const comecou = status !== 'futura'
 
-  let dot: AulaStatus | undefined
-  let badge: ReactNode
-
+  // Estado da CHAMADA
+  let chamadaBadge: ReactNode
   if (status === 'chamada_feita') {
-    dot = 'ok'
-    badge = (
+    chamadaBadge = (
       <Badge variant="ok" icon="fa-solid fa-check">
-        Chamada feita
-      </Badge>
-    )
-  } else if (status === 'agora') {
-    dot = 'now'
-    badge = (
-      <Badge variant="brand" icon="fa-solid fa-list-check">
-        Fazer chamada
-      </Badge>
-    )
-  } else if (status === 'pendente') {
-    badge = (
-      <Badge variant="warn" icon="fa-solid fa-clock">
-        {parcial ? `${sessao.n_registradas} de ${sessao.n_alunos}` : 'Sem chamada'}
-      </Badge>
-    )
-  } else if (status === 'perdida') {
-    badge = (
-      <Badge variant="info" icon="fa-solid fa-lock">
-        Janela encerrada
+        Chamada
       </Badge>
     )
   } else if (status === 'faltaram') {
-    badge = (
+    chamadaBadge = (
       <Badge variant="danger" icon="fa-solid fa-user-xmark">
         {sessao.n_alunos > 1 ? 'Faltaram' : 'Faltou'}
       </Badge>
     )
-  } else {
-    dot = 'next'
+  } else if (status === 'perdida') {
+    chamadaBadge = (
+      <Badge variant="info" icon="fa-solid fa-lock">
+        Encerrada
+      </Badge>
+    )
+  } else if (comecou) {
+    chamadaBadge = (
+      <Badge variant="warn" icon="fa-solid fa-clock">
+        {parcial ? `${sessao.n_registradas} de ${sessao.n_alunos}` : 'Sem chamada'}
+      </Badge>
+    )
+  }
+
+  // Estado do REGISTRO (prontuário) — não se aplica quando todos faltaram (sem conteúdo).
+  let registroBadge: ReactNode
+  if (comecou && status !== 'faltaram') {
+    registroBadge = registrada ? (
+      <Badge variant="ok" icon="fa-solid fa-clipboard-check">
+        Registrada
+      </Badge>
+    ) : (
+      <Badge variant="warn" icon="fa-solid fa-microphone">
+        Sem registro
+      </Badge>
+    )
   }
 
   return (
@@ -65,22 +74,14 @@ export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props
       titulo={tituloSessao(sessao)}
       detalhe={subtituloSessao(sessao)}
       badge={
-        registrada ? (
-          <span className="flex items-center gap-1.5">
-            {badge}
-            <span
-              className="flex h-[26px] flex-none items-center gap-1 rounded-full bg-brand-soft px-2 text-[11px] font-semibold text-brand-text"
-              title="Esta aula já tem relatório do Fábio"
-              aria-label="Aula já registrada pelo Fábio"
-            >
-              <i className="fa-solid fa-clipboard-check text-[11px]" aria-hidden="true" />
-            </span>
+        chamadaBadge || registroBadge ? (
+          <span className="flex flex-none flex-col items-end gap-1">
+            {chamadaBadge}
+            {registroBadge}
           </span>
-        ) : (
-          badge
-        )
+        ) : undefined
       }
-      status={dot}
+      status={status === 'futura' ? 'next' : undefined}
       action={
         mostrarGravar ? (
           <button
