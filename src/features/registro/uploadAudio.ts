@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase'
-import { enfileirarAudio } from '../../lib/api'
+import { enfileirarAudio, ErroGravacaoConhecido, type ErroGravacao } from '../../lib/api'
 import { extensaoDoMime } from './useRecorder'
 import { listarFila, removerDaFila, salvarNaFila } from './filaOffline'
 
@@ -18,6 +18,8 @@ export interface DadosEnvio {
 export type ResultadoEnvio =
   | { ok: true; audioId: string }
   | { ok: false; guardadoOffline: boolean }
+  /** Erro de validação (aula fora da janela etc.) — permanente, não foi pra fila. */
+  | { ok: false; erroGravacao: ErroGravacao }
 
 /**
  * Sobe o áudio pro bucket `fabio-audios` e enfileira via app_enfileirar_audio.
@@ -29,7 +31,12 @@ export async function enviarAudio(dados: DadosEnvio): Promise<ResultadoEnvio> {
   try {
     const audioId = await subirEEnfileirar(dados)
     return { ok: true, audioId }
-  } catch {
+  } catch (e) {
+    // Erro de validação (fora da janela, aula não é dele…) é PERMANENTE:
+    // não guarda offline — re-tentar nunca vai passar. Mostra o motivo.
+    if (e instanceof ErroGravacaoConhecido) {
+      return { ok: false, erroGravacao: e.codigo }
+    }
     try {
       await salvarNaFila({
         id: `${dados.aulaId}-${Date.now()}`,
@@ -89,7 +96,13 @@ export async function esvaziarFilaLocal(): Promise<number> {
         })
         await removerDaFila(item.id)
         enviados++
-      } catch {
+      } catch (e) {
+        // Validação permanente (ex.: janela fechou enquanto estava offline):
+        // descarta o item — re-tentar nunca vai passar e travaria a fila.
+        if (e instanceof ErroGravacaoConhecido) {
+          await removerDaFila(item.id)
+          continue
+        }
         break // ainda sem rede — tenta de novo no próximo 'online'
       }
     }

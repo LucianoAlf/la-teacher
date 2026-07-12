@@ -356,9 +356,33 @@ export interface EnfileirarResultado {
 }
 
 /**
+ * Erros de VALIDAÇÃO que a RPC de gravação levanta (message do PostgREST).
+ * São permanentes (não adianta re-tentar): aula não é do professor, cancelada,
+ * fora da janela. Mesma régua da chamada — desde 11/07 a RPC valida de verdade.
+ */
+export const ERROS_GRAVACAO = [
+  'aula_nao_pertence_ao_professor',
+  'aula_cancelada',
+  'gravacao_ainda_nao_disponivel',
+  'janela_de_gravacao_encerrada',
+] as const
+export type ErroGravacao = (typeof ERROS_GRAVACAO)[number]
+
+/** Erro de validação conhecido da gravação — permanente, NÃO vai pra fila offline. */
+export class ErroGravacaoConhecido extends Error {
+  readonly codigo: ErroGravacao
+  constructor(codigo: ErroGravacao) {
+    super(codigo)
+    this.name = 'ErroGravacaoConhecido'
+    this.codigo = codigo
+  }
+}
+
+/**
  * Enfileira um áudio gravado (fabio_fila_audios) para o Fábio processar.
  * A RPC resolve professor e unidade via auth.uid(); `registroId` não nulo
- * marca correção por voz (modo complementar). LANÇA exceção em erro.
+ * marca correção por voz (modo complementar). Levanta `ErroGravacaoConhecido`
+ * nos erros de validação (aula fora da janela etc.) e o erro cru no resto.
  */
 export async function enfileirarAudio(
   aulaId: number,
@@ -372,6 +396,10 @@ export async function enfileirarAudio(
     p_duracao_segundos: duracaoSegundos,
     ...(registroId ? { p_registro_id: registroId } : {}),
   })
-  if (error) throw error
+  if (error) {
+    const conhecido = ERROS_GRAVACAO.find((c) => error.message.includes(c))
+    if (conhecido) throw new ErroGravacaoConhecido(conhecido)
+    throw error
+  }
   return res as unknown as EnfileirarResultado
 }

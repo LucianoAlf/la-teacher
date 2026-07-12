@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AudioPlayer, Badge, Button, Card, EmptyState, ScreenHeader, Skeleton } from '../../components/ui'
-import type { SessaoAula } from '../../lib/api'
+import type { ErroGravacao, SessaoAula } from '../../lib/api'
 import { hojeBRT } from '../../lib/date'
-import { horaSessao, statusSessao, subtituloSessao, tituloSessao } from '../agenda/sessao'
+import { horaSessao, podeGravar, subtituloSessao, tituloSessao } from '../agenda/sessao'
 import { SessaoRow } from '../agenda/SessaoRow'
 import { useSessoes } from '../agenda/useSessoes'
 import { AppFrame } from '../../pages/app/AppFrame'
@@ -30,8 +30,9 @@ export default function GravarAulaPage() {
 function EscolherAula() {
   const navigate = useNavigate()
   const { estado } = useSessoes(hojeBRT())
-  // aula onde todo mundo faltou não recebe conteúdo (Alma); o resto pode gravar
-  const sessoes = estado.fase === 'ok' ? estado.sessoes.filter((s) => statusSessao(s) !== 'faltaram') : []
+  // Só as aulas na janela de gravação (mesma régua do mic na linha e da RPC):
+  // começou, dentro de 24h, e não é aula onde todo mundo faltou (Alma).
+  const sessoes = estado.fase === 'ok' ? estado.sessoes.filter((s) => podeGravar(s)) : []
 
   return (
     <AppFrame>
@@ -83,7 +84,31 @@ function EscolherAula() {
 // Gravador
 // ---------------------------------------------------------------------------
 
-type FaseEnvio = 'nao_enviado' | 'enviando' | 'fila_offline' | 'erro_envio' | 'somente_leitura'
+type FaseEnvio = 'nao_enviado' | 'enviando' | 'fila_offline' | 'erro_envio' | 'erro_gravacao' | 'somente_leitura'
+
+/** Mensagens amigáveis pros erros de validação da RPC de gravação. */
+const MSG_GRAVACAO: Record<ErroGravacao, { icon: string; title: string; desc: string }> = {
+  aula_nao_pertence_ao_professor: {
+    icon: 'fa-solid fa-user-slash',
+    title: 'Essa aula não é sua',
+    desc: 'Só dá pra registrar aulas da sua agenda. Se acha que é engano, fala com a coordenação.',
+  },
+  aula_cancelada: {
+    icon: 'fa-solid fa-ban',
+    title: 'Aula cancelada',
+    desc: 'Essa aula foi cancelada — não dá pra registrar.',
+  },
+  gravacao_ainda_nao_disponivel: {
+    icon: 'fa-solid fa-clock',
+    title: 'Ainda não abriu',
+    desc: 'A gravação abre 15 minutos antes da aula começar. Volta um pouco antes do horário.',
+  },
+  janela_de_gravacao_encerrada: {
+    icon: 'fa-solid fa-lock',
+    title: 'Janela encerrada',
+    desc: 'A gravação fecha 24h depois da aula. Depois disso, o registro é com a coordenação.',
+  },
+}
 
 function Gravador({ aulaId }: { aulaId: number }) {
   const navigate = useNavigate()
@@ -94,6 +119,7 @@ function Gravador({ aulaId }: { aulaId: number }) {
   const sessao = state?.sessao
   const rec = useRecorder()
   const [envio, setEnvio] = useState<FaseEnvio>('nao_enviado')
+  const [erroGrav, setErroGrav] = useState<ErroGravacao | null>(null)
 
   const titulo = sessao ? tituloSessao(sessao) : `Aula #${aulaId}`
   const sub = sessao ? [subtituloSessao(sessao), horaSessao(sessao)].filter(Boolean).join(' · ') : undefined
@@ -117,6 +143,9 @@ function Gravador({ aulaId }: { aulaId: number }) {
     })
     if (r.ok) {
       navigate(`/app/processando/${r.audioId}`, { state: { aulaLabel: titulo } })
+    } else if ('erroGravacao' in r) {
+      setErroGrav(r.erroGravacao)
+      setEnvio('erro_gravacao')
     } else {
       setEnvio(r.guardadoOffline ? 'fila_offline' : 'erro_envio')
     }
@@ -281,6 +310,19 @@ function Gravador({ aulaId }: { aulaId: number }) {
             action={
               <Button size="sm" onClick={() => void enviar()}>
                 <i className="fa-solid fa-rotate-right" aria-hidden="true" /> Tentar de novo
+              </Button>
+            }
+          />
+        )}
+
+        {envio === 'erro_gravacao' && erroGrav && (
+          <EmptyState
+            icon={MSG_GRAVACAO[erroGrav].icon}
+            title={MSG_GRAVACAO[erroGrav].title}
+            description={MSG_GRAVACAO[erroGrav].desc}
+            action={
+              <Button size="sm" variant="ghost" onClick={() => navigate('/app')}>
+                Voltar ao início
               </Button>
             }
           />
