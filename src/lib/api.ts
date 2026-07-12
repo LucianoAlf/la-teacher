@@ -479,9 +479,10 @@ export async function enfileirarAudio(
     p_aula_id: aulaId,
     p_storage_path: storagePath,
     p_duracao_segundos: duracaoSegundos,
-    // A RPC perdeu o DEFAULT NULL nos parâmetros — todos são obrigatórios agora.
-    // Sempre mandar a chave (null quando NÃO é correção por voz); cast porque o
-    // tipo gerado marca p_registro_id como string.
+    // Mando p_registro_id SEMPRE (null quando não é correção por voz), por
+    // robustez: funciona com ou sem o DEFAULT NULL da RPC — se o banco perder
+    // o default de novo, a gravação não quebra. Cast porque o tipo gerado
+    // (db.ts) marca o campo como string.
     p_registro_id: registroId as unknown as string,
   })
   if (error) {
