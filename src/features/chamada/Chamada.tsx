@@ -151,12 +151,14 @@ function LinhaAluno({
       </span>
       <span className="min-w-0 flex-1 truncate text-sm font-semibold">{aluno.nome}</span>
       {modo === 'interativa' ? (
+        // CONTORNO: pré-marcado, ainda NÃO enviado. O preenchido (verde/vermelho
+        // sólido) fica reservado pro estado já gravado no banco (modo leitura).
         ausente ? (
-          <Badge variant="danger" icon="fa-solid fa-user-xmark">
+          <Badge variant="warn" outline icon="fa-solid fa-user-xmark">
             Faltou
           </Badge>
         ) : (
-          <Badge variant="ok" icon="fa-solid fa-check">
+          <Badge variant="ok" outline icon="fa-solid fa-check">
             Presente
           </Badge>
         )
@@ -257,6 +259,16 @@ function Conteudo({ sessao, onRecarregar }: { sessao: SessaoAula; onRecarregar: 
   return (
     <div className="flex flex-1 flex-col">
       <ContextoAula sessao={sessao} />
+
+      {/* Estado da chamada: PENDENTE (âmbar) enquanto o professor não envia. O
+          "feito" (verde) só aparece DEPOIS de enviada — evita o professor ver
+          tudo verde, achar que gravou, e sair sem enviar (Emusys vira falta). */}
+      {interativa && (
+        <div className="mx-4 mb-3 flex items-center gap-2 rounded-md border border-border-subtle bg-warning-soft px-3 py-[10px] text-[12.5px] font-bold text-warning-text">
+          <i className="fa-solid fa-clock" aria-hidden="true" />
+          Chamada ainda não enviada — marque quem faltou e toque em Enviar chamada.
+        </div>
+      )}
 
       {/* Avisos de estado (sempre honestos, nunca tela branca) */}
       {SOMENTE_LEITURA && !enviada && (
