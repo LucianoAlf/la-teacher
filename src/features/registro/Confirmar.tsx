@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Badge, Button, EmptyState, Fatia, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
+import { Badge, Button, EmptyState, FabioMark, Fatia, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
 import {
   atualizarFatia,
   confirmarRegistro,
@@ -210,7 +210,7 @@ export default function ConfirmarPage() {
       <div className="flex-1 overflow-y-auto pb-36">
         {/* selo do Fábio */}
         <div className="mx-4 mb-3 flex items-center gap-2 rounded-md border border-[color:var(--brand-border)] bg-brand-soft px-3 py-2 text-[12px] font-semibold text-brand-text">
-          <i className="fa-solid fa-robot" aria-hidden="true" />
+          <FabioMark className="h-[17px] w-[17px] flex-none" knockout="var(--brand-soft)" />
           Fábio organizou seu áudio — confira e confirme. Eu nunca invento: campo vazio é convite ✋
         </div>
 

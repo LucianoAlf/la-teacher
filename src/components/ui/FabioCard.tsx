@@ -1,5 +1,12 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { cx } from '../../lib/cx'
+import { FabioIcon } from './FabioIcon'
+
+/** Fábio branco na bolota teal (mesma linguagem do herói do nav). */
+const FABIO_TEAL: CSSProperties = {
+  '--fabio-fill': 'var(--fabio-hero-fill)',
+  '--fabio-traco': 'var(--fabio-hero-traco)',
+} as CSSProperties
 
 export interface FabioCardProps {
   title?: string
@@ -19,8 +26,8 @@ export function FabioCard({ title = 'Briefing do Fábio', tag, className, childr
       )}
     >
       <div className="mb-2 flex items-center gap-[9px]">
-        <div className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-brand text-[13px] text-on-brand">
-          <i className="fa-solid fa-robot" aria-hidden="true" />
+        <div className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-brand">
+          <FabioIcon className="h-[19px] w-[19px]" style={FABIO_TEAL} />
         </div>
         <b className="text-[13.5px]">{title}</b>
         {tag && (

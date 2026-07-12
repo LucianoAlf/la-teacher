@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
-import { Button } from '../../components/ui'
+import { Button, FabioAvatar } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { isSemVinculo, minhaAgendaSessao } from '../../lib/api'
 import { iniciarSincronizacaoFila } from '../../features/registro/uploadAudio'
@@ -14,9 +14,7 @@ function Carregando() {
   return (
     <AppFrame>
       <div className="flex flex-1 flex-col items-center justify-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-soft text-2xl text-brand-text">
-          <i className="fa-solid fa-robot fa-bounce" aria-hidden="true" />
-        </div>
+        <FabioAvatar className="h-[84px] w-[84px] animate-bob" alt="Fábio" />
         <p className="text-[13px] text-text-secondary">Preparando seu dia…</p>
       </div>
     </AppFrame>

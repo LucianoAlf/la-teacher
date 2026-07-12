@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, EmptyState, FabioCard, Skeleton, Toast, useToast } from '../../components/ui'
+import { Card, EmptyState, FabioCard, FabioMark, Skeleton, Toast, useToast } from '../../components/ui'
 import { AppHeader } from './AppHeader'
 import { formatDiaCurto, hojeBRT } from '../../lib/date'
 import { meuPonto, registrosPendentes, type PontoDia, type RegistroRow, type SessaoAula } from '../../lib/api'
@@ -79,7 +79,7 @@ export default function HomePage() {
       </div>
 
       <AppNav
-        onFabio={() => show('Chat com o Fábio chega no Sprint 4 🤖')}
+        onFabio={() => show('Chat com o Fábio chega no Sprint 4 🎸')}
         onMais={() => show('Mais ferramentas chegam em breve 🧰')}
       />
       <Toast message={message} visible={visible} />
@@ -117,7 +117,7 @@ function AguardandoConfirmacao({ onAbrir }: { onAbrir: (registroId: string) => v
           className="flex w-full items-center gap-2 border-t border-border-subtle bg-transparent px-3 py-[10px] text-left"
           onClick={() => onAbrir(r.id)}
         >
-          <i className="fa-solid fa-robot text-brand-text" aria-hidden="true" />
+          <FabioMark className="h-[18px] w-[18px] flex-none" />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">
             {(r.campos.turma as string) ?? 'Registro de aula'}
           </span>

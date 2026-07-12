@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Button, ScreenHeader } from '../../components/ui'
+import { Button, FabioAvatar, ScreenHeader } from '../../components/ui'
 import { registrosPendentes, statusAudioFila, type StatusFila } from '../../lib/api'
 import { cx } from '../../lib/cx'
 import { AppFrame } from '../../pages/app/AppFrame'
@@ -84,9 +84,7 @@ export default function ProcessandoPage() {
       <ScreenHeader title="Áudio enviado ✓" subtitle={state?.aulaLabel} onBack={() => navigate('/app')} />
 
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
-        <div className="flex h-[84px] w-[84px] animate-bob items-center justify-center rounded-full border border-[color:var(--brand-border)] bg-brand-soft text-3xl text-brand-text">
-          <i className="fa-solid fa-robot" aria-hidden="true" />
-        </div>
+        <FabioAvatar className="h-[112px] w-[112px] animate-bob" alt="Fábio" />
 
         <div>
           <b className="block text-lg">O Fábio está montando seu relatório… 🎼</b>
