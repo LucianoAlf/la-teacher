@@ -121,6 +121,16 @@ export function chamadaCompleta(s: SessaoAula): boolean {
   return s.alunos.length > 0 && s.alunos.every((a) => a.tem_presenca_registrada)
 }
 
+/**
+ * true = a aula já tem RELATÓRIO do Fábio (anotacoes_fabio) pra algum aluno —
+ * é o `tem_registro` por aluno (relatório, NÃO presença). Gravar de novo em cima
+ * disso substitui em silêncio se o professor não perceber; por isso a UI precisa
+ * mostrar "Registrada" e avisar antes de regravar.
+ */
+export function aulaRegistrada(s: SessaoAula): boolean {
+  return s.alunos.some((a) => a.tem_registro)
+}
+
 /** Janela de chamada da aula (regra espelhada da RPC do banco). */
 export function janelaChamada(s: SessaoAula, now: Date = new Date()): JanelaChamada {
   const inicio = new Date(s.data_hora_inicio).getTime()

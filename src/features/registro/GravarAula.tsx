@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { AudioPlayer, Badge, Button, Card, EmptyState, ScreenHeader, Skeleton } from '../../components/ui'
 import type { ErroGravacao, SessaoAula } from '../../lib/api'
 import { hojeBRT } from '../../lib/date'
-import { horaSessao, podeGravar, subtituloSessao, tituloSessao } from '../agenda/sessao'
+import { aulaRegistrada, horaSessao, podeGravar, subtituloSessao, tituloSessao } from '../agenda/sessao'
 import { SessaoRow } from '../agenda/SessaoRow'
 import { useSessoes } from '../agenda/useSessoes'
 import { AppFrame } from '../../pages/app/AppFrame'
@@ -176,6 +176,17 @@ function Gravador({ aulaId }: { aulaId: number }) {
           <i className="fa-solid fa-circle-info text-brand-text" aria-hidden="true" /> Modo correção: fala só o
           que quer ajustar ou completar — o Fábio faz o merge no registro existente, sem apagar o resto.
         </p>
+      )}
+
+      {sessao && aulaRegistrada(sessao) && !registroCorrecao && (
+        <div className="mx-4 mt-2 flex items-start gap-2 rounded-md border border-border-subtle bg-warning-soft px-3 py-[10px] text-[12.5px] leading-relaxed text-warning-text">
+          <i className="fa-solid fa-triangle-exclamation mt-[2px]" aria-hidden="true" />
+          <span>
+            Esta aula <b>já tem relatório do Fábio</b>. Gravar e confirmar de novo <b>substitui</b> o anterior —
+            regrave só se for pra refazer mesmo. Pra ajustar sem apagar, use <b>“Corrigir por voz”</b> na tela de
+            confirmação.
+          </span>
+        </div>
       )}
 
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-5 text-center">
