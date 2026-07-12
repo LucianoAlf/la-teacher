@@ -111,9 +111,14 @@ export function presencaExibida(a: AlunoSessao): 'presente' | 'faltou' | 'aguard
   return 'aguardando'
 }
 
-/** true quando TODOS os alunos da sessão já têm presença lançada. */
+/**
+ * true quando TODOS os alunos já têm PRESENÇA lançada (chamada feita).
+ * Usa tem_presenca_registrada — NUNCA tem_registro: esse é o relatório do
+ * Fábio (anotacoes_fabio), e gravar o áudio não é dar chamada. Confundir os
+ * dois trancava a tela de chamada depois de gravar (aluno levava falta falsa).
+ */
 export function chamadaCompleta(s: SessaoAula): boolean {
-  return s.alunos.length > 0 && s.alunos.every((a) => a.tem_registro)
+  return s.alunos.length > 0 && s.alunos.every((a) => a.tem_presenca_registrada)
 }
 
 /** Janela de chamada da aula (regra espelhada da RPC do banco). */

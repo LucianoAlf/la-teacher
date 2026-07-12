@@ -28,7 +28,13 @@ export interface AlunoSessao {
   nome: string
   /** Presença lançada. 'a_confirmar' = chamada ainda não feita. */
   presenca: 'presente' | 'falta' | 'a_confirmar'
-  /** true = presença JÁ lançada pra este aluno (não é anotação do Fábio). */
+  /** true = a PRESENÇA deste aluno já foi lançada (chamada feita). Fonte de verdade da chamada. */
+  tem_presenca_registrada: boolean
+  /**
+   * true = existe o RELATÓRIO do Fábio (anotacoes_fabio) desta aula — NÃO é
+   * presença. Gravação e chamada são INDEPENDENTES: nunca use isto pra decidir
+   * "chamada feita" (foi o bug que trancava a chamada depois de gravar o áudio).
+   */
   tem_registro: boolean
   /** Falta justificada pela coordenação (aluno_presenca_administrativo). */
   justificada: boolean
