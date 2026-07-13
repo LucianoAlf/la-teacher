@@ -14,7 +14,7 @@ import { hojeBRT } from '../../lib/date'
 import { cx } from '../../lib/cx'
 import { AppFrame } from './AppFrame'
 import { useSessoes } from '../../features/agenda/useSessoes'
-import { horaSessao, podeGravar, tituloSessao } from '../../features/agenda/sessao'
+import { horaSessao, podeGravar, statusSessao, tituloSessao } from '../../features/agenda/sessao'
 
 type Estado =
   | { fase: 'carregando' }
@@ -93,6 +93,7 @@ export default function AlunoDetalhePage() {
         {estado.fase === 'ok' && (
           <FichaConteudo
             ficha={estado.ficha}
+            alunoId={idNum}
             sessaoCarregando={estadoSessoes.fase === 'carregando'}
             sessaoGravavel={sessaoGravavel}
             onGravar={(s) => navigate(`/app/gravar/${s.aula_id_ancora}`, { state: { sessao: s } })}
@@ -106,11 +107,13 @@ export default function AlunoDetalhePage() {
 /** Conteúdo da ficha (os 6 blocos) — separado do carregamento pra ser testável. */
 export function FichaConteudo({
   ficha,
+  alunoId,
   sessaoCarregando,
   sessaoGravavel,
   onGravar,
 }: {
   ficha: AlunoFicha
+  alunoId: number
   sessaoCarregando: boolean
   sessaoGravavel: SessaoAula | null
   onGravar: (s: SessaoAula) => void
@@ -118,7 +121,7 @@ export function FichaConteudo({
   return (
     <div className="flex flex-col gap-4">
       <Identidade perfil={ficha.perfil} />
-      <GravarHoje carregando={sessaoCarregando} sessao={sessaoGravavel} onGravar={onGravar} />
+      <GravarHoje carregando={sessaoCarregando} sessao={sessaoGravavel} alunoId={alunoId} onGravar={onGravar} />
       <Responsaveis lista={ficha.responsaveis} />
       <Jornada jornada={ficha.minha_jornada} outros={ficha.outros_cursos} />
       <Presenca lista={ficha.presenca_recente} />
@@ -241,10 +244,12 @@ function Chip({ children, icon }: { children: ReactNode; icon?: string }) {
 function GravarHoje({
   carregando,
   sessao,
+  alunoId,
   onGravar,
 }: {
   carregando: boolean
   sessao: SessaoAula | null
+  alunoId: number
   onGravar: (s: SessaoAula) => void
 }) {
   if (carregando) {
@@ -257,6 +262,39 @@ function GravarHoje({
   }
 
   if (sessao) {
+    const hora = horaSessao(sessao)
+    const titulo = tituloSessao(sessao)
+    // Relatório do Fábio DESTE aluno (não .some da turma) — é a ficha dele.
+    const registrada = sessao.alunos.find((a) => a.aluno_id === alunoId)?.tem_registro ?? false
+    // 'agora' = entre início e fim de verdade. A janela de gravação fica aberta
+    // 24h, mas isso é PODER gravar, não estar acontecendo — não engana o relógio.
+    const emCurso = statusSessao(sessao) === 'agora'
+
+    // Já registrada → verde, "feito". Não pede gravação; oferece Regravar (que
+    // avisa antes de substituir o relatório — protege o prontuário).
+    if (registrada) {
+      return (
+        <div className="rounded-lg bg-success-soft px-4 py-4">
+          <div className="mb-3 flex items-center gap-[11px]">
+            <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-md bg-success text-base text-on-brand">
+              <i className="fa-solid fa-check" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <b className="block text-sm text-success-text">Aula de hoje registrada</b>
+              <span className="block truncate text-xs text-text-secondary">
+                {[titulo, hora].filter(Boolean).join(' · ')}
+              </span>
+            </div>
+          </div>
+          <Button block variant="ghost" onClick={() => onGravar(sessao)}>
+            <i className="fa-solid fa-microphone" aria-hidden="true" /> Regravar
+          </Button>
+        </div>
+      )
+    }
+
+    // Sem relatório ainda → card de gravação. "Acontecendo agora" SÓ quando está
+    // mesmo em curso; se já terminou (mas dá tempo), diz isso e tranquiliza o prazo.
     return (
       <div className="rounded-lg border border-[color:var(--brand-border)] bg-brand-soft px-4 py-4">
         <div className="mb-3 flex items-center gap-[11px]">
@@ -264,9 +302,9 @@ function GravarHoje({
             <i className="fa-solid fa-microphone" aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <b className="block text-sm">Aula acontecendo agora</b>
+            <b className="block text-sm">{emCurso ? 'Aula acontecendo agora' : `Aula de hoje, ${hora}`}</b>
             <span className="block truncate text-xs text-text-secondary">
-              {[tituloSessao(sessao), horaSessao(sessao)].filter(Boolean).join(' · ')}
+              {emCurso ? [titulo, hora].filter(Boolean).join(' · ') : `Dá pra registrar até amanhã ${hora}`}
             </span>
           </div>
         </div>
