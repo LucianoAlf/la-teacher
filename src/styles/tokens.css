@@ -62,6 +62,9 @@
   --login-watermark:rgba(245,245,245,.05);
   --login-danger:var(--red-400);
   --login-danger-soft:rgba(239,68,68,.12);
+  /* Onboarding/intro na capa dark: teal claro que lê bem sobre o fundo escuro
+     (o --brand-text vira teal-700 no tema claro e sumiria aqui). */
+  --login-accent:var(--teal-300);
 }
 
 /* ---------- 2. TOKENS SEMÂNTICOS — DARK (tema padrão) ---------- */

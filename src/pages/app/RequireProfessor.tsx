@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Outlet } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { Button, FabioAvatar } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { isSemVinculo, minhaAgendaSessao } from '../../lib/api'
+import { introVisto } from '../../features/onboarding/introState'
+import { OnboardingGate } from '../../features/onboarding/OnboardingGate'
 import { iniciarSincronizacaoFila } from '../../features/registro/uploadAudio'
 import { AppFrame } from './AppFrame'
 import VinculoPendentePage from './VinculoPendente'
@@ -60,7 +62,8 @@ export function RequireProfessor() {
   }, [estado])
 
   if (loading) return <Carregando />
-  if (!session) return <Navigate to="/app/login" replace />
+  // Sem sessão: primeira vez no dispositivo vê o intro; quem já viu vai pro login.
+  if (!session) return <Navigate to={introVisto() ? '/app/login' : '/app/intro'} replace />
   if (estado === 'checando') return <Carregando />
   if (estado === 'sem_vinculo') return <VinculoPendentePage />
 
@@ -82,5 +85,6 @@ export function RequireProfessor() {
     )
   }
 
-  return <Outlet />
+  // Vínculo ok → o porteiro do onboarding decide: primeiro acesso ou app normal.
+  return <OnboardingGate />
 }

@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import DesignSystemPage from './pages/dev/DesignSystem'
 import LoginPage from './pages/app/Login'
+import IntroPage from './pages/app/Intro'
 import HomePage from './pages/app/Home'
 import AgendaPage from './pages/app/Agenda'
 import AlunosPage from './pages/app/Alunos'
@@ -21,9 +22,17 @@ function LoginRoute() {
   return <LoginPage />
 }
 
+/** Intro é pré-login: quem já tem sessão não precisa ver — vai direto pro app. */
+function IntroRoute() {
+  const { session, loading } = useAuth()
+  if (!loading && session) return <Navigate to="/app" replace />
+  return <IntroPage />
+}
+
 export const router = createBrowserRouter(
   [
     { path: '/', element: <Navigate to="/app" replace /> },
+    { path: '/app/intro', element: <IntroRoute /> },
     { path: '/app/login', element: <LoginRoute /> },
     {
       // Guard por sessão + vínculo de professor.

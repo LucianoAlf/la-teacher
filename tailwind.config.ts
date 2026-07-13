@@ -40,6 +40,12 @@ export default {
           '0%': { opacity: '1', transform: 'translateY(0) rotate(0)' },
           '100%': { opacity: '0', transform: 'translateY(72vh) rotate(560deg)' },
         },
+        // entrada suave das telas de onboarding (só opacidade + translação)
+        'fade-up': {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-in': { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
       },
       animation: {
         'pulse-soft': 'pulse-soft 1.6s infinite',
@@ -47,6 +53,8 @@ export default {
         bob: 'bob 2.2s ease-in-out infinite',
         pop: 'pop .45s cubic-bezier(.2,1.6,.4,1)',
         fall: 'fall 2.6s ease-in forwards',
+        'fade-up': 'fade-up .5s cubic-bezier(.2,.7,.3,1) both',
+        'fade-in': 'fade-in .4s ease both',
       },
     },
   },

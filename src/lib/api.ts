@@ -552,3 +552,70 @@ export async function enfileirarAudio(
   }
   return res as unknown as EnfileirarResultado
 }
+
+// ---------------------------------------------------------------------------
+// Onboarding do professor (primeiro acesso)
+// ---------------------------------------------------------------------------
+
+export interface MeuOnboarding {
+  professor_id: number
+  primeiro_nome: string
+  /** true quando o professor já passou pelo onboarding (não mostra de novo). */
+  concluido: boolean
+  /** true enquanto o WhatsApp não foi confirmado por ele. */
+  precisa_confirmar_whatsapp: boolean
+  /** número do cadastro pra pré-preencher (pode vir sem 55, sem 9, com máscara). */
+  whatsapp_sugerido: string | null
+  meus_alunos: number
+  meus_cursos: number
+}
+
+// As 3 RPCs de onboarding foram criadas depois da última geração de
+// src/types/db.ts, então ainda não estão no union de nomes tipado. Cast pontual
+// (com bind pra não perder o `this` do client) até o db.ts ser regenerado — o
+// contrato já foi verificado no banco. Remover quando db.ts incluir essas RPCs.
+const rpcOnboarding = supabase.rpc.bind(supabase) as unknown as (
+  fn: string,
+  args?: Record<string, unknown>,
+) => Promise<{
+  data: unknown
+  error: { message?: string; code?: string; details?: string; hint?: string } | null
+}>
+
+/** Estado do onboarding do professor logado (app_meu_onboarding). Read-only. */
+export async function meuOnboarding(): Promise<MeuOnboarding> {
+  const { data: res, error } = await rpcOnboarding('app_meu_onboarding')
+  if (error) throw error
+  return res as unknown as MeuOnboarding
+}
+
+/** Motivo amigável da recusa do confirmar-WhatsApp. */
+export type MotivoErroWhatsapp = 'ja_usado' | 'incompleto'
+export class ErroConfirmarWhatsapp extends Error {
+  constructor(public motivo: MotivoErroWhatsapp) {
+    super(motivo)
+    this.name = 'ErroConfirmarWhatsapp'
+  }
+}
+
+/**
+ * Confirma/corrige o WhatsApp do professor (app_confirmar_meu_whatsapp).
+ * A RPC canoniza qualquer formato (com/sem 55, com/sem 9, com máscara) e grava
+ * 55+DDD+número. Recusa colisão (número já usado por outro professor). LANÇA
+ * ErroConfirmarWhatsapp('ja_usado'|'incompleto') nesses casos; erro cru no resto.
+ */
+export async function confirmarMeuWhatsapp(telefone: string): Promise<void> {
+  const { error } = await rpcOnboarding('app_confirmar_meu_whatsapp', { p_telefone: telefone })
+  if (error) {
+    const bruto = [error.message, error.code, error.details, error.hint].filter(Boolean).join(' ')
+    if (bruto.includes('whatsapp_ja_usado')) throw new ErroConfirmarWhatsapp('ja_usado')
+    if (bruto.includes('whatsapp_incompleto')) throw new ErroConfirmarWhatsapp('incompleto')
+    throw error
+  }
+}
+
+/** Marca o onboarding como concluído (app_concluir_onboarding). Idempotente. */
+export async function concluirOnboarding(): Promise<void> {
+  const { error } = await rpcOnboarding('app_concluir_onboarding')
+  if (error) throw error
+}
