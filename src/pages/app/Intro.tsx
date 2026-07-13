@@ -75,9 +75,21 @@ export default function IntroPage() {
         {/* CTA */}
         <div className="relative z-10 px-7 pb-[calc(28px_+_env(safe-area-inset-bottom))] pt-2">
           {passo < TOTAL - 1 ? (
-            <Button block variant="ghost" onClick={avancar}>
+            // Botão custom com cores FIXAS: a capa é dark independente do tema,
+            // então não dá pra usar o Button ghost (texto segue o tema do aparelho
+            // e some no claro). Contorno + texto claro dos tokens --login-*.
+            <button
+              type="button"
+              onClick={avancar}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md py-[13px] text-[14.5px] font-bold transition-transform duration-75 active:scale-[.97]"
+              style={{
+                border: '1px solid var(--login-input-border)',
+                color: 'var(--login-text)',
+                background: 'transparent',
+              }}
+            >
               Continuar <i className="fa-solid fa-arrow-right" aria-hidden="true" />
-            </Button>
+            </button>
           ) : (
             <Button block onClick={sair}>
               <i className="fa-solid fa-arrow-right-to-bracket" aria-hidden="true" /> Entrar
