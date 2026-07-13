@@ -442,7 +442,59 @@ function Presenca({ lista }: { lista: AlunoFichaPresenca[] }) {
   )
 }
 
+// Registros origem:fabio saem do banco em seções "Rótulo: valor" (uma por
+// linha — Objetivo/Conteúdo/Progresso/Próximo passo/Observação/Repertório/
+// Dever de casa; campos ausentes já vêm podados). Rótulo em destaque + valor
+// embaixo dá o respiro que falta no texto corrido. Legado (origem:emusys) é
+// texto livre e não segue o padrão — cai no parágrafo simples de sempre.
+type BlocoRegistro = { rotulo: string; valor: string } | { paragrafo: string }
+
+function normalizarRotulo(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim()
+}
+
+function parseRegistroFabio(texto: string): BlocoRegistro[] {
+  return texto
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((linha) => {
+      const i = linha.indexOf(':')
+      // sem ":" (ou ele é o 1º caractere) → não casa o padrão, vira parágrafo
+      if (i <= 0) return { paragrafo: linha }
+      return { rotulo: linha.slice(0, i).trim(), valor: linha.slice(i + 1).trim() }
+    })
+}
+
+function ParagrafoRegistro({ texto }: { texto: string }) {
+  return <p className="whitespace-pre-line text-[13px] leading-relaxed text-text-primary">{texto}</p>
+}
+
+function SecaoRegistro({ rotulo, valor }: { rotulo: string; valor: string }) {
+  const dever = normalizarRotulo(rotulo) === 'dever de casa'
+  return (
+    <div className={cx(dever && 'rounded-md bg-warning-soft px-[10px] py-2')}>
+      <b
+        className={cx(
+          'mb-[3px] flex items-center gap-[6px] text-[11px] font-bold uppercase tracking-[.5px]',
+          dever ? 'text-warning-text' : 'text-text-secondary',
+        )}
+      >
+        {dever && <i className="fa-solid fa-house text-[10px]" aria-hidden="true" />}
+        {rotulo}
+      </b>
+      <p className="whitespace-pre-line text-[13px] leading-relaxed text-text-primary">{valor}</p>
+    </div>
+  )
+}
+
 function RegistroItem({ r, primeiro }: { r: AlunoFichaRegistro; primeiro?: boolean }) {
+  const blocos = r.origem === 'fabio' && r.texto ? parseRegistroFabio(r.texto) : null
+
   return (
     <div className={cx('py-3', !primeiro && 'border-t border-border-subtle')}>
       <div className="mb-1 flex items-center gap-2">
@@ -471,7 +523,20 @@ function RegistroItem({ r, primeiro }: { r: AlunoFichaRegistro; primeiro?: boole
           {r.foi_voce ? 'você' : 'prof. anterior'}
         </span>
       </div>
-      <p className="whitespace-pre-line text-[13px] leading-relaxed text-text-primary">{r.texto ?? '—'}</p>
+
+      {blocos ? (
+        <div className="flex flex-col gap-3">
+          {blocos.map((b, i) =>
+            'rotulo' in b ? (
+              <SecaoRegistro key={i} rotulo={b.rotulo} valor={b.valor} />
+            ) : (
+              <ParagrafoRegistro key={i} texto={b.paragrafo} />
+            ),
+          )}
+        </div>
+      ) : (
+        <ParagrafoRegistro texto={r.texto ?? '—'} />
+      )}
     </div>
   )
 }
