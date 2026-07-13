@@ -16,6 +16,9 @@ if (!url || !anonKey) {
  * Regra de fronteira: o cliente NUNCA faz select direto em tabela —
  * todo dado passa pelas RPCs app_* expostas em src/lib/api.ts.
  */
+// Config idêntica à do LA Organizer (confirmado comparando os dois repos) —
+// não é aqui que mora o bug do "pede login toda vez que reabre" (ver
+// src/features/pwa/persistStorage.ts pra causa real + fix).
 export const supabase = createClient<Database>(url, anonKey, {
   auth: {
     persistSession: true,

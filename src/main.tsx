@@ -10,9 +10,13 @@ import { ThemeProvider, aplicarTemaInicial } from './lib/theme'
 import { AtualizacaoDisponivel } from './features/pwa/AtualizacaoDisponivel'
 // Efeito de boot: captura o beforeinstallprompt cedo (antes de qualquer tela).
 import './features/pwa/installState'
+import { pedirArmazenamentoPersistente } from './features/pwa/persistStorage'
 
 // aplica o tema salvo antes do primeiro render (sem flash, vale em toda rota)
 aplicarTemaInicial()
+// pede ao navegador pra não descartar nosso storage sob pressão (ver arquivo —
+// bug do "pede login toda vez que reabre" no piloto).
+pedirArmazenamentoPersistente()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
