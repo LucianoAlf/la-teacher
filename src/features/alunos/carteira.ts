@@ -35,6 +35,27 @@ export interface GrupoCurso {
   alunos: CarteiraAluno[]
 }
 
+export interface UnidadeContagem {
+  unidade: string
+  total: number
+}
+
+/**
+ * Unidades distintas da carteira, com contagem, em ordem alfabética pt-BR.
+ * Só faz sentido oferecer o filtro quando há mais de uma (professor multiunidade).
+ * Alunos sem unidade caem em "Sem unidade" (só aparece se realmente existir).
+ */
+export function contarPorUnidade(alunos: CarteiraAluno[]): UnidadeContagem[] {
+  const map = new Map<string, number>()
+  for (const a of alunos) {
+    const u = a.unidade ?? 'Sem unidade'
+    map.set(u, (map.get(u) ?? 0) + 1)
+  }
+  return [...map.entries()]
+    .map(([unidade, total]) => ({ unidade, total }))
+    .sort((a, b) => a.unidade.localeCompare(b.unidade, 'pt'))
+}
+
 /** Agrupa a carteira por curso (grupos e alunos em ordem alfabética pt-BR). */
 export function agruparPorCurso(alunos: CarteiraAluno[]): GrupoCurso[] {
   const map = new Map<string, CarteiraAluno[]>()

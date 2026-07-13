@@ -7,10 +7,13 @@ import { horarioAluno, qualidadeLabel } from './carteira'
 export function AlunoRow({
   aluno,
   onAbrir,
+  mostrarUnidade = false,
 }: {
   aluno: CarteiraAluno
   /** Abre o detalhe do aluno. Só clicável quando há aluno_id (conciliado). */
   onAbrir?: (aluno: CarteiraAluno) => void
+  /** Mostra a unidade na linha (útil na visão "Todas", quando cursos se repetem entre unidades). */
+  mostrarUnidade?: boolean
 }) {
   const qualidade = qualidadeLabel(aluno.qualidade)
   const horario = horarioAluno(aluno)
@@ -45,6 +48,12 @@ export function AlunoRow({
           {[horario, aluno.jornada_label].filter(Boolean).join(' · ')}
         </span>
       </div>
+      {mostrarUnidade && aluno.unidade && (
+        <span className="inline-flex flex-none items-center gap-[5px] rounded-full bg-bg-inset px-[9px] py-[3px] text-[10.5px] font-semibold text-text-secondary">
+          <i className="fa-solid fa-location-dot text-[9px] text-text-muted" aria-hidden="true" />
+          {aluno.unidade}
+        </span>
+      )}
       {qualidade && (
         <Badge variant="warn" icon="fa-solid fa-circle-info">
           {qualidade}

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, EmptyState, Skeleton, Toast, useToast } from '../../components/ui'
+import { cx } from '../../lib/cx'
 import { useCarteira } from '../../features/alunos/useCarteira'
-import { agruparPorCurso, normalizar } from '../../features/alunos/carteira'
+import { agruparPorCurso, contarPorUnidade, normalizar, type UnidadeContagem } from '../../features/alunos/carteira'
 import { AlunoRow } from '../../features/alunos/AlunoRow'
 import type { CarteiraAluno } from '../../lib/api'
 import { AppFrame } from './AppFrame'
@@ -15,18 +16,29 @@ export default function AlunosPage() {
   const navigate = useNavigate()
   const { estado, recarregar } = useCarteira()
   const [busca, setBusca] = useState('')
+  // null = "Todas"; string = unidade escolhida.
+  const [unidade, setUnidade] = useState<string | null>(null)
 
   const abrirAluno = (aluno: CarteiraAluno) =>
     navigate(`/app/aluno/${aluno.aluno_id}`, { state: { aluno } })
 
   const alunos = estado.fase === 'ok' ? estado.alunos : []
+  const unidades = useMemo(() => contarPorUnidade(alunos), [alunos])
+  // Filtro de unidade só faz sentido pra quem dá aula em mais de uma.
+  const multiUnidade = unidades.length > 1
+
   const grupos = useMemo(() => {
     const q = normalizar(busca)
-    const filtrados = q ? alunos.filter((a) => normalizar(a.aluno_nome).includes(q)) : alunos
+    let filtrados = alunos
+    if (unidade) filtrados = filtrados.filter((a) => (a.unidade ?? 'Sem unidade') === unidade)
+    if (q) filtrados = filtrados.filter((a) => normalizar(a.aluno_nome).includes(q))
     return agruparPorCurso(filtrados)
-  }, [alunos, busca])
+  }, [alunos, busca, unidade])
 
   const totalFiltrado = grupos.reduce((n, g) => n + g.alunos.length, 0)
+  // Na visão "Todas" com múltiplas unidades, mostra a unidade na linha (Canto aparece
+  // em duas unidades — sem isso o professor não sabe de qual unidade é cada aluno).
+  const mostrarUnidadeNaLinha = multiUnidade && unidade === null
 
   return (
     <AppFrame>
@@ -48,11 +60,22 @@ export default function AlunosPage() {
           />
         </div>
 
+        {/* Filtro por unidade — só aparece pra professor multiunidade */}
+        {multiUnidade && (
+          <FiltroUnidades
+            unidades={unidades}
+            total={alunos.length}
+            selecionada={unidade}
+            onSelecionar={setUnidade}
+          />
+        )}
+
         <ConteudoCarteira
           fase={estado.fase}
           grupos={grupos}
           temBusca={busca.trim().length > 0}
           totalFiltrado={totalFiltrado}
+          mostrarUnidade={mostrarUnidadeNaLinha}
           onRetry={recarregar}
           onLimparBusca={() => setBusca('')}
           onAbrirAluno={abrirAluno}
@@ -70,11 +93,78 @@ export default function AlunosPage() {
 
 // ---------------------------------------------------------------------------
 
+/** Fileira de chips pra filtrar a carteira por unidade (rola na horizontal). */
+function FiltroUnidades({
+  unidades,
+  total,
+  selecionada,
+  onSelecionar,
+}: {
+  unidades: UnidadeContagem[]
+  total: number
+  selecionada: string | null
+  onSelecionar: (unidade: string | null) => void
+}) {
+  return (
+    <div className="mb-3 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <ChipUnidade
+        rotulo="Todas"
+        total={total}
+        ativo={selecionada === null}
+        onClick={() => onSelecionar(null)}
+      />
+      {unidades.map((u) => (
+        <ChipUnidade
+          key={u.unidade}
+          rotulo={u.unidade}
+          total={u.total}
+          ativo={selecionada === u.unidade}
+          onClick={() => onSelecionar(u.unidade)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function ChipUnidade({
+  rotulo,
+  total,
+  ativo,
+  onClick,
+}: {
+  rotulo: string
+  total: number
+  ativo: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={ativo}
+      className={cx(
+        'inline-flex flex-none items-center gap-[7px] rounded-full border px-[13px] py-[7px] text-[12.5px] font-bold transition-colors',
+        ativo
+          ? 'border-brand bg-brand text-on-brand'
+          : 'border-border-strong bg-bg-surface text-text-secondary',
+      )}
+    >
+      {rotulo}
+      <span className={cx('text-[11px] font-semibold', ativo ? 'text-on-brand' : 'text-text-muted')}>
+        {total}
+      </span>
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
 function ConteudoCarteira({
   fase,
   grupos,
   temBusca,
   totalFiltrado,
+  mostrarUnidade,
   onRetry,
   onLimparBusca,
   onAbrirAluno,
@@ -83,6 +173,7 @@ function ConteudoCarteira({
   grupos: ReturnType<typeof agruparPorCurso>
   temBusca: boolean
   totalFiltrado: number
+  mostrarUnidade: boolean
   onRetry: () => void
   onLimparBusca: () => void
   onAbrirAluno: (aluno: CarteiraAluno) => void
@@ -160,7 +251,12 @@ function ConteudoCarteira({
       {grupos.map((g) => (
         <Card key={g.curso} title={g.curso} icon="fa-solid fa-graduation-cap" right={`${g.alunos.length}`}>
           {g.alunos.map((a, i) => (
-            <AlunoRow key={`${a.aluno_id}-${a.curso}-${i}`} aluno={a} onAbrir={onAbrirAluno} />
+            <AlunoRow
+              key={`${a.aluno_id}-${a.curso}-${i}`}
+              aluno={a}
+              onAbrir={onAbrirAluno}
+              mostrarUnidade={mostrarUnidade}
+            />
           ))}
         </Card>
       ))}
