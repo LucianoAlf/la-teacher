@@ -24,7 +24,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s)
     })
-    return () => sub.subscription.unsubscribe()
+
+    // Refresh proativo ao voltar pro primeiro plano (padrão do LA Organizer,
+    // Sprint 27 — mesmo bug, já resolvido lá). Causa: o timer de
+    // autoRefreshToken do supabase-js só roda com o app em foreground. Este
+    // PWA fica horas fechado/em background, o token expira nesse meio tempo,
+    // e ninguém dispara a renovação — o professor era forçado a logar de novo
+    // (bug do Matheus no piloto). refreshSession() só renova de fato se
+    // faltar pouco pro vencimento, então é barato chamar sempre.
+    const aoFicarVisivel = () => {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.refreshSession().catch(() => {
+          /* falha silenciosa — o próximo request autenticado revalida */
+        })
+      }
+    }
+    document.addEventListener('visibilitychange', aoFicarVisivel)
+
+    return () => {
+      sub.subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', aoFicarVisivel)
+    }
   }, [])
 
   async function signIn(email: string, password: string) {
