@@ -22,7 +22,10 @@ export function AtualizacaoDisponivel() {
   )
 }
 
-/** Parte visual, isolada pra teste. Pílula fixa no topo, acima de tudo. */
+/**
+ * Parte visual, isolada pra teste. Pílula fixa EMBAIXO (flutuando acima da barra
+ * de navegação, na zona do polegar) — no topo virava "paisagem" e passava batido.
+ */
 export function BannerNovaVersao({
   show,
   onAtualizar,
@@ -36,15 +39,15 @@ export function BannerNovaVersao({
   return (
     <div
       role="status"
-      className="fixed inset-x-0 top-0 z-[60] flex justify-center px-3 pt-[calc(8px+env(safe-area-inset-top))]"
+      className="fixed inset-x-0 bottom-[calc(88px_+_env(safe-area-inset-bottom))] z-[60] flex justify-center px-3"
     >
-      <div className="flex w-full max-w-[420px] items-center gap-2 rounded-full border border-border-subtle bg-bg-surface px-3 py-2 shadow-fab">
-        <i className="fa-solid fa-arrows-rotate text-[13px] text-brand-text" aria-hidden="true" />
+      <div className="flex w-full max-w-[420px] items-center gap-2 rounded-full border border-border-subtle bg-bg-surface px-[14px] py-[10px] shadow-fab">
+        <i className="fa-solid fa-arrows-rotate text-[14px] text-brand-text" aria-hidden="true" />
         <span className="flex-1 text-[13px] font-semibold text-text-primary">Nova versão disponível</span>
         <button
           type="button"
           onClick={onAtualizar}
-          className="rounded-full bg-brand px-3 py-1 text-[12.5px] font-bold text-on-brand transition-transform active:scale-95"
+          className="rounded-full bg-brand px-[20px] py-[9px] text-[14px] font-bold text-on-brand transition-transform active:scale-95"
         >
           Atualizar
         </button>
