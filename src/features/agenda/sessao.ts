@@ -90,7 +90,10 @@ export function agruparSessoes(cruas: SessaoAula[]): SessaoAula[] {
         ...i,
         alunos: i.alunos.map((a) => ({ ...a, aula_id_alvo: i.aula_id_ancora })),
         aulas_agrupadas: [i.aula_id_ancora],
-        aula_id_chamada: null, // sem turma paralela → o banco não aceita chamada aqui
+        // Individual STANDALONE (sem turma pareada — ex.: aula reagendada): a
+        // própria individual é a âncora da chamada. O banco agora aceita
+        // (app_registrar_presencas_aula permite individual sem turma irmã).
+        aula_id_chamada: i.aula_id_ancora,
       })
     }
   }
