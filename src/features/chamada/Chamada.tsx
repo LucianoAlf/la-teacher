@@ -151,16 +151,18 @@ function LinhaAluno({
       </span>
       <span className="min-w-0 flex-1 truncate text-sm font-semibold">{aluno.nome}</span>
       {modo === 'interativa' ? (
-        // CONTORNO: pré-marcado, ainda NÃO enviado. O preenchido (verde/vermelho
-        // sólido) fica reservado pro estado já gravado no banco (modo leitura).
+        // RASCUNHO (não enviado): SEM verde/vermelho — essas cores são de "gravado
+        // no banco". Presente pendente fica NEUTRO (cinza) e Faltou pendente fica
+        // âmbar contorno. A lista "acende" verde/vermelho só DEPOIS de enviar
+        // (modo leitura) — assim o professor nunca acha que já gravou e sai fora.
         ausente ? (
           <Badge variant="warn" outline icon="fa-solid fa-user-xmark">
             Faltou
           </Badge>
         ) : (
-          <Badge variant="ok" outline icon="fa-solid fa-check">
-            Presente
-          </Badge>
+          <span className="inline-flex items-center gap-[5px] rounded-full border border-border-strong px-[9px] py-[3px] text-[11px] font-bold text-text-secondary">
+            <i className="fa-solid fa-check" aria-hidden="true" /> Presente
+          </span>
         )
       ) : (
         <span className="flex items-center gap-2">
