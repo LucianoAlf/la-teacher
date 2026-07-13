@@ -51,14 +51,27 @@ model** do Workbox — e ela decide se "corrijo e não muda" acontece ou não:
   os bundles novos, **sem depender de o professor tocar em nada**. Sem rede, cai
   no cache e abre offline (sala de aula).
 
-> **Pegadinha aprendida no LA Organizer (não redescubra do zero):** o que decide
-> a frescura do app é a requisição de **navegação** — `request.mode === 'navigate'`,
+> **Pegadinha 1 — o que testar (aprendida no LA Organizer):** o que decide a
+> frescura do app é a requisição de **navegação** — `request.mode === 'navigate'`,
 > ou seja, quando o browser busca o `index.html`. Testar cache com um `fetch()` de
 > um `.js` solto **não prova nada** sobre o comportamento offline/atualização: aquele
 > JS tem hash e vem do precache de qualquer jeito. Para validar de verdade: recarregue
 > a página (navegação) online e confirme que o HTML veio da rede; depois offline,
 > confirme que caiu no cache. `networkTimeoutSeconds: 3` é igual nos dois apps de
 > propósito — mesma config facilita quem mexe nos dois.
+
+> **Pegadinha 2 — o `vite-plugin-pwa` re-injeta `navigateFallback` (custou um deploy
+> pra achar):** o plugin tem `navigateFallback: 'index.html'` como **default** (é o
+> `defaultWorkbox` dele). Só *remover* a linha do `workbox` NÃO desliga — o default
+> volta via `Object.assign` e faz duas coisas: (1) re-adiciona `index.html` ao precache
+> mesmo sem `html` no `globPatterns`, e (2) registra uma `NavigationRoute` **cache-first
+> ANTES** da nossa `NetworkFirst`. No Workbox **a 1ª rota que casa vence** → a cache-first
+> captura a navegação e o network-first vira letra morta. O `sw.js` gerado *parece* certo
+> (tem o `NetworkFirst` lá), mas está anulado pela ordem. Solução: `navigateFallback:
+> undefined` explícito. **Como conferir no `sw.js` (não confie só no "tem NetworkFirst"):**
+> tem que existir **uma única** rota de navegação e **zero** `createHandlerBoundToURL`.
+> Heads-up: o LA Organizer usa o mesmo plugin — vale checar o `sw.js` dele com esse mesmo
+> critério (rota de navegação única).
 
 Além do network-first, o `registerType: 'prompt'` mostra o banner "Nova versão
 disponível" (rede de segurança pra trocar o precache offline). E o **selo de versão**
