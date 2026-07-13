@@ -173,10 +173,37 @@ export default function PerfilPage() {
             </form>
           </>
         )}
+
+        <SeloVersao />
       </div>
 
       <Toast message={message} visible={visible} />
     </AppFrame>
+  )
+}
+
+/** Selo discreto de build: dá pra bater o olho e saber em que versão o professor está. */
+function SeloVersao() {
+  const data = (() => {
+    try {
+      return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'America/Sao_Paulo',
+      }).format(new Date(__BUILD_TIME__))
+    } catch {
+      return null
+    }
+  })()
+
+  return (
+    <p className="mt-6 text-center text-[11px] text-text-muted">
+      LA Teacher · v{__APP_VERSION__}
+      {data ? ` · ${data}` : ''}
+    </p>
   )
 }
 
