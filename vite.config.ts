@@ -45,11 +45,18 @@ export default defineConfig({
       manifest: false,
       includeAssets: ['icons/*.png', 'icons/*.svg', 'og-image.png'],
       workbox: {
+        // ATENÇÃO — não reativar navigateFallback. O vite-plugin-pwa injeta
+        // navigateFallback:'index.html' por padrão (default do plugin), e isso
+        // faz DUAS coisas que quebram o network-first: (1) re-adiciona index.html
+        // ao precache e (2) registra uma NavigationRoute cache-first ANTES do
+        // nosso NetworkFirst. No Workbox a 1ª rota que casa vence → a cache-first
+        // captura a navegação e o network-first nunca roda. `undefined` sobrescreve
+        // o default (merge é Object.assign) e deixa o documento SÓ na rota abaixo.
+        navigateFallback: undefined,
         // App shell model: bundles com hash (js/css/fontes) ficam em precache
         // cache-first (imutáveis, carregam na hora). O HTML NÃO entra no precache
-        // (repare: sem 'html' aqui) — ele é a "portaria" que aponta os bundles,
-        // e é a única coisa mutável a cada deploy. Servir o HTML do cache é o
-        // clássico "corrijo e não muda".
+        // — ele é a "portaria" que aponta os bundles, e é a única coisa mutável a
+        // cada deploy. Servir o HTML do cache é o clássico "corrijo e não muda".
         globPatterns: ['**/*.{js,css,svg,png,webmanifest,woff2}'],
         runtimeCaching: [
           {
