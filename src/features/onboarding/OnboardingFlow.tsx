@@ -163,12 +163,14 @@ function BemVindo({
           </h1>
           <p className="mt-2 text-[14px] leading-relaxed text-text-secondary">
             {dados.meus_cursos} {dados.meus_cursos === 1 ? 'curso' : 'cursos'}, já organizados por
-            unidade. Você faz só duas coisas aqui:
+            unidade. Olha o que o Fábio traz pra você:
           </p>
 
           <div className="mt-6 grid grid-cols-2 gap-3">
-            <AcaoCard icon="fa-solid fa-clipboard-check" titulo="Dar chamada" legenda="quem veio, num toque" />
             <AcaoCard icon="fa-solid fa-microphone" titulo="Gravar a aula" legenda="você fala, o Fábio escreve" />
+            <AcaoCard icon="fa-solid fa-user-group" titulo="Seus alunos" legenda="a carteira toda, por unidade" />
+            <AcaoCard icon="fa-solid fa-chart-line" titulo="Gerar relatórios" legenda="a evolução de cada um" emBreve />
+            <AcaoCard icon="fa-solid fa-pen-ruler" titulo="Criar exercícios" legenda="material sob medida" emBreve />
           </div>
         </div>
 
@@ -190,12 +192,30 @@ function BemVindo({
   )
 }
 
-function AcaoCard({ icon, titulo, legenda }: { icon: string; titulo: string; legenda: string }) {
+function AcaoCard({
+  icon,
+  titulo,
+  legenda,
+  emBreve = false,
+}: {
+  icon: string
+  titulo: string
+  legenda: string
+  /** Feature ainda não construída: mostra a visão com selo honesto "em breve". */
+  emBreve?: boolean
+}) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-bg-surface p-4">
-      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-[17px] text-brand-text">
-        <i className={icon} aria-hidden="true" />
-      </span>
+    <div className="relative flex flex-col gap-2 rounded-lg border border-border-subtle bg-bg-surface p-4">
+      <div className="flex items-start justify-between">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-[17px] text-brand-text">
+          <i className={icon} aria-hidden="true" />
+        </span>
+        {emBreve && (
+          <span className="rounded-full bg-bg-inset px-2 py-[3px] text-[10px] font-bold uppercase tracking-[.3px] text-text-muted">
+            em breve
+          </span>
+        )}
+      </div>
       <b className="text-[14px] leading-tight text-text-primary">{titulo}</b>
       <span className="text-[12px] leading-snug text-text-secondary">{legenda}</span>
     </div>
