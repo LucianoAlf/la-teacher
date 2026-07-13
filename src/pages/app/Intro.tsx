@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, FabioAvatar } from '../../components/ui'
 import { DemoMorph } from '../../features/onboarding/DemoMorph'
@@ -16,6 +16,13 @@ const TOTAL = 3
 export default function IntroPage() {
   const navigate = useNavigate()
   const [passo, setPasso] = useState(0)
+
+  // Marca "visto" assim que o intro aparece: já foi apresentado. Sem isso, quem
+  // sai no meio (ou o guard reenvia porque o flag nunca setou) via o intro TODA
+  // vez que abria o app. Rever de propósito? Só entrando em /app/intro na mão.
+  useEffect(() => {
+    marcarIntroVisto()
+  }, [])
 
   function sair() {
     marcarIntroVisto()
