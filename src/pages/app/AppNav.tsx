@@ -26,8 +26,6 @@ const FABIO_HERO_VARS = {
 } as CSSProperties
 
 interface Props {
-  /** Toque no Fábio herói (chat é do Sprint 4). */
-  onFabio: () => void
   /** Toque em "Mais" (ferramentas futuras). */
   onMais: () => void
 }
@@ -37,7 +35,7 @@ interface Props {
  * central (o coração — chat/dual-channel) e o microfone como FAB flutuante à
  * direita (ação de gravar aula, estilo LA Organizer).
  */
-export function AppNav({ onFabio, onMais }: Props) {
+export function AppNav({ onMais }: Props) {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const ativo = pathname.startsWith('/app/alunos')
@@ -57,13 +55,13 @@ export function AppNav({ onFabio, onMais }: Props) {
         }}
       />
 
-      {/* Fábio herói — bolota central (o produto: chat espelhado no WhatsApp) */}
+      {/* Fábio herói — bolota central: abre o chat (espelhado no WhatsApp) */}
       <Fab
         placement="center"
         label="Fábio — seu assistente"
         node={<FabioIcon className="h-[32px] w-[32px]" />}
         style={FABIO_HERO_VARS}
-        onClick={onFabio}
+        onClick={() => nav('/app/fabio')}
       />
 
       {/* Microfone — FAB utilitário flutuante à direita (gravar aula); fundo
