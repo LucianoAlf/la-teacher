@@ -15,6 +15,7 @@ import { cx } from '../../lib/cx'
 import { AppFrame } from './AppFrame'
 import { useSessoes } from '../../features/agenda/useSessoes'
 import { horaSessao, podeGravar, statusSessao, tituloSessao } from '../../features/agenda/sessao'
+import { ParagrafoRegistro, SecaoRegistro } from '../../features/ficha/registroSecoes'
 
 type Estado =
   | { fase: 'carregando' }
@@ -449,14 +450,6 @@ function Presenca({ lista }: { lista: AlunoFichaPresenca[] }) {
 // texto livre e não segue o padrão — cai no parágrafo simples de sempre.
 type BlocoRegistro = { rotulo: string; valor: string } | { paragrafo: string }
 
-function normalizarRotulo(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .trim()
-}
-
 function parseRegistroFabio(texto: string): BlocoRegistro[] {
   return texto
     .split('\n')
@@ -468,28 +461,6 @@ function parseRegistroFabio(texto: string): BlocoRegistro[] {
       if (i <= 0) return { paragrafo: linha }
       return { rotulo: linha.slice(0, i).trim(), valor: linha.slice(i + 1).trim() }
     })
-}
-
-function ParagrafoRegistro({ texto }: { texto: string }) {
-  return <p className="whitespace-pre-line text-[13px] leading-relaxed text-text-primary">{texto}</p>
-}
-
-function SecaoRegistro({ rotulo, valor }: { rotulo: string; valor: string }) {
-  const dever = normalizarRotulo(rotulo) === 'dever de casa'
-  return (
-    <div className={cx(dever && 'rounded-md bg-warning-soft px-[10px] py-2')}>
-      <b
-        className={cx(
-          'mb-[3px] flex items-center gap-[6px] text-[11px] font-bold uppercase tracking-[.5px]',
-          dever ? 'text-warning-text' : 'text-text-secondary',
-        )}
-      >
-        {dever && <i className="fa-solid fa-house text-[10px]" aria-hidden="true" />}
-        {rotulo}
-      </b>
-      <p className="whitespace-pre-line text-[13px] leading-relaxed text-text-primary">{valor}</p>
-    </div>
-  )
 }
 
 function RegistroItem({ r, primeiro }: { r: AlunoFichaRegistro; primeiro?: boolean }) {

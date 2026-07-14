@@ -570,11 +570,11 @@ export interface MeuOnboarding {
   meus_cursos: number
 }
 
-// As 3 RPCs de onboarding foram criadas depois da última geração de
-// src/types/db.ts, então ainda não estão no union de nomes tipado. Cast pontual
-// (com bind pra não perder o `this` do client) até o db.ts ser regenerado — o
-// contrato já foi verificado no banco. Remover quando db.ts incluir essas RPCs.
-const rpcOnboarding = supabase.rpc.bind(supabase) as unknown as (
+// Helper pra RPCs criadas DEPOIS da última geração de src/types/db.ts — ainda
+// não estão no union de nomes tipado. Cast pontual (com bind pra não perder o
+// `this` do client), contrato verificado no banco. Usado por onboarding e pelo
+// histórico da turma. Remover cada chamada quando o db.ts incluir a RPC.
+const rpcSolta = supabase.rpc.bind(supabase) as unknown as (
   fn: string,
   args?: Record<string, unknown>,
 ) => Promise<{
@@ -584,7 +584,7 @@ const rpcOnboarding = supabase.rpc.bind(supabase) as unknown as (
 
 /** Estado do onboarding do professor logado (app_meu_onboarding). Read-only. */
 export async function meuOnboarding(): Promise<MeuOnboarding> {
-  const { data: res, error } = await rpcOnboarding('app_meu_onboarding')
+  const { data: res, error } = await rpcSolta('app_meu_onboarding')
   if (error) throw error
   return res as unknown as MeuOnboarding
 }
@@ -605,7 +605,7 @@ export class ErroConfirmarWhatsapp extends Error {
  * ErroConfirmarWhatsapp('ja_usado'|'incompleto') nesses casos; erro cru no resto.
  */
 export async function confirmarMeuWhatsapp(telefone: string): Promise<void> {
-  const { error } = await rpcOnboarding('app_confirmar_meu_whatsapp', { p_telefone: telefone })
+  const { error } = await rpcSolta('app_confirmar_meu_whatsapp', { p_telefone: telefone })
   if (error) {
     const bruto = [error.message, error.code, error.details, error.hint].filter(Boolean).join(' ')
     if (bruto.includes('whatsapp_ja_usado')) throw new ErroConfirmarWhatsapp('ja_usado')
@@ -616,6 +616,62 @@ export async function confirmarMeuWhatsapp(telefone: string): Promise<void> {
 
 /** Marca o onboarding como concluído (app_concluir_onboarding). Idempotente. */
 export async function concluirOnboarding(): Promise<void> {
-  const { error } = await rpcOnboarding('app_concluir_onboarding')
+  const { error } = await rpcSolta('app_concluir_onboarding')
   if (error) throw error
+}
+
+// ---------------------------------------------------------------------------
+// Histórico da turma (app_historico_turma)
+// ---------------------------------------------------------------------------
+
+/** Repertório individual de um aluno numa sessão da turma (ex.: música pró recital). */
+export interface RepertorioAluno {
+  aluno: string
+  primeiro_nome: string
+  repertorio: string
+}
+
+export interface HistoricoTurmaSessao {
+  data: string
+  origem: 'fabio' | 'emusys'
+  /** Campos estruturados — só em origem:fabio (null no legado). */
+  objetivo: string | null
+  conteudo: string | null
+  dever_casa: string | null
+  repertorio_turma: string | null
+  /** Repertório por aluno (recital etc.) — pode coexistir com repertorio_turma. */
+  repertorio_por_aluno: RepertorioAluno[]
+  /** Texto corrido do Emusys — só em origem:emusys (null no fabio). */
+  texto_legado: string | null
+}
+
+export interface HistoricoTurma {
+  turma_nome: string
+  curso: string | null
+  alunos_atuais: string[]
+  sessoes: HistoricoTurmaSessao[]
+}
+
+/** A RPC recusa turma que não é do professor logado. */
+export const TURMA_NAO_SUA = 'turma_nao_encontrada_ou_nao_e_sua' as const
+
+/**
+ * Histórico pedagógico de uma turma (app_historico_turma) — sessões mais recentes
+ * primeiro, scoped ao professor logado. Devolve TURMA_NAO_SUA se a turma não é dele.
+ * LANÇA em erro de rede.
+ */
+export async function historicoTurma(
+  turmaNome: string,
+  limite = 15,
+): Promise<HistoricoTurma | typeof TURMA_NAO_SUA> {
+  const { data: res, error } = await rpcSolta('app_historico_turma', {
+    p_turma_nome: turmaNome,
+    p_limite: limite,
+  })
+  if (error) {
+    const bruto = [error.message, error.code, error.details, error.hint].filter(Boolean).join(' ')
+    if (bruto.includes(TURMA_NAO_SUA)) return TURMA_NAO_SUA
+    throw error
+  }
+  return res as unknown as HistoricoTurma
 }

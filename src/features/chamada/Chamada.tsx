@@ -262,6 +262,20 @@ function Conteudo({ sessao, onRecarregar }: { sessao: SessaoAula; onRecarregar: 
     <div className="flex flex-1 flex-col">
       <ContextoAula sessao={sessao} />
 
+      {/* Atalho pro histórico da turma ("o que eu dei nas últimas aulas") — só
+          faz sentido em turma (individual pura não tem turma_nome). */}
+      {sessao.turma_nome && (
+        <button
+          type="button"
+          onClick={() => navigate(`/app/turma/${encodeURIComponent(sessao.turma_nome!)}`)}
+          className="mx-4 mb-3 flex items-center gap-2 rounded-md border border-border-subtle bg-bg-surface px-3 py-[10px] text-left text-[12.5px] font-semibold text-brand-text"
+        >
+          <i className="fa-solid fa-clock-rotate-left" aria-hidden="true" />
+          Ver histórico da turma
+          <i className="fa-solid fa-chevron-right ml-auto text-[11px] text-text-muted" aria-hidden="true" />
+        </button>
+      )}
+
       {/* Estado da chamada: PENDENTE (âmbar) enquanto o professor não envia. O
           "feito" (verde) só aparece DEPOIS de enviada — evita o professor ver
           tudo verde, achar que gravou, e sair sem enviar (Emusys vira falta). */}
