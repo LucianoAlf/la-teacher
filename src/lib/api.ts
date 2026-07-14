@@ -570,21 +570,9 @@ export interface MeuOnboarding {
   meus_cursos: number
 }
 
-// Helper pra RPCs criadas DEPOIS da última geração de src/types/db.ts — ainda
-// não estão no union de nomes tipado. Cast pontual (com bind pra não perder o
-// `this` do client), contrato verificado no banco. Usado por onboarding e pelo
-// histórico da turma. Remover cada chamada quando o db.ts incluir a RPC.
-const rpcSolta = supabase.rpc.bind(supabase) as unknown as (
-  fn: string,
-  args?: Record<string, unknown>,
-) => Promise<{
-  data: unknown
-  error: { message?: string; code?: string; details?: string; hint?: string } | null
-}>
-
 /** Estado do onboarding do professor logado (app_meu_onboarding). Read-only. */
 export async function meuOnboarding(): Promise<MeuOnboarding> {
-  const { data: res, error } = await rpcSolta('app_meu_onboarding')
+  const { data: res, error } = await supabase.rpc('app_meu_onboarding')
   if (error) throw error
   return res as unknown as MeuOnboarding
 }
@@ -605,7 +593,7 @@ export class ErroConfirmarWhatsapp extends Error {
  * ErroConfirmarWhatsapp('ja_usado'|'incompleto') nesses casos; erro cru no resto.
  */
 export async function confirmarMeuWhatsapp(telefone: string): Promise<void> {
-  const { error } = await rpcSolta('app_confirmar_meu_whatsapp', { p_telefone: telefone })
+  const { error } = await supabase.rpc('app_confirmar_meu_whatsapp', { p_telefone: telefone })
   if (error) {
     const bruto = [error.message, error.code, error.details, error.hint].filter(Boolean).join(' ')
     if (bruto.includes('whatsapp_ja_usado')) throw new ErroConfirmarWhatsapp('ja_usado')
@@ -616,7 +604,7 @@ export async function confirmarMeuWhatsapp(telefone: string): Promise<void> {
 
 /** Marca o onboarding como concluído (app_concluir_onboarding). Idempotente. */
 export async function concluirOnboarding(): Promise<void> {
-  const { error } = await rpcSolta('app_concluir_onboarding')
+  const { error } = await supabase.rpc('app_concluir_onboarding')
   if (error) throw error
 }
 
@@ -664,7 +652,7 @@ export async function historicoTurma(
   turmaNome: string,
   limite = 15,
 ): Promise<HistoricoTurma | typeof TURMA_NAO_SUA> {
-  const { data: res, error } = await rpcSolta('app_historico_turma', {
+  const { data: res, error } = await supabase.rpc('app_historico_turma', {
     p_turma_nome: turmaNome,
     p_limite: limite,
   })
@@ -698,7 +686,7 @@ export interface PreferenciasFabio {
  * A RPC cria o default no primeiro acesso (não precisa tratar "vazio"). LANÇA em erro.
  */
 export async function minhasPreferenciasFabio(): Promise<PreferenciasFabio> {
-  const { data: res, error } = await rpcSolta('app_minhas_preferencias_fabio')
+  const { data: res, error } = await supabase.rpc('app_minhas_preferencias_fabio')
   if (error) throw error
   return res as unknown as PreferenciasFabio
 }
@@ -711,9 +699,9 @@ export async function minhasPreferenciasFabio(): Promise<PreferenciasFabio> {
 export async function atualizarPreferenciaFabio(
   campos: Partial<PreferenciasFabio>,
 ): Promise<void> {
-  const args: Record<string, unknown> = {}
-  if (campos.canal_preferido !== undefined) args.p_canal_preferido = campos.canal_preferido
-  if (campos.recebe_domingo !== undefined) args.p_recebe_domingo = campos.recebe_domingo
-  const { error } = await rpcSolta('app_atualizar_preferencia_fabio', args)
+  const { error } = await supabase.rpc('app_atualizar_preferencia_fabio', {
+    ...(campos.canal_preferido !== undefined ? { p_canal_preferido: campos.canal_preferido } : {}),
+    ...(campos.recebe_domingo !== undefined ? { p_recebe_domingo: campos.recebe_domingo } : {}),
+  })
   if (error) throw error
 }

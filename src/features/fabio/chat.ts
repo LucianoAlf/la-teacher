@@ -22,38 +22,20 @@ export interface ChatMensagem {
   criado_em: string
 }
 
-type ErroPg = { message?: string } | null
-
-// Tabela criada DEPOIS da última geração de src/types/db.ts — ainda não está
-// no union tipado do client (mesmo caso do rpcSolta em api.ts). Cast pontual
-// com o contrato conferido no banco; remover quando o db.ts for regenerado.
-interface TabelaChat {
-  select: (cols: '*') => {
-    eq: (col: 'professor_id', v: number) => {
-      order: (
-        col: 'criado_em',
-        opts: { ascending: boolean },
-      ) => PromiseLike<{ data: ChatMensagem[] | null; error: ErroPg }>
-    }
-  }
-  insert: (row: { professor_id: number; role: 'professor'; content: string }) => {
-    select: (cols: '*') => {
-      single: () => PromiseLike<{ data: ChatMensagem | null; error: ErroPg }>
-    }
-  }
-}
-const tabelaChat = supabase.from.bind(supabase) as unknown as (
-  t: 'fabio_chat_mensagens',
-) => TabelaChat
+// As colunas role/kind/channel são TEXT no banco (não enums), então o tipo
+// gerado as marca como `string`. O app trabalha com uniões mais estreitas
+// (ChatMensagem) — o cast na fronteira estreita esse texto, contrato garantido
+// pelos DEFAULTs/CHECKs da tabela.
 
 /** Histórico completo da conversa do professor, mais antigas primeiro. */
 export async function carregarMensagens(professorId: number): Promise<ChatMensagem[]> {
-  const { data, error } = await tabelaChat('fabio_chat_mensagens')
+  const { data, error } = await supabase
+    .from('fabio_chat_mensagens')
     .select('*')
     .eq('professor_id', professorId)
     .order('criado_em', { ascending: true })
   if (error) throw error
-  return data ?? []
+  return (data ?? []) as ChatMensagem[]
 }
 
 /**
@@ -62,12 +44,13 @@ export async function carregarMensagens(professorId: number): Promise<ChatMensag
  * quando o Realtime ecoar o próprio insert.
  */
 export async function enviarMensagem(professorId: number, texto: string): Promise<ChatMensagem> {
-  const { data, error } = await tabelaChat('fabio_chat_mensagens')
+  const { data, error } = await supabase
+    .from('fabio_chat_mensagens')
     .insert({ professor_id: professorId, role: 'professor', content: texto })
     .select('*')
     .single()
   if (error || !data) throw error ?? new Error('insert_sem_retorno')
-  return data
+  return data as ChatMensagem
 }
 
 /**
