@@ -21,3 +21,18 @@ export async function buscarPendencias(): Promise<Pendencias | null> {
   const pendentes = agruparSessoes(res).filter((s) => statusSessao(s, now) === 'pendente')
   return pendentes.length > 0 ? { data: ontem, sessoes: pendentes } : null
 }
+
+/**
+ * Aulas de HOJE já começadas e ainda sem chamada enviada ('agora' ou
+ * 'pendente') — busca independente da DateNav, pro alerta da Home sempre
+ * falar de hoje, mesmo se o professor estiver olhando outro dia na tela.
+ */
+export async function buscarPendentesHoje(): Promise<SessaoAula[]> {
+  const now = new Date()
+  const res = await minhaAgendaSessao(hojeBRT())
+  if (isSemVinculo(res)) return []
+  return agruparSessoes(res).filter((s) => {
+    const st = statusSessao(s, now)
+    return st === 'agora' || st === 'pendente'
+  })
+}

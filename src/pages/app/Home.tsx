@@ -9,7 +9,8 @@ import { SessaoRow } from '../../features/agenda/SessaoRow'
 import { CardSessoesDoDia } from '../../features/agenda/CardSessoesDoDia'
 import { DateNav } from '../../features/agenda/DateNav'
 import { useSessoes } from '../../features/agenda/useSessoes'
-import { buscarPendencias, type Pendencias } from '../../features/agenda/pendencias'
+import { buscarPendencias, buscarPendentesHoje, type Pendencias } from '../../features/agenda/pendencias'
+import { horaSessao, tituloSessao } from '../../features/agenda/sessao'
 import { useFilaOfflineCount } from '../../features/registro/filaOffline'
 import { AppFrame } from './AppFrame'
 import { AppNav } from './AppNav'
@@ -33,6 +34,9 @@ export default function HomePage() {
       <AppHeader />
 
       <div className="flex-1 overflow-y-auto px-4 pb-[calc(96px_+_env(safe-area-inset-bottom))] pt-2">
+        {/* Chamada de hoje ainda não enviada — não deixa passar despercebido */}
+        <AlertaChamadaHoje onAbrir={abrirChamada} />
+
         {/* Áudios aguardando conexão (fila offline) */}
         {filaOffline > 0 && (
           <div className="mb-3 flex items-center gap-2 rounded-md border border-border-subtle bg-warning-soft px-3 py-[10px] text-[12.5px] font-semibold text-warning-text">
@@ -168,6 +172,40 @@ function PontoHojeCard({ onAbrir }: { onAbrir: () => void }) {
         </span>
       </div>
       <i className="fa-solid fa-chevron-right text-[11px] text-text-muted" aria-hidden="true" />
+    </button>
+  )
+}
+
+/** Alerta de topo: chamada(s) de HOJE já na janela e ainda sem envio. */
+function AlertaChamadaHoje({ onAbrir }: { onAbrir: (sessao: SessaoAula) => void }) {
+  const [pendentes, setPendentes] = useState<SessaoAula[]>([])
+
+  useEffect(() => {
+    let vivo = true
+    buscarPendentesHoje()
+      .then((s) => vivo && setPendentes(s))
+      .catch(() => {}) // atalho é bônus — nunca quebra a Home
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  if (pendentes.length === 0) return null
+  const primeira = pendentes[0]
+
+  return (
+    <button
+      type="button"
+      onClick={() => onAbrir(primeira)}
+      className="mb-3 flex w-full items-center gap-2 rounded-md border border-border-subtle bg-warning-soft px-3 py-[10px] text-left text-[12.5px] font-semibold text-warning-text"
+    >
+      <i className="fa-solid fa-bell" aria-hidden="true" />
+      <span className="min-w-0 flex-1">
+        {pendentes.length === 1
+          ? `1 chamada de hoje ainda não enviada — ${horaSessao(primeira)} ${tituloSessao(primeira)}`
+          : `${pendentes.length} chamadas de hoje ainda não enviadas`}
+      </span>
+      <i className="fa-solid fa-chevron-right text-[11px]" aria-hidden="true" />
     </button>
   )
 }
