@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, EmptyState, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
 import { atualizarPerfil, meuPerfil, type MeuPerfil } from '../../lib/api'
+import { PreferenciasFabio } from '../../features/fabio/PreferenciasFabio'
 import { AppFrame } from './AppFrame'
 
 type Estado =
@@ -171,6 +172,9 @@ export default function PerfilPage() {
                 </button>
               </div>
             </form>
+
+            {/* Preferências do Fábio — canal e domingo (salva incremental) */}
+            <PreferenciasFabio onToast={show} />
           </>
         )}
 

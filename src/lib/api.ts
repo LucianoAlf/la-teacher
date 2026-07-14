@@ -675,3 +675,45 @@ export async function historicoTurma(
   }
   return res as unknown as HistoricoTurma
 }
+
+// ---------------------------------------------------------------------------
+// Preferências do Fábio (como e quando ele fala com o professor)
+// ---------------------------------------------------------------------------
+
+/** Por onde o Fábio fala com o professor. Default do banco = 'ambos'. */
+export type CanalPreferido = 'app' | 'whatsapp' | 'ambos'
+
+/**
+ * Só o que a tela v1 expõe. O banco guarda mais campos (silêncio por horário,
+ * tom, cobrança de pendência), reservados de propósito — a tela do professor
+ * mexe só em canal e domingo por enquanto.
+ */
+export interface PreferenciasFabio {
+  canal_preferido: CanalPreferido
+  recebe_domingo: boolean
+}
+
+/**
+ * Preferências do Fábio do professor logado (app_minhas_preferencias_fabio).
+ * A RPC cria o default no primeiro acesso (não precisa tratar "vazio"). LANÇA em erro.
+ */
+export async function minhasPreferenciasFabio(): Promise<PreferenciasFabio> {
+  const { data: res, error } = await rpcSolta('app_minhas_preferencias_fabio')
+  if (error) throw error
+  return res as unknown as PreferenciasFabio
+}
+
+/**
+ * Atualização PARCIAL das preferências (app_atualizar_preferencia_fabio): só os
+ * campos presentes em `campos` são enviados — o resto fica intacto no banco.
+ * A tela salva incremental (um campo por toque). LANÇA em erro.
+ */
+export async function atualizarPreferenciaFabio(
+  campos: Partial<PreferenciasFabio>,
+): Promise<void> {
+  const args: Record<string, unknown> = {}
+  if (campos.canal_preferido !== undefined) args.p_canal_preferido = campos.canal_preferido
+  if (campos.recebe_domingo !== undefined) args.p_recebe_domingo = campos.recebe_domingo
+  const { error } = await rpcSolta('app_atualizar_preferencia_fabio', args)
+  if (error) throw error
+}
