@@ -85,7 +85,10 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(appVersion()),
     __BUILD_TIME__: JSON.stringify(BUILD_TIME),
   },
-  // Respeita a porta atribuída pelo harness (PORT) — 5173 pode estar ocupada
-  // por outro app (ex.: LA-performance-report). strictPort=false deixa subir.
-  server: { port: Number(process.env.PORT) || 5173 },
+  // Porta FIXA e exclusiva do la-teacher (5183, não 5173 — evita colidir com
+  // outros apps locais tipo LA-performance-report). strictPort:true faz o Vite
+  // FALHAR em vez de subir noutra porta: porta variável = origem variável =
+  // localStorage zerado a cada restart (intro/sessão "esquecem" sozinhas em
+  // dev, sem ser bug — só pareceu bug até a gente entender essa pegadinha).
+  server: { port: Number(process.env.PORT) || 5183, strictPort: true },
 })
