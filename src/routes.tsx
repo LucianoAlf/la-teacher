@@ -55,8 +55,11 @@ export const router = createBrowserRouter(
         { path: '/app/confirmar/:registroId', element: <ConfirmarPage /> },
       ],
     },
-    // Vitrine do design system — pública (sem guard), útil no dev.
-    { path: '/dev/ds', element: <DesignSystemPage /> },
+    // Vitrine do design system — SÓ em desenvolvimento. Em produção a rota nem
+    // existe (cai no catch-all → /app), pra nenhum professor tropeçar nela.
+    ...(import.meta.env.DEV
+      ? [{ path: '/dev/ds', element: <DesignSystemPage /> }]
+      : []),
     { path: '*', element: <Navigate to="/app" replace /> },
   ],
   {
