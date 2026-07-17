@@ -98,6 +98,12 @@ begin
     return jsonb_build_object('aula_id',p_aula_ancora_id,'aplicado',false,'motivo','aula_cancelada');
   end if;
 
+  -- #1 dono da aula: nunca escrever presença na aula de outro professor
+  if v_aula.professor_id is distinct from p_professor_id then
+    if p_estrito then raise exception 'aula_nao_pertence_ao_professor'; end if;
+    return jsonb_build_object('aula_id',v_aula.id,'aplicado',false,'motivo','professor_divergente');
+  end if;
+
   -- janela (só bloqueia em modo estrito; fabio é tolerante)
   if p_estrito then
     if v_aula.data_hora_inicio > now() + interval '15 minutes' then raise exception 'chamada_ainda_nao_disponivel'; end if;
@@ -116,12 +122,15 @@ begin
     return jsonb_build_object('aula_id',v_aula.id,'aplicado',false,'motivo','roster_incompleto');
   end if;
 
+  -- #2 ausente fora do roster: em estrito RAISE; em não-estrito ABORTA sem escrever
+  -- (senão o id ruim seria ignorado e todo mundo viraria presente por engano)
   if exists (
     select 1 from unnest(coalesce(p_alunos_ausentes,'{}'::int[])) a(aluno_id)
     where not exists (select 1 from public.aula_alunos_emusys r
                       where r.aula_emusys_id = v_aula.id and r.aluno_id = a.aluno_id)
   ) then
-    if p_estrito then raise exception 'aluno_ausente_fora_do_roster'; end if;
+    if p_estrito then raise exception 'aluno_ausente_fora_do_roster';
+    else return jsonb_build_object('aula_id',v_aula.id,'aplicado',false,'motivo','aluno_ausente_fora_do_roster'); end if;
   end if;
 
   -- upsert de PROMOÇÃO: fonte forte vence null/emusys/sistema, nunca outra forte
@@ -180,10 +189,17 @@ begin
       raise exception 'chamada_somente_na_aula_ancora (use a aula % deste horario)', v_turma_irma; end if;
   end if;
 
-  -- curto-circuito: só conta como já enviada se já houver linha FORTE (emusys não conta)
-  if exists (select 1 from public.aluno_presenca ap
-             where ap.aula_emusys_id = v_aula.id
-               and ap.respondido_por in ('professor_la_teacher','fabio_audio','manual')) then
+  -- #3 curto-circuito "já enviada" só quando TODOS do roster já têm fonte forte
+  -- (não basta 1; senão bloquearia completar os outros alunos). emusys NÃO conta.
+  if exists (select 1 from public.aula_alunos_emusys r where r.aula_emusys_id=v_aula.id and r.aluno_id is not null)
+     and not exists (
+       select 1 from public.aula_alunos_emusys r
+       where r.aula_emusys_id = v_aula.id and r.aluno_id is not null
+         and not exists (
+           select 1 from public.aluno_presenca ap
+           where ap.aula_emusys_id = v_aula.id and ap.aluno_id = r.aluno_id
+             and ap.respondido_por in ('professor_la_teacher','fabio_audio','manual')))
+  then
     return jsonb_build_object('aula_id', v_aula.id, 'chamada_ja_enviada', true,
       'inseridos', 0, 'total_roster', (select count(*) from public.aula_alunos_emusys where aula_emusys_id=v_aula.id));
   end if;
@@ -284,11 +300,14 @@ begin
     from public.fabio_registros_aula f where f.parent_id = p_registro_id;
   end if;
 
-  -- ancora da chamada = turma-irma se existir, senao a propria aula do registro
+  -- ancora da chamada = turma-irma do MESMO professor se existir, senao a propria aula
+  -- #4 filtra por professor_id: nao pegar turma de outro professor no mesmo horario/unidade
   select coalesce((
     select t.id from public.aulas_emusys t
-     where t.tipo='turma' and t.unidade_id=(select unidade_id from public.aulas_emusys where id=v_reg.aula_id)
-       and t.data_hora_inicio=(select data_hora_inicio from public.aulas_emusys where id=v_reg.aula_id)
+     where t.tipo='turma'
+       and t.unidade_id       = (select unidade_id from public.aulas_emusys where id=v_reg.aula_id)
+       and t.data_hora_inicio = (select data_hora_inicio from public.aulas_emusys where id=v_reg.aula_id)
+       and t.professor_id is not distinct from v_reg.professor_id
        and coalesce(t.cancelada,false)=false limit 1), v_reg.aula_id) into v_ancora;
 
   begin
