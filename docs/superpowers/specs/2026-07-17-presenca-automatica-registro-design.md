@@ -39,7 +39,9 @@ fn_registrar_presencas_core(
 ) returns jsonb
 ```
 
-Contém: resolução da âncora (turma-irmã), first-write-wins (`on conflict (aluno_id,aula_emusys_id) do nothing`), curto-circuito se já há presença respondida pela mesma fonte forte. `app_registrar_presencas_aula` passa a **chamar o core** com `p_respondido_por='professor_la_teacher'`, `p_estrito=true` (contrato externo inalterado).
+Contém: resolução da âncora (turma-irmã) e o **upsert condicional de PROMOÇÃO** (ajuste #1 do Alfredo — crítico): `ON CONFLICT (aluno_id, aula_emusys_id) DO UPDATE ... WHERE aluno_presenca.respondido_por IS NULL OR respondido_por IN ('emusys','sistema')`. Uma fonte forte (`professor_la_teacher`/`fabio_audio`) **promove** sobre a linha fraca do Emusys, mas **nunca pisa** em forte → é **first-HUMAN-write-wins**, simétrico ao que o próprio sync já faz. `app_registrar_presencas_aula` passa a chamar o core com `p_respondido_por='professor_la_teacher'`, `p_estrito=true`; o curto-circuito "chamada já enviada" só dispara se já existir linha **forte** (a linha `emusys` NÃO conta como enviada).
+
+> **Efeito colateral bom:** isso conserta de brinde o **lockout original da chamada do professor** (caso Anna Clara) — hoje o `do nothing` fazia a chamada ser ignorada quando o Emusys gravava primeiro. Com a promoção, o professor sempre vence o default do Emusys na própria aula.
 
 **1.2 Emissão de presença a partir do registro.**
 
@@ -49,11 +51,12 @@ fabio_emitir_presenca_por_registro(p_registro_id uuid) returns jsonb
 
 - Lê o tronco (`fabio_registros_aula` onde `id=p_registro_id`) e as fatias (`parent_id=p_registro_id`); no caso 1-aluno, o próprio tronco.
 - Deriva **ausentes** = alunos cuja fatia tem `campos->>'presenca' = 'ausente'`; os demais do roster viram **presente**.
-- Chama `fn_registrar_presencas_core(v_reg.aula_id, professor, ausentes, 'fabio_audio', p_estrito=false)` — a âncora é resolvida no core.
-- **Não-fatal / idempotente:** first-write-wins não sobrescreve presença já respondida (professor/manual); reconfirmar não duplica. Retorna `{aula_id, presentes, ausentes, ja_havia, aplicado}`.
+- Chama `fn_registrar_presencas_core(v_reg.aula_id, professor, ausentes, 'fabio_audio', p_estrito=false)` — a âncora é resolvida no core; **promove** sobre `emusys`/`null`/`sistema`, nunca sobre forte.
+- **Idempotente:** re-executar é no-op (promoção não altera linha já forte).
+- **Não-fatal, mas NÃO silencioso** (ajuste #3 do Alfredo): carimba o resultado no `campos` do **tronco** (`fabio_registros_aula`) — `presenca_emitida` (bool), `presenca_emitida_em`, `presenca_aplicado`, `presenca_erro` — pra governança/retry enxergarem sem tabela nova. Retorna também `{aula_id, presentes, ausentes, ja_havia, aplicado}`.
 
 **1.3 Pendurar no gancho.**
-No fim de `app_confirmar_registro` (após o loop de fatias), chamar `fabio_emitir_presenca_por_registro(p_registro_id)` dentro de bloco `EXCEPTION WHEN OTHERS` **não-fatal** (a confirmação do registro nunca falha por causa da presença) e anexar o resultado ao jsonb de retorno (`presenca: {...}`).
+No fim de `app_confirmar_registro` (após o loop de fatias), chamar `fabio_emitir_presenca_por_registro(p_registro_id)` dentro de bloco `EXCEPTION WHEN OTHERS` **não-fatal** (a confirmação do registro nunca falha por causa da presença) e anexar o resultado ao jsonb de retorno (`presenca: {...}`). Como a emissão carimba o desfecho no `campos` do tronco (1.2), a evidência **fica persistida** mesmo se o caller não guardar o JSON — nada some no silêncio.
 
 **1.4 Sinal de presença pendente.**
 
@@ -61,9 +64,15 @@ No fim de `app_confirmar_registro` (após o loop de fatias), chamar `fabio_emiti
 vw_presenca_pendencia_fabio
 ```
 
-Critério (refina o do Alfredo pra funcionar apesar do sync do Emusys sempre gravar): aula **encerrada** (passou a janela operacional), **não cancelada**, **roster sincronizado** (aluno_id não-nulo), **professor conhecido**, e **sem presença CONFIRMADA** — i.e. nenhuma linha em `aluno_presenca` com `respondido_por in ('professor_la_teacher','fabio_audio','manual')` para aquela aula. (Linha só-`emusys` = ainda pendente de confirmação humana; é o caso de Campo Grande.) Expõe professor/unidade/aula/alunos/dias_em_atraso, no mesmo shape de `vw_registro_pendencia`.
+Critério **por ALUNO do roster** (ajuste #2 do Alfredo — NÃO por aula inteira, senão uma aula com 1 de 3 alunos confirmados sumiria da fila). A view é no grão **(aula, aluno)** e lista **cada aluno do roster sem presença FORTE** (`respondido_por in ('professor_la_teacher','fabio_audio','manual')`). Linha só-`emusys` conta como **fraca** = ainda pendente (é o caso de Campo Grande). Filtros: aula **encerrada**, **não cancelada**, **roster sincronizado**, **professor conhecido**. Uma aula está pendente sse `count(presenças fortes do roster) < count(alunos do roster)`.
 
-Leitor pro app/Fábio (reusando o padrão de pendências, sem duplicar): estender `app_minhas_pendencias` com uma seção `presenca`, ou `fn_presenca_pendencia_do_professor(p_professor_id)`.
+**Janela operacional (recomendação do Alfredo)** — a view expõe colunas separadas por consumidor:
+- `pendente` — a partir de **30 min** após o fim da aula;
+- `cobravel_professor` — até **24h** após o fim (app);
+- `cobravel_governanca` — até **7 dias** (ADM/coordenação);
+- `dias_em_atraso`, `motivo_bloqueio`.
+
+Leitor pro app/Fábio (reusando o padrão de pendências, sem duplicar): estender `app_minhas_pendencias` com uma seção `presenca`, ou `fn_presenca_pendencia_do_professor(p_professor_id)` — agregando a view (aula, aluno) por aula.
 
 **1.5 (Opcional/fase 2) Gerador de governança.** Função que varre `vw_presenca_pendencia_fabio` e enfileira `fabio_notificacoes` (professor, `categoria=governanca`) + `fila_relatorios_whatsapp` (ADM/coord). Pode nascer no cron do Alfredo lendo a view diretamente.
 
@@ -92,16 +101,18 @@ Leitor pro app/Fábio (reusando o padrão de pendências, sem duplicar): estende
 ## Verificação (como testar)
 
 1. Registro com fatias marcando 1 aluno `presenca='ausente'` → `app_confirmar_registro` → conferir `aluno_presenca`: os presentes com `respondido_por='fabio_audio'`, o ausente como `falta`, e nada sobrescrito se já havia `manual`/`professor`.
-2. Idempotência: reconfirmar não duplica nem altera.
-3. Não-fatal: aula fora da janela/roster incompleto → registro confirma mesmo assim; `presenca.aplicado=false`.
+1b. **Promoção (o caso CG):** aula que já tinha linha `emusys` → após emitir, a linha vira `fabio_audio` (promovida, não bloqueada). É o teste que prova o ajuste #1.
+2. Idempotência (ajuste do Alfredo — testar **direto**, não via reconfirmar, que muda status e não re-confirma): chamar `fabio_emitir_presenca_por_registro()` 2× → a 2ª é no-op (não duplica nem altera linha já forte).
+3. Não-fatal: aula fora da janela/roster incompleto → registro confirma mesmo assim; `presenca.aplicado=false` **e** o carimbo (`presenca_erro`/`presenca_aplicado`) fica no `campos` do tronco.
 4. `vw_presenca_pendencia_fabio`: uma aula CG só com linha `emusys` aparece como pendente; depois de `fabio_audio`/`professor`, some.
 5. App: pendência aparece, fechar em 1 toque grava e some da fila.
 
 ## Dependências / questões abertas
 
-- Alfredo: edge passa a preencher `campos.presenca`; destravar o worker de governança.
-- Definir a **janela operacional** de "presença pendente" (ex.: pendente a partir de X h após o fim da aula; cobrável até Y dias).
+- Alfredo: edge passa a preencher `campos.presenca`; destravar o worker de governança (hoje em `briefing_only`).
+- ~~Definir a janela operacional~~ **resolvida** (Alfredo): pendente 30 min após o fim; cobrável no app até 24h; governança até 7 dias.
 - Confirmar `fn_aula_individual_do_aluno` / `fn_compor_texto_prontuario` (usados por `app_confirmar_registro`) seguem estáveis.
+- Ao refatorar `app_registrar_presencas_aula` pro core, revalidar o curto-circuito "chamada já enviada" (só forte conta) e os testes existentes da chamada.
 
 ## Fases
 
