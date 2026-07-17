@@ -432,3 +432,23 @@ git commit -m "feat(presenca): app_confirmar_registro emite presenca (nao-fatal)
 
 - Escritas no banco (aplicar migration/execute_sql DDL) passam pela regra `mcp__…__execute_sql` já liberada. **Recomendo criar uma branch Supabase** (`create_branch`) pra testar sem tocar no piloto, e `merge_branch` ao fim.
 - Fase 2 (view `vw_presenca_pendencia_fabio` + tela do professor no app) e Fase 3 (governança WhatsApp, lado do Alfredo) entram como planos próprios.
+
+---
+
+## Execução — 2026-07-17 · APLICADO EM PROD ✅
+
+Migration `supabase/migrations/009-presenca-do-registro.sql` aplicada em produção via `apply_migration` (nome `presenca_do_registro`) + revoke de grants. 16/16 testes verdes.
+
+**Ambiente:** branch Supabase se mostrou **inviável** — o histórico de migrations rastreado do projeto está dessincronizado do schema real (a branch nova subiu `MIGRATIONS_FAILED`, quase vazia; a `p01c-staging` não tem `aula_alunos_emusys`). Testado então via **`BEGIN … ROLLBACK` em prod** (schema/deps/dados reais, zero traço), provado non-destrutivo antes.
+
+**Descobertas + hardening além do plano (todos testados):**
+1. **Constraint `aluno_presenca_respondido_por_check` não permitia `fabio_audio`** → ampliada (superset). Era showstopper: toda emissão estouraria `check_violation`.
+2. **Retorno do wrapper = SUPERSET compatível** com `ResultadoChamada` — o app só lê `total_roster` + `chamada_ja_enviada`; nada muda no front.
+3. **Guarda registro-de-1-aluno**: nunca marca turma inteira (âncora = a própria aula; aborta se roster>1).
+4. **Guarda "sem sinal de presença"** (anti over-marking): o gancho é **no-op** enquanto o edge do Alfredo não preencher `campos.presenca`. Liga sozinho quando entrar. Sem isto, todo registro confirmado marcaria a turma inteira presente e travaria a correção pela chamada.
+5. **Âncora da turma = ela mesma** (sem hop turma-irmã quando a aula já é turma) — evita ambiguidade com 2 turmas no mesmo horário.
+6. **`revoke execute`** dos 2 helpers internos (`fn_registrar_presencas_core`, `fabio_emitir_presenca_por_registro`) de `public/anon/authenticated` — pegaram grant PUBLIC default e ficariam chamáveis pelo anon (o core aceita `professor_id` confiável). Alinhado ao padrão do banco.
+
+**Verificado ao vivo (aula real 204140, em `BEGIN…ROLLBACK`):** promove a linha `emusys` (Braz) → `professor_la_teacher`, e **respeita a `manual`** (Anna Clara, intocada). Conserta o lockout na raiz.
+
+**Pendências:** Alfredo — edge passa a preencher `campos.presenca` (liga a emissão) + destravar o worker de governança (`briefing_only`). Depois: Fase 2 (view `vw_presenca_pendencia_fabio` + tela do professor) e Fase 3 (WhatsApp).
