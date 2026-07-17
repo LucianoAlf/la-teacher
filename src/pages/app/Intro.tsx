@@ -31,9 +31,9 @@ export default function IntroPage() {
   const avancar = () => (passo < TOTAL - 1 ? setPasso((p) => p + 1) : sair())
 
   return (
-    <div className="flex h-dvh justify-center overflow-hidden" style={{ background: 'var(--login-bg)' }}>
+    <div className="flex h-svh justify-center overflow-hidden" style={{ background: 'var(--login-bg)' }}>
       <div
-        className="relative flex h-dvh w-full max-w-[430px] flex-col overflow-hidden"
+        className="relative flex h-svh w-full max-w-[430px] flex-col overflow-hidden"
         style={{ background: 'var(--login-bg)', color: 'var(--login-text)' }}
       >
         {/* Atmosfera: pontinhos halftone rosa (assinatura da família LA) */}

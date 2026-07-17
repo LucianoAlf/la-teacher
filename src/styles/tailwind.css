@@ -13,6 +13,18 @@
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
+  /* App-shell travado na viewport: só o miolo designado de cada tela
+     (flex-1 overflow-y-auto) rola — o DOCUMENTO nunca. Sem essa trava, no PWA
+     instalado o arrasto no dedo rolava a página inteira e a TabBar/Fab (presas
+     na moldura, não na tela) escorregavam pra fora do rodapé. overscroll-behavior
+     mata o efeito elástico / pull-to-refresh que também deslocava a barra. */
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
   /* App mobile: rola no dedo/scroll, sem a barra cinza do desktop (como app nativo). */
   * {
     scrollbar-width: none; /* Firefox */

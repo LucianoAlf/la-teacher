@@ -38,9 +38,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex h-dvh justify-center overflow-hidden" style={{ background: 'var(--login-bg)' }}>
+    <div className="flex h-svh justify-center overflow-hidden" style={{ background: 'var(--login-bg)' }}>
       <div
-        className="relative flex h-dvh w-full max-w-[430px] flex-col overflow-x-hidden overflow-y-auto"
+        className="relative flex h-svh w-full max-w-[430px] flex-col overflow-x-hidden overflow-y-auto"
         style={{ background: 'var(--login-bg)', color: 'var(--login-text)' }}
       >
         {/* ---- ATMOSFERA — cobre o topo, atrás de tudo (pontinhos + marca d'água grande) ---- */}
