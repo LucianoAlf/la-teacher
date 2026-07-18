@@ -13,9 +13,9 @@ import { formatHoraBRT } from '../../lib/date'
  */
 
 const MIN = 60_000
-/** A chamada abre 15 min antes da aula e fecha 24h após o fim (regra do banco). */
+/** A chamada abre 15 min antes da aula e fecha 3 dias após o fim (regra do banco). */
 const ANTECEDENCIA_CHAMADA_MS = 15 * MIN
-const JANELA_POS_AULA_MS = 24 * 60 * MIN
+const JANELA_POS_AULA_MS = 3 * 24 * 60 * MIN
 
 export type StatusSessao = 'chamada_feita' | 'agora' | 'pendente' | 'perdida' | 'futura' | 'faltaram'
 export type JanelaChamada = 'antes' | 'aberta' | 'encerrada'
@@ -154,15 +154,18 @@ export function statusSessao(s: SessaoAula, now: Date = new Date()): StatusSessa
 }
 
 /**
- * Pode gravar a aula AGORA? Regra de janela do CLIENTE — a RPC de gravação
- * (app_enfileirar_audio) NÃO valida horário (só a de chamada valida), então a
- * trava é aqui: grava-se a partir do momento em que a aula começa até 24h depois
- * (mesma janela da chamada), exceto se todo mundo faltou (Alma: sem conteúdo).
+ * Pode gravar a aula AGORA? Janela do CLIENTE espelhando o SERVIDOR — tanto
+ * app_enfileirar_audio (gravação) quanto a RPC de chamada validam a janela de
+ * 3 dias no banco. O guard de janela aqui alinha o mic com o servidor: não
+ * mostra botão que o backend vai recusar (antes o mic aparecia em aula fora da
+ * janela e só estourava 'janela_encerrada' na hora de enviar). Grava-se do
+ * início da aula até 3 dias depois, exceto se todo mundo faltou (Alma: sem conteúdo).
  *  · 'futura'  → nada aconteceu ainda, nada pra registrar;
  *  · 'faltaram'→ ninguém veio, não há conteúdo;
- *  · 'perdida' → passou das 24h, é assunto da coordenação.
+ *  · 'perdida' → passou dos 3 dias, é assunto da coordenação.
  */
 export function podeGravar(s: SessaoAula, now: Date = new Date()): boolean {
+  if (janelaChamada(s, now) === 'encerrada') return false
   const st = statusSessao(s, now)
   return st === 'agora' || st === 'pendente' || st === 'chamada_feita'
 }

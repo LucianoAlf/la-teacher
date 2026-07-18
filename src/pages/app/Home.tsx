@@ -262,7 +262,7 @@ function PendenciasCard({
       ))}
       <p className="mt-[9px] flex items-start gap-2 text-[12.5px] leading-relaxed text-text-secondary">
         <i className="fa-solid fa-clock mt-[3px] text-brand-text" aria-hidden="true" />
-        <span>A chamada fecha 24h depois da aula — depois disso, só a coordenação lança. ⏳</span>
+        <span>A chamada fecha 3 dias depois da aula — depois disso, só a coordenação lança. ⏳</span>
       </p>
     </Card>
   )

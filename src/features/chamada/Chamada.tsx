@@ -26,7 +26,7 @@ const ERRO_TEXTO: Record<ErroChamada | 'desconhecido', string> = {
   aula_nao_pertence_ao_professor: 'Essa aula não está na sua agenda.',
   aula_cancelada: 'Essa aula foi cancelada — não tem chamada.',
   chamada_ainda_nao_disponivel: 'A chamada abre 15 minutos antes da aula.',
-  janela_de_chamada_encerrada: 'A janela de chamada (24h após a aula) já fechou. Fala com a coordenação.',
+  janela_de_chamada_encerrada: 'A janela de chamada (3 dias após a aula) já fechou. Fala com a coordenação.',
   roster_nao_sincronizado: 'A lista de alunos desta aula ainda não sincronizou. Tenta de novo em alguns minutos.',
   roster_incompleto: 'Tem aluno sem cadastro conciliado nesta aula — bloqueei pra não gravar chamada parcial.',
   aluno_ausente_fora_do_roster: 'A lista de alunos mudou desde que você abriu. Recarrega e confere de novo.',
@@ -314,7 +314,7 @@ function Conteudo({ sessao, onRecarregar }: { sessao: SessaoAula; onRecarregar: 
       )}
       {!enviada && !semRoster && naoConciliados.length === 0 && janela === 'encerrada' && (
         <Aviso icone="fa-solid fa-lock" tom="warn">
-          A janela de chamada fechou (24h após a aula). Agora só a coordenação pode lançar.
+          A janela de chamada fechou (3 dias após a aula). Agora só a coordenação pode lançar.
         </Aviso>
       )}
       {!enviada && janela === 'aberta' && naoConciliados.length === 0 && !semRoster && semPortaChamada && (

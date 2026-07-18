@@ -106,7 +106,7 @@ const MSG_GRAVACAO: Record<ErroGravacao, { icon: string; title: string; desc: st
   janela_de_gravacao_encerrada: {
     icon: 'fa-solid fa-lock',
     title: 'Janela encerrada',
-    desc: 'A gravação fecha 24h depois da aula. Depois disso, o registro é com a coordenação.',
+    desc: 'A gravação fecha 3 dias depois da aula. Depois disso, o registro é com a coordenação.',
   },
 }
 
