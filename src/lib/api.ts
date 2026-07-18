@@ -28,7 +28,11 @@ export interface AlunoSessao {
   nome: string
   /** Presença lançada. 'a_confirmar' = chamada ainda não feita. */
   presenca: 'presente' | 'falta' | 'a_confirmar'
-  /** true = a PRESENÇA deste aluno já foi lançada (chamada feita). Fonte de verdade da chamada. */
+  /**
+   * true = presença deste aluno lançada por FONTE FORTE (professor_la_teacher /
+   * fabio_audio / manual / professor_whatsapp) — chamada REAL, não o default do
+   * Emusys. Fonte de verdade do selo "chamada feita" (Fase 2 — selo honesto).
+   */
   tem_presenca_registrada: boolean
   /**
    * true = existe o RELATÓRIO do Fábio (anotacoes_fabio) desta aula — NÃO é
@@ -56,7 +60,7 @@ export interface SessaoAula {
   /** A aula da sessão — âncora do áudio da gravação e da chamada. */
   aula_id_ancora: number
   n_alunos: number
-  /** Nº de alunos com presença já lançada. */
+  /** Nº de alunos com presença de FONTE FORTE (chamada real, não o default do Emusys). */
   n_registradas: number
   /** true = há aluno do roster sem conciliação (chamada bloqueada no banco). */
   roster_incompleto: boolean
