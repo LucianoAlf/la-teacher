@@ -2,6 +2,13 @@
 
 _2026-07-19 · Alf → Codex · **mesma fonte única do Fábio, da Sol e do LA Teacher**_
 
+> **⚠️ STATUS (22/07):** este handoff segue **válido como produto** — é a fase **P3** do plano de presença do próprio Codex (LA Report/secretaria). Mas foi escrito ANTES da auditoria cruzada, e 3 âncoras técnicas serão rebaseadas na SPEC da presença:
+> 1. a "régua única" `fn_presenca_e_forte` vira a **matriz única de fontes** (convergência com `vw_aluno_presenca_semantica_v1` + `presenca_politicas_confiabilidade` do Codex — auditoria §5);
+> 2. os 4 estados daqui se mapeiam nos **estados semânticos** (`presente`, `falta_confirmada`, `falta_provavel`/não-marcado, `aula_justificada`);
+> 3. justificar/corrigir dialoga com `aluno_presenca_retificacoes` + `admin_corrigir_presenca`, que **já existem**.
+>
+> O que **não muda**: as 3 RPCs que o LA Teacher fornece, os requisitos de UX, o piloto em CG e as proibições. **Não executar antes da SPEC aprovada.** Ver `docs/auditorias/2026-07-22-auditoria-read-only-la-teacher-presenca-hs-v3.md` (decisões do Alf no §9).
+
 ## TL;DR
 
 Construir no LA Report a **tela de chamada em lote** pra secretaria/ADM das 3 unidades. Motivo: o Emusys não distingue *"aluno faltou"* de *"ninguém marcou"* (tudo vira `ausente` — o **fantasma**), não tem "marcar ausente" na UI (só "Marcar Presença Manual"; o resto é default) e **a API dele não aceita escrita de presença** (conferido em 19/07: só cancelar/reagendar/CRM). Estamos migrando a operação pro ecossistema LA — a chamada passa a nascer aqui.
