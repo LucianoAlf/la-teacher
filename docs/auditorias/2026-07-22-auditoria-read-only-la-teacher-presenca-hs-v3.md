@@ -43,7 +43,7 @@ O LA Teacher está aderente à arquitetura exigida: **só fala com o banco via R
 - **D3 — duas réguas de interpretação convivem:** `fn_presenca_e_forte` (migration 012 — selo do app, `vw_presenca_pendencia` 013, RPC do Fábio 014) × `vw_aluno_presenca_semantica_v1` + `presenca_politicas_confiabilidade` (Codex). Hoje concordam em todos os casos existentes; divergirão no `fabio_audio`. Precisa de **uma matriz única de fontes** (§5).
 - **D4 — Ficha do Aluno lê bruto** (`app_aluno_ficha`: le_aluno_presenca=true, le_semantica=false) → o professor vê falta-fantasma de CG como "falta". Migrar para a camada semântica (`falta_provavel`/`indeterminado` distintos de `falta_confirmada`).
 - **D5 —** assinatura real da correção: `admin_corrigir_presenca(p_aluno_presenca_id uuid, p_status_presenca text, p_motivo text)` (difere do §9.3 no nome dos parâmetros; cosmético).
-- **D6 — retificações não guardam a autoria de origem** (`status_anterior` sim; `respondido_por_anterior` não) — a trilha perde QUEM tinha respondido antes da correção. Aditivo simples.
+- ~~**D6 — retificações não guardam a autoria de origem**~~ **RETIRADO (22/07):** achado meu estava ERRADO — as colunas `respondido_por_anterior`/`respondido_em_anterior` existem e são preenchidas pelo trigger `completar_origem_retificacao_presenca`, que eu não vi na introspecção (li só o corpo da função, não os triggers da tabela). Correção do Codex, confirmada.
 - **D7 — política × decisão do Alf:** `ausencia_emusys → falta_confirmada` em Barra/Recreio é confiança-por-unidade **para o KPI** (versionada, com CG em revisão). O Alf rejeitou confiança-por-unidade **para alerta** ("não posso confiar que estarão sempre 100%"). Não é contradição se ficar explícito que são planos diferentes — KPI versionado × alerta sempre-ligado (a fila da Sol/`vw_presenca_pendencia` cobra "chamada não lançada" em TODAS as unidades, sempre). Precisa de decisão formal (Q2).
 
 ## 4. Riscos
@@ -54,7 +54,7 @@ O LA Teacher está aderente à arquitetura exigida: **só fala com o banco via R
 | **P1a** | Semântica ignora `fabio_audio` — evidência humana mal classificada quando o áudio voltar | corrigir **antes de 3/ago** |
 | **P1b** | Ficha do Aluno exibe bruto como resultado pedagógico | migrar leitura p/ semântica |
 | **P1c** | Duas réguas de fonte sem matriz única | convergir (§5) |
-| **P2a** | `aluno_presenca_retificacoes` sem `respondido_por_anterior` | coluna aditiva |
+| ~~P2a~~ | ~~retificações sem autoria de origem~~ — **RETIRADO** (já existia via trigger; ver D6) | — |
 | **P2b** | `admin_corrigir_presenca` executável por `authenticated` | **seguro hoje** (gate interno verificado); recomendação: teste de permissão no CI ou restringir grant |
 | **P2c** | Promoção sobre linha pré-16/07 perde status original do Emusys | janela histórica; aceitar e documentar |
 
@@ -92,10 +92,10 @@ UI: bloco no **Perfil** (`src/pages/app/Perfil.tsx`) — score parcial rotulado 
 
 | # | Entrega | Tipo |
 |---|---|---|
-| M1 | Semântica + matriz de fontes aprende `fabio_audio`/`professor_whatsapp` | migration (review Alfredo) — **antes de 3/ago** |
-| M2 | Retificações += autoria de origem | migration |
+| ~~M1~~ | ✅ **FEITO pelo Codex (22/07)** — migration `20260722153000_presenca_fontes_humanas_ficha_semantica.sql`: `fn_presenca_e_forte` virou a matriz única (mesma lista de fontes da 012) + semântica `v1.3` conhece `fabio_audio`/`professor_whatsapp`. Prazo de 3/ago atendido | — |
+| ~~M2~~ | ~~Retificações += autoria de origem~~ — **RETIRADO** (já existia; ver D6) | — |
 | ~~M3~~ | ~~`app_meu_health_score_v3` + grants~~ — **ADIADO** (decisão 22/07: HS não aparece no app do professor; futuro = app dos coordenadores, lado LA Report). Desenho do §6 fica arquivado pra quando for a hora | — |
-| R1 | `app_aluno_ficha` migra pra camada semântica | RPC |
+| ~~R1~~ | ✅ **FEITO pelo Codex (22/07)** — `app_aluno_ficha.presenca_recente` agora vem da semântica: `data, horario, status(=estado_origem, compat), resultado_pedagogico, situacao_chamada, confianca, proveniencia, revisao_operacional_*, curso` | — |
 | ~~F1~~ | ~~Bloco V3 no Perfil~~ — **ADIADO** (mesma decisão) | — |
 | F2 | Ficha exibe `falta_provavel`/`indeterminado` sem ambiguidade | frontend |
 | T | Congelar os 24 testes do §12 do handoff como suite SQL (harness `BEGIN/ROLLBACK`) — #14/#15 hoje passam por construção; #13 passa por curto-circuito | testes |
