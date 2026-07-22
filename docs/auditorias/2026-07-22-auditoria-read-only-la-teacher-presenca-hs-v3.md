@@ -94,12 +94,12 @@ UI: bloco no **Perfil** (`src/pages/app/Perfil.tsx`) — score parcial rotulado 
 |---|---|---|
 | M1 | Semântica + matriz de fontes aprende `fabio_audio`/`professor_whatsapp` | migration (review Alfredo) — **antes de 3/ago** |
 | M2 | Retificações += autoria de origem | migration |
-| M3 | `app_meu_health_score_v3` + grants | migration |
+| ~~M3~~ | ~~`app_meu_health_score_v3` + grants~~ — **ADIADO** (decisão 22/07: HS não aparece no app do professor; futuro = app dos coordenadores, lado LA Report). Desenho do §6 fica arquivado pra quando for a hora | — |
 | R1 | `app_aluno_ficha` migra pra camada semântica | RPC |
-| F1 | Bloco V3 no Perfil | frontend |
+| ~~F1~~ | ~~Bloco V3 no Perfil~~ — **ADIADO** (mesma decisão) | — |
 | F2 | Ficha exibe `falta_provavel`/`indeterminado` sem ambiguidade | frontend |
 | T | Congelar os 24 testes do §12 do handoff como suite SQL (harness `BEGIN/ROLLBACK`) — #14/#15 hoje passam por construção; #13 passa por curto-circuito | testes |
-| — | UI da chamada com estados novos + correção pelo professor | **aguarda SPEC da presença** (depende de Q1) |
+| — | UI da chamada com estados novos — **sem correção pelo professor** (decisão 22/07); correção segue exclusiva da coordenação via fluxo auditado | aguarda SPEC da presença |
 
 ## 8. Perguntas de negócio (decisão do Alf)
 
@@ -107,6 +107,13 @@ UI: bloco no **Perfil** (`src/pages/app/Perfil.tsx`) — score parcial rotulado 
 2. **Duas políticas explícitas:** confirmar que convivem — (a) KPI: `ausente` Emusys = `falta_confirmada` em B/R com CG em revisão (versionado, tabela de políticas); (b) alerta/governança: "chamada não lançada" cobrada **sempre, em todas as unidades** (fila da Sol nunca cala por confiança). É como está montado; falta o carimbo.
 3. **Health Score no app:** libera já como "diagnóstico parcial" no Perfil do professor, ou espera o primeiro fechamento oficial de ciclo?
 4. **Ficha do Aluno:** ok exibir a verdade semântica ao professor (falta *provável* ≠ falta confirmada), sabendo que em CG isso vai escancarar o buraco de registro?
+
+## 9. Decisões do Alf (22/07) — as 4 perguntas fechadas
+
+1. **Professor NÃO corrige a própria chamada.** Mantém como está: promoção recusa forte-sobre-forte; retificação é exclusiva da coordenação (`admin_corrigir_presenca`, auditada). A SPEC da presença não inclui "editar chamada" no app do professor.
+2. **Carimbadas as duas políticas.** (a) KPI: `ausente` Emusys = `falta_confirmada` em Barra/Recreio, CG em revisão operacional (versionado em `presenca_politicas_confiabilidade`); (b) governança/alerta: "chamada não lançada" cobrada **sempre, em todas as unidades** (`vw_presenca_pendencia` → Sol/Fábio). Convivem oficialmente.
+3. **Health Score NÃO entra no app do professor por enquanto.** Futuro: aplicativo dos **coordenadores** (lado LA Report). M3/F1 adiados; o desenho da `app_meu_health_score_v3` (§6) fica arquivado como referência.
+4. **Princípio da ficha: "informação certa por professor, dentro do que já desenhamos."** Aplicação prática: R1/F2 seguem — a Ficha do Aluno migra pra camada semântica (falta **confirmada** ≠ falta **provável/não conferida**), que é o dado certo; em CG isso vai expor o buraco de registro, e é essa a verdade que a governança já ataca.
 
 ---
 
