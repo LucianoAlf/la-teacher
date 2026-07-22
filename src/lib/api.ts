@@ -409,10 +409,32 @@ export interface AlunoFichaResponsavel {
   principal: boolean | null
 }
 
+/** Estados da camada semântica de presença (regra v1.3 do LA Report, 22/07). */
+export type ResultadoPedagogico =
+  | 'presente'
+  | 'falta_confirmada'
+  | 'falta_provavel'
+  | 'indeterminado'
+  | 'aula_justificada'
+  | 'aula_cancelada'
+
 export interface AlunoFichaPresenca {
   data: string
+  /** Estado BRUTO da origem — legado, mantido por compatibilidade. Prefira resultado_pedagogico. */
   status: string | null
   curso: string | null
+  horario?: string | null
+  /**
+   * A verdade pedagógica: falta CONFIRMADA (chamada real) ≠ falta PROVÁVEL
+   * (o "ausente" automático do Emusys quando ninguém fez a chamada).
+   */
+  resultado_pedagogico?: ResultadoPedagogico | null
+  situacao_chamada?: string | null
+  confianca?: string | null
+  /** Quem marcou: 'la_teacher' | 'fabio_audio' | 'manual' | 'emusys'. */
+  proveniencia?: string | null
+  revisao_operacional_exigida?: boolean | null
+  revisao_operacional_status?: string | null
 }
 
 export interface AlunoFichaRegistro {

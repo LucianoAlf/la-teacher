@@ -191,6 +191,34 @@ const ehFalta = (s: string | null) => {
   return v === 'falta' || v === 'ausente'
 }
 
+// Verdade semântica (regra v1.3): falta CONFIRMADA ≠ o "ausente" automático do
+// Emusys sem chamada real (falta_provavel). Payload antigo (sem o campo) cai no
+// fallback honesto: bruto 'ausente' vira provável — nunca afirmamos falta sem chamada.
+type EstadoSemantico = NonNullable<AlunoFichaPresenca['resultado_pedagogico']>
+
+function estadoSemantico(p: AlunoFichaPresenca): EstadoSemantico {
+  if (p.resultado_pedagogico) return p.resultado_pedagogico
+  if (ehPresente(p.status)) return 'presente'
+  if (ehFalta(p.status)) return 'falta_provavel'
+  return 'indeterminado'
+}
+
+const FONTE_LABEL: Record<string, string> = {
+  la_teacher: 'chamada do professor',
+  fabio_audio: 'áudio do Fábio',
+  manual: 'coordenação',
+  emusys: 'Emusys, automático',
+}
+
+const ESTADO_UI: Record<EstadoSemantico, { rotulo: string; dot: string }> = {
+  presente: { rotulo: 'Presente', dot: 'bg-success' },
+  falta_confirmada: { rotulo: 'Faltou', dot: 'bg-danger' },
+  falta_provavel: { rotulo: 'Falta não conferida', dot: 'bg-warning' },
+  indeterminado: { rotulo: 'Sem registro', dot: 'bg-border-strong' },
+  aula_justificada: { rotulo: 'Justificada', dot: 'border-[1.5px] border-success bg-transparent' },
+  aula_cancelada: { rotulo: 'Cancelada', dot: '' },
+}
+
 // ---------------------------------------------------------------------------
 // Blocos
 // ---------------------------------------------------------------------------
@@ -408,36 +436,68 @@ function Presenca({ lista }: { lista: AlunoFichaPresenca[] }) {
     )
   }
 
-  const presentes = lista.filter((p) => ehPresente(p.status)).length
-  const faltas = lista.filter((p) => ehFalta(p.status)).length
-  const base = presentes + faltas
+  // Cancelada não conta história de presença — fora da tirinha e das contas.
+  const aulas = lista.filter((p) => estadoSemantico(p) !== 'aula_cancelada')
+  if (aulas.length === 0) {
+    return (
+      <Card title="Presença" icon="fa-solid fa-calendar-check">
+        <p className="py-1 text-sm text-text-secondary">Sem presença registrada ainda.</p>
+      </Card>
+    )
+  }
+
+  const conta = (e: EstadoSemantico) => aulas.filter((p) => estadoSemantico(p) === e).length
+  const presentes = conta('presente')
+  const confirmadas = conta('falta_confirmada')
+  const provaveis = conta('falta_provavel')
+  // % só sobre FATO (presente + falta confirmada) — mesma régua do denominador
+  // semântico do LA Report. "Não conferida" não vira falta no número.
+  const base = presentes + confirmadas
   const pct = base > 0 ? Math.round((presentes / base) * 100) : null
   // lista vem em ordem decrescente (recente → antigo); a tirinha mostra antigo → recente.
-  const tirinha = [...lista].reverse()
+  const tirinha = [...aulas].reverse()
 
   return (
     <Card title="Presença" icon="fa-solid fa-calendar-check">
-      <div className="mb-3 flex flex-wrap gap-[5px]">
-        {tirinha.map((p, i) => (
-          <span
-            key={`${p.data}-${i}`}
-            title={`${dataCurta(p.data)} · ${p.status ?? '—'}`}
-            className={cx(
-              'h-[11px] w-[11px] rounded-full',
-              ehPresente(p.status) ? 'bg-success' : ehFalta(p.status) ? 'bg-danger' : 'bg-border-strong',
-            )}
-          />
-        ))}
+      <div className="mb-2 flex flex-wrap gap-[5px]">
+        {tirinha.map((p, i) => {
+          const ui = ESTADO_UI[estadoSemantico(p)]
+          const fonte = p.proveniencia ? (FONTE_LABEL[p.proveniencia] ?? p.proveniencia) : null
+          return (
+            <span
+              key={`${p.data}-${i}`}
+              title={`${dataCurta(p.data)} · ${ui.rotulo}${fonte ? ` (${fonte})` : ''}`}
+              className={cx('h-[11px] w-[11px] rounded-full', ui.dot)}
+            />
+          )
+        })}
       </div>
+      {(confirmadas > 0 || provaveis > 0) && (
+        <p className="mb-2 text-[11.5px] leading-relaxed text-text-secondary">
+          {confirmadas > 0 && (
+            <>
+              <span className="font-semibold text-danger-text">{confirmadas}</span> falta
+              {confirmadas > 1 ? 's' : ''} confirmada{confirmadas > 1 ? 's' : ''}
+            </>
+          )}
+          {confirmadas > 0 && provaveis > 0 && ' · '}
+          {provaveis > 0 && (
+            <>
+              <span className="font-semibold text-warning-text">{provaveis}</span> não conferida
+              {provaveis > 1 ? 's' : ''} (aula sem chamada real)
+            </>
+          )}
+        </p>
+      )}
       <div className="flex items-center gap-2 border-b border-border-subtle py-[6px] text-[13px]">
         <i className="fa-solid fa-chart-simple text-[13px] text-text-secondary" aria-hidden="true" />
-        Presença recente
+        Presença confirmada
         <span className="ml-auto font-semibold">{pct != null ? `${pct}%` : '—'}</span>
       </div>
       <div className="flex items-center gap-2 py-[6px] text-[13px]">
         <i className="fa-solid fa-clock text-[13px] text-text-secondary" aria-hidden="true" />
         Última aula
-        <span className="ml-auto font-semibold">{diasDesde(lista[0].data)}</span>
+        <span className="ml-auto font-semibold">{diasDesde(aulas[0].data)}</span>
       </div>
     </Card>
   )
