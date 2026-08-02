@@ -92,7 +92,34 @@ Se quiser preparar alguma aula específica, me manda o nome do aluno.
 
 Regras de tom (contrato de alerta v1): parceiro de sala, **sem cobrança policial**; se não houver conteúdo, escreve *"Sem conteúdo registrado da última aula."* — **nunca inventa**.
 
-⚠️ **Ponto de atenção:** o `resumo_ultima_aula` vem como texto corrido truncado (~110 caracteres). Se quiser o formato rico do Alf (**Foco / Trabalho feito / Música**) em campos separados, tem 2 caminhos: (a) a Alma formata a partir do texto agora, ou (b) eu amplio a RPC pra devolver os campos estruturados do registro (`objetivo`, `conteudo`, `repertorio`…). **Me fala qual você prefere que eu faço a (b) hoje mesmo.**
+### ✅ RESOLVIDO (02/08, já em produção — migration `016`)
+
+A RPC agora devolve **os campos separados**, do jeito que o formato aprovado precisa. Cada aluno traz:
+
+```jsonc
+{
+  "nome": "Valentina Mendes Rodrigues Aleixo",
+  "primeiro_nome": "Valentina",
+  "resumo_ultima_aula": "…",          // COMPAT: idêntico ao de antes, pode seguir usando
+  "ultima_aula": {                     // NOVO — use este
+    "data": "2026-07-13",              // → "Última aula registrada: 13/07"
+    "foco": "…",                       // → *Foco:*
+    "trabalho_feito": "…",             // → *Trabalho feito:*  (texto COMPLETO, sem corte)
+    "repertorio": "…",                 // → *Música/Repertório:*
+    "dever_casa": "…",                 // → só aparece se existir
+    "proximo_passo": "…",              // → só aparece se existir
+    "observacao": "…"
+  }
+}
+```
+
+Mais: o nível de cima agora traz **`total_aulas`** e **`total_alunos`** prontos ("Hoje você tem *4 aulas* com *5 alunos*") — não precisa contar.
+
+**Chaves ausentes = não existe registro daquilo.** O objeto vem "enxuto" (`jsonb_strip_nulls`): se `repertorio` não vier, **não escreva a linha** — nada de "não registrado" inventado. Se `ultima_aula` vier `null`, escreva *"Sem conteúdo registrado da última aula."*
+
+**Dois campos novos que valem ouro** (não estavam na simulação, sugiro incluir):
+- **`dever_casa`** — o professor consegue cobrar o dever logo na entrada da aula. Ex. real da Valentina amanhã: *"Ouvir a música para decorar a letra"*.
+- **`proximo_passo`** — o que ficou combinado pra esta aula. Ex. real do Arthur: *"Continuar trabalhando a independência dos dedos para tocar com as duas mãos juntas"*.
 
 ## 7. O outro ponto crítico de amanhã — presença por áudio
 
