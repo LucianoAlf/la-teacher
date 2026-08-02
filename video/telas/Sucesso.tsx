@@ -63,8 +63,9 @@ const Badge: React.FC<{ texto: string; desde: number }> = ({ texto, desde }) => 
   )
 }
 
-export const Sucesso: React.FC<{ badges?: string[] }> = ({
+export const Sucesso: React.FC<{ badges?: string[]; sub?: string }> = ({
   badges = ['1 tronco', '1 fatia', '1 dever de casa'],
+  sub = '1 aluno recebeu a aula no diário. Visível pra coordenação.',
 }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
@@ -141,7 +142,7 @@ export const Sucesso: React.FC<{ badges?: string[] }> = ({
           opacity: texto,
         }}
       >
-        A aula da Valentina já está no diário dela.
+        {sub}
       </div>
 
       <div style={{ marginTop: 24, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>

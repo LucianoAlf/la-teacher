@@ -27,10 +27,12 @@ const MicGlyph: React.FC<{ tamanho: number; cor: string }> = ({ tamanho, cor }) 
   </svg>
 )
 
-export const Gravar: React.FC<{ micFrame: number; stopFrame: number }> = ({
-  micFrame,
-  stopFrame,
-}) => {
+export const Gravar: React.FC<{
+  micFrame: number
+  stopFrame: number
+  /** efeito montagem: o timer corre mais rápido que o relógio (1 = tempo real) */
+  aceleracao?: number
+}> = ({ micFrame, stopFrame, aceleracao = 1 }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
 
@@ -46,7 +48,10 @@ export const Gravar: React.FC<{ micFrame: number; stopFrame: number }> = ({
           ? 'gravando'
           : 'gravado'
 
-  const decorrido = Math.max(0, Math.floor((Math.min(frame, stopFrame) - gravandoDesde) / fps))
+  const decorrido = Math.min(
+    38,
+    Math.max(0, Math.floor(((Math.min(frame, stopFrame) - gravandoDesde) / fps) * aceleracao)),
+  )
   const timer = `0:${String(decorrido).padStart(2, '0')}`
 
   const entrada = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: 'clamp' })

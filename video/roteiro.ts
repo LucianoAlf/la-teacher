@@ -32,26 +32,26 @@ export const ROTEIRO: Cena[] = [
   },
   {
     id: 'login',
-    duracaoMinS: 12,
+    duracaoMinS: 7,
     caption: '',
     narracao:
       'Primeiro acesso é rapidinho: teu e-mail da LA e a senha que a coordenação te passou. Só isso.',
   },
   {
     id: 'home',
-    duracaoMinS: 10,
+    duracaoMinS: 8,
     caption: '',
     narracao: 'Essa é tua casa. Eu te recebo com o resumo do dia, tuas aulas e o que ficou pendente.',
   },
   {
     id: 'agenda',
-    duracaoMinS: 10,
+    duracaoMinS: 8,
     caption: '',
     narracao: 'Tua agenda do dia. Aluno, horário, sala — tudo no lugar quando você chega.',
   },
   {
     id: 'gravar',
-    duracaoMinS: 15,
+    duracaoMinS: 13,
     caption: '',
     narracao:
       'Acabou a aula? Toca aqui e fala, do teu jeito. É tipo contar pro colega como foi. Trinta segundos e tá feito.',
@@ -90,7 +90,7 @@ export const ROTEIRO: Cena[] = [
   },
   {
     id: 'chamada',
-    duracaoMinS: 16,
+    duracaoMinS: 15,
     caption: '',
     narracao:
       'E se num dia você não gravar o áudio? A chamada manual tá aqui: todo mundo começa presente, você só toca em quem faltou e envia. Dois toques.',

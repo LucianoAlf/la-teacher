@@ -1,8 +1,22 @@
 {
-  "intro": "intro.366eba6d.mp3",
-  "agenda": "agenda.198379b0.mp3",
+  "abertura": "abertura.366eba6d.mp3",
+  "intro": "intro.aaf5ebb6.mp3",
+  "login": "login.702622ab.mp3",
+  "home": "home.cbbaed2e.mp3",
+  "agenda": "agenda.6386eb8a.mp3",
   "gravar": "gravar.eb42d842.mp3",
-  "resultado": "resultado.9c881735.mp3",
+  "ouvir": "ouvir.41166b2f.mp3",
+  "processando": "processando.22a3821e.mp3",
+  "confirmar": "confirmar.e98a4d25.mp3",
+  "sucesso": "sucesso.05bba3c6.mp3",
   "presenca": "presenca.3eaedf38.mp3",
-  "outro": "outro.8ac89243.mp3"
+  "chamada": "chamada.f9beedb3.mp3",
+  "alunos": "alunos.c6e90390.mp3",
+  "ficha": "ficha.40c77323.mp3",
+  "turma": "turma.3e5ddf96.mp3",
+  "chat": "chat.3bcd4bbd.mp3",
+  "whatsapp": "whatsapp.509b56ec.mp3",
+  "semana": "semana.d6d694fa.mp3",
+  "perfil": "perfil.106c8bb1.mp3",
+  "fecho": "fecho.8ac89243.mp3"
 }
