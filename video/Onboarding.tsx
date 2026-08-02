@@ -412,9 +412,9 @@ const CenaPerfil: React.FC = () => {
   })
   const kfs: CursorKeyframe[] = [
     { frame: 8, x: 330, y: 700 },
-    { frame: 80, x: 205, y: 375, click: true }, // Bio
+    { frame: 80, x: 205, y: 395, click: true }, // Bio
     { frame: 92, x: 300, y: 690 },
-    { frame: 250, x: 205, y: 560, click: true }, // Salvar perfil
+    { frame: 250, x: 205, y: 524, click: true }, // Salvar perfil
     { frame: 262, x: 330, y: 650 },
   ]
   return (
