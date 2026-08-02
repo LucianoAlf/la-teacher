@@ -1,8 +1,13 @@
 // Funções puras do cache de narração (testáveis sem rede).
 import { createHash } from 'node:crypto';
 
+// Muda quando a RECEITA de geração muda (não o texto) — invalida o cache sozinho.
+// v2: break tag no fim + cauda aparada (a ElevenLabs cortava a última palavra).
+// v3: aparação só do silêncio que vai até o fim (a v2 decepava frase no meio).
+export const GEN_VERSION = 'v3';
+
 export function hashText(text) {
-  return createHash('sha1').update(String(text), 'utf-8').digest('hex').slice(0, 8);
+  return createHash('sha1').update(`${GEN_VERSION}|${String(text)}`, 'utf-8').digest('hex').slice(0, 8);
 }
 
 export function audioFileName(sceneId, text) {

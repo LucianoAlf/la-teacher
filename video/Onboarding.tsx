@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   AbsoluteFill,
   Audio,
@@ -12,9 +12,10 @@ import { ROTEIRO } from './roteiro'
 import { SceneAudio, type SceneMeta } from './lib/narration'
 import { sceneDuration } from './lib/timing'
 import { Sfx, SFX } from './lib/sfx'
-import { Cursor, type CursorKeyframe } from './lib/Cursor'
+import { Dedo, type CursorKeyframe } from './lib/Dedo'
 import { TypingTicks } from './lib/TypingTicks'
 import { Telefone } from './ui/Telefone'
+import { MenuProfessor } from './ui/AppShell'
 import { Abertura, Fecho } from './cenas/Marca'
 import { IntroTela } from './telas/IntroTela'
 import { Login } from './telas/Login'
@@ -123,7 +124,7 @@ const CenaIntro: React.FC = () => {
   return (
     <Palco>
       <IntroTela passo={passo} faseDemo={faseDemo} demoDesde={faseDemo === 3 ? 305 : 160} />
-      <Cursor keyframes={kfs} />
+      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={310} volume={0.3} />
       <Sfx file={SFX.popIn} at={318} volume={0.26} />
     </Palco>
@@ -150,7 +151,7 @@ const CenaLogin: React.FC = () => {
         senhaDigitada={digitado(frame, 126, 8, 8)}
         entrando={frame >= 168}
       />
-      <Cursor keyframes={kfs} />
+      <Dedo keyframes={kfs} />
       <TypingTicks text={EMAIL} startFrame={26} cps={10} />
       <TypingTicks text="••••••••" startFrame={126} cps={8} />
     </Palco>
@@ -172,7 +173,7 @@ const CenaHome: React.FC = () => {
   return (
     <Palco>
       <Home scrollY={scrollY} />
-      <Cursor keyframes={kfs} />
+      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={10} volume={0.3} />
     </Palco>
   )
@@ -190,7 +191,7 @@ const CenaAgenda: React.FC = () => {
   return (
     <Palco>
       <AgendaTela aulaDestacada={frame >= 164 ? 0 : -1} />
-      <Cursor keyframes={kfs} />
+      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={10} volume={0.28} />
       <Sfx file={SFX.swoosh} at={168} volume={0.3} />
     </Palco>
@@ -211,7 +212,7 @@ const CenaGravar: React.FC = () => {
   return (
     <Palco>
       <Gravar micFrame={GRAVAR_MIC} stopFrame={GRAVAR_STOP} aceleracao={4.6} />
-      <Cursor keyframes={kfs} />
+      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={GRAVAR_STOP + 8} volume={0.3} />
     </Palco>
   )
@@ -229,7 +230,7 @@ const CenaOuvir: React.FC = () => {
   return (
     <Palco>
       <Ouvir playFrame={20} enviarFrame={212} />
-      <Cursor keyframes={kfs} />
+      <Dedo keyframes={kfs} />
       <Sfx file={SFX.swoosh} at={218} volume={0.3} />
     </Palco>
   )
@@ -270,7 +271,7 @@ const CenaConfirmar: React.FC = () => {
         toastVisivel={frame >= 212 && frame < 268}
         gravando={frame >= 470}
       />
-      <Cursor keyframes={kfs} />
+      <Dedo keyframes={kfs} />
       <TypingTicks text={OBS_TEXTO} startFrame={96} cps={12} />
       <Sfx file={SFX.popIn} at={214} volume={0.3} />
     </Palco>
@@ -306,26 +307,33 @@ const CenaChamada: React.FC = () => {
   return (
     <Palco>
       <ChamadaTela faltouFrame={76} enviarFrame={180} agoraFrame={290} enviadaFrame={352} />
-      <Cursor keyframes={kfs} />
+      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={186} volume={0.28} />
       <Sfx file={SFX.chime} at={356} volume={0.3} />
     </Palco>
   )
 }
 
+/** Vem da Home: o dedo toca a aba ALUNOS lá embaixo e a carteira abre. */
 const CenaAlunos: React.FC = () => {
   const frame = useCurrentFrame()
+  const TROCA = 30 // frame em que a aba responde
   const kfs: CursorKeyframe[] = [
-    { frame: 10, x: 330, y: 680 },
-    { frame: 60, x: 330, y: 560 },
+    { frame: 6, x: 330, y: 690 },
+    { frame: 22, x: 123, y: 778, click: true }, // aba Alunos (TabBar)
+    { frame: 44, x: 320, y: 620 },
     { frame: 190, x: 205, y: 203, click: true }, // Valentina
-    { frame: 204, x: 320, y: 400 },
+    { frame: 204, x: 320, y: 420 },
   ]
   return (
     <Palco>
-      <AlunosTela destacado={frame >= 194 ? 'Valentina' : undefined} />
-      <Cursor keyframes={kfs} />
-      <Sfx file={SFX.popIn} at={10} volume={0.28} />
+      {frame < TROCA ? (
+        <Home />
+      ) : (
+        <AlunosTela destacado={frame >= 194 ? 'Valentina' : undefined} />
+      )}
+      <Dedo keyframes={kfs} />
+      <Sfx file={SFX.swoosh} at={TROCA} volume={0.28} />
     </Palco>
   )
 }
@@ -343,7 +351,7 @@ const CenaFicha: React.FC = () => {
   return (
     <Palco>
       <FichaTela scrollY={scrollY} />
-      <Cursor keyframes={kfs} />
+      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={24} volume={0.28} />
     </Palco>
   )
@@ -357,22 +365,31 @@ const CenaTurma: React.FC = () => (
   </Palco>
 )
 
+/** Vem da Home: o dedo aperta a BOLOTA TEAL do Fábio (o FAB central) e o chat abre. */
 const CenaChat: React.FC = () => {
+  const frame = useCurrentFrame()
+  const TROCA = 32
   const kfs: CursorKeyframe[] = [
-    { frame: 8, x: 330, y: 650 },
-    { frame: 20, x: 190, y: 780, click: true }, // input
-    { frame: 32, x: 300, y: 720 },
-    { frame: 100, x: 368, y: 780 },
-    { frame: 110, x: 368, y: 780, click: true }, // enviar
-    { frame: 124, x: 330, y: 700 },
+    { frame: 6, x: 320, y: 700 },
+    { frame: 24, x: 205, y: 752, click: true }, // FAB central do Fábio
+    { frame: 48, x: 300, y: 700 },
+    { frame: 68, x: 190, y: 780, click: true }, // campo de mensagem
+    { frame: 84, x: 300, y: 720 },
+    { frame: 150, x: 368, y: 780, click: true }, // enviar
+    { frame: 168, x: 330, y: 700 },
   ]
   return (
     <Palco>
-      <ChatTela digitaFrame={30} enviaFrame={110} digitandoFrame={130} respostaFrame={260} />
-      <Cursor keyframes={kfs} />
-      <TypingTicks text={PERGUNTA} startFrame={30} cps={12} />
-      <Sfx file={SFX.msgPop} at={118} volume={0.4} rate={1.12} />
-      <Sfx file={SFX.msgPop} at={260} volume={0.45} />
+      {frame < TROCA ? (
+        <Home />
+      ) : (
+        <ChatTela digitaFrame={78} enviaFrame={150} digitandoFrame={172} respostaFrame={286} />
+      )}
+      <Dedo keyframes={kfs} />
+      <TypingTicks text={PERGUNTA} startFrame={78} cps={12} />
+      <Sfx file={SFX.swoosh} at={TROCA} volume={0.28} />
+      <Sfx file={SFX.msgPop} at={158} volume={0.4} rate={1.12} />
+      <Sfx file={SFX.msgPop} at={286} volume={0.45} />
     </Palco>
   )
 }
@@ -397,37 +414,65 @@ const CenaWhatsApp: React.FC = () => (
   </Palco>
 )
 
-const CenaSemana: React.FC = () => (
-  <Palco>
-    <SemanaTela />
-    <Sfx file={SFX.popIn} at={12} volume={0.26} />
-  </Palco>
-)
+/** Vem da Home: o dedo toca o card "Minha semana" e a tela abre. */
+const CenaSemana: React.FC = () => {
+  const frame = useCurrentFrame()
+  const TROCA = 34
+  const kfs: CursorKeyframe[] = [
+    { frame: 6, x: 330, y: 640 },
+    { frame: 24, x: 205, y: 712, click: true }, // card Minha semana
+    { frame: 46, x: 330, y: 560 },
+    { frame: 160, x: 335, y: 430 },
+  ]
+  return (
+    <Palco>
+      {frame < TROCA ? <Home /> : <SemanaTela />}
+      <Dedo keyframes={kfs} />
+      <Sfx file={SFX.swoosh} at={TROCA} volume={0.28} />
+    </Palco>
+  )
+}
 
+/** Caminho real do Perfil: avatar do professor → menu → Perfil. Sem pular etapa. */
 const CenaPerfil: React.FC = () => {
   const frame = useCurrentFrame()
-  const scrollY = interpolate(frame, [25, 60], [0, 150], {
+  const MENU = 22 // o menu abre
+  const TROCA = 62 // o Perfil abre
+  const scrollY = interpolate(frame, [TROCA + 4, TROCA + 40], [0, 150], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   })
   const kfs: CursorKeyframe[] = [
-    { frame: 8, x: 330, y: 700 },
-    { frame: 80, x: 205, y: 395, click: true }, // Bio
-    { frame: 92, x: 300, y: 690 },
-    { frame: 250, x: 205, y: 524, click: true }, // Salvar perfil
-    { frame: 262, x: 330, y: 650 },
+    { frame: 4, x: 300, y: 300 },
+    { frame: 20, x: 374, y: 34, click: true }, // avatar do professor
+    { frame: 40, x: 300, y: 200 },
+    { frame: 54, x: 300, y: 189, click: true }, // item "Perfil" do menu
+    { frame: 72, x: 320, y: 620 },
+    { frame: 120, x: 205, y: 395, click: true }, // Bio
+    { frame: 134, x: 300, y: 690 },
+    { frame: 286, x: 205, y: 524, click: true }, // Salvar perfil
+    { frame: 300, x: 330, y: 660 },
   ]
   return (
     <Palco>
-      <PerfilTela
-        scrollY={scrollY}
-        bioFoco={frame >= 80 && frame < 250}
-        bioDigitada={digitado(frame, 92, 20, BIO.length)}
-        toastVisivel={frame >= 260 && frame < 326}
-      />
-      <Cursor keyframes={kfs} />
-      <TypingTicks text={BIO} startFrame={92} cps={20} />
-      <Sfx file={SFX.popIn} at={262} volume={0.3} />
+      {frame < TROCA ? (
+        <>
+          <Home />
+          {frame >= MENU ? <MenuProfessor destaque={frame >= 54 ? 'Perfil' : undefined} /> : null}
+        </>
+      ) : (
+        <PerfilTela
+          scrollY={scrollY}
+          bioFoco={frame >= 120 && frame < 286}
+          bioDigitada={digitado(frame, 134, 20, BIO.length)}
+          toastVisivel={frame >= 296 && frame < 362}
+        />
+      )}
+      <Dedo keyframes={kfs} />
+      <TypingTicks text={BIO} startFrame={134} cps={20} />
+      <Sfx file={SFX.popIn} at={MENU} volume={0.28} />
+      <Sfx file={SFX.swoosh} at={TROCA} volume={0.28} />
+      <Sfx file={SFX.popIn} at={298} volume={0.3} />
     </Palco>
   )
 }

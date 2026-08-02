@@ -83,6 +83,44 @@ export const ScreenHeader: React.FC<{ titulo: string; subtitulo?: string }> = ({
   </div>
 )
 
+/** Menu que abre no avatar do professor (canto sup. dir.) — caminho real do Perfil. */
+export const MenuProfessor: React.FC<{ destaque?: string }> = ({ destaque }) => (
+  <div
+    style={{
+      position: 'absolute',
+      top: 60,
+      right: 16,
+      width: 224,
+      borderRadius: 16,
+      background: C.bgSurface,
+      border: `1px solid ${C.borderStrong}`,
+      boxShadow: '0 18px 40px rgba(0,0,0,.55)',
+      overflow: 'hidden',
+      zIndex: 40,
+      fontFamily: FONT,
+    }}
+  >
+    <div style={{ padding: '11px 14px', borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>Matheus Felipe</div>
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 1 }}>Professor</div>
+    </div>
+    {['Trocar foto', 'Mudar senha', 'Perfil', 'Configurações', 'Sair'].map((item) => (
+      <div
+        key={item}
+        style={{
+          padding: '9px 14px',
+          fontSize: 13,
+          fontWeight: 600,
+          color: item === 'Sair' ? '#F87171' : C.text,
+          background: destaque === item ? C.bgHover : 'transparent',
+        }}
+      >
+        {item}
+      </div>
+    ))}
+  </div>
+)
+
 const Aba: React.FC<{ icone: React.ReactNode; label: string; ativa?: boolean }> = ({
   icone,
   label,
