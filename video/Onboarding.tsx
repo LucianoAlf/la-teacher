@@ -2,6 +2,7 @@
 import {
   AbsoluteFill,
   Audio,
+  Easing,
   interpolate,
   Series,
   staticFile,
@@ -64,11 +65,20 @@ export const BackgroundMusic: React.FC<{ file: string }> = ({ file }) => {
   )
 }
 
+/** Entrada de cena: além do fade, um leve recuo que assenta — dá respiro ao corte. */
 export const FadeIn: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const frame = useCurrentFrame()
+  const t = interpolate(frame, [0, 14], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  })
   return (
     <AbsoluteFill
-      style={{ opacity: interpolate(frame, [0, 8], [0, 1], { extrapolateRight: 'clamp' }) }}
+      style={{
+        opacity: interpolate(frame, [0, 8], [0, 1], { extrapolateRight: 'clamp' }),
+        transform: `scale(${1.035 - t * 0.035})`,
+      }}
     >
       {children}
     </AbsoluteFill>
@@ -420,13 +430,14 @@ const CenaSemana: React.FC = () => {
   const TROCA = 34
   const kfs: CursorKeyframe[] = [
     { frame: 6, x: 330, y: 640 },
-    { frame: 24, x: 205, y: 712, click: true }, // card Minha semana
+    { frame: 24, x: 205, y: 659, click: true }, // card Minha semana (Home rolada)
     { frame: 46, x: 330, y: 560 },
     { frame: 160, x: 335, y: 430 },
   ]
   return (
     <Palco>
-      {frame < TROCA ? <Home /> : <SemanaTela />}
+      {/* a Home entra já rolada pro card "Minha semana" aparecer acima da barra */}
+      {frame < TROCA ? <Home scrollY={120} /> : <SemanaTela />}
       <Dedo keyframes={kfs} />
       <Sfx file={SFX.swoosh} at={TROCA} volume={0.28} />
     </Palco>
@@ -446,7 +457,7 @@ const CenaPerfil: React.FC = () => {
     { frame: 4, x: 300, y: 300 },
     { frame: 20, x: 374, y: 34, click: true }, // avatar do professor
     { frame: 40, x: 300, y: 200 },
-    { frame: 54, x: 300, y: 189, click: true }, // item "Perfil" do menu
+    { frame: 54, x: 300, y: 203, click: true }, // item "Perfil" do menu
     { frame: 72, x: 320, y: 620 },
     { frame: 120, x: 205, y: 395, click: true }, // Bio
     { frame: 134, x: 300, y: 690 },
