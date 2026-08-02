@@ -37,16 +37,19 @@ export const Dedo: React.FC<{
 
   const ordenados = [...keyframes].sort((a, b) => a.frame - b.frame)
 
-  // POUSAR E SEGURAR: depois de apertar, a mão fica no botão por ~8 frames
-  // antes de sair. Sem isso ela toca e foge no mesmo instante — o toque não
-  // "assenta" e o olho não acompanha o que foi apertado.
+  // POUSAR E SEGURAR: depois de apertar, a mão fica no botão por até 14 frames
+  // (~0,5s) antes de sair. Sem isso ela toca e foge no mesmo instante — o toque
+  // não "assenta" e o olho não acompanha o que foi apertado.
+  // A permanência encolhe se o próximo destino estiver perto, sempre deixando
+  // no mínimo 6 frames de viagem (senão a mão "teleporta").
   const comPousada: CursorKeyframe[] = []
   ordenados.forEach((k, i) => {
     comPousada.push(k)
     const proximo = ordenados[i + 1]
-    if (k.click && proximo && proximo.frame >= k.frame + 12) {
-      comPousada.push({ frame: k.frame + 8, x: k.x, y: k.y })
-    }
+    if (!k.click || !proximo) return
+    const janela = proximo.frame - k.frame
+    if (janela < 12) return
+    comPousada.push({ frame: k.frame + Math.min(14, janela - 6), x: k.x, y: k.y })
   })
 
   // interpolate exige inputRange crescente; keyframes repetidos (chega e clica
