@@ -13,7 +13,15 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'n5v3Z2TRRdx6ixolQQMW' // voz do Fábio (criada pelo Alf)
 const MODEL_ID = 'eleven_multilingual_v2'
-const VIDEO_ID = 'onboarding-professor'
+
+// Qual vídeo gerar: node scripts/gen-narration.mjs [--video teaser-efeitos --roteiro video/roteiroTeaser.ts]
+const argv = process.argv.slice(2)
+const arg = (nome, padrao) => {
+  const i = argv.indexOf(nome)
+  return i >= 0 && argv[i + 1] ? argv[i + 1] : padrao
+}
+const VIDEO_ID = arg('--video', 'onboarding-professor')
+const ROTEIRO_PATH = arg('--roteiro', 'video/roteiro.ts')
 
 function loadEnv() {
   const envPath = resolve(root, '.env')
@@ -24,9 +32,9 @@ function loadEnv() {
   }
 }
 
-/** O roteiro vive em video/roteiro.ts; aqui lemos os campos sem compilar TS. */
+/** O roteiro vive num .ts; aqui lemos os campos sem compilar TS. */
 function lerRoteiro() {
-  const src = readFileSync(resolve(root, 'video', 'roteiro.ts'), 'utf-8')
+  const src = readFileSync(resolve(root, ROTEIRO_PATH), 'utf-8')
   const cenas = []
   const re = /\{\s*id:\s*'([^']+)'[\s\S]*?narracao:\s*'((?:[^'\\]|\\.)*)'/g
   let m

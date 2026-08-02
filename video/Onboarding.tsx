@@ -27,7 +27,7 @@ import { C, FONT } from './tokens'
 
 const MUSIC_VOLUME = 0.09
 
-const BackgroundMusic: React.FC<{ file: string }> = ({ file }) => {
+export const BackgroundMusic: React.FC<{ file: string }> = ({ file }) => {
   const { durationInFrames } = useVideoConfig()
   return (
     <Audio
@@ -45,7 +45,7 @@ const BackgroundMusic: React.FC<{ file: string }> = ({ file }) => {
   )
 }
 
-const FadeIn: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const FadeIn: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const frame = useCurrentFrame()
   return (
     <AbsoluteFill
@@ -56,10 +56,15 @@ const FadeIn: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   )
 }
 
-/** O aparelho no palco: halo teal + respiração lenta (sem zoom agressivo). */
-const Palco: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+/** O aparelho no palco: halo teal + respiração lenta (sem zoom agressivo).
+ *  Escala 1.8: em 1080×1920 o telefone ocupa ~72% da largura — vídeo 9:16
+ *  é sobre o celular, ele tem que dominar a tela. */
+export const Palco: React.FC<{ children: React.ReactNode; escalaBase?: number }> = ({
+  children,
+  escalaBase = 1.8,
+}) => {
   const frame = useCurrentFrame()
-  const escala = 1.3 + Math.sin(frame / 90) * 0.006
+  const escala = escalaBase + Math.sin(frame / 90) * 0.006
   return (
     <AbsoluteFill style={{ background: '#05080A' }}>
       <AbsoluteFill

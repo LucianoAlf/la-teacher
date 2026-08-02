@@ -18,6 +18,7 @@
   "devDependencies": {
     "@remotion/bundler": "^4.0.504",
     "@remotion/cli": "^4.0.504",
+    "@remotion/google-fonts": "^4.0.504",
     "@remotion/player": "^4.0.504",
     "@remotion/renderer": "^4.0.504",
     "@types/node": "^26.1.1",

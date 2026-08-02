@@ -23,5 +23,8 @@ export const C = {
   pink: '#E91451', // a marca da família LA
 } as const
 
+// Fiel ao app: Inter é a fonte da UI (400–800); Prompt 900 aparece SÓ na marca
+// (login e vinhetas). Antes o vídeo usava Prompt em tudo — não era a cara do app.
 export const FONT =
-  '"Prompt", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
+  '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
+export const FONT_MARCA = '"Prompt", "Inter", system-ui, sans-serif'

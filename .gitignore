@@ -43,3 +43,6 @@ supabase/.branches/
 
 # test
 coverage/
+
+# renders do estudio de video (binarios grandes)
+out/

@@ -34,7 +34,7 @@ export const Cursor: React.FC<{ keyframes: CursorKeyframe[]; size?: number; clic
           <div key={k.frame} style={{
             position: 'absolute', left: k.x, top: k.y, width: size * (1 + t * 1.6), height: size * (1 + t * 1.6),
             transform: 'translate(-50%, -50%)', borderRadius: '50%',
-            border: '3px solid rgba(163,190,80,0.9)', opacity: 1 - t,
+            border: '3px solid rgba(72,191,179,0.9)', opacity: 1 - t,
           }} />
         );
       })}
