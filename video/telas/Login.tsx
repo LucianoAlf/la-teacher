@@ -1,6 +1,7 @@
 import React from 'react'
 import { interpolate, staticFile, useCurrentFrame } from 'remotion'
 import { C } from '../tokens'
+import { MarcaLA } from '../ui/MarcaLA'
 
 /**
  * Tela de login — réplica fiel de src/pages/app/Login.tsx.
@@ -101,22 +102,16 @@ export const Login: React.FC<{
             backgroundSize: '14px 14px',
           }}
         />
+        {/* a LOGOMARCA de verdade (mesmo SVG do app), não texto em fonte */}
         <div
           style={{
             position: 'absolute',
             left: '50%',
             top: 0,
-            width: 470,
             transform: 'translateX(-50%) rotate(-6deg)',
-            color: LOGIN.watermark,
-            fontSize: 400,
-            fontWeight: 900,
-            fontFamily: 'Prompt, sans-serif',
-            lineHeight: 0.9,
-            userSelect: 'none',
           }}
         >
-          LA
+          <MarcaLA largura={470} cor={LOGIN.watermark} />
         </div>
       </div>
 

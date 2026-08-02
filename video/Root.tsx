@@ -14,9 +14,10 @@ import type { Cena } from './lib/types'
 const MUSIC_DEFAULT = 'music/tom-theme.mp3'
 
 // O áudio dita a duração: mede os MP3 e dimensiona cada cena (+0.8s de respiro).
-// A trilha entra SEMPRE por padrão. (Antes eu checava com fetch(staticFile);
-// no render por CLI esse fetch falha e o vídeo saía mudo — foi o "falta música".)
-// Pra rodar sem trilha: --props='{"musicFile":null}'
+// A trilha entra SEMPRE por padrão — via defaultProps, NUNCA via check de
+// undefined: o defaultProps entrega `null`, então `=== undefined` nunca
+// dispara e o vídeo sai sem música (2ª vez que esse bug morde — teaser 02/08,
+// flagrado pelo Alf). Pra rodar sem trilha: --props='{"musicFile":null}'
 const metadataDoRoteiro =
   (videoId: string, roteiro: Cena[]) =>
   async ({ props }: { props: { scenes: SceneMeta[]; musicFile: string | null } }) => {
@@ -37,7 +38,7 @@ export const Root: React.FC = () => (
       fps={30}
       width={1080}
       height={1920} // 9:16 — o app é PWA de celular, o vídeo tem que ter a cara dele
-      defaultProps={{ scenes: [] as SceneMeta[], musicFile: null as string | null }}
+      defaultProps={{ scenes: [] as SceneMeta[], musicFile: MUSIC_DEFAULT as string | null }}
       calculateMetadata={metadataDoRoteiro(VIDEO_ID, ROTEIRO)}
     />
     <Composition
@@ -46,7 +47,7 @@ export const Root: React.FC = () => (
       fps={30}
       width={1080}
       height={1920}
-      defaultProps={{ scenes: [] as SceneMeta[], musicFile: null as string | null }}
+      defaultProps={{ scenes: [] as SceneMeta[], musicFile: MUSIC_DEFAULT as string | null }}
       calculateMetadata={metadataDoRoteiro(TEASER_ID, TEASER)}
     />
   </>
