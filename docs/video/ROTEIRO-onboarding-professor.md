@@ -25,7 +25,20 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 2 · Login — ~14s
+## Cena 2 · Primeiro acesso — a apresentação do Fábio — ~20s
+
+**Tela (3 passos do Intro, com os pontinhos rosa na tela inteira):**
+1. **"Oi. Eu sou o Fábio."** — o personagem 150px flutuando (bob), subtítulo *"Você fala. Eu escrevo."*
+2. **A demo que se reorganiza** (`DemoMorph`): pílula *"Fábio ouvindo…"* com ponto teal pulsando → a fala crua entra palavra por palavra (*"o gustavo foi bem no ritmo mas desafina no agudo, a maria é o contrário…"*) → **gustavo/ritmo/agudo/maria acendem em teal** → a fala esmaece e vira os **2 cards estruturados** (Gustavo: progresso + próximo passo; Maria idem) e a pílula troca pra *"Fábio estruturou"*.
+3. **"Eu nunca invento."** — escudo em círculo teal 76px, *"Campo vazio é convite. Nada vai pro diário do seu aluno sem você confirmar."*
+
+**Dedo:** toca em **Continuar** (2×) e **Entrar** no passo 3.
+**Som:** `pop-in` nos cards da demo · `ui-tap` nos botões
+**Narração:** *"Na primeira vez, eu me apresento. Olha só o que eu faço: você fala do jeito que sai — e eu transformo em registro organizado, aluno por aluno. E fica combinado: eu nunca invento nada."*
+
+---
+
+## Cena 3 · Login — ~14s
 
 **Tela:** réplica de `Login.tsx` — moldura 430px, pontinhos rosa nos 60% do topo, marca d'água "LA" a −6°, Fábio 120px com glow, título Prompt 900/32px, labels `E-MAIL`/`SENHA` (11px, uppercase, tracking .5px), inputs raio 12px sobre `#1A2421`.
 
@@ -41,7 +54,7 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 3 · Home — ~16s
+## Cena 4 · Home — ~16s
 
 **Tela:** `AppHeader` (Fábio colorido 44px + "**E aí, Matheus! 👋**" 17px extrabold + "Segunda, 3 de agosto" 12.5px) · botão de tema · avatar do professor. Abaixo: **FabioCard** ("Briefing do Fábio", gradiente 150° teal, robozinho teal na bolota de 30px). Depois o card **HOJE** com as 4 aulas. Rodapé: TabBar 5 colunas + **bolota teal de 64px com o robozinho** + FAB do microfone.
 
@@ -51,7 +64,7 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 4 · Agenda — ~14s
+## Cena 5 · Agenda — ~14s
 
 **Tela:** `SemanaStrip` (os 7 dias, hoje destacado em teal) · `DateNav` ("Segunda, 3 de agosto de 2026 / HOJE") · as 4 aulas reais: **11:00 Canto — Valentina · Palavra Cantada**, **15:00 Canto — Amanda**, **17:00 Musicalização — Gustavo e Maria Isabel**, **18:00 Musicalização — Arthur · Balão Mágico**.
 
@@ -61,7 +74,7 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 5 · Abrir a aula e gravar — ~22s
+## Cena 6 · Abrir a aula e gravar — ~22s
 
 **Tela A (2s):** toca no **mic da SessaoRow** (32px, teal-soft) → tela **`Registrar aula`** com o contexto (quadrado 38px teal + `Canto · turma de 4` + `Canto · 11h`).
 
@@ -75,7 +88,7 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 6 · Ouvir antes de mandar — ~10s
+## Cena 7 · Ouvir antes de mandar — ~10s
 
 **Tela:** fone em círculo teal 56px, **`Gravado — 0:38`**, o **AudioPlayer** (32 barras; as tocadas acendem em teal da esquerda pra direita, tempo mono `0:12 / 0:38`), e os botões `Enviar pro Fábio` / `Re-gravar`.
 
@@ -85,7 +98,7 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 7 · O Fábio trabalhando — ~12s
+## Cena 8 · O Fábio trabalhando — ~12s
 
 **Tela:** **Fábio colorido 112px flutuando** (bob 2.2s) + *"O Fábio está montando seu relatório… 🎼"* + a trilha de 3 passos acendendo em sequência: **Na fila do Fábio** → **Transcrevendo seu áudio** → **Organizando por aluno — tronco + fatias**. Cada marcador (26px) troca o spinner teal por um **✓ verde**.
 
@@ -95,7 +108,7 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 8 · Conferir e confirmar — ~24s
+## Cena 9 · Conferir e confirmar — ~24s
 
 **Tela:** o selo teal do Fábio no topo (*"Eu nunca invento: campo vazio é convite ✋"*), o bloco **`O QUE A TURMA TRABALHOU`** (tronco) com Atividades/Objetivo/Observações e o **Dever de casa em âmbar** com a casinha, e abaixo as **fatias por aluno** (accordion — presente já nasce aberto, avatar 34px).
 
@@ -105,7 +118,7 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 9 · A comemoração — ~10s
+## Cena 10 · A comemoração — ~10s
 
 **Tela:** **16 confetes caindo** (2.6s, teal/laranja/coral/amarelo/azul) + o **check verde 92px** com o pop elástico + **`Registro gravado! 🎉`** + os badges (`1 tronco`, `4 fatias`, `1 dever de casa`).
 
@@ -114,7 +127,7 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 10 · Presença automática — ~9s
+## Cena 11 · Presença automática — ~9s
 
 **Tela:** volta pra agenda/ficha e a tirinha de presença acende: o selo **`Presença lançada automaticamente`** e as bolinhas ficando verdes.
 
@@ -123,7 +136,21 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 11 · A carteira — ~12s
+## Cena 12 · Chamada manual — ~18s
+
+**Tela:** a tela de **Chamada** — contexto teal no topo (`Canto · turma de 4` · `Canto · 17h`), a faixa âmbar *"Chamada ainda não enviada — marque quem faltou e toque em Enviar chamada."*, e a lista de alunos (avatar-inicial 36px + pílula `✓ Presente` em contorno cinza).
+
+**Dedo (o fluxo inteiro, sem pular):**
+1. Toca no nome de um aluno → a pílula vira `⤫ Faltou` (contorno âmbar) e o contador atualiza: `3 presente(s) · 1 falta(s)`
+2. Toca em **Enviar chamada** → sobe o card *"Confirma a chamada?"* com o nome de quem faltou em negrito
+3. Toca em **Enviar agora** → *"Enviando a chamada…"* (nuvem quicando) → **"Chamada enviada ✓"**
+
+**Som:** `ui-tap` (3×) · `chime` suave no enviado
+**Narração:** *"E se num dia você não gravar o áudio? A chamada manual tá aqui: todo mundo começa presente, você só toca em quem faltou e envia. Dois toques."*
+
+---
+
+## Cena 13 · A carteira — ~12s
 
 **Tela:** `Alunos.tsx` — busca ("Buscar aluno pelo nome…"), chips de unidade, cards por curso com título em CAIXA ALTA + ícone de capelo teal, e as linhas de aluno (avatar-inicial teal 36px, nome, "Terça · 15h · Aula 20/40", chevron).
 
@@ -133,7 +160,7 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 12 · A ficha do aluno — ~20s
+## Cena 14 · A ficha do aluno — ~20s
 
 **Tela:** foto/inicial 84px, nome, chips ("9 anos · Kids", unidade, "2 anos e 3 meses de casa"), card de gravar, **Jornada** com a barra de progresso animando, **Presença** com a tirinha honesta (verde/vermelho/âmbar/cinza) + "2 faltas confirmadas · 3 não conferidas", e o **Histórico pedagógico** com o selo "ÚLTIMA AULA".
 
@@ -143,7 +170,17 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 13 · O chat do Fábio — ~16s
+## Cena 15 · Histórico da turma — ~8s
+
+**Tela:** a tela de **Histórico da turma** — as últimas aulas registradas da turma, em sequência, com data e resumo.
+
+**Dedo:** vem do atalho *"Ver histórico da turma"* na chamada; rola duas entradas.
+**Som:** `ui-tap`
+**Narração:** *"Cada turma guarda a linha do tempo das aulas — você nunca chega perdido."*
+
+---
+
+## Cena 16 · O chat do Fábio — ~16s
 
 **Tela:** `ChatFabio` — header com o Fábio colorido 40px e "seu assistente · também no WhatsApp". Bolhas: a do professor à direita (teal translúcido), a do Fábio à esquerda. O indicador "**Fábio está digitando**" com o robozinho teal 18px e os 3 pontinhos pulsando defasados.
 
@@ -153,7 +190,7 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 14 · O Fábio no WhatsApp — ~14s
+## Cena 17 · O Fábio no WhatsApp — ~14s
 
 **Tela:** moldura de WhatsApp (usar `WhatsAppChat` do estúdio do TOM, adaptado) com o **briefing matinal real** chegando: "Bom dia, Matheus! 🎵 Hoje você tem 4 aulas com 5 alunos…"
 
@@ -163,7 +200,27 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ---
 
-## Cena 15 · Fecho — ~7s
+## Cena 18 · Minha semana — ~10s
+
+**Tela:** **"Minha semana"** (*"Suas aulas dadas, dia a dia — só leitura"*): a navegação de semana (`Seg, 03/08 — Dom, 09/08`), o card **Semana** com o total no canto (`6h30`), e as linhas por dia (`Seg, 03/08 · 4 aula(s) · 11:00–19:00 · 4h`).
+
+**Dedo:** vem do card *"Minha semana"* na Home; rola a lista.
+**Som:** `ui-tap` · `pop-in` nas linhas
+**Narração:** *"Suas horas nascem da chamada, sozinhas. Aqui você acompanha a semana inteira — sem planilha, sem papel."*
+
+---
+
+## Cena 19 · Meu perfil — ~14s
+
+**Tela:** **"Meu perfil"** (*"O que o Fábio usa pra te conhecer melhor"*): foto, nome, e-mail e unidades (só leitura) + os campos editáveis **Como quer ser chamado** e **Biografia** + a seção **Preferências do Fábio** (tom das mensagens, canal, horário de silêncio).
+
+**Dedo:** abre pelo avatar → menu → **Perfil**; toca na biografia, digita um trecho (*"Baterista, 12 anos de palco…"*), salva → Toast `Perfil atualizado ✓`.
+**Som:** `ui-tap` · `key-tick` · `pop-in` no toast
+**Narração:** *"No teu perfil, conta quem você é — o Fábio usa isso pra falar contigo do teu jeito. E é aqui que você ajusta como e quando ele te chama."*
+
+---
+
+## Cena 20 · Fecho — ~7s
 
 **Tela:** Fábio colorido grande, e o texto: "**Grava o conteúdo.** / **O resto é comigo.**"
 
@@ -174,10 +231,10 @@ _02/08/2026 · 9:16 (1080×1920) · 30fps · alvo 4–5 min · **aguardando apro
 
 ## Total estimado
 
-~171s de narração + respiros ≈ **3min10 a 3min40**. Cabe folgado no limite de 5 min, e sobra espaço se você quiser que eu abra mais alguma tela (Meu Ponto, Perfil, Turma).
+~240s de narração + respiros ≈ **4min20 a 4min50** — no teto dos 5 min, cobrindo TODAS as telas (decisão do Alf 02/08: é lançamento, nada fica de fora).
 
-## O que falta decidir (rápido)
+## Decisões do Alf (02/08)
 
-1. **Onboarding pré-login** (as 3 telas do Fábio se apresentando, com a demo que se reorganiza): entra no vídeo ou pula direto pro app? *Minha sugestão: pular — o professor vê isso sozinho no primeiro acesso, e são +25s.*
-2. **Meu Ponto e Perfil**: entram? *Sugestão: não neste vídeo — viram um segundo vídeo curto.*
-3. Alguma tela que **você quer destacar** que eu não listei?
+- **Entra tudo** — é lançamento: primeiro acesso, chamada manual, histórico da turma, Minha semana e Meu perfil incluídos.
+- **"Ponto" não existe pro professor** — conferido no app: a tela já se chama "Minha semana" (só rota/arquivo internos usam a palavra; invisível ao usuário).
+- 9:16 · e-mail real do Matheus no login · até 5 min.
