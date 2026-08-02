@@ -65,6 +65,25 @@ def tabela(path: str, params: Dict[str, str]) -> List[Dict[str, Any]]:
     return []
 
 
+def enviar_whatsapp(telefone: str, texto: str) -> None:
+    """Envia direto pra um número (o relatório vai pro Alf, que não é professor).
+    Mesmo caminho do bridge: UAZAPI /send/text com o payload dele."""
+    import requests  # dependência já usada pelo bridge
+
+    if not getattr(bridge, "UAZAPI_TOKEN", None):
+        print("[aviso] UAZAPI_TOKEN ausente — nada enviado.", file=sys.stderr)
+        return
+    r = requests.post(
+        f"{bridge.UAZAPI_URL}/send/text",
+        headers={"Content-Type": "application/json", "token": bridge.UAZAPI_TOKEN},
+        json=bridge.whatsapp_send_payload(telefone, texto),
+        timeout=30,
+    )
+    if r.status_code >= 400:
+        raise RuntimeError(f"uazapi send/text {r.status_code}: {r.text[:300]}")
+    print(f"[ok] relatório enviado para …{telefone[-4:]}", file=sys.stderr)
+
+
 # ---------------------------------------------------------------- checagens
 
 def check_servicos(fix: bool) -> None:
@@ -145,10 +164,44 @@ def check_fila_audios(fix: bool) -> None:
             falhou.append(f"Retry da fila falhou: {str(e)[:120]}")
     elif retriaveis:
         decisao.append(f"{len(retriaveis)} áudio(s) parado(s) em pendente/erro")
+    # 'transcrevendo' preso: o retry não cobre esse status. Mas às vezes o trabalho
+    # FOI concluído (o prontuário já está em aulas_emusys.anotacoes_fabio) e só o
+    # status ficou órfão — nesse caso a auditoria fecha sozinha. (Caso real: 02/08,
+    # aula experimental da Letícia, presa desde 17/07 com o prontuário já gravado.)
     travados = [p for p in presos if p["status"] == "transcrevendo"]
-    if travados:
-        ids = ", ".join(p["id"][:8] for p in travados[:3])
-        decisao.append(f"{len(travados)} áudio(s) preso(s) em *transcrevendo* há +3h ({ids}) — o retry não pega esse status")
+    orfaos, de_verdade = [], []
+    for p in travados:
+        aula_id = p.get("aula_id")
+        concluido = False
+        if aula_id:
+            try:
+                aula = tabela("/rest/v1/aulas_emusys", {
+                    "select": "id,anotacoes_fabio", "id": f"eq.{aula_id}", "limit": "1"})
+                concluido = bool(aula and (aula[0].get("anotacoes_fabio") or "").strip())
+            except Exception:
+                pass
+        (orfaos if concluido else de_verdade).append(p)
+
+    if orfaos and fix:
+        for p in orfaos:
+            try:
+                bridge.sb_patch(
+                    "/rest/v1/fabio_fila_audios",
+                    {"id": f"eq.{p['id']}"},
+                    {"status": "normalizado",
+                     "erro": "status orfao fechado pela auditoria: prontuario ja gravado na aula"},
+                )
+            except Exception as e:
+                falhou.append(f"Não consegui fechar o áudio órfão {p['id'][:8]}: {str(e)[:90]}")
+        fechados = len(orfaos) - len([f for f in falhou if "órfão" in f])
+        if fechados > 0:
+            consertado.append(f"{fechados} áudio(s) com status órfão → fechados (o prontuário já estava gravado)")
+    elif orfaos:
+        decisao.append(f"{len(orfaos)} áudio(s) com status órfão (prontuário já gravado)")
+
+    if de_verdade:
+        ids = ", ".join(p["id"][:8] for p in de_verdade[:3])
+        decisao.append(f"{len(de_verdade)} áudio(s) preso(s) em *transcrevendo* SEM prontuário gravado ({ids}) — precisa investigar")
 
 
 def check_pipeline_presenca() -> None:
@@ -260,14 +313,11 @@ def main() -> int:
     print(texto)
 
     if a.send:
-        destino = os.getenv("FABIO_AUDIT_WHATSAPP")  # número do Alf, via env
+        destino = os.getenv("FABIO_AUDIT_WHATSAPP")  # número do Alf, via env do service
         if not destino:
             print("\n[aviso] FABIO_AUDIT_WHATSAPP não definido — nada enviado.", file=sys.stderr)
             return 0
-        try:
-            bridge.send_whatsapp_text_to_phone(destino, texto)  # type: ignore[attr-defined]
-        except AttributeError:
-            bridge.send_whatsapp_text(int(os.getenv("FABIO_AUDIT_PROFESSOR_DEST", PROF_PILOTO)), texto)
+        enviar_whatsapp(destino, texto)
     return 1 if falhou else 0
 
 

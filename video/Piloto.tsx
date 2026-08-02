@@ -1,5 +1,5 @@
 import React from 'react'
-import { AbsoluteFill, interpolate, Sequence, useCurrentFrame } from 'remotion'
+import { AbsoluteFill, Audio, interpolate, Sequence, staticFile, useCurrentFrame } from 'remotion'
 import { Telefone } from './ui/Telefone'
 import { Agenda } from './cenas/Agenda'
 import { Gravando } from './cenas/Gravando'
@@ -80,14 +80,17 @@ export const Piloto: React.FC = () => {
         </div>
       </AbsoluteFill>
 
-      {/* narração legendada */}
+      {/* narração — a voz do Fábio (ElevenLabs), entrando junto com a legenda */}
       <Sequence durationInFrames={150}>
+        <Audio src={staticFile('audio/n1.mp3')} />
         <Legenda texto="Sua agenda do dia, já pronta." dur={150} />
       </Sequence>
       <Sequence from={150} durationInFrames={180}>
+        <Audio src={staticFile('audio/n2.mp3')} />
         <Legenda texto="Toque e fale. 30 segundos bastam." dur={180} />
       </Sequence>
       <Sequence from={330} durationInFrames={210}>
+        <Audio src={staticFile('audio/n3.mp3')} />
         <Legenda texto="O Fábio organiza — e a presença sai sozinha." dur={210} />
       </Sequence>
     </AbsoluteFill>
