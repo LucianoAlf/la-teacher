@@ -20,7 +20,13 @@ const WA = {
 
 export type MsgWA = { texto: React.ReactNode; atFrame: number; enviada?: boolean; hora?: string }
 
-export const WhatsAppFabio: React.FC<{ mensagens: MsgWA[] }> = ({ mensagens }) => {
+/** `rolagem`: a conversa sobe conforme as mensagens chegam (o briefing é longo).
+ *  `rascunho`: o que está escrito na barra de digitar (vazio = placeholder). */
+export const WhatsAppFabio: React.FC<{
+  mensagens: MsgWA[]
+  rolagem?: number
+  rascunho?: string
+}> = ({ mensagens, rolagem = 0, rascunho = '' }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
   return (
@@ -71,8 +77,19 @@ export const WhatsAppFabio: React.FC<{ mensagens: MsgWA[] }> = ({ mensagens }) =
         <span style={{ color: WA.muted, fontSize: 15, letterSpacing: 2 }}>⋮</span>
       </div>
 
-      {/* conversa */}
-      <div style={{ flex: 1, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* conversa. ⚠️ O recorte fica AQUI e a rolagem no filho: se os dois
+          ficarem no mesmo elemento, o transform arrasta a própria janela de
+          recorte e o painel inteiro sobe pra fora da tela — a conversa some no
+          fim da cena (foi o que aconteceu, flagrado nos quadros de conferência). */}
+      <div style={{ flex: 1, overflow: 'hidden', padding: '14px 12px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            transform: `translateY(${-rolagem}px)`,
+          }}
+        >
         <div style={{ alignSelf: 'center', marginBottom: 4 }}>
           <span
             style={{
@@ -116,6 +133,50 @@ export const WhatsAppFabio: React.FC<{ mensagens: MsgWA[] }> = ({ mensagens }) =
             </div>
           )
         })}
+        </div>
+      </div>
+
+      {/* barra de digitar: é ela que dá sentido ao dedo tocando aqui embaixo —
+          o professor PERGUNTA pelo WhatsApp, não só recebe */}
+      <div
+        style={{
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '8px 10px 12px',
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            background: WA.panel,
+            borderRadius: 999,
+            padding: '10px 14px',
+          }}
+        >
+          <span style={{ color: WA.muted, fontSize: 15 }}>☺</span>
+          <span style={{ color: WA.muted, fontSize: 13.5, flex: 1 }}>{rascunho || 'Mensagem'}</span>
+          <span style={{ color: WA.muted, fontSize: 14 }}>📎</span>
+        </div>
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 999,
+            background: WA.tealName,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#0B141A',
+            fontSize: 17,
+          }}
+        >
+          {rascunho ? '➤' : '🎤'}
+        </div>
       </div>
     </div>
   )

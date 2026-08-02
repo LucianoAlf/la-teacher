@@ -130,20 +130,20 @@ export const ROTEIRO: Cena[] = [
   },
   {
     id: 'whatsapp',
-    duracaoMinS: 10,
+    duracaoMinS: 15,
     caption: '',
     // ⚠️ Sem reticências no INÍCIO da fala: o modelo arrastava pro dobro do
     // tempo (1,66 palavras/s). E comentário NUNCA entre `narracao:` e o texto —
     // o leitor do roteiro (regex) perde a cena inteira e embaralha as falas.
     narracao:
-      'E no teu WhatsApp também! Toda manhã, cedinho, eu te mando a agenda do dia com o que rolou na última aula de cada aluno. Você chega sabendo.',
+      'E no teu WhatsApp também! Toda manhã, cedinho, eu te mando a agenda do dia: cada aula com o foco, o que já foi trabalhado e o repertório de cada aluno. Você chega sabendo. E pode responder ali mesmo, viu? Pergunta o que quiser que eu respondo na hora, igual aqui dentro do app.',
   },
   {
     id: 'semana',
     duracaoMinS: 8,
     caption: '',
     narracao:
-      'Suas horas nascem da chamada, sozinhas. Aqui você acompanha a semana inteira, dia a dia — sem planilha, sem papel, sem pedir pra ninguém.',
+      'Suas horas nascem da chamada, sozinhas. Aqui você acompanha a semana inteira, dia a dia, sem planilha e sem papel.',
   },
   {
     id: 'perfil',

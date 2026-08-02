@@ -6,7 +6,8 @@ import { createHash } from 'node:crypto';
 // v3: aparação só do silêncio que vai até o fim (a v2 decepava frase no meio).
 // v4: SEM break tag no texto (o modelo vocalizava a tag e virava ruído);
 //     o silêncio da cauda passou a ser digital, por apad, depois da geração.
-export const GEN_VERSION = 'v4';
+// v5: modelo eleven_turbo_v2_5 (o v2 atropelava a fala).
+export const GEN_VERSION = 'v5';
 
 export function hashText(text) {
   return createHash('sha1').update(`${GEN_VERSION}|${String(text)}`, 'utf-8').digest('hex').slice(0, 8);

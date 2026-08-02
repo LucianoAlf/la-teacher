@@ -13,7 +13,9 @@ import { planFiles, audioFileName } from './narration-lib.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'n5v3Z2TRRdx6ixolQQMW' // voz do Fábio (criada pelo Alf)
-const MODEL_ID = 'eleven_multilingual_v2'
+// turbo_v2_5 (pedido do Alf): fala mais pausada que o multilingual_v2, que
+// atropelava (3,6 palavras/s contra 3,05). Medido na mesma frase, mesma voz.
+const MODEL_ID = process.env.ELEVENLABS_MODEL_ID || 'eleven_turbo_v2_5'
 
 // Qual vídeo gerar: node scripts/gen-narration.mjs [--video teaser-efeitos --roteiro video/roteiroTeaser.ts]
 const argv = process.argv.slice(2)
@@ -78,6 +80,17 @@ for (const f of plan.stale) unlinkSync(resolve(audioDir, f))
  * (`apad`), que é silêncio digital e não pode contaminar a voz.
  */
 const CAUDA_S = 0.5
+
+const VOZ = { stability: 0.5, similarity_boost: 0.75, style: 0.4, use_speaker_boost: true, speed: 1.05 }
+
+/**
+ * Ajuste fino por cena. `stability` baixa deixa a voz expressiva mas às vezes
+ * sai PICOTADA (micro-pausas a cada palavra) — soa estranho mesmo sem ruído.
+ * Subir a estabilidade nessa cena resolve sem mudar a voz das outras.
+ */
+const AJUSTE_POR_CENA = {
+  semana: { stability: 0.8, style: 0.25 },
+}
 
 // O ffmpeg escreve TUDO (duração, silencedetect) em stderr — por isso spawnSync
 // com stderr capturado, e não execFileSync (que devolve só o stdout, vazio).
@@ -146,7 +159,7 @@ for (const g of plan.generate) {
     body: JSON.stringify({
       text: g.narracao,
       model_id: MODEL_ID,
-      voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.4, use_speaker_boost: true, speed: 1.05 },
+      voice_settings: { ...VOZ, ...(AJUSTE_POR_CENA[g.id] ?? {}) },
     }),
   })
   if (!res.ok) { console.error(`HTTP ${res.status} na cena ${g.id}:`, (await res.text()).slice(0, 200)); process.exit(1) }

@@ -410,25 +410,87 @@ const CenaChat: React.FC = () => {
   )
 }
 
+/** O briefing REAL que o Fábio manda às 8h — no formato detalhado do Alf:
+ *  cada aula com última aula registrada, foco, trabalho feito e repertório.
+ *  É o que o professor mais usa, então aparece por inteiro. */
 const BRIEFING = `Bom dia, Matheus! 🎵
 
-Hoje você tem 4 aulas:
-• 11:00 — Canto · Valentina
-• 15:00 — Canto · Amanda
-• 17:00 — Musicalização · Gustavo e Maria Isabel
-• 18:00 — Musicalização · Arthur
+Hoje você tem 4 aulas com 5 alunos.
 
-Na última aula, a Valentina trabalhou “Temos que Pegar” (Pokémon) e ficou de ouvir a música pra decorar a letra. Bora! 🚀`
+*Agenda de hoje:*
 
-const CenaWhatsApp: React.FC = () => (
-  <Palco>
-    <WhatsAppFabio
-      mensagens={[
-        { texto: <span style={{ whiteSpace: 'pre-line' }}>{BRIEFING}</span>, atFrame: 35, hora: '7:58' },
-      ]}
-    />
-  </Palco>
-)
+*11:00 — Canto*
+Aluna: Valentina
+Última aula registrada: 27/07
+Foco: decorar a letra, com preparação vocal.
+Trabalho feito: vocalizes e respiração.
+Repertório: “Temos que Pegar” (Pokémon).
+
+*15:00 — Canto*
+Aluna: Amanda
+Última aula registrada: 28/07
+Foco: afinação no registro médio.
+Trabalho feito: escalas e apoio.
+Repertório: “Anunciação”.
+
+*17:00 — Musicalização*
+Alunos: Gustavo e Maria Isabel
+Última aula registrada: 28/07
+Foco: pulsação e tempo forte.
+Trabalho feito: marchinha com palmas.
+
+*18:00 — Musicalização*
+Aluno: Arthur
+Última aula registrada: 28/07
+Foco: firmar o tempo forte.
+Repertório: Balão Mágico.
+
+Bora! 🚀`
+
+const PERGUNTA_WA = 'Fábio, o Arthur ficou com dever de casa?'
+const RESPOSTA_WA =
+  'Ficou sim! Treinar as palmas no refrão do Balão Mágico. Quer que eu lembre a mãe dele hoje à tarde?'
+
+/** WhatsApp — a cena mais importante pro professor: o briefing detalhado das
+ *  8h E a conversa. Aqui ele pergunta e o Fábio responde, igual dentro do app. */
+// O WhatsApp é onde o professor mais vai usar o Fábio (pedido do Alf), então a
+// cena não pode ser só "chega mensagem": ele TOCA a barra, digita e envia — e o
+// Fábio responde ali mesmo, igual dentro do app. É o que a narração promete.
+// Os frames saem da própria narração, medida por silencedetect no MP3: a fala
+// "E pode responder ali mesmo" começa em 9,91s → frame 302 (5 de atraso da voz).
+// O dedo tem que ir digitar AÍ, não antes — senão ele pergunta enquanto o Fábio
+// ainda está descrevendo o briefing.
+const WA_TOQUE = 300
+const WA_DIGITA = 308
+const WA_ENVIA = 342
+const CenaWhatsApp: React.FC = () => {
+  const frame = useCurrentFrame()
+  const rolagem = interpolate(frame, [70, 190, 348, 396], [0, 46, 120, 210], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  })
+  const rascunho = PERGUNTA_WA.slice(0, digitado(frame, WA_DIGITA, 45, PERGUNTA_WA.length))
+  const kfs: CursorKeyframe[] = [
+    { frame: 260, x: 340, y: 880 },
+    { frame: WA_TOQUE, x: 170, y: 788, click: true }, // barra de digitar
+    { frame: WA_ENVIA, x: 370, y: 788, click: true }, // botão de enviar
+    { frame: 400, x: 350, y: 880 },
+  ]
+  return (
+    <Palco dedo={kfs}>
+      <WhatsAppFabio
+        rolagem={rolagem}
+        rascunho={frame >= WA_ENVIA ? '' : rascunho}
+        mensagens={[
+          { texto: <span style={{ whiteSpace: 'pre-line' }}>{BRIEFING}</span>, atFrame: 24, hora: '8:00' },
+          { texto: PERGUNTA_WA, atFrame: WA_ENVIA + 2, enviada: true, hora: '8:04' },
+          { texto: RESPOSTA_WA, atFrame: 382, hora: '8:04' },
+        ]}
+      />
+      <TypingTicks text={PERGUNTA_WA} startFrame={WA_DIGITA} cps={45} />
+    </Palco>
+  )
+}
 
 /** Vem da Home: o dedo toca o card "Minha semana" e a tela abre. */
 const CenaSemana: React.FC = () => {
