@@ -64,7 +64,9 @@ for (const f of plan.stale) unlinkSync(resolve(audioDir, f))
  * pra voz completar a palavra, e depois aparar o silêncio sobrando pra CAUDA_S.
  */
 const BREAK_FINAL = ' <break time="0.8s" />'
-const CAUDA_S = 0.35
+// 0,6s: com 0,35 sobravam só ~0,2s de cauda audível em algumas falas — perto
+// demais do limite pra arriscar "palavra comida". Folga custa nada.
+const CAUDA_S = 0.6
 
 // O ffmpeg escreve TUDO (duração, silencedetect) em stderr — por isso spawnSync
 // com stderr capturado, e não execFileSync (que devolve só o stdout, vazio).

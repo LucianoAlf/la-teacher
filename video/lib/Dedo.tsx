@@ -3,38 +3,55 @@ import { interpolate, staticFile, useCurrentFrame, Easing, Img } from 'remotion'
 import { Sfx, SFX } from './sfx'
 
 /**
- * A MÃOZINHA — mão 3D de verdade (gerada no Higgsfield/Nano Banana e recortada,
- * em public/brand/mao-dedo.png) que caminha pela tela e aperta os botões.
- * A 1ª versão era um desenho meu em SVG e ficou ridícula (palavras do Alf, e
- * ele tinha razão): parecia luva de desenho animado, não mão.
+ * A MÃOZINHA — mão gerada no Higgsfield/Nano Banana e recortada, em
+ * public/brand/mao-dedo.png. Ela vem DE CIMA, com o indicador apontando pra
+ * baixo-esquerda, que é como se toca uma tela de verdade.
+ *
+ * Duas versões anteriores foram reprovadas pelo Alf, com razão: a 1ª era um
+ * desenho meu em SVG (parecia luva); a 2ª era uma mão 3D boa mas apontando pra
+ * CIMA — ou seja, encostando na tela com as costas do dedo, de baixo pra cima.
  *
  * • A PONTA DO DEDO é o ponto de toque — as coordenadas dos keyframes são
  *   sempre onde a mão encosta, não onde ela fica.
  * • Caminhando: inclina pro lado do movimento e balança de leve.
- * • No toque: desce na direção do dedo, encolhe um tico e solta o anel teal.
+ * • No toque: avança na direção do dedo, encolhe um tico e solta o anel teal.
  * Coordenadas no espaço do pai (position:relative).
  */
 
 export type CursorKeyframe = { frame: number; x: number; y: number; click?: boolean }
 
-// onde está a ponta do dedo dentro do PNG (896×1200), em fração da imagem
-const PONTA_X = 0.44
-const PONTA_Y = 0.135
-const RAZAO = 1200 / 896
+// Onde está a ponta do dedo dentro do PNG (1024×1024) — MEDIDO pixel a pixel
+// (pixel opaco mais baixo da imagem), não estimado no olho.
+const PONTA_X = 0.1792
+const PONTA_Y = 0.8701
+const RAZAO = 1
 
 export const Dedo: React.FC<{
   keyframes: CursorKeyframe[]
   /** largura da mão em px (no espaço do telefone) */
   tamanho?: number
   clickSound?: boolean
-}> = ({ keyframes, tamanho = 132, clickSound = true }) => {
+}> = ({ keyframes, tamanho = 168, clickSound = true }) => {
   const frame = useCurrentFrame()
   if (keyframes.length < 2) return null
 
+  const ordenados = [...keyframes].sort((a, b) => a.frame - b.frame)
+
+  // POUSAR E SEGURAR: depois de apertar, a mão fica no botão por ~8 frames
+  // antes de sair. Sem isso ela toca e foge no mesmo instante — o toque não
+  // "assenta" e o olho não acompanha o que foi apertado.
+  const comPousada: CursorKeyframe[] = []
+  ordenados.forEach((k, i) => {
+    comPousada.push(k)
+    const proximo = ordenados[i + 1]
+    if (k.click && proximo && proximo.frame >= k.frame + 12) {
+      comPousada.push({ frame: k.frame + 8, x: k.x, y: k.y })
+    }
+  })
+
   // interpolate exige inputRange crescente; keyframes repetidos (chega e clica
   // no mesmo frame) são deduplicados pro cálculo de posição.
-  const ordenados = [...keyframes].sort((a, b) => a.frame - b.frame)
-  const pos = ordenados.filter((k, i) => i === 0 || k.frame > ordenados[i - 1].frame)
+  const pos = comPousada.filter((k, i) => i === 0 || k.frame > comPousada[i - 1].frame)
   const frames = pos.map((k) => k.frame)
   const opts = {
     extrapolateLeft: 'clamp',
@@ -59,7 +76,7 @@ export const Dedo: React.FC<{
   const cliques = ordenados.filter((k) => k.click)
   const noClique = cliques.find((k) => frame >= k.frame && frame <= k.frame + 12)
 
-  // aperto: a mão desce um tico no eixo do dedo e encolhe
+  // aperto: a mão avança um tico no eixo do dedo (baixo-esquerda) e encolhe
   const aperto = noClique
     ? interpolate(frame - noClique.frame, [0, 4, 12], [0, 1, 0], {
         extrapolateLeft: 'clamp',
@@ -68,12 +85,12 @@ export const Dedo: React.FC<{
     : 0
 
   // caminhando: inclina pro lado pra onde vai + balanço leve (o "passo")
-  const inclinacao = interpolate(vx, [-14, 0, 14], [-11, 0, 11], {
+  const inclinacao = interpolate(vx, [-14, 0, 14], [-9, 0, 9], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   })
-  const balanco = velocidade > 0.6 ? Math.sin(frame / 3.6) * 2.2 : 0
-  const giro = -4 + inclinacao + balanco + aperto * 2
+  const balanco = velocidade > 0.6 ? Math.sin(frame / 3.6) * 2 : 0
+  const giro = inclinacao + balanco + aperto * 3
   const escala = 1 - aperto * 0.05
 
   return (
@@ -109,8 +126,8 @@ export const Dedo: React.FC<{
         src={staticFile('brand/mao-dedo.png')}
         style={{
           position: 'absolute',
-          left: x,
-          top: y + aperto * 5,
+          left: x - aperto * 3,
+          top: y + aperto * 4,
           width: tamanho,
           height: tamanho * RAZAO,
           transform: `translate(${-PONTA_X * 100}%, ${-PONTA_Y * 100}%) rotate(${giro}deg) scale(${escala})`,
