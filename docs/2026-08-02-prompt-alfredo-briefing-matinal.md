@@ -106,6 +106,30 @@ Ou seja: **o caminho nunca rodou com áudio real depois da correção.** A guard
 
 → **Pedido:** quando o Matheus gravar o primeiro áudio amanhã, me avisa que eu acompanho no banco os 5 passos (fila → registro → `campos.presenca` → emissão → linha `fabio_audio`). Se travar, o diagnóstico é rápido.
 
+## 7.1 ⚠️ GOVERNANÇA — a régua certa é CONTEÚDO, nunca presença
+
+Decisão do Alf (reafirmada hoje): **o Fábio NÃO cobra presença do professor.** O áudio/conteúdo já emite a presença — não existem duas camadas. Cobrar as duas coisas seria pedir trabalho dobrado por algo que o sistema resolve sozinho.
+
+**E os números provam que isso não é filosofia — é proteção.** Rodei as duas filas do prof 25 hoje:
+
+| Fila | RPC | Resultado (prof 25) |
+|---|---|---|
+| **CONTEÚDO** (registro) | `fabio_pendencias_professor(25)` | **0 pendências** — tudo em dia ✅ |
+| PRESENÇA | `fabio_presencas_pendentes_professor(25)` | **18 aulas** p/ escalar (16–34 dias) 🚩 |
+
+Se a cobrança saísse pela fila de presença, o Matheus levaria uma escalada pra coordenação **tendo feito tudo certo** — a presença não saiu por causa do bug do `campos.presenca` (corrigido no teu `ba1ca01`), não por culpa dele. **Queimaria a confiança no dia 1.**
+
+→ **Regra: a cobrança ao professor sai SEMPRE de `fabio_pendencias_professor` (conteúdo).** A fila de presença serve pra Sol/ADM e pra coordenação enxergarem o buraco de registro — **nunca** pra cutucar professor.
+
+**A régua de tempo (confirmada na migration 014):**
+- **Dias 1 a 3** → o Fábio lembra o professor, direto, leve, todo dia.
+- **> 3 dias** → o Fábio **para de cutucar** e a bola sobe pro grupo COORDENACAO PEDAGÓGICA (JID `120363304349910605@g.us`, já allowlistado: `agente='fabio'`, escopo `governanca_presenca`, modo `so_registrar`).
+
+**Tom (o Alf ditou hoje):** parceiro, nunca chato. Algo como:
+> *"Fala, Matheus, tudo bem? Passando aqui pra você mandar rapidinho o conteúdo dos seus alunos de ontem. Não demora não, cara — senão daqui a dois dias isso tem que ir pra coordenação, e aí eles vão te encher. 😉"*
+
+Ou seja: o Fábio **avisa do prazo como quem protege o professor**, não como quem ameaça.
+
 ## 8. Checklist antes de dormir hoje
 
 - [ ] Rotina do briefing implementada (com claim/dedupe)
@@ -113,6 +137,8 @@ Ou seja: **o caminho nunca rodou com áudio real depois da correção.** A guard
 - [ ] **Dry-run manual**: rodar a rotina agora e mandar o preview pro Alf aprovar o texto
 - [ ] Confirmar o número do WhatsApp do Matheus na `fabio_identidade_whatsapp`
 - [ ] Nada de envio pra outros professores (piloto de 1)
+- [ ] **Cobrança de pendência sai por `fabio_pendencias_professor` (conteúdo), nunca pela de presença** (§7.1)
+- [ ] Escala > 3 dias aponta pro grupo da coordenação (já allowlistado), mas **só depois de o Alf aprovar o texto**
 
 Qualquer coisa que precise de banco (RPC nova, campo a mais, grant), me chama que eu faço hoje — o Alf está de plantão pra aprovar.
 
