@@ -86,10 +86,16 @@ export const FadeIn: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 }
 
 /** O aparelho no palco: halo teal + respiração lenta. 1.8× — o celular domina o 9:16. */
-export const Palco: React.FC<{ children: React.ReactNode; escalaBase?: number }> = ({
-  children,
-  escalaBase = 1.8,
-}) => {
+export const Palco: React.FC<{
+  children: React.ReactNode
+  escalaBase?: number
+  /** A mão vai AQUI (não como filha da tela): renderizada por cima do aparelho,
+   *  fora do recorte, senão ela é decepada pela moldura quando toca perto da
+   *  borda — na barra de baixo só aparecia a pontinha do dedo.
+   *  Coordenadas continuam as do conteúdo (410×816); o deslocamento da moldura
+   *  (10px de borda + 44px de status bar) é aplicado aqui. */
+  dedo?: CursorKeyframe[]
+}> = ({ children, escalaBase = 1.8, dedo }) => {
   const frame = useCurrentFrame()
   const escala = escalaBase + Math.sin(frame / 90) * 0.006
   return (
@@ -101,8 +107,13 @@ export const Palco: React.FC<{ children: React.ReactNode; escalaBase?: number }>
         }}
       />
       <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ transform: `scale(${escala})` }}>
+        <div style={{ transform: `scale(${escala})`, position: 'relative' }}>
           <Telefone>{children}</Telefone>
+          {dedo ? (
+            <div style={{ position: 'absolute', left: 10, top: 54, width: 410, height: 816 }}>
+              <Dedo keyframes={dedo} />
+            </div>
+          ) : null}
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
@@ -116,27 +127,32 @@ const digitado = (frame: number, desde: number, cps: number, max: number) =>
 
 const EMAIL = 'matheus.felipe@lamusic.com.br'
 
+/** Frames de espera antes da voz entrar em cada cena. A vinheta de abertura
+ *  precisa de mais: o logo tem que assentar e o whoosh sair da frente antes
+ *  do Fábio falar (era o "embolou o áudio no início"). */
+const ATRASO_VOZ: Record<string, number> = { abertura: 20 }
+const ATRASO_PADRAO = 5
+
 /* ------------------------------- cenas ---------------------------------- */
 
 const CenaIntro: React.FC = () => {
   const frame = useCurrentFrame()
-  const passo = frame < 145 ? 1 : frame < 372 ? 2 : 3
-  const faseDemo = frame < 240 ? 1 : frame < 305 ? 2 : 3
+  const passo = frame < 122 ? 1 : frame < 332 ? 2 : 3
+  const faseDemo = frame < 212 ? 1 : frame < 268 ? 2 : 3
   const kfs: CursorKeyframe[] = [
-    { frame: 90, x: 330, y: 760 },
-    { frame: 128, x: 205, y: 758, click: true }, // Continuar (passo 1)
-    { frame: 142, x: 320, y: 690 },
-    { frame: 358, x: 205, y: 758, click: true }, // Continuar (passo 2)
-    { frame: 372, x: 320, y: 690 },
-    { frame: 505, x: 205, y: 758, click: true }, // Entrar (passo 3)
-    { frame: 518, x: 320, y: 720 },
+    { frame: 80, x: 330, y: 760 },
+    { frame: 108, x: 205, y: 758, click: true }, // Continuar (passo 1)
+    { frame: 120, x: 320, y: 690 },
+    { frame: 318, x: 205, y: 758, click: true }, // Continuar (passo 2)
+    { frame: 332, x: 320, y: 690 },
+    { frame: 428, x: 205, y: 758, click: true }, // Entrar (passo 3)
+    { frame: 442, x: 320, y: 720 },
   ]
   return (
-    <Palco>
-      <IntroTela passo={passo} faseDemo={faseDemo} demoDesde={faseDemo === 3 ? 305 : 160} />
-      <Dedo keyframes={kfs} />
-      <Sfx file={SFX.popIn} at={310} volume={0.3} />
-      <Sfx file={SFX.popIn} at={318} volume={0.26} />
+    <Palco dedo={kfs}>
+      <IntroTela passo={passo} faseDemo={faseDemo} demoDesde={faseDemo === 3 ? 268 : 138} />
+      <Sfx file={SFX.popIn} at={273} volume={0.3} />
+      <Sfx file={SFX.popIn} at={281} volume={0.26} />
     </Palco>
   )
 }
@@ -153,7 +169,7 @@ const CenaLogin: React.FC = () => {
     { frame: 176, x: 310, y: 765 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       <Login
         focoEmail={frame >= 22 && frame < 118}
         emailDigitado={digitado(frame, 26, 10, EMAIL.length)}
@@ -161,7 +177,6 @@ const CenaLogin: React.FC = () => {
         senhaDigitada={digitado(frame, 126, 8, 8)}
         entrando={frame >= 168}
       />
-      <Dedo keyframes={kfs} />
       <TypingTicks text={EMAIL} startFrame={26} cps={10} />
       <TypingTicks text="••••••••" startFrame={126} cps={8} />
     </Palco>
@@ -181,9 +196,8 @@ const CenaHome: React.FC = () => {
     { frame: 232, x: 205, y: 120 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       <Home scrollY={scrollY} />
-      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={10} volume={0.3} />
     </Palco>
   )
@@ -199,9 +213,8 @@ const CenaAgenda: React.FC = () => {
     { frame: 174, x: 320, y: 420 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       <AgendaTela aulaDestacada={frame >= 164 ? 0 : -1} />
-      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={10} volume={0.28} />
       <Sfx file={SFX.swoosh} at={168} volume={0.3} />
     </Palco>
@@ -220,9 +233,8 @@ const CenaGravar: React.FC = () => {
     { frame: GRAVAR_STOP + 12, x: 315, y: 700 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       <Gravar micFrame={GRAVAR_MIC} stopFrame={GRAVAR_STOP} aceleracao={4.6} />
-      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={GRAVAR_STOP + 8} volume={0.3} />
     </Palco>
   )
@@ -238,9 +250,8 @@ const CenaOuvir: React.FC = () => {
     { frame: 224, x: 320, y: 700 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       <Ouvir playFrame={20} enviarFrame={212} />
-      <Dedo keyframes={kfs} />
       <Sfx file={SFX.swoosh} at={218} volume={0.3} />
     </Palco>
   )
@@ -273,7 +284,7 @@ const CenaConfirmar: React.FC = () => {
     { frame: 480, x: 330, y: 730 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       <ConfirmarTela
         scrollY={scrollY}
         obsFoco={frame >= 86 && frame < 206}
@@ -281,7 +292,6 @@ const CenaConfirmar: React.FC = () => {
         toastVisivel={frame >= 212 && frame < 268}
         gravando={frame >= 470}
       />
-      <Dedo keyframes={kfs} />
       <TypingTicks text={OBS_TEXTO} startFrame={96} cps={12} />
       <Sfx file={SFX.popIn} at={214} volume={0.3} />
     </Palco>
@@ -315,9 +325,8 @@ const CenaChamada: React.FC = () => {
     { frame: 302, x: 330, y: 680 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       <ChamadaTela faltouFrame={76} enviarFrame={180} agoraFrame={290} enviadaFrame={352} />
-      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={186} volume={0.28} />
       <Sfx file={SFX.chime} at={356} volume={0.3} />
     </Palco>
@@ -336,13 +345,12 @@ const CenaAlunos: React.FC = () => {
     { frame: 204, x: 320, y: 420 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       {frame < TROCA ? (
         <Home />
       ) : (
         <AlunosTela destacado={frame >= 194 ? 'Valentina' : undefined} />
       )}
-      <Dedo keyframes={kfs} />
       <Sfx file={SFX.swoosh} at={TROCA} volume={0.28} />
     </Palco>
   )
@@ -359,9 +367,8 @@ const CenaFicha: React.FC = () => {
     { frame: 330, x: 340, y: 480 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       <FichaTela scrollY={scrollY} />
-      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={24} volume={0.28} />
     </Palco>
   )
@@ -389,13 +396,12 @@ const CenaChat: React.FC = () => {
     { frame: 168, x: 330, y: 700 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       {frame < TROCA ? (
         <Home />
       ) : (
         <ChatTela digitaFrame={78} enviaFrame={150} digitandoFrame={172} respostaFrame={286} />
       )}
-      <Dedo keyframes={kfs} />
       <TypingTicks text={PERGUNTA} startFrame={78} cps={12} />
       <Sfx file={SFX.swoosh} at={TROCA} volume={0.28} />
       <Sfx file={SFX.msgPop} at={158} volume={0.4} rate={1.12} />
@@ -435,10 +441,9 @@ const CenaSemana: React.FC = () => {
     { frame: 160, x: 335, y: 430 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       {/* a Home entra já rolada pro card "Minha semana" aparecer acima da barra */}
       {frame < TROCA ? <Home scrollY={120} /> : <SemanaTela />}
-      <Dedo keyframes={kfs} />
       <Sfx file={SFX.swoosh} at={TROCA} volume={0.28} />
     </Palco>
   )
@@ -465,7 +470,7 @@ const CenaPerfil: React.FC = () => {
     { frame: 300, x: 330, y: 660 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       {frame < TROCA ? (
         <>
           <Home />
@@ -479,7 +484,6 @@ const CenaPerfil: React.FC = () => {
           toastVisivel={frame >= 296 && frame < 362}
         />
       )}
-      <Dedo keyframes={kfs} />
       <TypingTicks text={BIO} startFrame={134} cps={20} />
       <Sfx file={SFX.popIn} at={MENU} volume={0.28} />
       <Sfx file={SFX.swoosh} at={TROCA} volume={0.28} />
@@ -492,7 +496,7 @@ const CENAS: Record<string, React.FC> = {
   abertura: () => (
     <>
       <Abertura />
-      <Sfx file={SFX.introWhoosh} at={2} volume={0.5} />
+      <Sfx file={SFX.introWhoosh} at={0} volume={0.32} />
     </>
   ),
   intro: CenaIntro,
@@ -547,7 +551,7 @@ export const Onboarding: React.FC<{ scenes: SceneMeta[]; musicFile?: string | nu
                 <Cena />
               </FadeIn>
             )}
-            <SceneAudio meta={meta} />
+            <SceneAudio meta={meta} atraso={ATRASO_VOZ[cena.id] ?? ATRASO_PADRAO} />
           </Series.Sequence>
         )
       })}

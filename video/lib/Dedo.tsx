@@ -1,56 +1,33 @@
 import React from 'react'
-import { interpolate, useCurrentFrame, Easing } from 'remotion'
+import { interpolate, staticFile, useCurrentFrame, Easing, Img } from 'remotion'
 import { Sfx, SFX } from './sfx'
 
 /**
- * O DEDINHO — mão apontando que caminha pela tela e aperta os botões.
- * (Antes era uma bolinha translúcida herdada do estúdio do TOM; o Alf pediu
- * dedo, e dedo faz sentido: o LA Teacher é PWA de celular, o professor toca.)
+ * A MÃOZINHA — mão 3D de verdade (gerada no Higgsfield/Nano Banana e recortada,
+ * em public/brand/mao-dedo.png) que caminha pela tela e aperta os botões.
+ * A 1ª versão era um desenho meu em SVG e ficou ridícula (palavras do Alf, e
+ * ele tinha razão): parecia luva de desenho animado, não mão.
  *
  * • A PONTA DO DEDO é o ponto de toque — as coordenadas dos keyframes são
- *   sempre onde o dedo encosta, não onde a mão fica.
- * • Caminhando: inclina levemente pro lado do movimento e balança de leve.
- * • No toque: a mão desce na direção do dedo, encolhe um tico e solta o anel.
+ *   sempre onde a mão encosta, não onde ela fica.
+ * • Caminhando: inclina pro lado do movimento e balança de leve.
+ * • No toque: desce na direção do dedo, encolhe um tico e solta o anel teal.
  * Coordenadas no espaço do pai (position:relative).
  */
 
 export type CursorKeyframe = { frame: number; x: number; y: number; click?: boolean }
 
-// posição da ponta do dedo dentro do desenho (viewBox 120×160)
-const PONTA_X = 41 / 120
-const PONTA_Y = 10 / 160
-
-const MaoSVG: React.FC<{ largura: number }> = ({ largura }) => {
-  const altura = (largura * 160) / 120
-  // as MESMAS formas desenhadas 2×: dark por baixo (contorno) e claro por cima
-  const formas = (
-    <>
-      <rect x="30" y="6" width="22" height="72" rx="11" /> {/* dedo indicador */}
-      <rect x="26" y="60" width="72" height="90" rx="30" /> {/* punho */}
-      <circle cx="68" cy="68" r="14" /> {/* dedos dobrados */}
-      <circle cx="86" cy="80" r="13" />
-      <circle cx="93" cy="97" r="12" />
-      <rect x="14" y="84" width="50" height="22" rx="11" transform="rotate(-14 39 95)" /> {/* polegar */}
-    </>
-  )
-  return (
-    <svg width={largura} height={altura} viewBox="0 0 120 160" style={{ display: 'block' }}>
-      <g fill="#0E1614" stroke="#0E1614" strokeWidth="9" strokeLinejoin="round">
-        {formas}
-      </g>
-      <g fill="#F4F1EC">{formas}</g>
-      {/* unha, pra leitura rápida de "isso é um dedo" */}
-      <rect x="35" y="13" width="12" height="15" rx="6" fill="#D9CFC4" />
-    </svg>
-  )
-}
+// onde está a ponta do dedo dentro do PNG (896×1200), em fração da imagem
+const PONTA_X = 0.44
+const PONTA_Y = 0.135
+const RAZAO = 1200 / 896
 
 export const Dedo: React.FC<{
   keyframes: CursorKeyframe[]
   /** largura da mão em px (no espaço do telefone) */
   tamanho?: number
   clickSound?: boolean
-}> = ({ keyframes, tamanho = 76, clickSound = true }) => {
+}> = ({ keyframes, tamanho = 132, clickSound = true }) => {
   const frame = useCurrentFrame()
   if (keyframes.length < 2) return null
 
@@ -82,7 +59,7 @@ export const Dedo: React.FC<{
   const cliques = ordenados.filter((k) => k.click)
   const noClique = cliques.find((k) => frame >= k.frame && frame <= k.frame + 12)
 
-  // aperto: a mão desce ~5px no eixo do dedo e encolhe um tico
+  // aperto: a mão desce um tico no eixo do dedo e encolhe
   const aperto = noClique
     ? interpolate(frame - noClique.frame, [0, 4, 12], [0, 1, 0], {
         extrapolateLeft: 'clamp',
@@ -91,13 +68,13 @@ export const Dedo: React.FC<{
     : 0
 
   // caminhando: inclina pro lado pra onde vai + balanço leve (o "passo")
-  const inclinacao = interpolate(vx, [-14, 0, 14], [-13, 0, 13], {
+  const inclinacao = interpolate(vx, [-14, 0, 14], [-11, 0, 11], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   })
-  const balanco = velocidade > 0.6 ? Math.sin(frame / 3.4) * 2.6 : 0
-  const giro = -8 + inclinacao + balanco + aperto * 2
-  const escala = 1 - aperto * 0.07
+  const balanco = velocidade > 0.6 ? Math.sin(frame / 3.6) * 2.2 : 0
+  const giro = -4 + inclinacao + balanco + aperto * 2
+  const escala = 1 - aperto * 0.05
 
   return (
     <>
@@ -128,20 +105,21 @@ export const Dedo: React.FC<{
         )
       })}
 
-      <div
+      <Img
+        src={staticFile('brand/mao-dedo.png')}
         style={{
           position: 'absolute',
           left: x,
           top: y + aperto * 5,
+          width: tamanho,
+          height: tamanho * RAZAO,
           transform: `translate(${-PONTA_X * 100}%, ${-PONTA_Y * 100}%) rotate(${giro}deg) scale(${escala})`,
           transformOrigin: `${PONTA_X * 100}% ${PONTA_Y * 100}%`,
-          filter: 'drop-shadow(0 10px 16px rgba(0,0,0,.55))',
+          filter: 'drop-shadow(0 14px 22px rgba(0,0,0,.55))',
           zIndex: 50,
           pointerEvents: 'none',
         }}
-      >
-        <MaoSVG largura={tamanho} />
-      </div>
+      />
     </>
   )
 }

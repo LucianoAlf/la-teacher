@@ -4,7 +4,7 @@ import { TEASER } from './roteiroTeaser'
 import { SceneAudio, type SceneMeta } from './lib/narration'
 import { sceneDuration } from './lib/timing'
 import { Sfx, SFX } from './lib/sfx'
-import { Dedo, type CursorKeyframe } from './lib/Dedo'
+import type { CursorKeyframe } from './lib/Dedo'
 import { TypingTicks } from './lib/TypingTicks'
 import { BackgroundMusic, FadeIn, Palco } from './Onboarding'
 import { Abertura, Fecho } from './cenas/Marca'
@@ -36,7 +36,7 @@ const CenaLogin: React.FC = () => {
     { frame: 174, x: 310, y: 765 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       <Login
         focoEmail={frame >= 22 && frame < 118}
         emailDigitado={frame < 26 ? 0 : clamp(Math.floor(((frame - 26) * 10) / 30), 0, EMAIL.length)}
@@ -44,7 +44,6 @@ const CenaLogin: React.FC = () => {
         senhaDigitada={frame < 126 ? 0 : clamp(Math.floor(((frame - 126) * 8) / 30), 0, 8)}
         entrando={frame >= 166}
       />
-      <Dedo keyframes={kfs} />
       <TypingTicks text={EMAIL} startFrame={26} cps={10} />
       <TypingTicks text="••••••••" startFrame={126} cps={8} />
     </Palco>
@@ -64,9 +63,8 @@ const CenaGravar: React.FC = () => {
     { frame: STOP_FRAME + 12, x: 315, y: 700 },
   ]
   return (
-    <Palco>
+    <Palco dedo={kfs}>
       <Gravar micFrame={MIC_FRAME} stopFrame={STOP_FRAME} />
-      <Dedo keyframes={kfs} />
       <Sfx file={SFX.popIn} at={STOP_FRAME + 6} volume={0.3} />
     </Palco>
   )

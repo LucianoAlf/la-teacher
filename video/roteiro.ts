@@ -1,20 +1,20 @@
-import type { Cena } from './lib/types'
+﻿import type { Cena } from './lib/types'
 
 export type { Cena }
 
 export const VIDEO_ID = 'onboarding-professor'
 
 /**
- * Onboarding do professor no LA Teacher — 20 cenas, TODAS as telas
- * (decisão do Alf 02/08: é lançamento, nada fica de fora). Falas aprovadas
- * pelo Alf em 02/08 — texto verbatim de docs/video/ROTEIRO-onboarding-professor.md.
+ * Onboarding do professor no LA Teacher — 20 cenas, TODAS as telas.
  *
- * TOM: o professor de música é descolado — a narração fala como colega de
- * palco, não como manual. SEM legenda na tela (decisão de 19/06): a voz
- * conduz, a tela mostra.
+ * ⚠️ REGRA QUE EU QUEBREI NO 1º CORTE (e que não pode se repetir): a fala tem
+ * que COBRIR a ação. Eu tinha escrito frases curtas de apresentação e uma
+ * coreografia longa de dedo — resultado: 65s dos 204s (32%) sem voz nenhuma,
+ * só trilha, e o vídeo morria no meio de quase toda cena. As falas abaixo são
+ * dimensionadas pelo tempo de cada cena (~3,2 palavras/s + 1s de respiro).
+ * Ao mexer numa cena, recalcular: palavras ≈ (duracaoMinS − 1,8) × 3,2.
  *
- * `duracaoMinS` é o piso pra coreografia do dedo caber; o áudio estica se
- * a fala for maior.
+ * TOM: colega de palco, não manual. SEM legenda: a voz conduz, a tela mostra.
  */
 export const ROTEIRO: Cena[] = [
   {
@@ -25,10 +25,10 @@ export const ROTEIRO: Cena[] = [
   },
   {
     id: 'intro',
-    duracaoMinS: 18,
+    duracaoMinS: 15,
     caption: '',
     narracao:
-      'Na primeira vez, eu me apresento. Olha só o que eu faço: você fala do jeito que sai — e eu transformo em registro organizado, aluno por aluno. E fica combinado: eu nunca invento nada.',
+      'Na primeira vez que você entra, eu me apresento. Olha só o que eu faço: você fala do seu jeito, e eu separo o que é de cada aluno. Repara — o Gustavo e a Maria saíram na mesma frase, e cada um ficou com a sua. E fica combinado: eu nunca invento nada.',
   },
   {
     id: 'login',
@@ -41,105 +41,113 @@ export const ROTEIRO: Cena[] = [
     id: 'home',
     duracaoMinS: 8,
     caption: '',
-    narracao: 'Essa é tua casa. Eu te recebo com o resumo do dia, tuas aulas e o que ficou pendente.',
+    narracao:
+      'Essa é tua casa. Eu te recebo com o resumo do dia, tuas aulas e o que ficou pendente — tudo na primeira tela, sem precisar procurar.',
   },
   {
     id: 'agenda',
     duracaoMinS: 8,
     caption: '',
-    narracao: 'Tua agenda do dia. Aluno, horário, sala — tudo no lugar quando você chega.',
+    narracao:
+      'Tua agenda do dia. Aluno, horário, sala — tudo no lugar quando você chega. E os dias da semana ali em cima, é só deslizar.',
   },
   {
     id: 'gravar',
     duracaoMinS: 13,
     caption: '',
     narracao:
-      'Acabou a aula? Toca aqui e fala, do teu jeito. É tipo contar pro colega como foi. Trinta segundos e tá feito.',
+      'Acabou a aula? Toca aqui e fala, do teu jeito. É tipo contar pro colega como foi: o que trabalharam, como cada um foi, o dever de casa. Pode gaguejar, pode voltar atrás — eu entendo. Trinta segundos e tá feito.',
   },
   {
     id: 'ouvir',
     duracaoMinS: 9,
     caption: '',
-    narracao: 'Quer conferir antes? Escuta aqui. Tá bom? Manda pra mim.',
+    narracao:
+      'Quer conferir antes de mandar? Escuta aqui, ó. Se não gostou, é só regravar. Tá bom? Então manda pra mim que eu já começo a trabalhar.',
   },
   {
     id: 'processando',
     duracaoMinS: 10,
     caption: '',
     narracao:
-      'Aí eu escuto, entendo e separo aluno por aluno. Leva menos de um minuto — e você pode sair da tela, não perde nada.',
+      'Aí eu escuto, entendo e separo aluno por aluno. Leva menos de um minuto. E você pode sair da tela, ir tomar um café — quando ficar pronto, eu te aviso.',
   },
   {
     id: 'confirmar',
     duracaoMinS: 18,
     caption: '',
     narracao:
-      'Antes de ir pro diário, você confere. Se faltou alguma coisa, é só tocar e completar. Nada entra sem o teu OK — eu nunca invento.',
+      'Antes de ir pro diário, você confere. Em cima fica o que a turma trabalhou; embaixo, a parte de cada aluno. Se eu não ouvi alguma coisa no áudio, eu deixo o campo vazio com um convite — é só tocar e completar, ó. Nada entra sem o teu OK. Eu nunca invento.',
   },
   {
     id: 'sucesso',
     duracaoMinS: 7,
     caption: '',
-    narracao: 'Pronto! Cada aluno recebeu a aula no diário dele.',
+    narracao:
+      'Pronto! Cada aluno recebeu a aula no diário dele, e a coordenação já consegue ver. Sem digitar nada.',
   },
   {
     id: 'presenca',
     duracaoMinS: 7,
     caption: '',
-    narracao: 'E a presença? Já lancei. Você gravou o conteúdo, o resto é comigo.',
+    narracao:
+      'E a presença? Já lancei, junto com o registro. Você gravou o conteúdo — o resto é comigo.',
   },
   {
     id: 'chamada',
     duracaoMinS: 15,
     caption: '',
     narracao:
-      'E se num dia você não gravar o áudio? A chamada manual tá aqui: todo mundo começa presente, você só toca em quem faltou e envia. Dois toques.',
+      'E se num dia você não gravar o áudio? A chamada manual tá aqui. Todo mundo já começa presente — você só toca em quem faltou, confere e envia. Dois toques e acabou. Só presta atenção: depois de enviar, não dá pra editar pelo app.',
   },
   {
     id: 'alunos',
-    duracaoMinS: 9,
+    duracaoMinS: 10,
     caption: '',
-    narracao: 'Aqui é tua carteira inteira, separada por curso e unidade.',
+    narracao:
+      'Aqui é tua carteira inteira, separada por curso e unidade. Dá pra buscar pelo nome, e cada linha já mostra o dia, a hora e em que aula o aluno está.',
   },
   {
     id: 'ficha',
     duracaoMinS: 13,
     caption: '',
     narracao:
-      'E a ficha de cada aluno: a jornada, a presença de verdade e tudo que já foi trabalhado — inclusive o que ficou de professores anteriores.',
+      'E a ficha de cada aluno: a jornada dele, a presença de verdade — a que foi confirmada e a que ninguém conferiu — e tudo que já foi trabalhado, inclusive o que ficou de professores anteriores. Você nunca começa do zero.',
   },
   {
     id: 'turma',
     duracaoMinS: 7,
     caption: '',
-    narracao: 'Cada turma guarda a linha do tempo das aulas — você nunca chega perdido.',
+    narracao:
+      'Cada turma guarda a linha do tempo das aulas — o que rolou na semana passada, na retrasada. Você nunca chega perdido.',
   },
   {
     id: 'chat',
     duracaoMinS: 13,
     caption: '',
-    narracao: 'Precisa de alguma coisa? Só me chamar. Eu tô aqui dentro do app…',
+    narracao:
+      'Precisa de alguma coisa? Só me chamar. Pergunta do jeito que você falaria com um colega: como foi a aula do Arthur, o que passar de dever, quem tá faltando muito. Eu tô aqui dentro do app…',
   },
   {
     id: 'whatsapp',
     duracaoMinS: 10,
     caption: '',
     narracao:
-      '…e no teu WhatsApp também. Toda manhã eu te mando a agenda do dia, com o que rolou na última aula de cada aluno.',
+      '…e no teu WhatsApp também. Toda manhã, cedinho, eu te mando a agenda do dia com o que rolou na última aula de cada aluno. Você chega sabendo.',
   },
   {
     id: 'semana',
     duracaoMinS: 8,
     caption: '',
     narracao:
-      'Suas horas nascem da chamada, sozinhas. Aqui você acompanha a semana inteira — sem planilha, sem papel.',
+      'Suas horas nascem da chamada, sozinhas. Aqui você acompanha a semana inteira, dia a dia — sem planilha, sem papel, sem pedir pra ninguém.',
   },
   {
     id: 'perfil',
     duracaoMinS: 13,
     caption: '',
     narracao:
-      'No teu perfil, conta quem você é — o Fábio usa isso pra falar contigo do teu jeito. E é aqui que você ajusta como e quando ele te chama.',
+      'No teu perfil, conta quem você é: teu instrumento, teu jeito de dar aula. Eu uso isso pra falar contigo do teu jeito. E é aqui que você escolhe onde quer me receber — no app, no WhatsApp, ou nos dois.',
   },
   {
     id: 'fecho',

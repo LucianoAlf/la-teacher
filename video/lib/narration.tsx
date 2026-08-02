@@ -3,7 +3,7 @@
 // GOTCHA: o Studio cacheia manifest/MP3 (HTTP + cache interno do media-utils);
 // depois de regenerar narração com o Studio aberto, RECARREGUE a página.
 // Render via CLI é processo novo — sempre lê o estado atual.
-import { Audio, staticFile, interpolate, useCurrentFrame } from 'remotion';
+import { Audio, Sequence, staticFile, interpolate, useCurrentFrame } from 'remotion';
 import { getAudioDurationInSeconds } from '@remotion/media-utils';
 import { sceneDuration } from './timing';
 import type { Cena } from './types';
@@ -32,8 +32,15 @@ export async function measureScenes(videoId: string, roteiro: Cena[]): Promise<S
   }));
 }
 
-export const SceneAudio: React.FC<{ meta: SceneMeta }> = ({ meta }) =>
-  meta.audioFile ? <Audio src={staticFile(meta.audioFile)} /> : null;
+/** `atraso`: frames de espera antes da voz entrar — evita a fala colidir com o
+ *  swoosh da transição/vinheta (o "embolou o áudio no início"). Cabe no respiro
+ *  de 0,8s que o sceneDuration já reserva. */
+export const SceneAudio: React.FC<{ meta: SceneMeta; atraso?: number }> = ({ meta, atraso = 0 }) =>
+  meta.audioFile ? (
+    <Sequence from={atraso}>
+      <Audio src={staticFile(meta.audioFile)} />
+    </Sequence>
+  ) : null;
 
 export const Caption: React.FC<{ text: string }> = ({ text }) => {
   const frame = useCurrentFrame();
