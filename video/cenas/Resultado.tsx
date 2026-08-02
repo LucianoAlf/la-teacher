@@ -10,9 +10,14 @@ const CAMPOS = [
   { rotulo: 'Dever de casa', valor: 'Ouvir a música para decorar a letra' },
 ]
 
-export const Resultado: React.FC = () => {
-  const frame = useCurrentFrame()
+/** `destaquePresenca`: a cena seguinte reusa o mesmo prontuário, já montado,
+ *  e joga a luz no selo verde — que é o ponto da narração ali. */
+export const Resultado: React.FC<{ destaquePresenca?: boolean }> = ({
+  destaquePresenca = false,
+}) => {
+  const frameReal = useCurrentFrame()
   const { fps } = useVideoConfig()
+  const frame = destaquePresenca ? frameReal + 70 : frameReal
 
   return (
     <div style={{ height: '100%', background: C.bgApp, padding: '20px 18px' }}>
@@ -84,19 +89,22 @@ export const Resultado: React.FC = () => {
       {/* o pulo do gato: presença automática */}
       {(() => {
         const e = spring({ frame: frame - 56, fps, config: { damping: 12, stiffness: 90 } })
+        // na cena dedicada, o selo pulsa pra puxar o olho enquanto a voz fala dele
+        const pulso = destaquePresenca ? 1 + Math.abs(Math.sin(frameReal / 14)) * 0.035 : 1
         return (
           <div
             style={{
               marginTop: 8,
               background: 'rgba(34,197,94,.12)',
-              border: '1px solid rgba(34,197,94,.4)',
+              border: `1px solid rgba(34,197,94,${destaquePresenca ? 0.7 : 0.4})`,
               borderRadius: 12,
               padding: '13px 14px',
               display: 'flex',
               alignItems: 'center',
               gap: 11,
               opacity: e,
-              transform: `scale(${0.9 + e * 0.1})`,
+              transform: `scale(${(0.9 + e * 0.1) * pulso})`,
+              boxShadow: destaquePresenca ? '0 0 32px rgba(34,197,94,.22)' : 'none',
             }}
           >
             <div style={{ fontSize: 20 }}>✅</div>
