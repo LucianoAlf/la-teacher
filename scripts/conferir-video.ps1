@@ -1,17 +1,15 @@
-# Harness de conferência do vídeo. Calcula a linha do tempo real (mesma regra do
+﻿# Harness de conferÃªncia do vÃ­deo. Calcula a linha do tempo real (mesma regra do
 # sceneDuration), mapeia cada toque pro frame global, extrai os quadros EXATOS e
-# monta folhas de contato. Bar do Alf: 9,5 — conferir TUDO, não amostrar.
+# monta folhas de contato. Bar do Alf: 9,5 â€” conferir TUDO, nÃ£o amostrar.
 #
-# ⚠️ A extração usa `select=eq(n,FRAME)` numa passada única, e NÃO `-ss`:
+# âš ï¸ A extraÃ§Ã£o usa `select=eq(n,FRAME)` numa passada Ãºnica, e NÃƒO `-ss`:
 # a busca por tempo (mesmo em 2 passos) entrega quadros ~8 frames adiantados
-# num H.264 com B-frames, o que fez a mão parecer fora do alvo em toques que
-# na verdade estavam certos. O filtergraph vai num arquivo pra não depender
-# de escape de vírgula no shell.
+# num H.264 com B-frames, o que fez a mÃ£o parecer fora do alvo em toques que
+# na verdade estavam certos. O filtergraph vai num arquivo pra nÃ£o depender
+# de escape de vÃ­rgula no shell.
 param([string]$Video = "out/onboarding-professor.mp4", [string]$Saida = "$env:TEMP\claude\conf")
 
-$dur = @{abertura=5.62;intro=14.58;login=6.03;home=10.48;agenda=10.11;gravar=11.91;ouvir=7.89;
-  processando=9.8;confirmar=16.72;sucesso=9.17;presenca=6.9;chamada=13.56;alunos=8.83;ficha=12.12;
-  turma=10.16;chat=10.79;whatsapp=9.17;semana=11.18;perfil=10.81;fecho=4.18}
+$dur = @{abertura=5.09;agenda=8.25;alunos=8.8;chamada=13.64;chat=10.84;confirmar=14.76;fecho=3.89;ficha=12.75;gravar=12.02;home=7.97;intro=15.02;login=6.11;ouvir=7.65;perfil=11.23;presenca=5.98;processando=8.99;semana=8.44;sucesso=6.58;turma=7.55;whatsapp=8.07}
 $min = [ordered]@{abertura=4;intro=15;login=7;home=8;agenda=8;gravar=13;ouvir=9;processando=10;
   confirmar=18;sucesso=7;presenca=7;chamada=15;alunos=10;ficha=13;turma=7;chat=13;whatsapp=10;
   semana=8;perfil=13;fecho=5}
@@ -21,12 +19,12 @@ $cliques = @{
   ouvir=@(20,212); confirmar=@(86,206,466); chamada=@(76,180,290); alunos=@(22,190);
   chat=@(24,68,150); semana=@(24); perfil=@(20,54,120,286)
 }
-$OLHAR = 8   # frames após o clique: meio da permanência, com o anel visível
+$OLHAR = 8   # frames apÃ³s o clique: meio da permanÃªncia, com o anel visÃ­vel
 
-# CALIBRAÇÃO: o Remotion mede os MP3 (getAudioDurationInSeconds) um tico
-# diferente do ffprobe, então minha linha do tempo desvia alguns frames ao
-# longo do vídeo. Comparo meu total com a duração REAL do arquivo e distribuo
-# a diferença proporcionalmente. Sem isso os quadros de conferência saem
+# CALIBRAÃ‡ÃƒO: o Remotion mede os MP3 (getAudioDurationInSeconds) um tico
+# diferente do ffprobe, entÃ£o minha linha do tempo desvia alguns frames ao
+# longo do vÃ­deo. Comparo meu total com a duraÃ§Ã£o REAL do arquivo e distribuo
+# a diferenÃ§a proporcionalmente. Sem isso os quadros de conferÃªncia saem
 # deslocados e toques certos parecem errados.
 $saidaFfp = & npx remotion ffmpeg -i $Video 2>&1 | Out-String
 $framesReais = if ($saidaFfp -match 'Duration: (\d+):(\d+):([\d.]+)') {
@@ -43,19 +41,19 @@ $fator = if ($framesReais -gt 0) { $framesReais / $inicio } else { 1 }
 $lista = $lista | ForEach-Object {
   [pscustomobject]@{ nome = $_.nome; frame = [math]::Round($_.bruto * $fator) }
 } | Sort-Object frame
-"linha do tempo calculada: $inicio frames · real: $framesReais · fator $([math]::Round($fator,5))"
+"linha do tempo calculada: $inicio frames Â· real: $framesReais Â· fator $([math]::Round($fator,5))"
 "toques a conferir: $($lista.Count)"
 
 New-Item -ItemType Directory -Force $Saida | Out-Null
 Get-ChildItem "$Saida\*.png" -ErrorAction SilentlyContinue | Remove-Item -Force
 
-# Extração EXATA: `-ss` DEPOIS do `-i` = seek por decodificação (o ffmpeg
-# decodifica desde o início e descarta até o ponto). É lento, mas é o único
-# modo que entrega o quadro pedido. Seek rápido (-ss antes do -i, mesmo em
-# 2 passos) cai no keyframe e devolve quadros ~8 frames adiantados — foi o que
-# fez toques certos parecerem errados na 1ª rodada de conferência.
-# (A passada única com select=eq(n,X) seria mais rápida, mas o muxer de
-# sequência image2 %03d falha neste build do ffmpeg do Remotion.)
+# ExtraÃ§Ã£o EXATA: `-ss` DEPOIS do `-i` = seek por decodificaÃ§Ã£o (o ffmpeg
+# decodifica desde o inÃ­cio e descarta atÃ© o ponto). Ã‰ lento, mas Ã© o Ãºnico
+# modo que entrega o quadro pedido. Seek rÃ¡pido (-ss antes do -i, mesmo em
+# 2 passos) cai no keyframe e devolve quadros ~8 frames adiantados â€” foi o que
+# fez toques certos parecerem errados na 1Âª rodada de conferÃªncia.
+# (A passada Ãºnica com select=eq(n,X) seria mais rÃ¡pida, mas o muxer de
+# sequÃªncia image2 %03d falha neste build do ffmpeg do Remotion.)
 $i = 0
 foreach ($item in $lista) {
   $i++

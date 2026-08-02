@@ -1,4 +1,4 @@
-// Gera a narração do vídeo com a VOZ DO FÁBIO, com cache por hash do texto.
+﻿// Gera a narração do vídeo com a VOZ DO FÁBIO, com cache por hash do texto.
 // Adaptado do estúdio do TOM (D:\la-organizer\video-studio) — mesmo motor, outra voz.
 // Rodar: node scripts/gen-narration.mjs
 //
@@ -46,6 +46,14 @@ function lerRoteiro() {
 const cenas = lerRoteiro()
 const ids = cenas.map(c => c.id)
 if (new Set(ids).size !== ids.length) { console.error('ids duplicados no roteiro'); process.exit(1) }
+// Trava contra leitura silenciosamente errada: o regex casa `narracao:` seguido
+// da string, e um comentário no meio faz a cena inteira ser pulada — a fala
+// seguinte é colada na cena errada e ninguém percebe. Conta os ids do arquivo.
+const idsNoArquivo = (readFileSync(resolve(root, ROTEIRO_PATH), 'utf-8').match(/^\s*id:\s*'/gm) || []).length
+if (idsNoArquivo !== cenas.length) {
+  console.error(`roteiro tem ${idsNoArquivo} cenas mas li ${cenas.length} — comentário entre 'narracao:' e o texto?`)
+  process.exit(1)
+}
 loadEnv()
 const API_KEY = process.env.ELEVENLABS_API_KEY
 if (!API_KEY) { console.error('ELEVENLABS_API_KEY ausente no .env'); process.exit(1) }
@@ -58,15 +66,18 @@ console.log(`cache: ${plan.keep.length} mantidos · ${plan.generate.length} a ge
 for (const f of plan.stale) unlinkSync(resolve(audioDir, f))
 
 /**
- * A ElevenLabs entrega o MP3 terminando no ÚLTIMO SOM — sem decaimento, o que
- * soa como palavra cortada (11 dos 20 áudios do 1º corte, flagrado pelo Alf).
- * Receita: pedir uma pausa no fim (`<break>`, suportada pelo multilingual_v2)
- * pra voz completar a palavra, e depois aparar o silêncio sobrando pra CAUDA_S.
+ * CAUDA DO ÁUDIO — nunca mais mexer no texto enviado à API.
+ *
+ * A ElevenLabs entrega o MP3 terminando no último som, o que soa como palavra
+ * comida. Minha 1ª receita anexava `<break time="0.8s" />` ao texto: o modelo
+ * VOCALIZOU a tag em várias falas e o resultado virou "um ET falando língua
+ * esquisita" (palavras do Alf). Sintoma mensurável: a velocidade caiu de ~3,3
+ * pra ~2,0 palavras/s — som que não é palavra.
+ *
+ * Agora o texto vai PURO e o silêncio é acrescentado DEPOIS, por ffmpeg
+ * (`apad`), que é silêncio digital e não pode contaminar a voz.
  */
-const BREAK_FINAL = ' <break time="0.8s" />'
-// 0,6s: com 0,35 sobravam só ~0,2s de cauda audível em algumas falas — perto
-// demais do limite pra arriscar "palavra comida". Folga custa nada.
-const CAUDA_S = 0.6
+const CAUDA_S = 0.5
 
 // O ffmpeg escreve TUDO (duração, silencedetect) em stderr — por isso spawnSync
 // com stderr capturado, e não execFileSync (que devolve só o stdout, vazio).
@@ -103,24 +114,18 @@ function fimDaFala(caminho, limiar) {
 // disso — é a trava que impede o corte de decepar frase (bug da v2).
 const MAX_CAUDA_S = 2.2
 
-/** Corta o excesso de silêncio do fim, deixando exatamente CAUDA_S. */
+/** Acrescenta CAUDA_S de silêncio DIGITAL no fim. Não toca na fala. */
 function ajustarCauda(caminho) {
-  // -45dB pega silêncio limpo; se a cauda tiver ruído de sala, -38dB acha —
-  // e a trava MAX_CAUDA_S garante que só o rabo é cortado, nunca a fala.
-  let { duracao, cauda } = fimDaFala(caminho, -45)
+  const { duracao } = fimDaFala(caminho, -45)
   if (duracao == null) return null
-  if (cauda == null || cauda < duracao - MAX_CAUDA_S) {
-    const brando = fimDaFala(caminho, -38)
-    cauda = brando.cauda != null && brando.cauda >= duracao - MAX_CAUDA_S ? brando.cauda : null
-  }
-  if (cauda == null) {
-    console.warn(`  ⚠️ ${caminho.split(/[\\/]/).pop()}: sem cauda detectável — NÃO cortei`)
-    return duracao
-  }
-  const alvo = cauda + CAUDA_S
-  if (alvo >= duracao - 0.05) return duracao // já está curta: não mexe
+  const alvo = duracao + CAUDA_S
   const tmp = `${caminho}.tmp.mp3`
-  ffmpeg(['-y', '-i', caminho, '-t', alvo.toFixed(3), '-c:a', 'libmp3lame', '-b:a', '128k', tmp])
+  ffmpeg([
+    '-y', '-i', caminho,
+    '-af', `apad=pad_dur=${CAUDA_S}`,
+    '-t', alvo.toFixed(3),
+    '-c:a', 'libmp3lame', '-b:a', '128k', tmp,
+  ])
   unlinkSync(caminho)
   renameSync(tmp, caminho)
   return alvo
@@ -139,7 +144,7 @@ for (const g of plan.generate) {
     method: 'POST',
     headers: { 'xi-api-key': API_KEY, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
     body: JSON.stringify({
-      text: g.narracao + BREAK_FINAL,
+      text: g.narracao,
       model_id: MODEL_ID,
       voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.4, use_speaker_boost: true, speed: 1.05 },
     }),

@@ -4,7 +4,9 @@ import { createHash } from 'node:crypto';
 // Muda quando a RECEITA de geração muda (não o texto) — invalida o cache sozinho.
 // v2: break tag no fim + cauda aparada (a ElevenLabs cortava a última palavra).
 // v3: aparação só do silêncio que vai até o fim (a v2 decepava frase no meio).
-export const GEN_VERSION = 'v3';
+// v4: SEM break tag no texto (o modelo vocalizava a tag e virava ruído);
+//     o silêncio da cauda passou a ser digital, por apad, depois da geração.
+export const GEN_VERSION = 'v4';
 
 export function hashText(text) {
   return createHash('sha1').update(`${GEN_VERSION}|${String(text)}`, 'utf-8').digest('hex').slice(0, 8);

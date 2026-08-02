@@ -22,8 +22,8 @@ export type CursorKeyframe = { frame: number; x: number; y: number; click?: bool
 
 // Onde está a ponta do dedo dentro do PNG (1024×1024) — MEDIDO pixel a pixel
 // (pixel opaco mais baixo da imagem), não estimado no olho.
-const PONTA_X = 0.1792
-const PONTA_Y = 0.8701
+const PONTA_X = 0.1968
+const PONTA_Y = 0.874
 const RAZAO = 1
 
 export const Dedo: React.FC<{
