@@ -1,0 +1,51 @@
+# `vps/fabio` — o que roda na VPS do Fábio
+
+Espelho versionado dos scripts que vivem em `fabio@89.116.73.186:~/fabio-chat-bridge/`.
+O repo é a fonte de leitura; **a VPS é onde executa**. Ao editar aqui, subir com `scp`.
+
+| Arquivo | O que é | Onde roda |
+|---|---|---|
+| `fabio_auditoria.py` | Auditoria: diagnostica, **conserta o que dá**, reporta o resto | `fabio-auditoria.timer` → 7h e 21h (BRT) |
+
+## Auditoria — filosofia
+
+Decisão do Alf (02/08/2026): *"já conserta e traz o que foi corrigido e o que precisa de decisão minha"*.
+O relatório **nunca** é lista de tarefa pro Alf. É: o que já foi resolvido sozinho + o que só um humano decide.
+
+**Conserta sozinho** (só operações idempotentes e reversíveis — nada destrutivo):
+- serviço caído → `systemctl --user restart`
+- áudio parado em `pendente`/`erro` → `fn_fabio_retry_fila()`
+
+**Só reporta** (precisa de humano): timer desarmado, briefing que falhou, áudio preso em
+`transcrevendo` (o retry não cobre esse status), registro que não virou presença,
+professor passando da régua de 3 dias, disco/RAM apertados.
+
+**Não cobra presença do professor** — a régua é conteúdo (`fabio_pendencias_professor`).
+
+## Comandos
+
+```bash
+# rodar à mão (imprime, NÃO envia)
+ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 \
+  "cd ~/fabio-chat-bridge && HERMES_HOME=/home/fabio/.hermes python3 fabio_auditoria.py"
+```
+
+Flags: `--send` (envia no WhatsApp) · `--no-fix` (só diagnostica) · `--janela 7h`.
+
+## Envio: DESLIGADO por ora
+
+O `ExecStart` do service **não** usa `--send` — a saída fica no journal
+(`journalctl --user -u fabio-auditoria`). Para ligar o envio: definir
+`FABIO_AUDIT_WHATSAPP` (número do Alf) no service e acrescentar `--send`.
+Regra permanente: **envio real só com OK explícito do Alf.**
+
+## Timers do usuário `fabio`
+
+| Timer | Quando | O quê |
+|---|---|---|
+| `fabio-auditoria.timer` | 7h e 21h BRT | esta auditoria |
+| `fabio-briefing-matheus.timer` | 8h BRT | briefing matinal (piloto prof. 25) |
+| `fabio-notification-worker.timer` | — | worker genérico (disabled) |
+
+⚠️ **A VPS roda em UTC.** Os units usam `America/Sao_Paulo` no `OnCalendar`, então o
+systemd converte sozinho — mas ao ler `list-timers`, os horários aparecem em UTC.
