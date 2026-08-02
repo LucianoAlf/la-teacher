@@ -37,19 +37,38 @@ export const Dedo: React.FC<{
 
   const ordenados = [...keyframes].sort((a, b) => a.frame - b.frame)
 
-  // POUSAR E SEGURAR: depois de apertar, a mão fica no botão por até 14 frames
-  // (~0,5s) antes de sair. Sem isso ela toca e foge no mesmo instante — o toque
-  // não "assenta" e o olho não acompanha o que foi apertado.
-  // A permanência encolhe se o próximo destino estiver perto, sempre deixando
-  // no mínimo 6 frames de viagem (senão a mão "teleporta").
+  // POUSAR E SEGURAR: depois de apertar, a mão fica no botão POUSADA_F frames
+  // (~0,5s) e só então viaja, com VIAGEM_MIN de folga pra não "teleportar".
+  // Sem isso ela toca e foge no mesmo instante — o toque não assenta e o olho
+  // não acompanha o que foi apertado.
+  //
+  // Se a cena não deu espaço suficiente entre o clique e o destino seguinte,
+  // a própria mão EMPURRA os keyframes seguintes pra frente. Os keyframes pós-
+  // clique são só "sair da frente", não têm significado — adiá-los é seguro, e
+  // evita ter que reequilibrar à mão as ~25 janelas curtas da coreografia.
+  const POUSADA_F = 14
+  const VIAGEM_MIN = 12
+
+  // Só o keyframe de SAÍDA (o logo após um clique) é adiado — nunca um clique,
+  // senão a mão descasa das mudanças de tela, que são presas a frames fixos.
+  // O adiamento respeita o keyframe seguinte, então nada atropela nada.
+  const espacados = ordenados.map((k, i) => {
+    const anterior = ordenados[i - 1]
+    if (!anterior?.click || k.click) return k
+    const depois = ordenados[i + 1]
+    const desejado = anterior.frame + POUSADA_F + VIAGEM_MIN
+    const teto = depois ? depois.frame - 4 : desejado
+    return { ...k, frame: Math.max(k.frame, Math.min(desejado, teto)) }
+  })
+
   const comPousada: CursorKeyframe[] = []
-  ordenados.forEach((k, i) => {
+  espacados.forEach((k, i) => {
     comPousada.push(k)
-    const proximo = ordenados[i + 1]
+    const proximo = espacados[i + 1]
     if (!k.click || !proximo) return
     const janela = proximo.frame - k.frame
-    if (janela < 12) return
-    comPousada.push({ frame: k.frame + Math.min(14, janela - 6), x: k.x, y: k.y })
+    if (janela < 8) return
+    comPousada.push({ frame: k.frame + Math.min(POUSADA_F, janela - 6), x: k.x, y: k.y })
   })
 
   // interpolate exige inputRange crescente; keyframes repetidos (chega e clica

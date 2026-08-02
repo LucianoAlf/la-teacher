@@ -246,7 +246,7 @@ const CenaOuvir: React.FC = () => {
     { frame: 20, x: 205, y: 430, click: true }, // player
     { frame: 32, x: 320, y: 620 },
     { frame: 198, x: 240, y: 600 },
-    { frame: 212, x: 205, y: 530, click: true }, // Enviar pro Fábio
+    { frame: 212, x: 205, y: 516, click: true }, // Enviar pro Fábio
     { frame: 224, x: 320, y: 700 },
   ]
   return (
