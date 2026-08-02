@@ -14,7 +14,9 @@ export const Ouvir: React.FC<{ playFrame: number; enviarFrame: number }> = ({
   enviarFrame,
 }) => {
   const frame = useCurrentFrame()
-  const enviando = frame >= enviarFrame + 8
+  // +16: a tela só muda DEPOIS do dedo assentar o toque (a mão pousa 8 frames).
+  // Com +8 a tela virava enquanto o dedo ainda apertava — parecia atropelado.
+  const enviando = frame >= enviarFrame + 16
   const DURACAO = 38
   const tocado = Math.max(0, Math.min(1, (frame - playFrame) / (30 * 6))) // 6s de "escuta" viram a barra toda
   const tempoTocado = Math.floor(tocado * DURACAO)

@@ -37,7 +37,7 @@ export const Gravar: React.FC<{
   const { fps } = useVideoConfig()
 
   const ACESSO_F = 12 // "Pedindo acesso ao microfone…"
-  const POS_STOP_F = 10 // o stop fica na tela durante o aperto; só depois vira o chip
+  const POS_STOP_F = 16 // o stop fica na tela durante o aperto; só depois vira o chip
   const gravandoDesde = micFrame + ACESSO_F
   const fase: 'repouso' | 'pedindo' | 'gravando' | 'gravado' =
     frame < micFrame

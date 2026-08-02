@@ -175,7 +175,7 @@ const CenaLogin: React.FC = () => {
         emailDigitado={digitado(frame, 26, 10, EMAIL.length)}
         focoSenha={frame >= 118 && frame < 164}
         senhaDigitada={digitado(frame, 126, 8, 8)}
-        entrando={frame >= 168}
+        entrando={frame >= 178}
       />
       <TypingTicks text={EMAIL} startFrame={26} cps={10} />
       <TypingTicks text="••••••••" startFrame={126} cps={8} />
@@ -289,7 +289,7 @@ const CenaConfirmar: React.FC = () => {
         scrollY={scrollY}
         obsFoco={frame >= 86 && frame < 206}
         obsDigitada={digitado(frame, 96, 12, OBS_TEXTO.length)}
-        toastVisivel={frame >= 212 && frame < 268}
+        toastVisivel={frame >= 220 && frame < 276}
         gravando={frame >= 470}
       />
       <TypingTicks text={OBS_TEXTO} startFrame={96} cps={12} />
@@ -336,7 +336,7 @@ const CenaChamada: React.FC = () => {
 /** Vem da Home: o dedo toca a aba ALUNOS lá embaixo e a carteira abre. */
 const CenaAlunos: React.FC = () => {
   const frame = useCurrentFrame()
-  const TROCA = 30 // frame em que a aba responde
+  const TROCA = 36 // a aba só responde depois do toque assentar
   const kfs: CursorKeyframe[] = [
     { frame: 6, x: 330, y: 690 },
     { frame: 22, x: 123, y: 778, click: true }, // aba Alunos (TabBar)
@@ -385,7 +385,7 @@ const CenaTurma: React.FC = () => (
 /** Vem da Home: o dedo aperta a BOLOTA TEAL do Fábio (o FAB central) e o chat abre. */
 const CenaChat: React.FC = () => {
   const frame = useCurrentFrame()
-  const TROCA = 32
+  const TROCA = 38
   const kfs: CursorKeyframe[] = [
     { frame: 6, x: 320, y: 700 },
     { frame: 24, x: 205, y: 752, click: true }, // FAB central do Fábio
@@ -433,7 +433,7 @@ const CenaWhatsApp: React.FC = () => (
 /** Vem da Home: o dedo toca o card "Minha semana" e a tela abre. */
 const CenaSemana: React.FC = () => {
   const frame = useCurrentFrame()
-  const TROCA = 34
+  const TROCA = 38
   const kfs: CursorKeyframe[] = [
     { frame: 6, x: 330, y: 640 },
     { frame: 24, x: 205, y: 659, click: true }, // card Minha semana (Home rolada)
@@ -452,8 +452,8 @@ const CenaSemana: React.FC = () => {
 /** Caminho real do Perfil: avatar do professor → menu → Perfil. Sem pular etapa. */
 const CenaPerfil: React.FC = () => {
   const frame = useCurrentFrame()
-  const MENU = 22 // o menu abre
-  const TROCA = 62 // o Perfil abre
+  const MENU = 34 // o menu abre
+  const TROCA = 68 // o Perfil abre
   const scrollY = interpolate(frame, [TROCA + 4, TROCA + 40], [0, 150], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
@@ -481,7 +481,7 @@ const CenaPerfil: React.FC = () => {
           scrollY={scrollY}
           bioFoco={frame >= 120 && frame < 286}
           bioDigitada={digitado(frame, 134, 20, BIO.length)}
-          toastVisivel={frame >= 296 && frame < 362}
+          toastVisivel={frame >= 300 && frame < 366}
         />
       )}
       <TypingTicks text={BIO} startFrame={134} cps={20} />

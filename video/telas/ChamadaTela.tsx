@@ -21,11 +21,12 @@ export const ChamadaTela: React.FC<{
 }> = ({ faltouFrame, enviarFrame, agoraFrame, enviadaFrame }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
-  const faltou = frame >= faltouFrame + 4
-  const confirmando = frame >= enviarFrame + 4 && frame < agoraFrame + 4
-  const enviando = frame >= agoraFrame + 4 && frame < enviadaFrame
+  // as mudanças de estado esperam o toque assentar (a mão pousa 8 frames)
+  const faltou = frame >= faltouFrame + 10
+  const confirmando = frame >= enviarFrame + 14 && frame < agoraFrame + 14
+  const enviando = frame >= agoraFrame + 14 && frame < enviadaFrame
   const enviada = frame >= enviadaFrame
-  const cardConfirma = spring({ frame: frame - enviarFrame - 4, fps, config: { damping: 15 } })
+  const cardConfirma = spring({ frame: frame - enviarFrame - 14, fps, config: { damping: 15 } })
   const popEnviada = spring({ frame: frame - enviadaFrame, fps, config: { damping: 11, stiffness: 110 } })
 
   const Pilula: React.FC<{ nome: string; estaFaltando: boolean }> = ({ nome, estaFaltando }) => (
