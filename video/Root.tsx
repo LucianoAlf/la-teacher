@@ -16,21 +16,16 @@ export const Root: React.FC = () => (
       component={Onboarding}
       fps={30}
       width={1080}
-      height={1350}
+      height={1920} // 9:16 — o app é PWA de celular, o vídeo tem que ter a cara dele
       defaultProps={{ scenes: [] as SceneMeta[], musicFile: null as string | null }}
       // O áudio dita a duração: mede os MP3 e dimensiona cada cena (+0.8s de respiro).
       calculateMetadata={async ({ props }) => {
         const scenes = await measureScenes(VIDEO_ID, ROTEIRO)
         const durationInFrames = scenes.reduce((a, s) => a + s.durationInFrames, 0)
-        let musicFile = props.musicFile ?? null
-        if (!musicFile) {
-          try {
-            const r = await fetch(staticFile(MUSIC_DEFAULT))
-            if (r.ok) musicFile = MUSIC_DEFAULT
-          } catch {
-            musicFile = null
-          }
-        }
+        // A trilha entra SEMPRE por padrão. (Antes eu checava com fetch(staticFile);
+        // no render por CLI esse fetch falha e o vídeo saía mudo — foi o "falta música".)
+        // Pra rodar sem trilha: --props='{"musicFile":null}'
+        const musicFile = props.musicFile === undefined ? MUSIC_DEFAULT : props.musicFile
         return {
           durationInFrames: Math.max(durationInFrames, sec(10)),
           props: { ...props, scenes, musicFile },
