@@ -92,17 +92,33 @@ const alvo = arquivos.join(' + ')
 // teste toca. Se outro processo escrever numa dessas linhas durante os ~2s do
 // ensaio, isto acusa — falso alarme barulhento e re-rodável, que é o lado certo
 // pra errar.
+// Duas impressões, e as duas são comparativas — nunca "conte X e espere zero".
+// A primeira versão conferia resíduo com contagens fixas dos objetos da 018;
+// no dia em que a 018 foi aplicada, esse check passou a acusar produção como
+// sujeira. Comparar o estado com ele mesmo não envelhece.
 const SQL_IMPRESSAO = `
-  select json_build_object(
-    'linhas', count(*),
-    'digest', coalesce(md5(string_agg(linha, '|' order by linha)), 'vazio'),
-    'amostra', coalesce(json_agg(left(linha, 240) order by linha), '[]'::json)
-  ) as impressao
-  from (
+  with dados as (
     select to_jsonb(n.*)::text as linha
     from public.fabio_notificacoes n
     where n.professor_id = 25
-  ) t`
+  ), objetos as (
+    select 'col:'||table_name||'.'||column_name as item
+      from information_schema.columns
+     where table_schema='public' and table_name like 'fabio\\_%'
+    union all
+    select 'fn:'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')'
+      from pg_proc p where p.pronamespace='public'::regnamespace
+       and (p.proname like 'fabio\\_%' or p.proname like 'app\\_%' or p.proname like 'fn\\_%')
+    union all
+    select 'ix:'||indexname from pg_indexes
+     where schemaname='public' and tablename like 'fabio\\_%'
+  )
+  select json_build_object(
+    'linhas',  (select count(*) from dados),
+    'dados',   (select coalesce(md5(string_agg(linha,'|' order by linha)),'vazio') from dados),
+    'objetos', (select coalesce(md5(string_agg(item, '|' order by item)),'vazio') from objetos),
+    'amostra', (select coalesce(json_agg(left(linha,240) order by linha),'[]'::json) from dados)
+  ) as impressao`
 
 async function impressao() {
   const r = await consultar(SQL_IMPRESSAO)
@@ -146,52 +162,33 @@ if (!ensaio.ok) {
   }
 }
 
-// ── 2) Confirmação do ROLLBACK, em OUTRA conexão ─────────────────────────────
-// O ensaio mexe em fabio_notificacoes, que o briefing usa. Confiar no rollback
-// implícito seria repetir o defeito que esta versão existe pra corrigir.
-const residuo = await consultar(`
-  select json_build_object(
-    'coluna_lease',  (select count(*) from information_schema.columns
-                       where table_schema='public' and table_name='fabio_notificacoes'
-                         and column_name='lease_token'),
-    'rpc_nova',      (select count(*) from pg_proc
-                       where pronamespace='public'::regnamespace
-                         and proname='fabio_claim_notificacao_por_referencia'),
-    'indice_novo',   (select count(*) from pg_indexes
-                       where schemaname='public' and indexname='uq_fabio_notif_por_referencia'),
-    'linhas_teste',  (select count(*) from public.fabio_notificacoes
-                       where referencia_id like 'teste-%')
-  ) as estado`)
-
-if (!residuo.ok) {
-  console.error(`\n✗ não consegui conferir os objetos criados pelo ensaio:\n${residuo.texto}`)
-  falhou = true
-} else {
-  const e = Array.isArray(residuo.dados) ? residuo.dados[0]?.estado : null
-  const sujeira = e ? Object.entries(e).filter(([, v]) => v > 0) : [['resposta inesperada', 1]]
-  if (sujeira.length) {
-    console.error(`\n✗ ROLLBACK NÃO LIMPOU — sobrou em produção: ${JSON.stringify(Object.fromEntries(sujeira))}`)
-    falhou = true
-  } else {
-    console.log('✓ nenhum objeto do ensaio sobrou (coluna, índice, RPC, linhas de teste)')
-  }
-}
-
-// ── 3) Impressão digital DEPOIS: as linhas vivas voltaram IDÊNTICAS? ─────────
+// ── 2) Impressão digital DEPOIS, em OUTRA conexão ────────────────────────────
+// O ensaio mexe em linhas vivas e cria colunas/funções. Confiar no rollback
+// implícito seria repetir o defeito que este runner existe pra corrigir.
 const depois = await impressao()
 if (depois?.erro) {
   console.error(`\n✗ não consegui tirar a impressão digital final:\n${depois.erro}`)
   falhou = true
-} else if (antes.digest !== depois.digest || antes.linhas !== depois.linhas) {
-  console.error('\n✗ ROLLBACK NÃO RESTAUROU as linhas vivas — o ensaio alterou produção.')
-  console.error(`  antes:  ${antes.linhas} linha(s), digest ${antes.digest}`)
-  console.error(`  depois: ${depois.linhas} linha(s), digest ${depois.digest}`)
-  const so = (a, b) => (a ?? []).filter((x) => !(b ?? []).includes(x))
-  for (const l of so(antes.amostra, depois.amostra)) console.error(`  − ${l}`)
-  for (const l of so(depois.amostra, antes.amostra)) console.error(`  + ${l}`)
-  falhou = true
 } else {
-  console.log(`✓ linhas vivas idênticas antes e depois — ${depois.linhas} linha(s), digest ${depois.digest.slice(0, 12)}…`)
+  if (antes.dados !== depois.dados || antes.linhas !== depois.linhas) {
+    console.error('\n✗ ROLLBACK NÃO RESTAUROU as linhas vivas — o ensaio alterou produção.')
+    console.error(`  antes:  ${antes.linhas} linha(s), digest ${antes.dados}`)
+    console.error(`  depois: ${depois.linhas} linha(s), digest ${depois.dados}`)
+    const so = (a, b) => (a ?? []).filter((x) => !(b ?? []).includes(x))
+    for (const l of so(antes.amostra, depois.amostra)) console.error(`  − ${l}`)
+    for (const l of so(depois.amostra, antes.amostra)) console.error(`  + ${l}`)
+    falhou = true
+  } else {
+    console.log(`✓ linhas vivas idênticas antes e depois — ${depois.linhas} linha(s), digest ${depois.dados.slice(0, 12)}…`)
+  }
+
+  if (antes.objetos !== depois.objetos) {
+    console.error('\n✗ ROLLBACK NÃO LIMPOU — o schema mudou (coluna, função ou índice sobrou).')
+    console.error(`  antes:  ${antes.objetos}\n  depois: ${depois.objetos}`)
+    falhou = true
+  } else {
+    console.log(`✓ schema idêntico antes e depois — digest ${depois.objetos.slice(0, 12)}…`)
+  }
 }
 
 // Sai por process.exitCode, NUNCA por process.exit(): chamar exit() logo depois
