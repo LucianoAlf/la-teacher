@@ -1,17 +1,20 @@
--- Teste de concorrência da migration 018. Roda em BEGIN/ROLLBACK: não deixa traço.
+-- Teste de concorrência da migration 018.
 --
--- ⚠️ ESTE TESTE ABORTA. Cada verificação passa por pg_temp.checar(), que levanta
---    exceção na divergência — a transação morre ali e o runner devolve código de
---    saída ≠ 0. A versão anterior só imprimia PASSOU/FALHOU numa tabela, e verde
---    por leitura humana não é prova: bastava ninguém olhar a coluna certa.
+-- ⚠️ ESTE TESTE NÃO ABORTA — DE PROPÓSITO.
 --
--- Rodar com (a migration vai junto, aplicada e descartada no mesmo fôlego):
+--    A versão anterior levantava exceção na divergência. Isso dava rc correto,
+--    mas deixava a transação em estado abortado e o ROLLBACK dependendo de
+--    cleanup implícito da conexão — que a Management API não promete. Ou seja:
+--    exatamente no caminho de falha, DDL e locks numa tabela viva
+--    (fabio_notificacoes, que o briefing usa) ficavam por conta da sorte.
 --
---   node scripts/rodar-teste-sql.mjs \
---     supabase/migrations/018-notificacoes-lease-e-referencia.sql \
---     supabase/migrations/018-notificacoes-lease-e-referencia.test.sql
+--    Agora `pg_temp.checar()` REGISTRA a divergência numa temp table, o teste
+--    segue até o fim, o ROLLBACK executa normalmente e o resumo estruturado sai
+--    no último SELECT. Quem reprova é o runner, lendo esse resumo — e ele ainda
+--    confere, numa SEGUNDA conexão, que nada sobrou.
 --
--- Sucesso = rc 0 e a linha final "TODOS OS PASSOS PASSARAM".
+-- Rodar com:  npm run teste:018
+--   (= node scripts/rodar-teste-sql.mjs <migration>.sql <este arquivo>)
 --
 -- O runner é DONO da transação (BEGIN/ROLLBACK). Este arquivo não abre nem
 -- fecha transação de propósito: assim não existe a versão dele em que alguém
@@ -22,21 +25,21 @@
 -- por qual delas o worker legado entrou. A catraca tem que segurar as duas
 -- sozinhas, então cada uma tem seu cenário.
 
+create temp table _falhas(passo text, esperado text, obtido text) on commit drop;
+
 create function pg_temp.checar(p_passo text, p_esperado text, p_obtido text)
 returns void language plpgsql as $c$
 begin
   if p_esperado is distinct from p_obtido then
-    raise exception 'TESTE 018 FALHOU em [%]: esperado=<%> obtido=<%>',
-      p_passo, coalesce(p_esperado,'(null)'), coalesce(p_obtido,'(null)');
+    insert into _falhas values (p_passo, coalesce(p_esperado,'(null)'), coalesce(p_obtido,'(null)'));
   end if;
 end $c$;
 
 -- ============================================================================
 -- PARTE 1 — o relógio do claim
 --
--- O passo "linha velha + lease vivo" é a regressão do bug que a 018 conserta:
--- com a regra antiga (`criado_em < now() - 10 min`) ele devolveria claimed=true
--- e este teste abortaria aqui.
+-- O passo 3 é a regressão do bug que a 018 conserta: com a regra antiga
+-- (`criado_em < now() - 10 min`) ele devolveria claimed=true.
 -- ============================================================================
 do $t$
 declare
@@ -69,18 +72,18 @@ begin
     public.fabio_marcar_notificacao_enviada(v_id, v_tok, 'recibo-do-velho')::text);
   perform pg_temp.checar('6. dono atual conclui','true',
     public.fabio_marcar_notificacao_enviada(v_id, v_tok2, 'wamid.NOVO')::text);
-
   perform pg_temp.checar('7. recibo do canal gravado','wamid.NOVO',
     (select envio_recibo from public.fabio_notificacoes where id=v_id));
   perform pg_temp.checar('8. tentativas contadas','2',
     (select tentativas::text from public.fabio_notificacoes where id=v_id));
+exception when others then
+  -- Exceção inesperada também é falha — mas registrada, não propagada, pra não
+  -- abortar a transação e devolver o ROLLBACK pra sorte.
+  insert into _falhas values ('PARTE 1 (excecao)','sem excecao', sqlerrm);
 end $t$;
 
 -- ============================================================================
 -- PARTE 2 — o corte na FINALIZAÇÃO entre worker antigo e novo
---
--- "p_lease_token default null só pode ser aceito enquanto a linha também
---  estiver sem token. Senão a compatibilidade vira bypass de fencing."
 -- ============================================================================
 do $t$
 declare a jsonb; b jsonb; v_id uuid; v_tok uuid; v_prof integer := 25;
@@ -113,13 +116,12 @@ begin
     public.fabio_marcar_notificacao_enviada(v_id, gen_random_uuid(), 'wamid.INTRUSO')::text);
   perform pg_temp.checar('18. dono com token conclui','true',
     public.fabio_marcar_notificacao_enviada(v_id, v_tok, 'wamid.OK')::text);
+exception when others then
+  insert into _falhas values ('PARTE 2 (excecao)','sem excecao', sqlerrm);
 end $t$;
 
 -- ============================================================================
 -- PARTE 3A — catraca do CLAIM, porta 'falhou' com o lease AINDA VIVO
---
--- Sem a catraca, o claim legado gravaria lease_token = null e desarmaria a
--- cerca. Aqui a porta aberta é o status; o lease continua no futuro.
 -- ============================================================================
 do $t$
 declare a jsonb; b jsonb; c jsonb; v_id uuid; v_tokA uuid; v_tokB uuid; v_prof integer := 25;
@@ -152,13 +154,12 @@ begin
     public.fabio_marcar_notificacao_enviada(v_id)::text);
   perform pg_temp.checar('39A. dono atual conclui','true',
     public.fabio_marcar_notificacao_enviada(v_id, v_tokB, 'wamid.A')::text);
+exception when others then
+  insert into _falhas values ('PARTE 3A (excecao)','sem excecao', sqlerrm);
 end $t$;
 
 -- ============================================================================
 -- PARTE 3B — catraca do CLAIM, porta 'processando' com o lease VENCIDO
---
--- A outra porta do DO UPDATE. O status continua 'processando'; quem abre é o
--- prazo. A catraca tem que segurar aqui também, sozinha.
 -- ============================================================================
 do $t$
 declare a jsonb; b jsonb; c jsonb; v_id uuid; v_tokA uuid; v_tokB uuid; v_prof integer := 25;
@@ -189,7 +190,16 @@ begin
     public.fabio_marcar_notificacao_enviada(v_id)::text);
   perform pg_temp.checar('39B. dono atual conclui','true',
     public.fabio_marcar_notificacao_enviada(v_id, v_tokB, 'wamid.B')::text);
+exception when others then
+  insert into _falhas values ('PARTE 3B (excecao)','sem excecao', sqlerrm);
 end $t$;
 
-select 'TODOS OS PASSOS PASSARAM' as resultado;
-
+-- Resumo estruturado — é ESTE resultado que o runner lê pra decidir o rc.
+-- A transação continua sadia aqui; o ROLLBACK do runner executa normalmente.
+select json_build_object(
+  'teste',  '018-notificacoes-lease-e-referencia',
+  'falhas', (select count(*) from _falhas),
+  'detalhe', coalesce((select json_agg(json_build_object(
+                'passo', passo, 'esperado', esperado, 'obtido', obtido))
+              from _falhas), '[]'::json)
+) as resumo;

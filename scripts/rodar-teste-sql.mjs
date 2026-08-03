@@ -1,24 +1,27 @@
 #!/usr/bin/env node
-// Roda um arquivo .sql contra o projeto Supabase e SAI COM CÓDIGO ≠ 0 se falhar.
+// Roda arquivos .sql contra o Supabase num ensaio descartável e SAI COM CÓDIGO
+// ≠ 0 se algo falhar OU se sobrar resíduo.
 //
-// Por que existe (exigência da auditoria, 03/08/2026): o teste da 018 só
-// imprimia PASSOU/FALHOU numa tabela. Verde por leitura humana não é prova —
-// se ninguém olhar a coluna certa, um teste quebrado passa batido. Agora o
-// próprio SQL levanta exceção na divergência, e este runner transforma isso em
-// código de saída, que CI e gente distraída não conseguem ignorar.
+// ── Por que ele é assim (duas auditorias) ────────────────────────────────────
 //
-// Equivalente ao `ON_ERROR_STOP=1` do psql: não temos psql nesta máquina, então
-// o batch inteiro vai numa requisição só. Qualquer erro aborta tudo e volta
-// como erro da API — e, como o arquivo roda dentro de BEGIN/ROLLBACK, abortar
-// no meio também não deixa traço.
+// 1ª: o teste só imprimia PASSOU/FALHOU numa tabela. Verde por leitura humana
+//     não é prova — bastava ninguém olhar a coluna certa.
 //
-// O runner é DONO da transação: ele mesmo abre BEGIN e fecha ROLLBACK, sempre.
-// Os arquivos não trazem controle de transação — assim não existe a versão do
-// teste em que alguém esqueceu o `rollback` e escreveu em produção. Por isso dá
-// pra passar a migration junto: ela é aplicada e descartada no mesmo fôlego.
+// 2ª: a correção foi levantar exceção na divergência. Isso dava rc certo, mas
+//     deixava a transação ABORTADA e o ROLLBACK por conta do cleanup implícito
+//     da conexão, que a Management API não promete. Justamente no caminho de
+//     falha, DDL e locks numa tabela viva (`fabio_notificacoes`, do briefing)
+//     ficavam dependendo de sorte.
+//
+// Agora:
+//   • o SQL NUNCA aborta — registra divergências e devolve um resumo em JSON,
+//     com a transação sadia, para o ROLLBACK executar normalmente;
+//   • o veredito vem desse resumo explícito, não da ausência de erro;
+//   • uma SEGUNDA chamada, em outra conexão, confirma que nada sobrou.
+//     Reprovar por resíduo é tão importante quanto reprovar por divergência:
+//     um ensaio que suja produção não é ensaio.
 //
 // Uso:  node scripts/rodar-teste-sql.mjs <migration.sql> <teste.sql>
-//       node scripts/rodar-teste-sql.mjs supabase/migrations/018-*.test.sql
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -50,10 +53,26 @@ if (!token) {
   process.exit(2)
 }
 
+async function consultar(sql) {
+  const r = await fetch(`https://api.supabase.com/v1/projects/${PROJETO}/database/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: sql }),
+  })
+  const texto = await r.text()
+  let dados = null
+  try {
+    dados = JSON.parse(texto)
+  } catch {
+    /* deixa null: quem chamou decide */
+  }
+  return { ok: r.ok, texto, dados }
+}
+
 const corpos = arquivos.map((a) => {
   const texto = readFileSync(resolve(a), 'utf8')
-  // Rede de segurança: se um arquivo trouxer controle de transação, o ROLLBACK
-  // do runner deixaria de valer pro que veio antes do COMMIT.
+  // Se um arquivo trouxer controle de transação, o ROLLBACK do runner deixaria
+  // de valer pro que veio antes do COMMIT.
   if (/^\s*(begin|commit|rollback)\s*;/im.test(texto)) {
     console.error(`✗ ${a} contém BEGIN/COMMIT/ROLLBACK — o runner é o dono da transação.`)
     process.exit(2)
@@ -61,41 +80,76 @@ const corpos = arquivos.map((a) => {
   return `-- >>>>> ${a}\n${texto}`
 })
 
-const sql = ['begin;', ...corpos, 'rollback;'].join('\n')
-
-const resposta = await fetch(
-  `https://api.supabase.com/v1/projects/${PROJETO}/database/query`,
-  {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: sql }),
-  },
-)
-
-const corpo = await resposta.text()
-
 const alvo = arquivos.join(' + ')
 
-if (!resposta.ok) {
-  // Aqui cai o RAISE do próprio teste: a mensagem já diz qual passo divergiu.
-  console.error(`\n✗ ${alvo}\n`)
-  try {
-    const j = JSON.parse(corpo)
-    console.error(j?.error?.message ?? j?.message ?? corpo)
-  } catch {
-    console.error(corpo)
-  }
-  process.exitCode = 1
-} else if (/FALHOU/.test(corpo)) {
-  // Cinto e suspensório: se algum dia um passo virar linha de resultado em vez
-  // de exceção, a palavra FALHOU também derruba o runner.
-  console.error(`\n✗ ${alvo} — resultado contém FALHOU:\n${corpo}`)
-  process.exitCode = 1
+// ── 1) O ensaio, numa transação que o runner abre e fecha ────────────────────
+const ensaio = await consultar(['begin;', ...corpos, 'rollback;'].join('\n'))
+
+let falhou = false
+
+if (!ensaio.ok) {
+  // Erro de verdade (sintaxe, permissão, exceção não prevista). O teste foi
+  // escrito pra não chegar aqui — se chegou, é problema, e a transação pode ter
+  // abortado: a checagem de resíduo abaixo passa a ser essencial.
+  console.error(`\n✗ ${alvo} — a execução falhou:\n`)
+  console.error(ensaio.dados?.error?.message ?? ensaio.dados?.message ?? ensaio.texto)
+  falhou = true
 } else {
-  console.log(`✓ ${alvo}\n  ${corpo.trim()}`)
+  const resumo = Array.isArray(ensaio.dados) ? ensaio.dados.at(-1)?.resumo : null
+  if (!resumo || typeof resumo.falhas !== 'number') {
+    console.error(`\n✗ ${alvo} — não veio resumo estruturado. O teste precisa terminar`)
+    console.error('  num SELECT json_build_object(... "falhas" ...). Sem veredito explícito,')
+    console.error(`  "não deu erro" não é aprovação.\n  Recebido: ${ensaio.texto.slice(0, 400)}`)
+    falhou = true
+  } else if (resumo.falhas > 0) {
+    console.error(`\n✗ ${alvo} — ${resumo.falhas} passo(s) divergiram:\n`)
+    for (const d of resumo.detalhe ?? []) {
+      console.error(`  • ${d.passo}\n      esperado <${d.esperado}>  obtido <${d.obtido}>`)
+    }
+    falhou = true
+  } else {
+    console.log(`✓ ${alvo} — nenhuma divergência`)
+  }
+}
+
+// ── 2) Confirmação do ROLLBACK, em OUTRA conexão ─────────────────────────────
+// O ensaio mexe em fabio_notificacoes, que o briefing usa. Confiar no rollback
+// implícito seria repetir o defeito que esta versão existe pra corrigir.
+const residuo = await consultar(`
+  select json_build_object(
+    'coluna_lease',  (select count(*) from information_schema.columns
+                       where table_schema='public' and table_name='fabio_notificacoes'
+                         and column_name='lease_token'),
+    'rpc_nova',      (select count(*) from pg_proc
+                       where pronamespace='public'::regnamespace
+                         and proname='fabio_claim_notificacao_por_referencia'),
+    'indice_novo',   (select count(*) from pg_indexes
+                       where schemaname='public' and indexname='uq_fabio_notif_por_referencia'),
+    'linhas_teste',  (select count(*) from public.fabio_notificacoes
+                       where referencia_id like 'teste-%'),
+    'briefing_hoje', (select count(*) from public.fabio_notificacoes
+                       where tipo='briefing_matinal' and dia_referencia=current_date)
+  ) as estado`)
+
+if (!residuo.ok) {
+  console.error(`\n✗ não consegui confirmar o rollback:\n${residuo.texto}`)
+  falhou = true
+} else {
+  const e = Array.isArray(residuo.dados) ? residuo.dados[0]?.estado : null
+  const sujeira = e
+    ? Object.entries(e).filter(([k, v]) => k !== 'briefing_hoje' && v > 0)
+    : [['resposta inesperada', 1]]
+  if (sujeira.length) {
+    console.error(`\n✗ ROLLBACK NÃO LIMPOU — sobrou em produção: ${JSON.stringify(Object.fromEntries(sujeira))}`)
+    falhou = true
+  } else {
+    console.log(`✓ rollback confirmado em outra conexão — zero resíduo` +
+      ` (briefing de hoje intacto: ${e.briefing_hoje} linha(s))`)
+  }
 }
 
 // Sai por process.exitCode, NUNCA por process.exit(): chamar exit() logo depois
 // do fetch derruba o libuv no Windows com "UV_HANDLE_CLOSING" e devolve rc=127
-// — ou seja, o runner reprovaria um teste que passou. Rc errado e' pior que rc
-// nenhum: e' a mesma classe de mentira que este teste existe pra impedir.
+// — o runner reprovaria um teste que passou. Rc errado é a mesma classe de
+// mentira que este runner existe pra impedir.
+process.exitCode = falhou ? 1 : 0
