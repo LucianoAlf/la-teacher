@@ -85,10 +85,15 @@ if (acumulado !== composicao.durationInFrames) {
   throw new Error(`soma das cenas ${acumulado} ≠ duração da composição ${composicao.durationInFrames}`)
 }
 
+// `--so agenda,perfil`: confere só essas cenas (pra iterar rápido em ajuste
+// visual). Sem o filtro, confere TUDO — que é o gate de entrega.
+const soCenas = arg('--so', '').split(',').filter(Boolean)
+
 const alvos = []
 for (const c of cenas) {
   const comp = componentePorCena[c.id]
   if (!comp) continue
+  if (soCenas.length && !soCenas.includes(c.id)) continue
   for (const k of keyframesDe(comp)) {
     if (!k.click) continue
     alvos.push({

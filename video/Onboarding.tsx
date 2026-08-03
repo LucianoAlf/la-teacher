@@ -119,7 +119,7 @@ export const Palco: React.FC<{
    *  Coordenadas continuam as do conteúdo (410×816); o deslocamento da moldura
    *  (10px de borda + 44px de status bar) é aplicado aqui. */
   dedo?: CursorKeyframe[]
-}> = ({ children, escalaBase = 1.8, dedo }) => {
+}> = ({ children, escalaBase = 2.08, dedo }) => {
   const frame = useCurrentFrame()
   const escala = escalaBase + Math.sin(frame / 90) * 0.006
   return (
