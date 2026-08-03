@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
@@ -15,7 +15,7 @@ import { CapaLogin, FaixaCapa, RotuloCapa, campoCapa, campoCapaStyle } from './C
  * a senha nova — e o link, que é de uso único, já teria queimado.
  */
 export default function NovaSenhaPage() {
-  const { session, loading } = useAuth()
+  const { session, loading, encerrarRecuperacao } = useAuth()
   const navigate = useNavigate()
   const [senha, setSenha] = useState('')
   const [conf, setConf] = useState('')
@@ -31,6 +31,8 @@ export default function NovaSenhaPage() {
     const { error } = await supabase.auth.updateUser({ password: senha })
     setSalvando(false)
     if (error) return setErro('Não consegui alterar a senha. Pede um link novo e tenta de novo.')
+    // Baixa a bandeira ANTES de sair, senão o GuardRecuperacao devolve pra cá.
+    encerrarRecuperacao()
     navigate('/app', { replace: true })
   }
 
@@ -47,14 +49,22 @@ export default function NovaSenhaPage() {
   // Sem sessão aqui = link expirado, já usado, ou aberto em outro navegador.
   // Os três casos têm a mesma saída prática: pedir outro.
   if (!session) {
+    // O botão precisa baixar a bandeira antes de voltar: enquanto ela estiver
+    // de pé, o GuardRecuperacao devolve o professor pra cá e ele fica num laço
+    // entre as duas telas, sem nunca conseguir pedir outro link.
     return (
       <CapaLogin>
         <FaixaCapa tom="erro">Esse link não vale mais. Eles expiram e só funcionam uma vez.</FaixaCapa>
-        <Link to="/app/login" className="mt-3 block">
-          <Button block>
-            <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Pedir um link novo
-          </Button>
-        </Link>
+        <Button
+          block
+          className="mt-3"
+          onClick={() => {
+            encerrarRecuperacao()
+            navigate('/app/login', { replace: true })
+          }}
+        >
+          <i className="fa-solid fa-arrow-left" aria-hidden="true" /> Pedir um link novo
+        </Button>
       </CapaLogin>
     )
   }
