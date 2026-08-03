@@ -1,7 +1,7 @@
 # Devolutiva de aula — design
 
 **Data:** 03/08/2026
-**Status:** design aprovado pelo Alf (seções 1–3 validadas em conversa); spec aguardando review
+**Status:** design aprovado pelo Alf; revisão do Alfredo incorporada (4 ajustes de contrato: gatilho 1:1, `oferecida` vs `entregue`, lease na fila, projeção family-safe) + 1 achado próprio na conferência (§2.5). Aguardando auditoria do diff antes da migration.
 **Escopo:** primeira fatia do sistema de relatórios do Fábio. As outras três (relatório completo do período, versão pra colar no Emusys, painel de coordenação) ficam para specs próprias.
 
 ---
@@ -36,13 +36,42 @@ A devolutiva nasce da confirmação do registro, em `app_confirmar_registro(p_re
 
 Ou seja: **`status = 'confirmado'` é exatamente o caso do aluno que faltou.** Um gatilho ingênuo em `status = 'confirmado'` geraria devolutiva só para quem não teve aula — o pior erro possível deste produto.
 
-**Predicado correto:** fatia com `parent_id is not null` **e** `status = 'gravado_emusys'` **e** `confirmado_em is not null`.
+### 2.3 A aula 1:1 não tem fatia
+
+`app_confirmar_registro` tem **dois ramos**, e eles se comportam diferente:
+
+- **Turma:** o tronco (`aluno_id is null`) tem fatias filhas, uma por aluno.
+- **Individual:** o registro **raiz** já tem `aluno_id` preenchido e **não tem fatia nenhuma**. Ele mesmo vira `gravado_emusys`.
+
+Amarrar o gatilho em `parent_id is not null` recortaria **toda aula individual** do produto. Hoje o banco tem 0 raízes 1:1 — mas a RPC viva já suporta esse caminho, então o dia em que ele começar a ser usado, a devolutiva simplesmente não apareceria, sem erro nenhum para avisar.
+
+### 2.4 Predicado correto
+
+```sql
+aluno_id     is not null                                   -- fatia OU raiz 1:1; nunca o tronco de turma
+and status    = 'gravado_emusys'
+and confirmado_em is not null
+and coalesce(campos->>'presenca', 'presente') <> 'ausente' -- ver 2.5
+```
+
+`aluno_id is not null` é o discriminador certo porque **é ele que separa "registro de um aluno" de "cabeçalho de turma"**, em vez de depender do formato da árvore. Fatia sem `aluno_id` nunca chega a `gravado_emusys` (vira pendência), então o predicado não perde nada por esse lado.
+
+### 2.5 O status não prova presença na aula individual
+
+Conferindo o ramo 1:1 da RPC apareceu um buraco que o ramo de turma não tem:
+
+| Ramo | Checa `presenca = 'ausente'`? |
+|---|---|
+| Turma (fatia) | **sim** — pula a fatia e marca `confirmado` |
+| **Individual (raiz)** | **não** — grava direto como `gravado_emusys` |
+
+Ou seja: numa aula 1:1, um aluno marcado ausente **termina em `gravado_emusys` do mesmo jeito**. Para a turma, o status já carrega a presença; para o 1:1, não carrega. Por isso o predicado checa `campos->>'presenca'` **explicitamente**, e não confia no status. Sem essa linha, o primeiro aluno individual que faltasse ganharia uma devolutiva contando a aula que ele não teve.
 
 *Nota de nomenclatura:* `gravado_emusys` hoje mente — o texto do Fábio não chega ao campo `anotacoes` do Emusys (auditoria pendente, thread separada). Isso não afeta este design: o que o predicado usa é "o professor confirmou e havia conteúdo", e disso o status é prova. Se o nome do status for corrigido depois, este é um dos pontos a atualizar junto.
 
-### 2.3 Estado hoje
+### 2.6 Estado hoje
 
-15 fatias já passaram por esse caminho (13–17/07/2026), todas terminando em `gravado_emusys`. Nenhuma fatia jamais terminou em `confirmado` — o ramo do aluno ausente **nunca rodou em produção** e precisa de teste explícito.
+15 fatias já passaram por esse caminho (13–17/07/2026), todas terminando em `gravado_emusys`. **Zero** raízes 1:1 e **zero** fatias em `confirmado` — ou seja, nem o caminho da aula individual nem o do aluno ausente jamais rodaram em produção. Os dois precisam de teste explícito, não de confiança.
 
 ### 2.4 O gancho não pode quebrar a confirmação
 
@@ -52,17 +81,42 @@ Ou seja: **`status = 'confirmado'` é exatamente o caso do aluno que faltou.** U
 
 ## 3. De onde sai o conteúdo
 
-### 3.1 A fonte é a mesma do prontuário
+### 3.1 Prontuário não é texto para a família
 
-`fn_compor_texto_prontuario(tronco.campos, fatia.campos)` já é a função que mescla o contexto da aula (tronco) com o que é daquele aluno (fatia). É o texto que vai para o prontuário.
+`fn_compor_texto_prontuario(tronco.campos, fatia.campos)` é a função que mescla o contexto da aula com o que é daquele aluno. Ela é a fonte certa do **conteúdo pedagógico** — mas ela **não** é segura para sair da escola. Ela monta oito rótulos, e dois deles são material interno:
 
-**A devolutiva lê exatamente essa composição.** Não relê os `campos` por conta própria e não reinterpreta o áudio. Motivo: se o professor confirmou aquele texto, é aquele texto que ele endossou. Uma segunda leitura independente abriria espaço para a devolutiva dizer algo que o prontuário não diz — e o professor descobriria isso na frente do responsável.
+| # | Rótulo | Vem de | Sai para a família? |
+|---|---|---|---|
+| 1 | Objetivo | `objetivo` | sim |
+| 2 | Conteúdo | `atividades` | sim |
+| 3 | Progresso | `progresso` | sim |
+| 4 | Próximo passo | `proximo_passo` | sim |
+| 5 | **Observação** | `observacao` / `obs_gerais` | **não** |
+| 6 | Repertório | `repertorio` | sim |
+| 7 | **Materiais** | `materiais` | **não** |
+| 8 | Dever de casa | `dever_casa` | sim |
 
-### 3.2 Os campos variam por molde
+"Observação" é onde o professor escreve o que ele não diria para a mãe: que a criança chorou, que o pai reclamou da mensalidade, uma suspeita sobre o aluno. **É literalmente o campo de recado interno**, e o prontuário o inclui na íntegra.
+
+### 3.2 Proibir na skill não basta
+
+A tentação é escrever na skill "não use a Observação". Isso não é controle: o texto continua **entrando no prompt**, e a única coisa entre ele e o WhatsApp da mãe é a boa vontade do modelo naquela geração. Uma instrução no prompt não é uma fronteira.
+
+**A fronteira é uma projeção explícita.** Uma função nova, `fn_devolutiva_fonte(p_tronco jsonb, p_fatia jsonb) returns jsonb`, devolve **só** os campos liberados — os seis marcados "sim" na tabela acima. A devolutiva nunca vê `observacao` nem `obs_gerais`; eles não chegam ao worker, quanto mais ao LLM.
+
+**É lista de permissão, não de bloqueio.** Campo de molde novo fica **de fora por padrão**, até alguém olhar e liberar. O contrário — bloquear o que se conhece — vaza silenciosamente no dia em que um molde novo trouxer `nota_interna` ou `alerta_coordenacao`.
+
+`fn_devolutiva_fonte` devolve **jsonb estruturado**, não texto colado, para que a skill saiba o que é progresso e o que é dever de casa em vez de reparsear parágrafo.
+
+### 3.3 A devolutiva não reinterpreta o áudio
+
+Dentro do que é permitido, a devolutiva usa **o que o professor confirmou** — não uma segunda leitura da transcrição. Se ele endossou aquele texto, é dele que a devolutiva fala. Uma leitura independente abriria espaço para a mensagem dizer algo que o prontuário não diz, e o professor descobriria isso na frente do responsável.
+
+### 3.4 Os campos variam por molde
 
 Hoje só existe o molde `C`, e as chaves que aparecem nas fatias são: `progresso`, `proximo_passo`, `observacao`, `repertorio`, `dever_casa` — mais chaves específicas de molde (`eixos`, `marco_ref`, `atividades`, `materiais`, `objetivo`, `obs_gerais`).
 
-**O gerador é tolerante a molde:** trabalha com o texto composto e com as chaves que existirem, nunca com uma lista fixa. Molde novo não pode quebrar devolutiva.
+**O gerador é tolerante a molde:** trabalha com as chaves que `fn_devolutiva_fonte` devolver, sem exigir que todas existam. Molde novo não pode quebrar devolutiva — e, pela regra da lista de permissão (§3.2), também não pode vazar campo novo sem alguém liberar.
 
 ---
 
@@ -80,9 +134,12 @@ Hoje só existe o molde `C`, e as chaves que aparecem nas fatias são: `progress
 | Alunos ativos | 1.185 |
 | Com `data_nascimento` preenchida | **1.185 (100%)** |
 | Menores de 15 | 764 (64%) |
-| Menores de 15 **sem** `responsavel_nome` | **6 (0,5%)** |
+| Menores de 15 **sem** `responsavel_nome` (antes da correção) | 6 (0,5%) |
+| Menores de 15 **sem** `responsavel_nome` (03/08, após puxar do Emusys) | **0** |
 
 A regra cobre a base inteira, e o caminho do responsável é a maioria — não a exceção.
+
+Os 6 buracos foram fechados em 03/08/2026: 5 tinham responsável cadastrado no Emusys e foram preenchidos (`updated_by = 'sistema-emusys-responsavel-2026-08-03'`). O sexto não era menor de idade — era data de nascimento corrompida na importação (§4.5).
 
 ### 4.3 Idade vem de `data_nascimento`, não de `idade_atual`
 
@@ -90,9 +147,17 @@ A regra cobre a base inteira, e o caminho do responsável é a maioria — não 
 
 **A idade é calculada de `data_nascimento` no momento da geração.** O custo é zero e elimina a classe inteira de bug "o aluno virou 15 e o texto continuou falando com a mãe".
 
-### 4.4 Os 6 sem nome do responsável
+### 4.4 Quando não houver nome do responsável
 
-Sem `responsavel_nome`, o texto fala com a família **sem vocativo nominal** ("Passando pra contar como foi a aula do Gustavo hoje…") e o Fábio avisa o professor na entrega: *"não tenho o nome do responsável do Gustavo — se quiser, me fala que eu ajusto."* Nunca inventa nome, nunca escreve "Sr(a). Responsável".
+Hoje não há nenhum caso, mas aluno novo entra sem responsável a qualquer momento — o fallback é parte do contrato, não contingência.
+
+Sem `responsavel_nome`, o texto fala com a família **sem vocativo nominal** ("Passando pra contar como foi a aula do Gustavo hoje…") e o Fábio avisa o professor na oferta: *"não tenho o nome do responsável do Gustavo — se quiser, me fala que eu ajusto."* Nunca inventa nome, nunca escreve "Sr(a). Responsável".
+
+### 4.5 A idade também pode estar corrompida
+
+Ao puxar os 6 do Emusys apareceu um caso que o desenho não previa: **Tiago Dos Santos Manoel** estava no LA com nascimento em **18/02/2026** — um bebê de 5 meses matriculado em Canto. No Emusys a data é **18/02/1989**: um adulto de 37 anos. O ano se perdeu na importação.
+
+A lição para este design: `data_nascimento` é confiável para **decidir o destinatário**, mas não é imune a lixo. Idade impossível para o contexto — abaixo de 2 anos, acima de 100 — **não escolhe destinatário sozinha**. Nesses casos o Fábio gera a devolutiva e pergunta ao professor para quem ela vai, em vez de escrever para uma mãe que talvez não exista.
 
 ---
 
@@ -163,10 +228,16 @@ Uma linha por fatia confirmada.
 | `texto_apoio_casa` | text | versão 2 |
 | `skill_id` | uuid → `fabio_skills(id)` | quem escreveu |
 | `skill_versao` | integer | cópia do número da versão, para ler sem join |
-| `status` | text | `pendente` \| `gerada` \| `entregue` \| `falhou` \| `descartada` |
+| `status` | text | `pendente` \| `gerando` \| `gerada` \| `oferecida` \| `falhou` \| `descartada` |
+| `lease_token` | uuid | dono do trabalho em `gerando` (§7.3) |
+| `lease_expira_em` | timestamptz | prazo do lease; expirou, volta para `pendente` |
 | `erro` | text | quando `falhou` |
 | `tentativas` | integer | backoff do worker |
-| `entregue_em` | timestamptz | quando o Fábio ofereceu ao professor |
+| `oferecida_em` | timestamptz | quando o Fábio ofereceu **ao professor** |
+| `copiada_em` | timestamptz | professor copiou o texto |
+| `editada_em` | timestamptz | professor editou antes de mandar (primeira edição) |
+| `compartilhada_em` | timestamptz | professor acionou o compartilhar |
+| `envio_confirmado_em` | timestamptz | professor marcou "mandei" |
 | `criado_em` / `atualizado_em` | timestamptz | |
 
 **Índice único em `registro_fatia_id`.** Uma fatia gera uma devolutiva; reconfirmar não duplica.
@@ -175,7 +246,29 @@ Uma linha por fatia confirmada.
 
 `idade_na_geracao` é congelada de propósito: daqui a um ano, olhando um texto que fala com a mãe, dá pra saber que na época estava certo.
 
-### 7.2 `fabio_skills`
+**`oferecida`, não `entregue`.** O Fábio entrega ao professor; quem entrega à família é o professor. Um status chamado `entregue` viraria, seis meses depois, um número em painel dizendo "1.200 devolutivas entregues às famílias" — e seria mentira. O nome do estado tem que dizer o que de fato aconteceu, porque é dele que a métrica vai nascer.
+
+**Os quatro carimbos de ação existem porque sem eles não dá para saber se o texto presta.** "O professor encaminhou sem editar" é o sinal mais honesto de qualidade que esse produto tem, e ele não é observável em lugar nenhum hoje. Quatro colunas resolvem sem inventar tabela; se um dia a trilha completa importar (quantas vezes editou, quando), aí vira tabela de eventos.
+
+### 7.2 Lease: por que status sozinho não segura
+
+Gerar a devolutiva é chamada de LLM: leva segundos e roda **fora** da transação. Se o worker só marcasse `gerada` no fim, dois disparos do timer — ou um retry depois de timeout — pegariam a mesma linha `pendente` e gerariam duas vezes. O professor receberia a mesma devolutiva duas vezes, ou pior, duas versões diferentes da mesma aula.
+
+O ciclo é:
+
+```
+pendente ──claim──► gerando ──sucesso──► gerada ──oferta──► oferecida
+   ▲                   │                    │
+   └── lease expirou ──┘                    └── falhou (tentativas++, volta a pendente com backoff)
+```
+
+`fabio_devolutiva_claim(p_worker text, p_lote int)` pega N linhas com `for update skip locked`, marca `gerando`, grava `lease_token` e `lease_expira_em = now() + interval '5 minutes'`, e devolve as linhas. Worker que morre no meio não trava a fila: passados os 5 minutos, a linha volta a ser elegível. É o mesmo desenho de `fabio_claim_notificacao`, que já roda em produção.
+
+**A oferta tem chave própria.** A notificação da devolutiva usa `referencia_tipo='devolutiva'` + `referencia_id=<devolutiva_id>`, com índice único **por devolutiva**, não por dia. O índice único que existe hoje em `fabio_notificacoes` é `(professor_id, tipo, dia_referencia, canal)` — errado para isto, porque um professor tem várias devolutivas no mesmo dia e o segundo aluno seria engolido pelo primeiro.
+
+> ⚠️ Índice novo = `ON CONFLICT` novo, na mesma leva. Ver o aviso em 7.1.
+
+### 7.3 `fabio_skills`
 
 | Coluna | Tipo | Papel |
 |---|---|---|
@@ -202,23 +295,26 @@ app_confirmar_registro
   ├─ grava prontuário (comportamento atual, inalterado)
   ├─ emite presença (gancho atual, não-fatal)
   └─ enfileira devolutiva ─────► fabio_devolutivas (status='pendente')
-        │                        só para fatia status='gravado_emusys'
-        │                        (nunca para ausente)
+        │                        predicado do §2.4: aluno_id not null,
+        │                        gravado_emusys, confirmado, não-ausente
         ▼
 fabio_devolutiva_worker.py (VPS, timer systemd user)
-  ├─ lê a fatia + tronco via fn_compor_texto_prontuario
+  ├─ claim com lease ──────────► status='gerando' (§7.2)
+  ├─ lê a fonte FILTRADA via fn_devolutiva_fonte  ← sem observação (§3.2)
   ├─ calcula idade de data_nascimento → destinatário
   ├─ carrega fabio_skills ativa de devolutiva_aula
   ├─ gera as DUAS versões numa chamada
-  └─ status='gerada', skill_versao=N
+  └─ status='gerada', skill_id/skill_versao
         │
         ▼
-Fábio oferece ao professor (chat do app + WhatsApp, conforme canal_preferido)
+fabio_notification_worker.py, evento devolutiva_pronta
+  respeita canal_preferido, silêncio, pausa_ate; único por devolutiva_id
   "Terminei o registro do Gustavo. Quer a devolutiva pra mandar pra mãe dele?"
         │
+        └─ status='oferecida', oferecida_em
         ▼
-professor lê, ajusta por áudio ou texto se quiser, encaminha
-        └─ status='entregue'
+professor lê, ajusta se quiser, encaminha
+        └─ app carimba copiada_em / editada_em / compartilhada_em / envio_confirmado_em
 ```
 
 ### 8.1 Onde cada peça roda
@@ -253,12 +349,17 @@ O Fábio oferece; não empurra. Vale a preferência que já existe em `fabio_pro
 
 | Risco | Mitigação |
 |---|---|
-| Gatilho pegar aluno ausente | Predicado exige `status='gravado_emusys'`; teste explícito do ramo ausente (nunca rodou em produção) |
+| **Recado interno vazar para a família** | `fn_devolutiva_fonte` com lista de permissão; `observacao`/`obs_gerais` não chegam ao LLM (§3.2) |
+| **Aula 1:1 ficar invisível** | Predicado por `aluno_id is not null`, não por `parent_id` (§2.3); teste obrigatório do caminho individual |
+| Gatilho pegar aluno ausente | Predicado checa `campos->>'presenca'` explicitamente — o status não protege no ramo 1:1 (§2.5) |
+| **Devolutiva gerada duas vezes** | Claim com lease de 5 min (§7.2); worker morto libera a linha sozinho |
+| **Oferta repetida ao professor** | Índice único da notificação por `devolutiva_id`, não por dia (§7.2) |
 | Texto sair acusatório | Regra escrita na skill + revisão do Alf antes de ligar para qualquer professor além do piloto |
-| LLM inventar fato que não estava no registro | Fonte é `fn_compor_texto_prontuario`; a skill proíbe acrescentar conteúdo |
+| LLM inventar fato que não estava no registro | Fonte é a projeção do registro confirmado; a skill proíbe acrescentar conteúdo |
 | Devolutiva quebrar a confirmação do registro | Confirmação só enfileira; geração roda fora, no worker |
 | Duplicar devolutiva em reconfirmação | Único em `registro_fatia_id` |
-| Professor achar que o Fábio já mandou pra família | Texto do oferecimento diz explicitamente "pra você mandar" |
+| Professor achar que o Fábio já mandou pra família | Texto da oferta diz explicitamente "pra você mandar"; estado se chama `oferecida` (§7.1) |
+| Data de nascimento corrompida escolher destinatário errado | Idade impossível não decide sozinha: o Fábio pergunta ao professor (§4.5) |
 
 ---
 
@@ -266,8 +367,10 @@ O Fábio oferece; não empurra. Vale a preferência que já existe em `fabio_pro
 
 Piloto com o Matheus, mesmo professor do briefing matinal.
 
-1. Uma fatia confirmada gera exatamente uma devolutiva, nas duas versões.
+1. Registro confirmado gera **exatamente uma** devolutiva, nas duas versões. Reconfirmar não duplica; dois disparos do timer não duplicam (§7.2).
 2. Aluno de 8 anos → texto fala com o responsável, pelo nome. Aluno de 16 → fala com o aluno.
-3. Aluno marcado ausente → **nenhuma** devolutiva.
-4. O Alf lê os primeiros textos e aprova o tom antes de qualquer professor além do Matheus.
-5. O professor encaminha sem editar em pelo menos metade dos casos — se ele reescreve sempre, o texto está errado, não o professor.
+3. Aluno marcado ausente → **nenhuma** devolutiva. Testar **nos dois ramos**: turma e 1:1 (§2.5) — o 1:1 é o que não tem proteção no status.
+4. **Aula individual gera devolutiva.** Nunca rodou em produção; sem esse teste, o produto pode nascer cego para metade do formato de aula (§2.3).
+5. Um registro com texto na Observação gera devolutiva **sem nenhum traço dele** — comparar o prontuário e a devolutiva lado a lado (§3.2).
+6. O Alf lê os primeiros textos e aprova o tom antes de qualquer professor além do Matheus.
+7. Com os carimbos de §7.1: o professor encaminha sem editar em pelo menos metade dos casos. Se ele reescreve sempre, o texto está errado — não o professor.
