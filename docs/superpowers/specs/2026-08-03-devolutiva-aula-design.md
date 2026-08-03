@@ -1,7 +1,7 @@
 # Devolutiva de aula — design
 
 **Data:** 03/08/2026
-**Status:** design aprovado pelo Alf. Duas rodadas de auditoria do Alfredo incorporadas — 1ª: gatilho 1:1, `oferecida` vs `entregue`, lease, projeção family-safe. 2ª: conserto na origem (§2.6), fencing do lease (§7.2), `aguardando_destinatario` (§4.5), outbox atômico + recibo (§7.4). Achados próprios na conferência: o ramo 1:1 não checa ausência (§2.5), 100% dos registros não têm a chave `presenca` (§2.6) e o conserto pode travar o piloto se subir fora de ordem (§2.7). Aguardando auditoria do diff antes da migration.
+**Status:** design aprovado pelo Alf. Três rodadas de auditoria do Alfredo incorporadas — 3ª: o cliente repete a mentira da presença (§2.7), a pendência não tem resposta possível na tela (§2.8), idempotência entre envio e recibo (§7.4c), saída durável de `aguardando_destinatario` (§4.5). Anteriores — 1ª: gatilho 1:1, `oferecida` vs `entregue`, lease, projeção family-safe. 2ª: conserto na origem (§2.6), fencing do lease (§7.2), `aguardando_destinatario` (§4.5), outbox atômico + recibo (§7.4). Achados próprios na conferência: o ramo 1:1 não checa ausência (§2.5), 100% dos registros não têm a chave `presenca` (§2.6) e o conserto pode travar o piloto se subir fora de ordem (§2.7). Aguardando auditoria do diff antes da migration.
 **Escopo:** primeira fatia do sistema de relatórios do Fábio. As outras três (relatório completo do período, versão pra colar no Emusys, painel de coordenação) ficam para specs próprias.
 
 ---
@@ -88,21 +88,46 @@ E o dado é mais duro do que parece:
 
 Isso é a mesma família do problema que a gente já matou na presença — lá "não-marcado" virava falta fantasma; aqui "não-informado" vira presença fantasma. Mesma raiz: **ausência de dado sendo lida como afirmação.**
 
-**O contrato do conserto:**
+### 2.7 O app mente igual — e mente na cara do professor
 
-1. Ramo 1:1 passa a checar `presenca = 'ausente'` igual ao de turma: não grava no prontuário, não vira `gravado_emusys`, não enfileira devolutiva.
-2. Chave `presenca` **ausente** deixa de virar `presente`. Vira pendência — o mesmo mecanismo que a turma já usa para fatia sem aluno ou sem texto — com motivo `presença não informada`, e o app pede ao professor que marque.
-3. O ramo 1:1 hoje não tem mecanismo de pendência (ele levanta exceção). Ganha um.
+Consertar só o banco não resolve, porque o cliente repete a mesma regra. Em `src/features/registro/texto.ts`:
 
-### 2.7 Sequência: esse conserto pode brickar o Confirmar
+```ts
+export function presencaDaFatia(f: RegistroRow): 'presente' | 'ausente' {
+  return (f.campos.presenca as string) === 'ausente' ? 'ausente' : 'presente'
+}
+```
 
-Se a regra 2 subir antes de existir prova de que o Hermes preenche `campos.presenca`, **toda confirmação vira pendência** — e o Matheus, no piloto, aperta "Confirmar" e não acontece nada. A gente teria trocado um erro silencioso por uma parada barulhenta em cima do único professor que está usando o produto.
+O tipo de retorno **não tem o terceiro caso**. Chave faltando → `'presente'`. E isso não fica escondido numa variável: é o que desenha o **selo verde "presente"** no card do aluno na tela de Confirmar (`Confirmar.tsx:316-319`), e o que decide quais fatias entram na gravação (linhas 82 e 118).
 
-**Gate obrigatório:** a regra 2 só sobe depois de um registro real, pós-patch, ser observado com `campos ? 'presenca'` verdadeiro. Até lá sobem só as regras 1 e 3, que não dependem do preenchimento.
+Isso é pior que o default do banco. No banco é uma suposição silenciosa; **na tela é uma afirmação exibida.** O professor lê "presente", entende que o sistema sabe disso, e confirma. Ele está endossando um fato que ninguém apurou — e não tem como perceber, porque a tela não distingue "ele estava lá" de "ninguém disse".
 
-Isso não é cautela genérica: é a única parte deste plano que pode derrubar o piloto.
+Enquanto isso existir, apertar "Confirmar" não significa o que a gente acha que significa. **`presencaDaFatia` ganha o terceiro estado `'nao_informada'`, e o selo passa a dizer isso.**
 
-### 2.8 Estado hoje
+### 2.8 A pendência tem que ter resposta na tela — hoje não tem
+
+Eu tinha escrito "vira pendência, e o app pede ao professor que marque". Fui ver o app: **a pendência não pede nada.** É texto morto (`Confirmar.tsx:231-247`) — uma lista `<li>` com nome e motivo, sem botão, sem ação, sem caminho de volta.
+
+E ela é indexada por fatia:
+
+```ts
+const nome = (fatias.find((f) => f.id === p.fatia_id)?.aluno_nome) ?? 'Aluno'
+```
+
+Numa aula 1:1 **não existe fatia**. O `find` não acha nada, e o professor lê **"Aluno: presença não informada"** — sem nome, sem botão, sem saída. A tela não trava por bug; ela trava porque não foi feita pra responder.
+
+Hoje isso quase não aparece (os motivos atuais são estruturais e raros). Transformar presença faltante em pendência tornaria esse beco **o caminho normal** — e, dado o §2.6, o caminho de **100%** dos registros.
+
+**O contrato do conserto — banco e app na mesma leva:**
+
+1. **Ramo 1:1 checa ausência** igual ao de turma: não grava no prontuário, não vira `gravado_emusys`, não enfileira devolutiva.
+2. **Presença faltando deixa de virar `presente`** — no banco e no cliente. Vira estado próprio, `nao_informada`, visível como tal.
+3. **A pendência passa a ser respondível.** O payload da RPC identifica a linha por `registro_id` (serve para fatia **e** para raiz 1:1) + `aluno_id` + `aluno_nome` — nunca só `fatia_id`. E a tela ganha a ação: *"O Gustavo esteve na aula?"* → **Esteve / Faltou** → grava `campos.presenca` e reconfirma.
+4. **Perguntar antes, não depois.** O lugar certo da pergunta é o card do aluno, junto do selo, **antes** de o professor apertar Confirmar — não numa lista de erro depois que a gravação falhou. Pendência é a rede de segurança; o fluxo normal é o professor responder onde ele já está olhando.
+
+Com o item 4 no lugar, o item 3 vira exceção rara em vez de porta de entrada. E o gate de sequência que eu tinha proposto (esperar prova de que o Hermes preenche a chave) deixa de ser necessário: **não importa se o Hermes preenche ou não, porque a tela pergunta.** A regra do banco pode subir junto, porque quando ela recusar, a tela já terá impedido.
+
+### 2.9 Estado hoje
 
 15 fatias já passaram por esse caminho (13–17/07/2026), todas terminando em `gravado_emusys`. **Zero** raízes 1:1 e **zero** fatias em `confirmado` — ou seja, nem o caminho da aula individual nem o do aluno ausente jamais rodaram em produção. Os dois precisam de teste explícito, não de confiança.
 
@@ -194,7 +219,20 @@ A lição para este design: `data_nascimento` é confiável para **decidir o des
 
 **E isso tem que barrar antes do LLM, não depois.** Se a devolutiva fosse gerada e só então alguém perguntasse para quem ela vai, o texto já teria sido escrito com um vocativo inventado ("Oi, mãe do Tiago") — e o professor receberia uma mensagem pronta que só piora se ele mandar. Pior: cada tentativa queima uma chamada de LLM para produzir algo inútil.
 
-Por isso existe o estado `aguardando_destinatario`: o worker resolve o destinatário **antes** de montar o prompt, e se não conseguir decidir, para ali. O Fábio pergunta ao professor para quem é, e a linha só volta para `pendente` com a resposta. Nada de texto gerado no escuro.
+Por isso existe o estado `aguardando_destinatario`: o worker resolve o destinatário **antes** de montar o prompt, e se não conseguir decidir, para ali. Nada de texto gerado no escuro.
+
+#### A saída desse estado precisa ser durável
+
+"O Fábio pergunta ao professor" era intenção minha, não contrato. Um estado sem saída definida é onde as coisas somem: ninguém consulta, ninguém é cobrado, e a devolutiva fica parada para sempre sem nunca aparecer como problema. **Estado de espera sem dono é vazamento com aparência de fila.**
+
+O contrato:
+
+1. **A pergunta é uma entrega, não um recado solto.** Ela passa pelo mesmo caminho de §7.4 — outbox atômico com a entrada em `aguardando_destinatario`, ida ao canal com recibo. Se o Fábio não conseguiu perguntar, isso fica registrado; a linha não fica "esperando" uma pergunta que nunca saiu.
+2. **A resposta escreve na linha e devolve à fila:** `destinatario` + `destinatario_nome` preenchidos, `aguardando_desde` limpo, status volta a `pendente`. A resposta vale como decisão do professor — fica gravada, não é só um clique.
+3. **Existe prazo.** Passados 7 dias sem resposta, a linha vai para `descartada` com motivo `sem destinatario definido`. Devolutiva de aula tem validade: uma que chega três semanas depois não serve pra ninguém, e é mais honesto encerrar do que manter viva uma promessa parada.
+4. **Existe visibilidade.** As linhas em `aguardando_destinatario` aparecem na auditoria do Fábio, junto com `falhou` — porque as duas dizem a mesma coisa para quem cuida do sistema: **tem devolutiva que não chegou em ninguém.**
+
+`aguardando_desde` (timestamptz) entra na tabela para sustentar os itens 3 e 4.
 
 ---
 
@@ -269,6 +307,9 @@ Uma linha por fatia confirmada.
 | `lease_token` | uuid | dono do trabalho em `gerando`; **toda** escrita exige (§7.2) |
 | `lease_expira_em` | timestamptz | prazo do lease |
 | `proxima_tentativa_em` | timestamptz | backoff real; o claim ignora quem ainda não venceu (§7.2) |
+| `aguardando_desde` | timestamptz | quando entrou em `aguardando_destinatario`; sustenta o prazo de 7 dias (§4.5) |
+| `envio_chave` | text | chave de idempotência reservada **antes** de chamar o canal (§7.4c) |
+| `envio_recibo` | text | id da mensagem devolvido pelo canal; é ele que prova que saiu (§7.4c) |
 | `erro` | text | quando `falhou` |
 | `tentativas` | integer | contador do backoff |
 | `oferecida_em` | timestamptz | quando o Fábio ofereceu **ao professor** |
@@ -348,6 +389,29 @@ Duas coisas separadas, as duas erradas se ficarem soltas:
 **b) `oferecida` só depois do recibo do canal.** Enfileirar não é entregar. `oferecida`/`oferecida_em` são escritos quando o canal confirma o envio — o mesmo recibo que o worker de notificação já usa hoje para escrever `enviada`. Enquanto o WhatsApp não confirmou, o estado é `gerada`, e a fila continua responsável por ela.
 
 O par resolve os dois lados: (a) impede perder devolutiva pronta, (b) impede contar como oferecida uma que nunca saiu.
+
+#### c) Entre o envio e o recibo existe uma janela — e ela duplica
+
+"Só marca depois do recibo" resolve o otimismo e cria um pessimismo:
+
+```
+10:00:00  worker manda pro WhatsApp        → chegou no professor
+10:00:01  worker tenta gravar 'oferecida'  → conexão cai
+10:05:00  retry: a linha ainda está 'gerada'
+          → manda DE NOVO
+```
+
+O professor recebe a mesma devolutiva duas vezes. Marcar antes duplicaria a contagem; marcar depois duplica a **mensagem** — que é o dano pior, porque quem vê é ele.
+
+**A saída é a reserva antes do envio.** O worker escreve uma **chave de idempotência** na linha *antes* de chamar o canal (`envio_chave`, derivada de `devolutiva_id` + tentativa). O envio carrega essa chave. No retry:
+
+1. já existe recibo gravado para essa chave → **não reenvia**, só completa a transição para `oferecida`;
+2. existe chave reservada sem recibo → consulta o canal por essa chave antes de decidir;
+3. sem chave → é a primeira vez, envia.
+
+O recibo do canal (`wa_message_id`, que `fabio_chat_mensagens` já guarda) fica na linha junto com a chave. É ele que responde "isso já saiu?" sem depender de a escrita seguinte ter dado certo.
+
+Sem isso, `oferecida` só descreve o que a gente **conseguiu anotar** — não o que o professor **recebeu**. As duas coisas divergem exatamente nas falhas, que é quando a informação importa.
 
 ### 7.3 `fabio_skills`
 
@@ -436,7 +500,11 @@ O Fábio oferece; não empurra. Vale a preferência que já existe em `fabio_pro
 | **Aula 1:1 ficar invisível** | Predicado por `aluno_id is not null`, não por `parent_id` (§2.3); teste obrigatório do caminho individual |
 | Gatilho pegar aluno ausente | Predicado checa `campos->>'presenca'` explicitamente — o status não protege no ramo 1:1 (§2.5) |
 | **Aula 1:1 do ausente virar registro pedagógico** | Conserto na origem (§2.6) — é pré-requisito, o predicado da devolutiva só desviava |
-| **Presença faltando virar "presente"** | `coalesce` sai; ausência vira pendência. **Gate de sequência em §2.7** — pode travar o Confirmar do piloto |
+| **Presença faltando virar "presente"** | `coalesce` sai do banco **e** do cliente; vira `nao_informada` visível (§2.7) |
+| **Professor endossar presença que ninguém apurou** | O selo para de dizer "presente" sem evidência; a pergunta vai pro card do aluno, antes do Confirmar (§2.7, §2.8) |
+| **Pendência sem resposta possível na tela** | Payload por `registro_id` (serve fatia e 1:1) + ação Esteve/Faltou; hoje é `<li>` sem botão (§2.8) |
+| **Mesma devolutiva enviada duas vezes** | Chave de idempotência reservada antes do envio + recibo do canal (§7.4c) |
+| **Devolutiva presa em `aguardando_destinatario` pra sempre** | Pergunta com recibo, resposta que grava decisão, prazo de 7 dias e visibilidade na auditoria (§4.5) |
 | **Devolutiva gerada duas vezes** | Claim com lease de 5 min (§7.2); worker morto libera a linha sozinho |
 | **Worker expirado sobrescrever texto novo** | Fencing: toda escrita exige `lease_token` + lease vivo; zero linhas = o trabalho não é mais meu (§7.2) |
 | **Linha quebrada queimar LLM a cada tick** | `proxima_tentativa_em` com backoff; teto de tentativas leva a `falhou` (§7.2) |
@@ -463,7 +531,10 @@ Piloto com o Matheus, mesmo professor do briefing matinal.
 4. **Aula individual gera devolutiva.** Nunca rodou em produção; sem esse teste, o produto pode nascer cego para metade do formato de aula (§2.3).
 5. Um registro com texto na Observação gera devolutiva **sem nenhum traço dele** — comparar o prontuário e a devolutiva lado a lado (§3.2).
 6. **Aula 1:1 com aluno ausente não vira registro no prontuário** — o conserto da origem (§2.6), não só o desvio da devolutiva.
-7. **Registro sem a chave `presenca` vira pendência, não "presente"** — e o gate do §2.7 foi cumprido: existe registro real pós-patch com a chave preenchida **antes** dessa regra subir.
+7. **Registro sem a chave `presenca` não mostra "presente" em lugar nenhum** — nem no selo do card, nem no banco. A tela pergunta antes do Confirmar, e a resposta grava (§2.7, §2.8).
+7b. **Pendência de aula 1:1 aparece com o nome do aluno e um botão que resolve** — hoje aparece "Aluno" e nada (§2.8).
+7c. **Enviar e falhar ao anotar não duplica a mensagem:** matar o worker entre o envio e a escrita de `oferecida`; no retry o professor **não** recebe de novo (§7.4c).
+7d. **`aguardando_destinatario` tem saída:** a pergunta sai com recibo, a resposta devolve à fila, e passados 7 dias sem resposta a linha vira `descartada` — nunca fica parada em silêncio (§4.5).
 8. **Fencing:** simular worker expirado voltando depois de outro ter concluído — a escrita velha afeta **zero linhas** e é descartada (§7.2).
 9. **Outbox:** derrubar o worker entre gerar e notificar — não existe devolutiva `gerada` sem linha de notificação (§7.4a).
 10. O Alf lê os primeiros textos e aprova o tom antes de qualquer professor além do Matheus.
