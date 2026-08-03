@@ -1,0 +1,21 @@
+[Unit]
+Description=Fabio - worker da devolutiva de aula (fila)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+Environment=HERMES_HOME=/home/fabio/.hermes
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_devolutiva_worker.py --lote 5
+[Unit]
+Description=Roda o worker da devolutiva a cada 5 min
+
+[Timer]
+# E fila, nao horario: passa de tempos em tempos e leva o que estiver pendente.
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Unit=fabio-devolutiva.service
+
+[Install]
+WantedBy=timers.target
