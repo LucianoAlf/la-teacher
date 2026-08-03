@@ -1,120 +1,120 @@
-# Datas de nascimento — o que foi corrigido e o que a equipe precisa conferir
+# Datas de nascimento — conferência contra o Emusys
 
 **03/08/2026** · levantado a pedido do Alf, depois da correção da data do Tiago.
+
+> **Esta é a segunda versão.** A primeira foi escrita comparando com o payload
+> guardado em `emusys_api_payload` e apontava 116 alunos sem como conferir.
+> Depois o Alf lembrou que as credenciais do Emusys estão no `.env`, puxei as
+> **4.825 matrículas das três unidades ao vivo** e o quadro mudou: **17 sem
+> fonte, não 116**, e a maior parte das pendências que eu tinha listado já
+> estava correta. O que vale é o que está abaixo.
 
 ## Por que isso importa
 
 A devolutiva de aula do Fábio decide **para quem falar** pela idade do aluno:
-abaixo de 15 anos ela vai para o responsável, acima vai para o próprio aluno.
-Data errada não é dado feio — é a devolutiva sobre uma criança de 9 anos indo
-para a criança em vez da mãe.
-
-A idade também alimenta a classificação **LAMK / EMLA** (corte em 12 anos), que
+abaixo de 15 anos vai para o responsável, acima vai para o próprio aluno. A
+idade também alimenta a classificação **LAMK / EMLA** (corte em 12 anos), que
 aparece em todo relatório da escola.
 
----
+## Onde a base está agora
 
-## ✅ Já corrigido — 11 alunos (migration 021)
+| | |
+|---|---|
+| Alunos no banco | 1.618 |
+| Conferidos contra o Emusys ao vivo | **1.601** (1.521 por id+unidade, 80 por nome) |
+| Divergências restantes | **0** |
+| Sem fonte para conferir | 17 (só **5 ativos**) |
 
-Comparei `alunos.data_nascimento` com o payload bruto do Emusys guardado no
-próprio banco. Onde divergia, alinhei ao Emusys. **Zero divergência restante.**
+Corrigidas em duas migrations: a **021** alinhou 11 datas (incluindo três
+crianças gravadas como adultos de 40+), a **022** pegou a última, achada só
+com a fonte viva — Ana Julia de Oliveira Gomes, evadida, que não muda
+destinatário de devolutiva.
 
-Os quatro que mudavam de lado na fronteira dos 15 anos:
-
-| Aluno | Estava | É | O que estava errado |
-|---|---|---|---|
-| Milena Americo Paiva | 49 anos | **9 anos** | data de um responsável |
-| Heitor Muniz Martis Da Silva | 43 anos | **7 anos** | data da mãe, Renata Muniz — batia **exata** |
-| Laiane Marins Lazaro | 45 anos | **11 anos** | data da mãe, Aline Marins — batia **exata** |
-| Tiago Dos Santos Manoel | 5 meses | **37 anos** | data próxima da matrícula |
-
-Os outros sete erravam a idade sem mudar de lado: Matheus Lopes de Medeiros
-(dois cadastros), Giselle Gomes Marques, Claudio Mascarenhas Neto, Beatriz
-Dolavale Assed, Bruno Ricardo da Silva, Dante Custódio Marques.
-
-> **O alerta do Alf se confirmou**: em dois casos o nosso banco tinha
-> literalmente a data de nascimento da mãe no campo do aluno. O Emusys separa
-> `aluno` e `responsavel` no cadastro, e a correção usou o campo do aluno.
+**Os sete alunos de 15 a 17 anos que a primeira versão deste documento mandava
+conferir já foram conferidos** — seis estão corretos. Sobra um, o Pedro
+Henrique Celestino, na lista abaixo.
 
 ---
 
-## 🔴 Prioridade 1 — 7 alunos entre 15 e 17 anos
+## 🔴 O que ainda precisa de olho humano
 
-Estes estão **em cima da fronteira** que decide o destinatário da devolutiva, e
-não têm registro no payload do Emusys para eu conferir. Se a data estiver
-errada para menos, a devolutiva vai para o adolescente em vez do responsável.
+### 5 alunos ativos sem registro na API do Emusys
 
-| Unidade | Aluno | Curso | Data no sistema | Idade | Responsável |
+Não aparecem na coleta das três unidades. Podem ser cadastro só no nosso lado,
+matrícula em unidade não coberta pelos três tokens, ou registro removido lá.
+
+| id | Aluno | Nascimento | Idade | Unidade | Tem responsável |
 |---|---|---|---|---|---|
-| Barra | Hugo Côvre Guimarães da Silva | Guitarra | 29/12/2009 | 16 | Mauro Guimarães |
-| Barra | Sofia Martins Guerreiro | Canto | 24/06/2009 | 17 | Fernanda Martins Guerreiro |
-| Campo Grande | Fernanda Gonçalves Freire | Canto | 27/10/2008 | 17 | Daniele Gonçalves da Gama Freire |
-| Campo Grande | Pedro Henrique Celestino | Bateria | 18/02/2009 | 17 | Márcio Rosa de Oliveira |
-| Recreio | Beatriz Affonso de Araujo Ferraz | Canto | 07/04/2010 | 16 | Marisa Affonso de Araújo |
-| Recreio | Catarina Westin | Violino | 12/07/2009 | 17 | Caroline Hofstaetter Westin Lara Camelo |
-| Recreio | Mateus Plácido Coimbra | Contrabaixo | 03/07/2011 | 15 | Marta Helena Placido Coimbra |
+| 1399 | **Pedro Henrique Celestino** | 18/02/2009 | 17 | Campo Grande | sim |
+| 1398 | Maria Eduarda Pery Natividade | 31/03/2003 | 23 | Campo Grande | não |
+| 1807 | Fátima Santa Cruz | 21/05/1980 | 46 | Barra | sim |
+| 1876 | Lúcia Lai Fon Dang Silva | 21/02/1983 | 43 | Recreio | sim |
+| 1886 | Marina Bessa | 01/11/2019 | 6 | Barra | sim |
 
-**Além de conferir a data, tem uma decisão de produto aqui, Alf:** todos os
-sete têm responsável cadastrado. Hoje a regra manda o Fábio falar direto com
-eles por terem 15+. É isso que você quer para um aluno de 15 anos, ou o corte
-deveria ser mais alto?
+O **Pedro Henrique** é o único que importa para a devolutiva: 17 anos, com
+responsável cadastrado, e a regra atual manda o Fábio falar direto com ele.
 
----
+Os outros 12 sem fonte estão inativos ou evadidos: Marcela Formaggini, Luciano
+da Silva Bernardino, Sophia Alves, Álvaro Andrade Pinheiro, Anna Clara de Souza
+Iorio Sales, Bruna Pereira Monteiro Carregosa, Lucas Keyne Pereira, Maite de
+Oliveira Gomes, Davi Guedes Queiroz de Souza, Alexandre Dos Santos, Pablo
+Dupret, Pietro Bittencourt Damasceno.
 
-## 🟡 Prioridade 2 — 8 alunos com a data da criança no cadastro do responsável
+### A decisão de produto que sobra pra você, Alf
 
-Nesses, o Emusys tem **a mesma data** em `aluno` e em `responsavel`. Olhando os
-cursos, a data é claramente a **da criança** (a Marina tem 2,8 anos e está em
-Musicalização para Bebês — a mãe não tem 2,8 anos).
+Todo aluno de 15 a 17 anos com responsável cadastrado recebe a devolutiva
+**direto**, sem passar pela mãe. Isso é o que você quer, ou o corte deveria ser
+mais alto?
 
-**O campo que a gente usa está correto.** O que está errado é o cadastro do
-responsável no Emusys, que herdou a data do filho. Não afeta o Fábio, mas
-polui o cadastro.
-
-| Unidade | Aluno | Curso | Responsável com a data errada |
-|---|---|---|---|
-| Barra | Isadora Florenzano Carvalho | Canto / Power Kids | Sheila Florenzano Carvalho |
-| Barra | João Gabriel Candido | Guitarra | Leandro Amaral Teixeira |
-| Barra | Luísa Schlinz Paz | Bateria | Júlia Rezende Schlinz |
-| Barra | Marina Holanda Cardoso | Musicalização para Bebês | Monica Holanda Ribeiro |
-| Barra | Lucas Cardoso Neiva | Violão | Maria da Glória Neiva |
-| Campo Grande | Emmanuel de Oliveira Carrari | Guitarra | Patricia Araujo de Oliveira Carrari |
-| Campo Grande | Rafael Ferreira Gusmão | Canto | Márcia Ferreira |
+Não é um caso isolado: é regra ativa para toda essa faixa. E não dá para
+resolver com dado — é escolha.
 
 ---
 
-## 🟢 Prioridade 3 — adultos com responsável de outro nome
+## 🟡 46 alunos com a mesma data de nascimento do responsável
 
-Confirmei que **a maioria não é erro**: são adultos cadastrados como o próprio
-responsável (nome igual). Sobraram estes, onde o responsável tem nome
-diferente. O padrão sugere **responsável financeiro de família** — a Roberta
-Alanna aparece como responsável de três adultos distintos — mas vale a
-conferida.
+Confirmado na fonte viva. Em **38 deles a data é claramente da criança** (menor
+de 18) — ou seja, foi o **cadastro do responsável** que herdou a data do filho.
+O campo do aluno está certo e o Fábio não é afetado; é higiene de cadastro.
 
-| Unidade | Aluno | Idade | Responsável |
-|---|---|---|---|
-| Barra | Ana Paula dos Santos Lima de Oliveira | 55 | Roberta Alanna dos Santos Lima de Oliveira |
-| Barra | Carlos Roberto de Oliveira | 72 | Roberta Alanna dos Santos Lima de Oliveira |
-| Barra | Renan Hozumi Barbieri | 34 | Roberta Alanna dos Santos Lima de Oliveira |
-| Barra | RAFAEL DA SILVA SANTOS | 52 | Flavia Azevedo Dias |
-| Recreio | Christiano Lopes Silva | 44 | Lúcia Lai Fon Dang Silva |
+Os **8 restantes são ambíguos** — o aluno é maior de idade, então não dá para
+dizer pelo número qual dos dois cadastros está errado:
 
-Os de 18–19 anos com responsável (Lucas Lassance, Davi Manaia, Maria Eduarda
-Bomfim, Carlos Eduardo Ferreira, Enzo Baptista) são plausíveis — recém-maiores
-com responsável financeiro. Não listei como pendência.
+| Unidade | Aluno | Nascimento | Idade | Responsável |
+|---|---|---|---|---|
+| Campo Grande | Ashlley Christiny de Oliveira | 06/02/2006 | 20 | Munyk Assis de Oliveira |
+| Recreio | Davi Nunes Correia | 30/05/2006 | 20 | Eric Castro Correia |
+| Campo Grande | Eduarda da Costa Barandin | 01/07/2008 | 18 | Claudio Barandin da Silva |
+| Campo Grande | Fabiana de Oliveira Costa | 12/02/1980 | 46 | *ela mesma* |
+| Barra | Guilherme Grigório Marcondes | 21/07/2002 | 24 | Alexandre Góis Villela Marcondes |
+| Recreio | Juliana Akemi Takeda | 26/05/1983 | 43 | Hissayuki Takenawa Junior |
+| Barra | Karinne Oliveira Bank | 01/10/2000 | 25 | Carmen N O da Silva Bank |
+| Campo Grande | Lana De Aguiar Figueiredo | 23/05/2005 | 21 | Mirian Estevam de Aguiar |
+
+A Fabiana é o próprio responsável, então está certa. Os outros sete valem uma
+conferida na secretaria.
+
+Nenhum deles afeta a devolutiva: todos são maiores de 15 pelas duas leituras.
 
 ---
 
-## O limite do que eu consegui verificar
+## Duas armadilhas da API do Emusys que custaram caro aqui
 
-**116 alunos não têm payload do Emusys no banco para comparar** — 99 deles
-ativos. Para esses, a data no nosso sistema pode estar errada e eu não tenho
-como saber daqui. As Prioridades 1 e 3 saíram desse grupo, filtradas pelos
-sinais que dava para medir (idade perto do corte, responsável com outro nome).
+Valem para qualquer um que for consultar o Emusys — inclusive o Codex.
 
-**Os outros ~85 são crianças com idade coerente com o curso** — não há sinal de
-erro, mas também não há confirmação. Se a equipe for conferir tudo, esse é o
-universo.
+**1. O header `token` precisa chegar em minúsculo literal.** `urllib` e
+`requests` capitalizam para `Token`, e a API responde
+`{"status":"erro","msg":"token invalido!"}` — parece credencial errada e não é.
+Em Python, `http.client` preserva o case.
 
-Para fechar isso sem depender de olho humano, o caminho é puxar os cadastros
-direto da API do Emusys (é GET, só leitura) e comparar — preciso do token.
+**2. A paginação é por cursor, e os parâmetros de página são ignorados em
+silêncio.** `?cursor=<paginacao.proximo_cursor>` é o certo. `pagina`, `page`,
+`offset`, `skip` e `inicio` são aceitos com HTTP 200 e devolvem sempre o começo
+da lista. Uma coleta que confie neles roda até o limite lendo a mesma página —
+foi o que aconteceu na minha primeira tentativa, que "coletou 30.000
+matrículas" que eram 101 alunos repetidos.
+
+**3. O `id` do aluno no Emusys é por unidade, não global.** 1.003 dos 2.732 ids
+aparecem com nomes diferentes entre as unidades — o id 38 é "Augusto Ramalho
+Tratch" na Barra e "Leonardo de Oliveira Gonçalves da Silva" no Recreio. Casar
+só por `emusys_student_id` junta pessoas diferentes. A chave é **(unidade, id)**.
