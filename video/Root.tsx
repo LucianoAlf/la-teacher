@@ -11,7 +11,9 @@ import type { Cena } from './lib/types'
 
 // Trilha padrão (herdada do estúdio do TOM). A/B por props:
 //   npx remotion render onboarding-professor --props='{"musicFile":"music/opcao-a.mp3"}'
-const MUSIC_DEFAULT = 'music/tom-theme.mp3'
+// A `-loop` (montada por scripts/montar-trilha.mjs), NUNCA o tom-theme cru: o
+// cru tem fade e silêncio nas pontas e abre buracos de 4,4s a cada emenda.
+const MUSIC_DEFAULT = 'music/tom-theme-loop.mp3'
 
 // O áudio dita a duração: mede os MP3 e dimensiona cada cena (+0.8s de respiro).
 // A trilha entra SEMPRE por padrão — via defaultProps, NUNCA via check de

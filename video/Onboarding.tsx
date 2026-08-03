@@ -4,6 +4,7 @@ import {
   Audio,
   Easing,
   interpolate,
+  Sequence,
   Series,
   staticFile,
   useCurrentFrame,
@@ -47,21 +48,44 @@ import { C, FONT } from './tokens'
 
 const MUSIC_VOLUME = 0.09
 
+/**
+ * ⚠️ A trilha TEM que ser a `-loop`, montada por scripts/montar-trilha.mjs.
+ *
+ * O tom-theme.mp3 cru tem 60s com fade-in e fade-out PRÓPRIOS (~2s cada) mais
+ * silêncio nas pontas: emendado ponta com ponta, cada volta abre um buraco de
+ * 4,4s de silêncio ABSOLUTO. No render de 3min42 saíram três buracos, o maior
+ * com 2,3s de nada — nem voz nem trilha. Passou despercebido porque meu teste
+ * de música só provava que existia som em ALGUM lugar do arquivo.
+ * A `-loop` já sai com a cauda cruzada em cima da cabeça: 50,7s sem um ponto
+ * abaixo de −30dB, então as cópias podem só encostar uma na outra.
+ *
+ * O envelope recebe o frame ABSOLUTO de propósito. Dentro de `<Audio loop>` o
+ * frame do callback reinicia a cada volta, e um fade escrito contra a duração
+ * do vídeo viraria um fade a cada emenda.
+ *
+ * Gate: node scripts/conferir-mixagem.mjs — não pode sobrar silêncio nenhum.
+ */
+const TRILHA_FRAMES = 1589 // 52,98s do tom-theme-loop (o script cospe esse número)
+const PASSO = TRILHA_FRAMES - 3 // 3 frames de sobreposição: nunca uma fresta
+
 export const BackgroundMusic: React.FC<{ file: string }> = ({ file }) => {
   const { durationInFrames } = useVideoConfig()
+  const copias = Math.ceil(durationInFrames / PASSO)
+  const envelope = (absoluto: number) =>
+    interpolate(
+      absoluto,
+      [0, 24, durationInFrames - 45, durationInFrames - 4],
+      [0, MUSIC_VOLUME, MUSIC_VOLUME, 0],
+      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+    )
   return (
-    <Audio
-      src={staticFile(file)}
-      loop
-      volume={(f) =>
-        interpolate(
-          f,
-          [0, 24, durationInFrames - 60, durationInFrames - 8],
-          [0, MUSIC_VOLUME, MUSIC_VOLUME, 0],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-        )
-      }
-    />
+    <>
+      {Array.from({ length: copias }, (_, i) => (
+        <Sequence key={i} from={i * PASSO} durationInFrames={TRILHA_FRAMES}>
+          <Audio src={staticFile(file)} volume={(f) => envelope(f + i * PASSO)} />
+        </Sequence>
+      ))}
+    </>
   )
 }
 
