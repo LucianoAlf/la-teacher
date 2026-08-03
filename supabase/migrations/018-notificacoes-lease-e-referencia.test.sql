@@ -1,168 +1,195 @@
 -- Teste de concorrência da migration 018. Roda em BEGIN/ROLLBACK: não deixa traço.
 --
--- Por que existe: claim é código de concorrência, e concorrência não se testa
--- lendo. O passo 3 é o que importa — ele reproduz o bug que a 018 conserta e
--- prova que ele morreu. Com a regra antiga (`criado_em < now() - 10 min`), o
--- passo 3 devolveria claimed=true e o teste falharia.
+-- ⚠️ ESTE TESTE ABORTA. Cada verificação passa por pg_temp.checar(), que levanta
+--    exceção na divergência — a transação morre ali e o runner devolve código de
+--    saída ≠ 0. A versão anterior só imprimia PASSOU/FALHOU numa tabela, e verde
+--    por leitura humana não é prova: bastava ninguém olhar a coluna certa.
 --
--- Uso: aplicar a 018 e rodar este arquivo inteiro. Todas as linhas do resultado
--- final precisam dizer PASSOU.
+-- Rodar com (a migration vai junto, aplicada e descartada no mesmo fôlego):
+--
+--   node scripts/rodar-teste-sql.mjs \
+--     supabase/migrations/018-notificacoes-lease-e-referencia.sql \
+--     supabase/migrations/018-notificacoes-lease-e-referencia.test.sql
+--
+-- Sucesso = rc 0 e a linha final "TODOS OS PASSOS PASSARAM".
+--
+-- O runner é DONO da transação (BEGIN/ROLLBACK). Este arquivo não abre nem
+-- fecha transação de propósito: assim não existe a versão dele em que alguém
+-- esqueceu o rollback e escreveu em produção.
+--
+-- Por que os cenários são separados: o `DO UPDATE` do claim tem DUAS portas —
+-- status 'falhou' e lease vencido. Um teste que abre as duas de uma vez não diz
+-- por qual delas o worker legado entrou. A catraca tem que segurar as duas
+-- sozinhas, então cada uma tem seu cenário.
 
-begin;
+create function pg_temp.checar(p_passo text, p_esperado text, p_obtido text)
+returns void language plpgsql as $c$
+begin
+  if p_esperado is distinct from p_obtido then
+    raise exception 'TESTE 018 FALHOU em [%]: esperado=<%> obtido=<%>',
+      p_passo, coalesce(p_esperado,'(null)'), coalesce(p_obtido,'(null)');
+  end if;
+end $c$;
 
-create temp table res(n int, passo text, esperado text, obtido text) on commit drop;
-
+-- ============================================================================
+-- PARTE 1 — o relógio do claim
+--
+-- O passo "linha velha + lease vivo" é a regressão do bug que a 018 conserta:
+-- com a regra antiga (`criado_em < now() - 10 min`) ele devolveria claimed=true
+-- e este teste abortaria aqui.
+-- ============================================================================
 do $t$
 declare
   a jsonb; b jsonb; c jsonb; d jsonb;
-  v_id uuid; v_tok uuid; v_tok2 uuid; ok1 boolean; ok2 boolean;
-  v_prof integer := 25;   -- Matheus (piloto). Trocar se rodar em outra base.
+  v_id uuid; v_tok uuid; v_tok2 uuid; v_prof integer := 25;   -- Matheus (piloto)
 begin
-  -- worker A pega o trabalho
   a := public.fabio_claim_notificacao_por_referencia(
         v_prof,'devolutiva_pronta','informativa','whatsapp','corpo A','devolutiva','teste-r1');
   v_id := (a->>'notificacao_id')::uuid;
   v_tok := (a->>'lease_token')::uuid;
-  insert into res values (1,'worker A reivindica','true',a->>'claimed');
+  perform pg_temp.checar('1. worker A reivindica','true',a->>'claimed');
 
-  -- worker B chega logo depois: o lease de A está vivo, então não é dele
   b := public.fabio_claim_notificacao_por_referencia(
         v_prof,'devolutiva_pronta','informativa','whatsapp','corpo B','devolutiva','teste-r1');
-  insert into res values (2,'worker B com lease de A vivo','false',b->>'claimed');
+  perform pg_temp.checar('2. worker B com lease de A vivo','false',b->>'claimed');
 
-  -- ===== O PASSO QUE PROVA O CONSERTO =====
-  -- Linha criada há 20 minutos, mas reivindicada agora. A regra antiga media
-  -- `criado_em` e daria a linha por abandonada — o worker B roubaria com o A
-  -- ainda enviando. A regra nova mede o lease.
+  -- ===== REGRESSÃO DO RELÓGIO =====
   update public.fabio_notificacoes set criado_em = now() - interval '20 minutes' where id=v_id;
   c := public.fabio_claim_notificacao_por_referencia(
         v_prof,'devolutiva_pronta','informativa','whatsapp','corpo C','devolutiva','teste-r1');
-  insert into res values (3,'REGRESSAO: linha velha + lease vivo','false',c->>'claimed');
+  perform pg_temp.checar('3. linha velha + lease vivo','false',c->>'claimed');
 
-  -- lease vence de verdade: aí sim outro worker pode assumir
   update public.fabio_notificacoes set lease_expira_em = now() - interval '1 second' where id=v_id;
   d := public.fabio_claim_notificacao_por_referencia(
         v_prof,'devolutiva_pronta','informativa','whatsapp','corpo D','devolutiva','teste-r1');
   v_tok2 := (d->>'lease_token')::uuid;
-  insert into res values (4,'lease vencido: novo dono assume','true',d->>'claimed');
+  perform pg_temp.checar('4. lease vencido: novo dono assume','true',d->>'claimed');
 
-  -- a cerca: o worker velho volta do timeout e tenta concluir
-  ok1 := public.fabio_marcar_notificacao_enviada(v_id, v_tok, 'recibo-do-velho');
-  insert into res values (5,'worker velho conclui com token morto','false',ok1::text);
+  perform pg_temp.checar('5. dono anterior nao conclui','false',
+    public.fabio_marcar_notificacao_enviada(v_id, v_tok, 'recibo-do-velho')::text);
+  perform pg_temp.checar('6. dono atual conclui','true',
+    public.fabio_marcar_notificacao_enviada(v_id, v_tok2, 'wamid.NOVO')::text);
 
-  -- o dono atual conclui e grava o recibo do canal
-  ok2 := public.fabio_marcar_notificacao_enviada(v_id, v_tok2, 'wamid.NOVO');
-  insert into res values (6,'dono atual conclui','true',ok2::text);
-
-  insert into res select 7,'recibo do canal gravado','wamid.NOVO',envio_recibo
-    from public.fabio_notificacoes where id=v_id;
-  insert into res select 8,'tentativas contadas','2',tentativas::text
-    from public.fabio_notificacoes where id=v_id;
+  perform pg_temp.checar('7. recibo do canal gravado','wamid.NOVO',
+    (select envio_recibo from public.fabio_notificacoes where id=v_id));
+  perform pg_temp.checar('8. tentativas contadas','2',
+    (select tentativas::text from public.fabio_notificacoes where id=v_id));
 end $t$;
 
 -- ============================================================================
--- PARTE 2 — o corte entre worker antigo e novo (exigência do Alfredo)
+-- PARTE 2 — o corte na FINALIZAÇÃO entre worker antigo e novo
 --
 -- "p_lease_token default null só pode ser aceito enquanto a linha também
 --  estiver sem token. Senão a compatibilidade vira bypass de fencing."
---
--- O passo 6 é o que prova: o worker legado tenta concluir uma linha que o
--- worker novo cercou. Com a regra frouxa (`p_lease_token is null` sozinho),
--- ele conseguiria — e a cerca inteira seria enfeite.
 -- ============================================================================
-
 do $t$
-declare a jsonb; b jsonb; v_id uuid; v_tok uuid; ok boolean;
-        v_prof integer := 25;
+declare a jsonb; b jsonb; v_id uuid; v_tok uuid; v_prof integer := 25;
 begin
-  -- O briefing de hoje já existe e está 'enviada' — o claim recusaria, com razão.
+  -- O briefing de hoje existe e está 'enviada' — o claim recusaria, com razão.
   -- Some com ele SÓ DENTRO DESTA TRANSAÇÃO, que termina em ROLLBACK.
   delete from public.fabio_notificacoes
    where professor_id=v_prof and tipo='briefing_matinal' and dia_referencia=current_date;
 
-  -- worker ANTIGO: não conhece p_com_token, então a linha nasce sem token
   a := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','corpo legado');
   v_id := (a->>'notificacao_id')::uuid;
-  insert into res values (11,'legado reivindica','true',a->>'claimed');
-  insert into res select 12,'linha do legado fica SEM token','true',(lease_token is null)::text
-    from public.fabio_notificacoes where id=v_id;
-  ok := public.fabio_marcar_notificacao_enviada(v_id);
-  insert into res values (13,'legado conclui a propria linha','true',ok::text);
+  perform pg_temp.checar('11. legado reivindica','true',a->>'claimed');
+  perform pg_temp.checar('12. linha do legado fica SEM token','true',
+    (select (lease_token is null)::text from public.fabio_notificacoes where id=v_id));
+  perform pg_temp.checar('13. legado conclui a propria linha','true',
+    public.fabio_marcar_notificacao_enviada(v_id)::text);
 
-  -- worker NOVO assume a mesma linha e cerca
   update public.fabio_notificacoes set status='falhou' where id=v_id;
   b := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','corpo novo',
         null, true);
   v_tok := (b->>'lease_token')::uuid;
-  insert into res values (14,'worker novo reivindica com token','true',b->>'claimed');
-  insert into res select 15,'agora a linha TEM token','true',(lease_token is not null)::text
-    from public.fabio_notificacoes where id=v_id;
+  perform pg_temp.checar('14. worker novo reivindica com token','true',b->>'claimed');
+  perform pg_temp.checar('15. agora a linha TEM token','true',
+    (select (lease_token is not null)::text from public.fabio_notificacoes where id=v_id));
 
-  -- ===== O BYPASS =====
-  ok := public.fabio_marcar_notificacao_enviada(v_id);
-  insert into res values (16,'BYPASS: legado conclui linha cercada','false',ok::text);
-
-  ok := public.fabio_marcar_notificacao_enviada(v_id, gen_random_uuid(), 'wamid.INTRUSO');
-  insert into res values (17,'token errado nao conclui','false',ok::text);
-
-  ok := public.fabio_marcar_notificacao_enviada(v_id, v_tok, 'wamid.OK');
-  insert into res values (18,'dono com token conclui','true',ok::text);
+  -- ===== BYPASS PELA FINALIZAÇÃO =====
+  perform pg_temp.checar('16. legado conclui linha cercada','false',
+    public.fabio_marcar_notificacao_enviada(v_id)::text);
+  perform pg_temp.checar('17. token errado nao conclui','false',
+    public.fabio_marcar_notificacao_enviada(v_id, gen_random_uuid(), 'wamid.INTRUSO')::text);
+  perform pg_temp.checar('18. dono com token conclui','true',
+    public.fabio_marcar_notificacao_enviada(v_id, v_tok, 'wamid.OK')::text);
 end $t$;
 
 -- ============================================================================
--- PARTE 3 — o bypass em DUAS ETAPAS, pelo claim
+-- PARTE 3A — catraca do CLAIM, porta 'falhou' com o lease AINDA VIVO
 --
--- A Parte 2 só cobria "legado tenta finalizar logo depois do novo cercar".
--- Faltava o caminho que estava realmente aberto: o legado REIVINDICANDO de
--- novo depois de falha/expiração. O `DO UPDATE` gravava lease_token = null e
--- desarmava a cerca; daí ele concluía numa boa.
---
--- Passos 22 e 23 são a prova: o legado é recusado E o token não é rebaixado.
--- Sem a catraca no claim, o 22 daria claimed=true e o 23 devolveria null.
+-- Sem a catraca, o claim legado gravaria lease_token = null e desarmaria a
+-- cerca. Aqui a porta aberta é o status; o lease continua no futuro.
 -- ============================================================================
-
 do $t$
-declare a jsonb; b jsonb; c jsonb;
-        v_id uuid; v_tokA uuid; v_tokB uuid; ok boolean;
-        v_prof integer := 25;
+declare a jsonb; b jsonb; c jsonb; v_id uuid; v_tokA uuid; v_tokB uuid; v_prof integer := 25;
 begin
   delete from public.fabio_notificacoes
    where professor_id=v_prof and tipo='briefing_matinal' and dia_referencia=current_date;
 
-  -- worker NOVO cerca a linha
-  a := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','c1',null,true);
+  a := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','A1',null,true);
   v_id := (a->>'notificacao_id')::uuid;
   v_tokA := (a->>'lease_token')::uuid;
-  insert into res values (21,'novo reivindica e cerca','true',a->>'claimed');
+  perform pg_temp.checar('31A. novo cerca','true',a->>'claimed');
 
-  -- a linha falha E o lease vence: as duas portas do DO UPDATE abertas
-  update public.fabio_notificacoes
-     set status='falhou', lease_expira_em = now() - interval '1 minute' where id=v_id;
+  -- SÓ o status muda: lease continua vivo
+  update public.fabio_notificacoes set status='falhou' where id=v_id;
+  perform pg_temp.checar('32A. lease ainda vivo','true',
+    (select (lease_expira_em > now())::text from public.fabio_notificacoes where id=v_id));
 
-  -- ===== O BYPASS EM DUAS ETAPAS =====
-  b := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','c2');
-  insert into res values (22,'legado reivindica linha cercada','false',b->>'claimed');
-  insert into res select 23,'token NAO foi rebaixado', v_tokA::text, lease_token::text
-    from public.fabio_notificacoes where id=v_id;
-  insert into res select 24,'status intacto (legado nao mexeu)','falhou',status
-    from public.fabio_notificacoes where id=v_id;
+  b := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','A2');
+  perform pg_temp.checar('33A. legado reivindica linha cercada','false',b->>'claimed');
+  perform pg_temp.checar('34A. token NAO foi rebaixado', v_tokA::text,
+    (select lease_token::text from public.fabio_notificacoes where id=v_id));
+  perform pg_temp.checar('35A. status intacto','falhou',
+    (select status from public.fabio_notificacoes where id=v_id));
 
-  -- só quem entende token retoma
-  c := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','c3',null,true);
+  c := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','A3',null,true);
   v_tokB := (c->>'lease_token')::uuid;
-  insert into res values (25,'novo retoma','true',c->>'claimed');
-  insert into res values (26,'token trocou',(v_tokA is distinct from v_tokB)::text,'true');
-
-  ok := public.fabio_marcar_notificacao_enviada(v_id);
-  insert into res values (27,'legado conclui linha cercada','false',ok::text);
-  ok := public.fabio_marcar_notificacao_enviada(v_id, v_tokA, 'wamid.VELHO');
-  insert into res values (28,'token A (morto) conclui','false',ok::text);
-  ok := public.fabio_marcar_notificacao_enviada(v_id, v_tokB, 'wamid.OK');
-  insert into res values (29,'token B (vivo) conclui','true',ok::text);
+  perform pg_temp.checar('36A. novo retoma','true',c->>'claimed');
+  perform pg_temp.checar('37A. token trocou','true',(v_tokA is distinct from v_tokB)::text);
+  perform pg_temp.checar('38A. legado ainda nao conclui','false',
+    public.fabio_marcar_notificacao_enviada(v_id)::text);
+  perform pg_temp.checar('39A. dono atual conclui','true',
+    public.fabio_marcar_notificacao_enviada(v_id, v_tokB, 'wamid.A')::text);
 end $t$;
 
-select n, passo, esperado, obtido,
-       case when esperado = obtido then 'PASSOU' else '*** FALHOU ***' end as veredito
-from res order by n;
+-- ============================================================================
+-- PARTE 3B — catraca do CLAIM, porta 'processando' com o lease VENCIDO
+--
+-- A outra porta do DO UPDATE. O status continua 'processando'; quem abre é o
+-- prazo. A catraca tem que segurar aqui também, sozinha.
+-- ============================================================================
+do $t$
+declare a jsonb; b jsonb; c jsonb; v_id uuid; v_tokA uuid; v_tokB uuid; v_prof integer := 25;
+begin
+  delete from public.fabio_notificacoes
+   where professor_id=v_prof and tipo='briefing_matinal' and dia_referencia=current_date;
 
-rollback;
+  a := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','B1',null,true);
+  v_id := (a->>'notificacao_id')::uuid;
+  v_tokA := (a->>'lease_token')::uuid;
+  perform pg_temp.checar('31B. novo cerca','true',a->>'claimed');
+
+  -- SÓ o prazo vence: status continua 'processando'
+  update public.fabio_notificacoes set lease_expira_em = now() - interval '1 minute' where id=v_id;
+  perform pg_temp.checar('32B. status continua processando','processando',
+    (select status from public.fabio_notificacoes where id=v_id));
+
+  b := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','B2');
+  perform pg_temp.checar('33B. legado reivindica linha cercada','false',b->>'claimed');
+  perform pg_temp.checar('34B. token NAO foi rebaixado', v_tokA::text,
+    (select lease_token::text from public.fabio_notificacoes where id=v_id));
+
+  c := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','B3',null,true);
+  v_tokB := (c->>'lease_token')::uuid;
+  perform pg_temp.checar('36B. novo retoma','true',c->>'claimed');
+  perform pg_temp.checar('37B. token trocou','true',(v_tokA is distinct from v_tokB)::text);
+  perform pg_temp.checar('38B. legado ainda nao conclui','false',
+    public.fabio_marcar_notificacao_enviada(v_id)::text);
+  perform pg_temp.checar('39B. dono atual conclui','true',
+    public.fabio_marcar_notificacao_enviada(v_id, v_tokB, 'wamid.B')::text);
+end $t$;
+
+select 'TODOS OS PASSOS PASSARAM' as resultado;
+
