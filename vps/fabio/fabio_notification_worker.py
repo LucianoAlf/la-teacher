@@ -238,16 +238,16 @@ _CAMPOS = [
 
 
 def _ultima_aula_lines(aluno: Dict[str, Any]) -> list[str]:
-    """Bloco de um aluno. O nome vem em negrito e sozinho na linha — antes ele
-    ficava no meio de 'Aluno(a): fulano' e se perdia na rolagem."""
-    linhas = [f"👤 *{display_student_name(aluno)}*"]
+    """Bloco de um aluno. O nome vem em negrito, sozinho na linha e com um
+    respiro embaixo (pedido do Alf) — antes ele ficava no meio de
+    'Aluno(a): fulano' e se perdia na rolagem."""
+    cabecalho = [f"👤 *{display_student_name(aluno)}*", ""]
     ultima = aluno.get("ultima_aula") if isinstance(aluno, dict) else None
 
     if not isinstance(ultima, dict) or not ultima:
         resumo = _encurtar(aluno.get("resumo_ultima_aula") if isinstance(aluno, dict) else "")
-        linhas.append(f"✅ *Trabalho feito:* {resumo}" if resumo
-                      else "_Sem conteúdo registrado da última aula._")
-        return linhas
+        return cabecalho + ([f"✅ *Trabalho feito:* {resumo}"] if resumo
+                            else ["_Sem conteúdo registrado da última aula._"])
 
     dados = {chave: _clean_text(ultima.get(chave)) for chave, _, _ in _CAMPOS}
     for chave in ("trabalho_feito", "foco"):
@@ -259,16 +259,19 @@ def _ultima_aula_lines(aluno: Dict[str, Any]) -> list[str]:
             if not dados.get(campo):
                 dados[campo] = valor
 
+    corpo: list[str] = []
     data_br = _format_date_br(ultima.get("data"))
     if data_br:
-        linhas.append(f"_última aula · {data_br}_")
+        corpo.append(f"_última aula · {data_br}_")
+    campos_com_texto = 0
     for chave, emoji, rotulo in _CAMPOS:
         valor = _encurtar(dados.get(chave, ""))
         if valor:
-            linhas.append(f"{emoji} *{rotulo}:* {valor}")
-    if len(linhas) <= 2:
-        linhas.append("_Sem conteúdo registrado da última aula._")
-    return linhas
+            corpo.append(f"{emoji} *{rotulo}:* {valor}")
+            campos_com_texto += 1
+    if not campos_com_texto:
+        corpo.append("_Sem conteúdo registrado da última aula._")
+    return cabecalho + corpo
 
 
 def _summary_lines_for_class(alunos: list[Dict[str, Any]]) -> list[str]:
