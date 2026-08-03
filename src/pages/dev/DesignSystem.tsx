@@ -159,8 +159,45 @@ export default function DesignSystemPage() {
             </div>
           </Section>
 
-          <Section n={7} title="Fatia (presente aberta · faltou)">
+          <Section n={7} title="Fatia (presente aberta · faltou · presença não informada)">
             <div className="space-y-[9px]">
+              {/* O terceiro estado (migration 019): ninguém declarou a presença.
+                  Selo em CONTORNO porque ainda depende do professor, e a
+                  pergunta fica no card — antes do Confirmar, não numa lista de
+                  erro depois. */}
+              <Fatia
+                nome="Valentina"
+                presenca="perguntar"
+                acao={
+                  <div>
+                    <p className="mb-[7px] text-[13px] text-text-secondary">
+                      Não recebi a presença — <b className="text-text-primary">Valentina</b> esteve nessa aula?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => show('Marcado como presente ✓')}
+                        className="flex-1 rounded-md border border-success-text px-3 py-[9px] text-[13px] font-bold text-success-text"
+                      >
+                        <i className="fa-solid fa-check" aria-hidden="true" /> Esteve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => show('Marcado como falta ✓')}
+                        className="flex-1 rounded-md border border-danger-text px-3 py-[9px] text-[13px] font-bold text-danger-text"
+                      >
+                        <i className="fa-solid fa-xmark" aria-hidden="true" /> Faltou
+                      </button>
+                    </div>
+                  </div>
+                }
+              >
+                <FieldCard
+                  label="Progresso"
+                  icon="fa-solid fa-arrow-trend-up"
+                  value="Trabalhou a letra da música e decorou o refrão."
+                />
+              </Fatia>
               <Fatia nome="Gael" defaultOpen>
                 <FieldCard
                   label="Progresso"

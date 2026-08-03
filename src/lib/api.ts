@@ -126,8 +126,18 @@ export async function meusRegistros(status?: string): Promise<unknown[]> {
 }
 
 export interface PendenciaConfirmacao {
+  /** Alvo da pendência: serve pra FATIA de turma e pra RAIZ de aula 1:1. */
+  registro_alvo_id: string
+  tipo_alvo: 'raiz' | 'fatia'
+  /** @deprecated Mesmo valor de registro_alvo_id. Sai quando ninguém mais ler. */
   fatia_id: string
   aluno_id: number | null
+  /** Vem do banco: em aula 1:1 não existe fatia pra tela procurar o nome. */
+  aluno_nome: string | null
+  /** 'presenca' quando o que falta é presença; null nas pendências estruturais. */
+  campo_obrigatorio: string | null
+  /** A tela desenha os botões a partir daqui, em vez de ter a lista fixa. */
+  valores_permitidos: string[] | null
   motivo: string
 }
 
@@ -172,6 +182,26 @@ export async function confirmarRegistro(
     throw error
   }
   return res as unknown as ConfirmacaoResultado
+}
+
+/**
+ * Responde a presença de um aluno num registro que ficou pendente.
+ *
+ * Existe porque a pendência sem ação era beco sem saída: a tela listava
+ * "falta a presença" e o professor não tinha o que clicar — em aula 1:1 nem o
+ * nome aparecia. `registroAlvoId` serve pros dois formatos (raiz e fatia).
+ */
+export async function responderPresenca(
+  registroAlvoId: string,
+  presenca: 'presente' | 'ausente',
+): Promise<void> {
+  // rpcSolta: a RPC nasceu na migration 019, depois da última geração do
+  // db.ts. Remover o helper quando o db.ts for regenerado.
+  const { error } = await rpcSolta('app_responder_presenca', {
+    p_registro_alvo_id: registroAlvoId,
+    p_presenca: presenca,
+  })
+  if (error) throw error
 }
 
 // ---------------------------------------------------------------------------

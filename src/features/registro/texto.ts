@@ -72,6 +72,23 @@ export function textoTronco(aula: AulaContexto | null, troncoCampos: Record<stri
   return blocos.join('\n\n')
 }
 
-export function presencaDaFatia(f: RegistroRow): 'presente' | 'ausente' {
-  return (f.campos.presenca as string) === 'ausente' ? 'ausente' : 'presente'
+export type PresencaDeclarada = 'presente' | 'ausente' | 'nao_informada'
+
+/**
+ * Presença é AFIRMAÇÃO, não ausência de negativa.
+ *
+ * Até 03/08/2026 esta função devolvia 'presente' pra qualquer coisa que não
+ * fosse 'ausente' — inclusive pro campo faltando. E isso não ficava escondido:
+ * era o selo verde "presente" no card do aluno. O professor lia que o sistema
+ * sabia, e confirmava. Estava endossando um fato que ninguém apurou.
+ *
+ * Espelha `fn_presenca_declarada` no banco (migration 019). As duas precisam
+ * concordar: se a tela disser "presente" e o banco disser "não informada", o
+ * professor aperta Confirmar e não entende por que virou pendência.
+ */
+export function presencaDaFatia(f: RegistroRow): PresencaDeclarada {
+  const v = f.campos.presenca as string | undefined
+  if (v === 'presente') return 'presente'
+  if (v === 'ausente') return 'ausente'
+  return 'nao_informada'
 }

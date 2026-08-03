@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, EmptyState, FabioMark, Fatia, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
 import {
   atualizarFatia,
+  responderPresenca,
   confirmarRegistro,
   ErroEscolhaModo,
   registroCompleto,
@@ -79,13 +80,32 @@ export default function ConfirmarPage() {
     try {
       await atualizarFatia(tronco.id, textoTronco(aula, novosCampos), { [chave]: valor })
       // o comum mudou → o texto final de TODAS as fatias presentes muda junto
-      for (const f of fatias.filter((f) => presencaDaFatia(f) === 'presente')) {
+      for (const f of fatias.filter((f) => presencaDaFatia(f) !== 'ausente')) {
         await atualizarFatia(f.id, textoFatia(aula, novosCampos, f.campos), null)
       }
       show('Campo atualizado ✓')
     } catch {
       show('Não consegui salvar — recarregando')
       carregar()
+    }
+  }
+
+  /** Resposta do professor à pergunta de presença — grava e some da pendência. */
+  async function responder(registroAlvoId: string, presenca: 'presente' | 'ausente') {
+    try {
+      await responderPresenca(registroAlvoId, presenca)
+      // Otimista no card, e tira da lista de pendências pra ele ver o que falta
+      // encolher enquanto responde.
+      setFatias((atual) =>
+        atual.map((f) => (f.id === registroAlvoId ? { ...f, campos: { ...f.campos, presenca } } : f)),
+      )
+      if (tronco?.id === registroAlvoId) {
+        setTronco({ ...tronco, campos: { ...tronco.campos, presenca } })
+      }
+      setPendencias((atual) => atual.filter((p) => p.registro_alvo_id !== registroAlvoId))
+      show(presenca === 'presente' ? 'Marcado como presente ✓' : 'Marcado como falta ✓')
+    } catch {
+      show('Não consegui salvar a presença — tenta de novo')
     }
   }
 
@@ -115,7 +135,7 @@ export default function ConfirmarPage() {
       // garante que TODA fatia presente vai gravar comum + individual
       // (regenera e persiste os textos finais antes da RPC de confirmação)
       await atualizarFatia(tronco.id, textoTronco(aula, tronco.campos), null)
-      for (const f of fatias.filter((f) => presencaDaFatia(f) === 'presente')) {
+      for (const f of fatias.filter((f) => presencaDaFatia(f) !== 'ausente')) {
         await atualizarFatia(f.id, textoFatia(aula, tronco.campos, f.campos), null)
       }
       const res = await confirmarRegistro(tronco.id, modo)
@@ -197,7 +217,7 @@ export default function ConfirmarPage() {
     return <TelaSucesso resultado={sucesso} fatias={fatias} temDever={Boolean(tronco.campos.dever_casa)} />
   }
 
-  const presentes = fatias.filter((f) => presencaDaFatia(f) === 'presente')
+  const presentes = fatias.filter((f) => presencaDaFatia(f) !== 'ausente')
   const temFatias = fatias.length > 0
   const sub = [aula?.curso, aula?.turma, aula?.data_aula && formatDiaCurto(aula.data_aula), aula?.hora && formatHoraBRT(aula.hora), `Molde ${tronco.molde}`]
     .filter(Boolean)
@@ -233,12 +253,27 @@ export default function ConfirmarPage() {
             <b className="mb-1 block font-bold text-danger-text">
               <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" /> Não gravei ainda — falta resolver:
             </b>
-            <ul className="list-inside list-disc text-text-secondary">
+            <ul className="space-y-2 text-text-secondary">
               {pendencias.map((p) => {
-                const nome = (fatias.find((f) => f.id === p.fatia_id)?.aluno_nome as string | null) ?? 'Aluno'
+                // O nome vem do BANCO. Antes a tela procurava o id na lista de
+                // fatias — e em aula 1:1 não existe fatia, então saía "Aluno".
+                const nome =
+                  p.aluno_nome ??
+                  (fatias.find((f) => f.id === p.registro_alvo_id)?.aluno_nome as string | null) ??
+                  'Aluno'
+                const pergunta = p.campo_obrigatorio === 'presenca'
                 return (
-                  <li key={p.fatia_id}>
-                    {nome}: {p.motivo === 'sem texto' ? 'sem conteúdo pra gravar' : p.motivo}
+                  <li key={p.registro_alvo_id}>
+                    <b className="text-text-primary">{nome}</b>{' '}
+                    {p.motivo === 'sem texto' ? 'sem conteúdo pra gravar' : p.motivo}
+                    {pergunta && (
+                      <div className="mt-[6px]">
+                        <PerguntaPresenca
+                          nome={nome}
+                          onResponder={(v) => void responder(p.registro_alvo_id, v)}
+                        />
+                      </div>
+                    )}
                   </li>
                 )
               })}
@@ -313,10 +348,21 @@ export default function ConfirmarPage() {
             const nomeCompleto = (f.aluno_nome as string | null) ?? 'Aluno'
             const primeiro = (f.aluno_primeiro_nome as string | null) ?? nomeCompleto
             const foto = (f.aluno_foto_url as string | null) ?? null
-            const ausente = presencaDaFatia(f) === 'ausente'
+            const declarada = presencaDaFatia(f)
+            const ausente = declarada === 'ausente'
+            const perguntar = declarada === 'nao_informada'
             return (
               <div key={f.id} className={cx(ausente && 'opacity-60')}>
-                <Fatia nome={nomeCompleto} fotoUrl={foto} presenca={ausente ? 'faltou' : 'presente'} defaultOpen={!ausente}>
+                <Fatia
+                  nome={nomeCompleto}
+                  fotoUrl={foto}
+                  presenca={ausente ? 'faltou' : perguntar ? 'perguntar' : 'presente'}
+                  defaultOpen={!ausente}
+                  // A pergunta vem ANTES do Confirmar, no card onde ele já está
+                  // olhando — e não numa lista de erro depois que a gravação
+                  // falhou. Pendência é a rede; o caminho normal é este.
+                  acao={perguntar ? <PerguntaPresenca nome={primeiro} onResponder={(v) => void responder(f.id, v)} /> : undefined}
+                >
                   {ausente ? (
                     <p className="px-[14px] py-[11px] text-sm text-text-secondary">
                       Ausente — nada será gravado pra {primeiro}. Nada foi inventado. ✋
@@ -521,6 +567,48 @@ function Confetes() {
           style={{ left: `${6 + Math.random() * 88}%`, animationDelay: `${Math.random() * 0.5}s` }}
         />
       ))}
+    </div>
+  )
+}
+
+/**
+ * A pergunta que faltava.
+ *
+ * Até 03/08/2026 o app afirmava "presente" pra qualquer aluno cujo campo de
+ * presença não tivesse chegado — e 31 de 31 registros do sistema nunca tiveram
+ * esse campo. O professor lia o selo verde, entendia que o sistema sabia, e
+ * confirmava. Aqui ele responde em vez de endossar.
+ */
+function PerguntaPresenca({
+  nome,
+  onResponder,
+}: {
+  nome: string
+  onResponder: (v: 'presente' | 'ausente') => void
+}) {
+  const botao =
+    'flex-1 rounded-md border px-3 py-[9px] text-[13px] font-bold transition-colors'
+  return (
+    <div>
+      <p className="mb-[7px] text-[13px] text-text-secondary">
+        Não recebi a presença — <b className="text-text-primary">{nome}</b> esteve nessa aula?
+      </p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => onResponder('presente')}
+          className={cx(botao, 'border-success-text text-success-text hover:bg-success-soft')}
+        >
+          <i className="fa-solid fa-check" aria-hidden="true" /> Esteve
+        </button>
+        <button
+          type="button"
+          onClick={() => onResponder('ausente')}
+          className={cx(botao, 'border-danger-text text-danger-text hover:bg-danger-soft')}
+        >
+          <i className="fa-solid fa-xmark" aria-hidden="true" /> Faltou
+        </button>
+      </div>
     </div>
   )
 }
