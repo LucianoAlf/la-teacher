@@ -30,6 +30,37 @@ const OLHAR = 8 // frames após o clique: meio da pousada, com o anel ainda vis�
 
 const fonte = readFileSync(resolve(root, 'video/Onboarding.tsx'), 'utf-8')
 
+/* ---------- 0. a geometria da mão, lida do Dedo.tsx ---------- */
+// Duplicar esses números aqui seria o mesmo erro da tabela de durações: eles
+// envelhecem calados. Leio da fonte.
+const dedoSrc = readFileSync(resolve(root, 'video/lib/Dedo.tsx'), 'utf-8')
+const Y_VIRA = Number(dedoSrc.match(/^const Y_VIRA = (\d+)/m)?.[1])
+const TAMANHO = Number(dedoSrc.match(/tamanho = (\d+)/)?.[1])
+const cmp = dedoSrc.match(/const ehCima = \(k: CursorKeyframe\) => k\.y (<|>=) Y_VIRA/)?.[1]
+const maosBloco = dedoSrc.slice(dedoSrc.indexOf('const MAOS = {'))
+// eslint-disable-next-line no-eval
+const MAOS = eval(`(${maosBloco.slice(maosBloco.indexOf('{'), maosBloco.indexOf('} as const') + 1).replace(/\/\/[^\n]*/g, '')})`)
+if (!Y_VIRA || !TAMANHO || !cmp || !MAOS?.cima) throw new Error('não li a geometria da mão no Dedo.tsx')
+const ehCima = (y) => (cmp === '<' ? y < Y_VIRA : y >= Y_VIRA)
+
+// A tela do telefone, em coordenadas do conteúdo (o mesmo espaço dos keyframes).
+const TELA_W = 410
+const TELA_H = 816
+
+/** Retângulo que a mão ocupa quando a ponta está em (x,y). */
+function caixaDaMao(x, y) {
+  const m = ehCima(y) ? MAOS.cima : MAOS.baixo
+  const largura = TAMANHO
+  const altura = TAMANHO / m.razao
+  return {
+    qual: ehCima(y) ? 'cima' : 'baixo',
+    esq: x - m.pontaX * largura,
+    dir: x - m.pontaX * largura + largura,
+    topo: y - m.pontaY * altura,
+    base: y - m.pontaY * altura + altura,
+  }
+}
+
 // Constantes usadas dentro dos keyframes (GRAVAR_MIC, MENU, ...). Sem resolver
 // isso o eval quebra — e quebrar é o certo: melhor falhar do que conferir frame
 // errado calado.
@@ -96,17 +127,38 @@ for (const c of cenas) {
   if (soCenas.length && !soCenas.includes(c.id)) continue
   for (const k of keyframesDe(comp)) {
     if (!k.click) continue
+    const caixa = caixaDaMao(k.x, k.y)
     alvos.push({
       nome: `${c.id}+${k.frame}`,
       cena: c.id,
       alvoX: k.x,
       alvoY: k.y,
-      // A mão vira quando o alvo é rodapé — o mesmo limiar do Dedo.tsx.
-      mao: k.y >= 700 ? 'cima' : 'baixo',
+      mao: caixa.qual,
+      caixa,
       frame: Math.min(inicioDaCena[c.id] + k.frame + OLHAR, acumulado - 1),
     })
   }
 }
+
+/**
+ * A MÃO NÃO PODE VAZAR DA TELA. Um punho cortado pela borda do quadro não lê
+ * como mão entrando em cena — lê como borrão em cima do botão. Eu vi isso nas
+ * folhas de contato e julguei que estava bom; o Alf reprovou e estava certo.
+ * Julgamento meu não serve aqui, então virou conta.
+ */
+const vazando = alvos.filter((a) => a.caixa.topo < -2 || a.caixa.base > TELA_H + 2)
+if (vazando.length) {
+  console.error(`\n❌ ${vazando.length} toque(s) com a mão saindo da tela (0..${TELA_H}):`)
+  for (const a of vazando) {
+    console.error(
+      `   ${a.nome.padEnd(16)} alvo y=${a.alvoY} · mão ${a.caixa.qual} ocupa ` +
+        `${a.caixa.topo.toFixed(0)}..${a.caixa.base.toFixed(0)}`,
+    )
+  }
+  console.error('\nNÃO renderizar — corrigir Y_VIRA/tamanho ou a altura do alvo.\n')
+  process.exit(1)
+}
+console.log(`mão dentro da tela nos ${alvos.length} toques ✅`)
 // Quadros extras que não são toque, mas que eu quero olhar (estado da tela
 // depois da ação): --tambem whatsapp:250,whatsapp:320
 for (const par of arg('--tambem', '').split(',').filter(Boolean)) {

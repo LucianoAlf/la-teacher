@@ -34,10 +34,25 @@ const MAOS = {
   cima: { arquivo: 'brand/mao-cima.png', pontaX: 0.0861, pontaY: 0, razao: 0.9831 },
 } as const
 
-/** Altura (no conteúdo de 410×816) a partir da qual o alvo é "rodapé" e a mão
- *  vira. 700 pega TabBar, FABs e botões de rodapé; deixa o resto com a mão de
- *  cima pra baixo, que é a que o Alf aprovou como padrão. */
-const Y_VIRA = 700
+/**
+ * Qual mão usar, por altura do alvo (no conteúdo de 410×816).
+ *
+ * A regra é o CORPO DA MÃO, não a "direção de onde ela viria":
+ *  • mão pra CIMA tem a ponta no topo da imagem e o corpo ABAIXO dela;
+ *  • mão pra BAIXO tem a ponta embaixo e o corpo ACIMA.
+ * Então o alvo tem que deixar espaço pro corpo DENTRO da tela: alvo alto pede
+ * a mão pra cima, alvo baixo pede a mão pra baixo.
+ *
+ * ⚠️ Eu tinha escrito o contrário (rodapé → mão pra cima), imaginando "a mão
+ * vem de baixo, como no celular de verdade". O resultado no vídeo foi o corpo
+ * da mão caindo fora do quadro e tapando o botão — o Alf reprovou, e estava
+ * certo: fica um borrão cortado, não uma mão. Nas folhas de contato eu VI o
+ * punho cortado e concluí que lia como mão entrando em cena. Não lê.
+ *
+ * 400 é o meio da tela e sobra folga: o corpo mede ~133px (baixo) e ~153px
+ * (cima), então nenhum dos dois encosta na borda. O harness confere isso.
+ */
+const Y_VIRA = 400
 
 /**
  * DESCANSO — onde a mão espera entre um toque e outro: FORA de cena, pelo lado
@@ -67,6 +82,7 @@ export const Dedo: React.FC<{
 
   const ordenados = [...keyframes].sort((a, b) => a.frame - b.frame)
   const cliques = ordenados.filter((k) => k.click)
+  const ehCima = (k: CursorKeyframe) => k.y < Y_VIRA
 
   // POUSAR E SEGURAR: depois de apertar, a mão fica no botão POUSADA_F frames
   // (~0,5s) e só então viaja, com VIAGEM_MIN de folga pra não "teleportar".
@@ -91,7 +107,9 @@ export const Dedo: React.FC<{
     if (k.click) return k
     const referencia = [...cliques].reverse().find((c) => c.frame <= k.frame) ?? cliques[0]
     if (!referencia) return k
-    const y = referencia.y >= Y_VIRA ? FORA_CIMA : FORA_BAIXO
+    // A mão descansa do lado onde o CORPO dela fica: a mão pra cima tem o corpo
+    // embaixo, então some por baixo; a mão pra baixo some por cima.
+    const y = ehCima(referencia) ? FORA_CIMA : FORA_BAIXO
     const anterior = ordenados[i - 1]
     if (!anterior?.click) return { ...k, y }
     const depois = ordenados[i + 1]
@@ -149,7 +167,6 @@ export const Dedo: React.FC<{
    * some, vira, e volta virada. Se não houver descanso entre os dois toques,
    * cai no meio da viagem, que é o menos pior.
    */
-  const ehCima = (k: CursorKeyframe) => k.y >= Y_VIRA
   const rampa: { frame: number; v: number }[] = []
   if (cliques.length) {
     rampa.push({ frame: ordenados[0].frame - 1, v: ehCima(cliques[0]) ? 1 : 0 })
