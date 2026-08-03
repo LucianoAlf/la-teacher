@@ -133,6 +133,79 @@ def extract_text(body: Dict[str, Any]) -> Optional[str]:
     return value or None
 
 
+_AUDIO_TIMEOUT = int(os.getenv("FABIO_AUDIO_TIMEOUT_SECONDS", "90"))
+
+
+def extract_media_kind(body: Dict[str, Any]) -> Optional[str]:
+    """Que tipo de midia e essa mensagem sem texto.
+
+    Melhor esforco: a UAZAPI varia o nome do campo entre versoes e entre
+    webhook e /message/find. Vale mais acertar "audio" por qualquer via do que
+    exigir um campo canonico que talvez nao venha.
+    """
+    data = get_data(body)
+    content = data.get("content")
+    if isinstance(content, dict) and content.get("PTT") is True:
+        return "audio"
+    pistas = []
+    for chave in ("messageType", "message_type", "type", "mediaType", "media_type"):
+        valor = data.get(chave)
+        if valor:
+            pistas.append(str(valor).strip().lower())
+    mime = str(data.get("mimetype") or data.get("mimeType") or "")
+    if not mime and isinstance(content, dict):
+        mime = str(content.get("mimetype") or content.get("mimeType") or "")
+    mime = mime.lower()
+    blob = " ".join(pistas)
+    if "audio" in blob or "ptt" in blob or mime.startswith("audio/"):
+        return "audio"
+    if "image" in blob or "sticker" in blob or mime.startswith("image/"):
+        return "imagem"
+    if "video" in blob or mime.startswith("video/"):
+        return "video"
+    if "document" in blob or "pdf" in mime:
+        return "documento"
+    if "location" in blob:
+        return "localizacao"
+    if "contact" in blob or "vcard" in blob:
+        return "contato"
+    # Tipo de texto sem texto: mensagem vazia ou editada. Nao e midia --
+    # devolver "conversation" aqui viraria um aviso dizendo "recebi seu
+    # conversation", que e pior do que nao saber o tipo.
+    if any(t in blob for t in ("conversation", "extendedtext", "text")):
+        return None
+    return pistas[0] if pistas else None
+
+
+def uazapi_transcrever_audio(wa_message_id: str) -> Dict[str, Any]:
+    """Pede a UAZAPI o audio ja transcrito.
+
+    /message/download com transcribe=true devolve a transcricao pronta -- e o
+    mesmo caminho que a edge function transcrever-mensagem-evasao usa. Nao
+    temos STT proprio nem precisamos de um.
+    """
+    if not UAZAPI_TOKEN:
+        raise RuntimeError("uazapi_token_missing")
+    r = requests.post(
+        f"{UAZAPI_URL}/message/download",
+        headers={"Content-Type": "application/json", "token": UAZAPI_TOKEN},
+        json={"id": wa_message_id, "transcribe": True, "generate_mp3": True, "return_link": True},
+        timeout=_AUDIO_TIMEOUT,
+    )
+    if r.status_code >= 400:
+        raise RuntimeError(f"uazapi message/download {r.status_code}: {r.text[:300]}")
+    corpo = r.json() if r.content else {}
+    if not isinstance(corpo, dict):
+        raise RuntimeError("uazapi message/download resposta inesperada")
+    texto = corpo.get("transcription")
+    texto = str(texto).strip() if texto else ""
+    return {
+        "texto": texto or None,
+        "url": corpo.get("fileURL") or corpo.get("fileUrl") or corpo.get("url"),
+        "mime": corpo.get("mimetype") or corpo.get("mimeType"),
+    }
+
+
 def extract_phone(body: Dict[str, Any]) -> Optional[str]:
     data = get_data(body)
     raw = data.get("chatid") or data.get("sender") or data.get("from") or data.get("remoteJid") or ""
@@ -193,15 +266,30 @@ def resolve_professor_by_phone(phone: str) -> Dict[str, Any]:
     return data
 
 
-def insert_identity_message(identity: Dict[str, Any], text: str, channel: str, wa_message_id: Optional[str] = None) -> Dict[str, Any]:
+def insert_identity_message(
+    identity: Dict[str, Any],
+    text: Optional[str],
+    channel: str,
+    wa_message_id: Optional[str] = None,
+    kind: str = "text",
+    media_url: Optional[str] = None,
+    media_mime: Optional[str] = None,
+    media_extracted_text: Optional[str] = None,
+) -> Dict[str, Any]:
     tipo = identity.get("tipo") or "professor"
     row = {
         "identidade_tipo": tipo,
         "role": "professor",
-        "kind": "text",
+        "kind": kind,
         "content": text,
         "channel": channel,
     }
+    if media_url:
+        row["media_url"] = media_url
+    if media_mime:
+        row["media_mime"] = media_mime
+    if media_extracted_text:
+        row["media_extracted_text"] = media_extracted_text
     if tipo == "admin":
         row["usuario_id"] = int(identity["usuario_id"])
     else:
@@ -1400,6 +1488,91 @@ def send_whatsapp_text(professor_id: int, text: str) -> None:
     log("whatsapp_sent", professor_id=professor_id, phone_tail=phone[-4:], typing_delay_ms=whatsapp_send_payload(phone, text).get("delay", 0))
 
 
+def send_whatsapp_text_direto(phone: str, text: str, motivo: str = "direto") -> None:
+    """Envia para um telefone ja resolvido.
+
+    send_whatsapp_text() resolve o numero a partir do professor_id, o que nao
+    serve para avisar um admin nem para responder antes de saber quem e.
+    """
+    if not UAZAPI_TOKEN:
+        log("uazapi_token_missing_skip_send", motivo=motivo)
+        return
+    r = requests.post(
+        f"{UAZAPI_URL}/send/text",
+        headers={"Content-Type": "application/json", "token": UAZAPI_TOKEN},
+        json=whatsapp_send_payload(phone, text),
+        timeout=_HTTP_TIMEOUT,
+    )
+    if r.status_code >= 400:
+        raise RuntimeError(f"uazapi send/text {r.status_code}: {r.text[:300]}")
+    log("whatsapp_sent", phone_tail=phone[-4:], motivo=motivo)
+
+
+AVISO_AUDIO_FALHOU = (
+    "Opa! Chegou seu \u00e1udio aqui, mas dessa vez eu n\u00e3o consegui ouvir \U0001f615\n\n"
+    "Me manda por escrito que eu te respondo na hora."
+)
+
+AVISO_MIDIA_SEM_SUPORTE = (
+    "Recebi aqui sua mensagem de {tipo}, mas por enquanto eu s\u00f3 consigo ler "
+    "texto e ouvir \u00e1udio no WhatsApp \U0001f64f\n\nMe conta por escrito que eu te ajudo."
+)
+
+
+def handle_media_message(body: Dict[str, Any], phone: str, wa_id: Optional[str], midia: Optional[str]) -> None:
+    """Mensagem sem texto: transcreve o audio, ou avisa que nao deu.
+
+    Roda fora do request do webhook porque a transcricao leva segundos e a
+    UAZAPI reenvia o webhook se demorarmos a responder. O sil\u00eancio nascia
+    exatamente aqui: sem texto, o handler devolvia 200 e esquecia a mensagem --
+    o professor via "entregue" e ninguem do lado de ca sabia que existiu.
+    """
+    try:
+        identity = resolve_identity_by_phone(phone)
+    except Exception as e:
+        log("midia_identidade_nao_resolvida", error=str(e)[:300], phone_tail=phone[-4:], midia=midia)
+        return
+    professor_id = identity.get("professor_id")
+
+    if midia == "audio" and wa_id:
+        try:
+            audio = uazapi_transcrever_audio(wa_id)
+        except Exception as e:
+            audio = None
+            log("audio_transcricao_falhou", error=str(e)[:300], professor_id=professor_id, phone_tail=phone[-4:])
+        if audio and audio.get("texto"):
+            try:
+                inserido = insert_identity_message(
+                    identity,
+                    None,
+                    "whatsapp",
+                    wa_id,
+                    kind="audio",
+                    media_url=audio.get("url"),
+                    media_mime=audio.get("mime") or "audio/ogg",
+                    media_extracted_text=audio["texto"],
+                )
+            except Exception as e:
+                log("audio_insert_falhou", error=str(e)[:300], professor_id=professor_id)
+                return
+            log(
+                "audio_transcrito",
+                professor_id=professor_id,
+                phone_tail=phone[-4:],
+                caracteres=len(audio["texto"]),
+                duplicate=bool(inserido.get("duplicate")),
+            )
+            return
+        aviso = AVISO_AUDIO_FALHOU
+    else:
+        aviso = AVISO_MIDIA_SEM_SUPORTE.format(tipo=midia or "arquivo")
+
+    try:
+        send_whatsapp_text_direto(phone, aviso, motivo=f"aviso_midia:{midia or 'desconhecida'}")
+    except Exception as e:
+        log("aviso_midia_falhou", error=str(e)[:300], professor_id=professor_id, midia=midia)
+
+
 def process_one() -> bool:
     first_row = claim_next_message()
     if not first_row:
@@ -1494,14 +1667,40 @@ class Handler(BaseHTTPRequestHandler):
             return
         # Ack fast to avoid UAZAPI retries; process ingestion in this request (cheap).
         try:
+            # Todo descarte deixa rastro. Antes estes returns eram mudos: 200
+            # para a UAZAPI, nada no log, nada no banco -- e nao havia como
+            # saber depois que a mensagem existiu.
             if is_ignorable_uazapi(body):
+                data = get_data(body)
+                log(
+                    "webhook_ignorado",
+                    motivo="evento_ignoravel",
+                    evento=str(body.get("EventType") or body.get("event_type") or body.get("type") or body.get("event") or "")[:40],
+                    from_me=bool(data.get("fromMe")),
+                    grupo=bool(data.get("isGroup")),
+                    por_api=bool(data.get("wasSentByApi")),
+                    tem_data=bool(data),
+                )
                 self._send(200, {"ok": True, "status": "ignored"})
                 return
             phone = extract_phone(body)
             text = extract_text(body)
             wa_id = extract_message_id(body)
-            if not phone or not text:
+            if not phone:
+                log("webhook_ignorado", motivo="sem_telefone", tem_texto=bool(text), tem_wa_id=bool(wa_id))
                 self._send(200, {"ok": True, "status": "ignored_missing_phone_or_text"})
+                return
+            if not text:
+                midia = extract_media_kind(body)
+                log("webhook_sem_texto", midia=midia or "desconhecida", phone_tail=phone[-4:], tem_wa_id=bool(wa_id))
+                # Responde ja: transcrever leva segundos e a UAZAPI reenvia o
+                # webhook se o ack demorar.
+                self._send(200, {"ok": True, "status": "media", "kind": midia or "desconhecida"})
+                threading.Thread(
+                    target=handle_media_message,
+                    args=(body, phone, wa_id, midia),
+                    daemon=True,
+                ).start()
                 return
             identity = resolve_identity_by_phone(phone)
             inserted = insert_identity_message(identity, text, "whatsapp", wa_id)
