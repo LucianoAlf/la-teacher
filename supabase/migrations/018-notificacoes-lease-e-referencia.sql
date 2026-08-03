@@ -22,15 +22,61 @@
 -- timeout e escreve 'enviada' por cima de quem já enviou, sem deixar rastro. As
 -- RPCs de conclusão passam a exigir o token.
 --
--- Compatibilidade: `p_lease_token` entra com DEFAULT null e a cerca só age
--- quando o token é passado. Isso existe porque o worker em produção ainda não
--- envia token — sem o default, esta migration derrubaria o briefing no instante
--- em que fosse aplicada. Depois do worker novo no ar, uma migration curta torna
--- o token obrigatório. O conserto do relógio, esse, vale desde já pra todo mundo.
+-- ⚠️ O CORTE ENTRE WORKER ANTIGO E NOVO (revisão do Alfredo, e ele está certo)
+--
+-- A primeira versão desta migration aceitava `p_lease_token is null` como
+-- "modo legado" **sem olhar a linha**. Isso não é compatibilidade, é bypass: o
+-- worker antigo poderia concluir uma linha que o worker novo tinha acabado de
+-- reivindicar, e a cerca inteira viraria enfeite.
+--
+-- A regra correta é a que ele cravou: **token nulo só vale em linha sem token.**
+--
+--     (p_lease_token is null and lease_token is null)   -- legado com legado
+--     or (lease_token = p_lease_token and lease_expira_em > now())
+--
+-- Só que isso, sozinho, quebraria o briefing: se as duas RPCs de claim
+-- passassem a gravar token, TODA linha teria token e o worker antigo — que não
+-- manda token — nunca mais concluiria nada. Por isso quem emite token é
+-- explícito:
+--
+--   • fabio_claim_notificacao_por_referencia  → SEMPRE emite (nasce agora, só o
+--     worker novo consome; não há legado pra proteger);
+--   • fabio_claim_notificacao (briefing)      → emite só com `p_com_token=true`.
+--     O worker em produção não passa esse parâmetro, então continua em linha
+--     sem token e continua funcionando. O worker novo passa, e a partir daí
+--     aquela linha fica cercada — inclusive contra o antigo.
+--
+-- O corte é por linha, não por data: cada notificação passa a ser cercada no
+-- instante em que um worker que entende token a reivindica. Não existe janela
+-- em que uma linha esteja com token e desprotegida.
+--
+-- Fase 2, depois do worker novo no ar: `p_com_token` vira default true e o
+-- caminho de token nulo é removido. O conserto do relógio vale desde já pra
+-- todo mundo, com ou sem token.
 --
 -- ⚠️ ÍNDICE ÚNICO E `ON CONFLICT` SÃO UM CONTRATO SÓ. Em 03/08/2026 o briefing
 --    parou inteiro (42P10) porque o índice mudou e a RPC ficou na chave antiga.
 --    Aqui entra índice novo E RPC nova, juntos.
+
+-- ⚠️ DOIS LANDMINES QUE SÓ APARECERAM RODANDO O TESTE
+--
+-- 1. `create or replace function` com PARÂMETRO NOVO não substitui: **cria uma
+--    sobrecarga**. As duas versões passam a existir, e toda chamada com a
+--    aridade antiga vira ambígua — `42725: function ... is not unique`. Aplicar
+--    sem os DROPs abaixo derrubaria o briefing na hora. Por isso a assinatura
+--    velha é removida explicitamente antes.
+--
+-- 2. DROP leva os GRANTS junto. Estas funções são executadas por `service_role`
+--    e `fabio_agent` (o worker). Sem re-conceder no fim desta migration, o
+--    worker passa a tomar "permission denied" — falha diferente, mesmo
+--    resultado: professor sem briefing.
+
+-- =====================================================================================
+-- 0) Remove as assinaturas antigas. Ver landmine 1.
+-- =====================================================================================
+drop function if exists public.fabio_claim_notificacao(integer, text, text, text, text, text);
+drop function if exists public.fabio_marcar_notificacao_enviada(uuid);
+drop function if exists public.fabio_marcar_notificacao_falhou(uuid, text);
 
 -- =====================================================================================
 -- 1) Colunas do lease. Aditivas e nullable: nenhuma linha existente quebra.
@@ -163,7 +209,8 @@ create or replace function public.fabio_claim_notificacao(
   p_categoria    text,
   p_canal        text,
   p_corpo        text,
-  p_titulo       text default null
+  p_titulo       text default null,
+  p_com_token    boolean default false   -- <<< 018: ver "O CORTE" no cabeçalho
 )
 returns jsonb
 language plpgsql
@@ -172,7 +219,9 @@ set search_path to 'public'
 as $function$
 declare
   v_id    uuid;
-  v_token uuid := gen_random_uuid();   -- <<< 018
+  -- null quando o chamador não entende token: a linha fica sem token e o worker
+  -- antigo consegue concluí-la. Quem passa p_com_token cerca a linha na hora.
+  v_token uuid := case when p_com_token then gen_random_uuid() else null end;  -- <<< 018
 begin
   insert into public.fabio_notificacoes
     (professor_id, tipo, categoria, canal, corpo, titulo, status, tentativas,
@@ -231,8 +280,12 @@ begin
          envio_recibo = coalesce(p_recibo, envio_recibo)
    where id = p_notificacao_id
      and status = 'processando'
-     and (p_lease_token is null                                  -- modo legado
-          or (lease_token = p_lease_token and lease_expira_em > now()));
+     -- O corte: token nulo SÓ vale em linha sem token. Assim que um worker que
+     -- entende token reivindica, o antigo não alcança mais aquela linha.
+     and ((p_lease_token is null and lease_token is null)
+          or (p_lease_token is not null
+              and lease_token = p_lease_token
+              and lease_expira_em > now()));
   get diagnostics v_n = row_count;
   -- false = o trabalho não é mais meu (lease venceu, ou outro worker concluiu).
   -- Quem chamou deve DESCARTAR o que fez, não insistir.
@@ -261,8 +314,11 @@ begin
                                      else proxima_tentativa_em end
    where id = p_notificacao_id
      and status = 'processando'
-     and (p_lease_token is null
-          or (lease_token = p_lease_token and lease_expira_em > now()));
+     -- Mesmo corte da RPC de sucesso: token nulo só vale em linha sem token.
+     and ((p_lease_token is null and lease_token is null)
+          or (p_lease_token is not null
+              and lease_token = p_lease_token
+              and lease_expira_em > now()));
   get diagnostics v_n = row_count;
   return v_n > 0;
 end;
@@ -270,3 +326,15 @@ $function$;
 
 comment on function public.fabio_marcar_notificacao_enviada is
   'Conclui a entrega. Devolve false quando o lease não é mais do chamador — nesse caso, descartar o trabalho, não reenviar.';
+
+-- =====================================================================================
+-- 6) Grants de volta. Ver landmine 2 — o DROP levou os originais
+--    ({postgres, service_role, fabio_agent}), e sem isto o worker toma
+--    "permission denied" na primeira execução.
+-- =====================================================================================
+grant execute on function
+  public.fabio_claim_notificacao(integer, text, text, text, text, text, boolean),
+  public.fabio_claim_notificacao_por_referencia(integer, text, text, text, text, text, text, text, integer),
+  public.fabio_marcar_notificacao_enviada(uuid, uuid, text),
+  public.fabio_marcar_notificacao_falhou(uuid, text, uuid, integer)
+to service_role, fabio_agent;
