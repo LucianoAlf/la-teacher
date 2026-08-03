@@ -82,6 +82,40 @@ const corpos = arquivos.map((a) => {
 
 const alvo = arquivos.join(' + ')
 
+// ── 0) Impressão digital ANTES ──────────────────────────────────────────────
+// O ensaio DELETA o briefing vivo do Matheus três vezes lá dentro. Contar
+// linhas depois não prova nada: poderia voltar a mesma quantidade com id,
+// status, corpo ou recibo diferentes, e o runner imprimiria "intacto". Só
+// baseline idêntico autoriza a palavra "limpo".
+//
+// Escopo = todas as notificações do professor do piloto, que é o único que o
+// teste toca. Se outro processo escrever numa dessas linhas durante os ~2s do
+// ensaio, isto acusa — falso alarme barulhento e re-rodável, que é o lado certo
+// pra errar.
+const SQL_IMPRESSAO = `
+  select json_build_object(
+    'linhas', count(*),
+    'digest', coalesce(md5(string_agg(linha, '|' order by linha)), 'vazio'),
+    'amostra', coalesce(json_agg(left(linha, 240) order by linha), '[]'::json)
+  ) as impressao
+  from (
+    select to_jsonb(n.*)::text as linha
+    from public.fabio_notificacoes n
+    where n.professor_id = 25
+  ) t`
+
+async function impressao() {
+  const r = await consultar(SQL_IMPRESSAO)
+  if (!r.ok) return { erro: r.texto }
+  return Array.isArray(r.dados) ? r.dados[0]?.impressao : { erro: r.texto }
+}
+
+const antes = await impressao()
+if (antes?.erro) {
+  console.error(`✗ não consegui tirar a impressão digital inicial:\n${antes.erro}`)
+  process.exit(2)
+}
+
 // ── 1) O ensaio, numa transação que o runner abre e fecha ────────────────────
 const ensaio = await consultar(['begin;', ...corpos, 'rollback;'].join('\n'))
 
@@ -126,26 +160,38 @@ const residuo = await consultar(`
     'indice_novo',   (select count(*) from pg_indexes
                        where schemaname='public' and indexname='uq_fabio_notif_por_referencia'),
     'linhas_teste',  (select count(*) from public.fabio_notificacoes
-                       where referencia_id like 'teste-%'),
-    'briefing_hoje', (select count(*) from public.fabio_notificacoes
-                       where tipo='briefing_matinal' and dia_referencia=current_date)
+                       where referencia_id like 'teste-%')
   ) as estado`)
 
 if (!residuo.ok) {
-  console.error(`\n✗ não consegui confirmar o rollback:\n${residuo.texto}`)
+  console.error(`\n✗ não consegui conferir os objetos criados pelo ensaio:\n${residuo.texto}`)
   falhou = true
 } else {
   const e = Array.isArray(residuo.dados) ? residuo.dados[0]?.estado : null
-  const sujeira = e
-    ? Object.entries(e).filter(([k, v]) => k !== 'briefing_hoje' && v > 0)
-    : [['resposta inesperada', 1]]
+  const sujeira = e ? Object.entries(e).filter(([, v]) => v > 0) : [['resposta inesperada', 1]]
   if (sujeira.length) {
     console.error(`\n✗ ROLLBACK NÃO LIMPOU — sobrou em produção: ${JSON.stringify(Object.fromEntries(sujeira))}`)
     falhou = true
   } else {
-    console.log(`✓ rollback confirmado em outra conexão — zero resíduo` +
-      ` (briefing de hoje intacto: ${e.briefing_hoje} linha(s))`)
+    console.log('✓ nenhum objeto do ensaio sobrou (coluna, índice, RPC, linhas de teste)')
   }
+}
+
+// ── 3) Impressão digital DEPOIS: as linhas vivas voltaram IDÊNTICAS? ─────────
+const depois = await impressao()
+if (depois?.erro) {
+  console.error(`\n✗ não consegui tirar a impressão digital final:\n${depois.erro}`)
+  falhou = true
+} else if (antes.digest !== depois.digest || antes.linhas !== depois.linhas) {
+  console.error('\n✗ ROLLBACK NÃO RESTAUROU as linhas vivas — o ensaio alterou produção.')
+  console.error(`  antes:  ${antes.linhas} linha(s), digest ${antes.digest}`)
+  console.error(`  depois: ${depois.linhas} linha(s), digest ${depois.digest}`)
+  const so = (a, b) => (a ?? []).filter((x) => !(b ?? []).includes(x))
+  for (const l of so(antes.amostra, depois.amostra)) console.error(`  − ${l}`)
+  for (const l of so(depois.amostra, antes.amostra)) console.error(`  + ${l}`)
+  falhou = true
+} else {
+  console.log(`✓ linhas vivas idênticas antes e depois — ${depois.linhas} linha(s), digest ${depois.digest.slice(0, 12)}…`)
 }
 
 // Sai por process.exitCode, NUNCA por process.exit(): chamar exit() logo depois
