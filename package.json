@@ -11,7 +11,8 @@
     "teste:019": "node scripts/rodar-teste-sql.mjs supabase/migrations/019-presenca-declarada-e-pendencia-por-alvo.sql supabase/migrations/019-presenca-declarada-e-pendencia-por-alvo.test.sql",
     "teste:020": "node scripts/rodar-teste-sql.mjs supabase/migrations/020-devolutiva-aula-fila-e-skill.sql supabase/migrations/020-devolutiva-aula-fila-e-skill.test.sql",
     "teste:020e": "node scripts/rodar-teste-sql.mjs supabase/migrations/020e-retomar-lease-vencido.sql supabase/migrations/020e-retomar-lease-vencido.test.sql",
-    "teste:023": "node scripts/rodar-teste-sql.mjs supabase/migrations/023-devolutiva-oferta-ao-professor.sql supabase/migrations/023-devolutiva-oferta-ao-professor.test.sql"
+    "teste:023": "node scripts/rodar-teste-sql.mjs supabase/migrations/023-devolutiva-oferta-ao-professor.sql supabase/migrations/023-devolutiva-oferta-ao-professor.test.sql",
+    "teste:024": "node scripts/rodar-teste-sql.mjs supabase/migrations/024-devolutiva-tela-do-professor.sql supabase/migrations/024-devolutiva-tela-do-professor.test.sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
