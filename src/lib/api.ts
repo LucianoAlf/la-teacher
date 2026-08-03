@@ -826,3 +826,41 @@ export async function salvarTextoDevolutiva(id: string, texto: string): Promise<
   const { error } = await rpcSolta('app_devolutiva_salvar_texto', { p_id: id, p_texto: texto })
   if (error) throw error
 }
+
+export interface DevolutivaAguardando {
+  id: string
+  aluno_id: number
+  aluno_nome: string
+  aluno_primeiro_nome: string
+  curso: string | null
+  responsavel_nome: string | null
+  /** Idade que está no cadastro — pode ser justamente ela que está errada. */
+  idade_cadastrada: number | null
+  /** Por que o worker não decidiu sozinho. */
+  motivo: string | null
+  aguardando_desde: string
+}
+
+/**
+ * Devolutivas paradas porque o Fábio não soube para quem mandar.
+ * Acontece quando a idade do aluno é impossível — que é exatamente o que uma
+ * data de nascimento quebrada produz.
+ */
+export async function devolutivasAguardando(): Promise<DevolutivaAguardando[]> {
+  const { data: res, error } = await rpcSolta('app_devolutivas_aguardando')
+  if (error) throw error
+  return (res as DevolutivaAguardando[]) ?? []
+}
+
+/** O professor diz para quem mandar; a devolutiva volta pra fila e é reescrita
+ *  para quem vai ler (o texto muda conforme o destinatário). */
+export async function definirDestinatarioDevolutiva(
+  id: string,
+  destinatario: 'responsavel' | 'aluno',
+): Promise<void> {
+  const { error } = await rpcSolta('app_devolutiva_definir_destinatario', {
+    p_id: id,
+    p_destinatario: destinatario,
+  })
+  if (error) throw error
+}

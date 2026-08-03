@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Badge, Button, Card, EmptyState, Toast, useToast } from '../../components/ui'
 import {
+  definirDestinatarioDevolutiva,
+  devolutivasAguardando,
   devolutivasPendentes,
   marcarDevolutiva,
   salvarTextoDevolutiva,
   type AcaoDevolutiva,
+  type DevolutivaAguardando,
   type DevolutivaPendente,
 } from '../../lib/api'
 import { AppFrame } from './AppFrame'
@@ -208,16 +211,99 @@ function CardDevolutiva({
   )
 }
 
+/**
+ * Card de quem ficou travada esperando decisão.
+ *
+ * O Fábio decide o destinatário pela idade — abaixo de 15 fala com o
+ * responsável, acima com o aluno. Quando a idade cadastrada é impossível ele
+ * NÃO chuta: para e pergunta. Sem esta tela a devolutiva ficaria presa pra
+ * sempre, em silêncio, até expirar em 7 dias.
+ */
+function CardAguardando({
+  devolutiva,
+  onAviso,
+  onDecidiu,
+}: {
+  devolutiva: DevolutivaAguardando
+  onAviso: (m: string) => void
+  onDecidiu: (id: string) => void
+}) {
+  const [enviando, setEnviando] = useState(false)
+
+  const decidir = async (destinatario: 'responsavel' | 'aluno') => {
+    setEnviando(true)
+    try {
+      await definirDestinatarioDevolutiva(devolutiva.id, destinatario)
+      onDecidiu(devolutiva.id)
+    } catch {
+      onAviso('Não consegui registrar agora. Tenta de novo?')
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <Card
+      title={devolutiva.aluno_nome}
+      icon="fa-solid fa-circle-question"
+      right={devolutiva.curso ?? undefined}
+    >
+      <div className="space-y-[10px] px-1 py-1">
+        <Badge variant="warn" icon="fa-solid fa-clock">
+          esperando você decidir
+        </Badge>
+        <p className="text-[13px] text-text-secondary">
+          Escrevi a devolutiva, mas não consegui saber para quem mandar
+          {devolutiva.idade_cadastrada !== null
+            ? ` — o cadastro diz ${devolutiva.idade_cadastrada} ano(s), e isso não parece certo`
+            : ''}
+          . Manda para quem?
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={enviando}
+            onClick={() => decidir('responsavel')}
+            className="flex-1 rounded-md border border-brand-text px-3 py-[9px] text-[13px] font-bold text-brand-text disabled:opacity-50"
+          >
+            <i className="fa-solid fa-user-shield" aria-hidden="true" />{' '}
+            {devolutiva.responsavel_nome
+              ? `Para ${devolutiva.responsavel_nome.split(' ')[0]}`
+              : 'Para o responsável'}
+          </button>
+          <button
+            type="button"
+            disabled={enviando}
+            onClick={() => decidir('aluno')}
+            className="flex-1 rounded-md border border-border-subtle px-3 py-[9px] text-[13px] font-bold text-text-primary disabled:opacity-50"
+          >
+            <i className="fa-solid fa-user" aria-hidden="true" /> Para{' '}
+            {devolutiva.aluno_primeiro_nome}
+          </button>
+        </div>
+        <p className="text-[11.5px] text-text-muted">
+          Eu reescrevo o texto para quem vai ler — muda o jeito de falar.
+        </p>
+      </div>
+    </Card>
+  )
+}
+
 /** /app/devolutivas — o que o Fábio escreveu, pro professor conferir e mandar. */
 export default function DevolutivasPage() {
   const { message, visible, show } = useToast()
   const [itens, setItens] = useState<DevolutivaPendente[] | null>(null)
+  const [aguardando, setAguardando] = useState<DevolutivaAguardando[]>([])
   const [erro, setErro] = useState(false)
 
   const carregar = useCallback(async () => {
     setErro(false)
     try {
-      setItens(await devolutivasPendentes())
+      const [pendentes, travadas] = await Promise.all([
+        devolutivasPendentes(),
+        devolutivasAguardando(),
+      ])
+      setItens(pendentes)
+      setAguardando(travadas)
     } catch {
       setErro(true)
       setItens([])
@@ -249,6 +335,20 @@ export default function DevolutivasPage() {
           <p className="py-8 text-center text-[13px] text-text-secondary">Carregando…</p>
         )}
 
+        {/* Primeiro o que depende de uma decisão dele: está bloqueando a
+            devolutiva de sair, e expira em 7 dias se ninguém responder. */}
+        {aguardando.map((d) => (
+          <CardAguardando
+            key={d.id}
+            devolutiva={d}
+            onAviso={show}
+            onDecidiu={(id) => {
+              setAguardando((atual) => atual.filter((x) => x.id !== id))
+              show('Beleza! Vou reescrever para quem vai ler 🎵')
+            }}
+          />
+        ))}
+
         {erro && (
           <Card title="Não consegui carregar" icon="fa-solid fa-triangle-exclamation">
             <div className="p-3">
@@ -259,7 +359,7 @@ export default function DevolutivasPage() {
           </Card>
         )}
 
-        {itens !== null && !erro && itens.length === 0 && (
+        {itens !== null && !erro && itens.length === 0 && aguardando.length === 0 && (
           <Card title="Devolutivas" icon="fa-solid fa-comment-dots">
             <EmptyState
               icon="fa-solid fa-mug-hot"

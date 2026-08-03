@@ -502,9 +502,40 @@ def format_oferta_devolutiva(prof: Dict[str, Any], devolutivas: list[Dict[str, A
     return "\n".join(linhas)
 
 
+DIAS_AGUARDANDO = int(os.getenv("FABIO_DEVOLUTIVA_DIAS_AGUARDANDO", "7"))
+DIAS_ENTREGA_INCERTA = int(os.getenv("FABIO_DEVOLUTIVA_DIAS_ENTREGA_INCERTA", "3"))
+
+
+def manutencao_devolutivas() -> Dict[str, int]:
+    """Fecha os dois becos antes de varrer a fila.
+
+    As RPCs da 025 existem; se ninguém as chamar, os dois estados voltam a ser
+    becos sem saída — que é exatamente o defeito que a 025 veio consertar. Já
+    aconteceu três vezes neste projeto (gancho da 020, ceifar_travadas da
+    020e, timer da oferta): função pronta, chamador nenhum, silêncio total.
+    """
+    resumo = {"expiradas": 0, "incertas": 0}
+    try:
+        resumo["expiradas"] = int(rpc("fabio_devolutiva_expirar_aguardando",
+                                      {"p_dias": DIAS_AGUARDANDO}) or 0)
+    except Exception as exc:
+        log("devolutiva_expirar_falhou", error=str(exc)[:300])
+    try:
+        resumo["incertas"] = int(rpc("fabio_devolutiva_marcar_entrega_incerta",
+                                     {"p_dias": DIAS_ENTREGA_INCERTA}) or 0)
+    except Exception as exc:
+        log("devolutiva_entrega_incerta_falhou", error=str(exc)[:300])
+    if resumo["expiradas"] or resumo["incertas"]:
+        log("devolutiva_manutencao", **resumo)
+    return resumo
+
+
 def run_devolutivas(channel: str, dry_run: bool, professor_id: Optional[int] = None) -> list[Dict[str, Any]]:
     spec_tipo, spec_categoria = "devolutiva_pronta", "informativa"
     resultados: list[Dict[str, Any]] = []
+
+    if not dry_run:
+        manutencao_devolutivas()
 
     grupos = devolutivas_a_oferecer()
     if professor_id is not None:
