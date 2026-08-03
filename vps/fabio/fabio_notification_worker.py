@@ -380,12 +380,28 @@ def claim_notification(pid: int, spec: EventSpec, channel: str, content: str, ti
     return data or {"ok": False, "claimed": False}
 
 
-def mark_sent(notification_id: str) -> None:
-    rpc("fabio_marcar_notificacao_enviada", {"p_notificacao_id": notification_id})
+def mark_sent(notification_id: str, lease_token: Optional[str] = None) -> bool:
+    """Fecha a notificação. Devolve False se a cerca recusou.
+
+    A 018 exige que o token bata: `(p_lease_token is null AND lease_token is
+    null) OR (token confere E lease vivo)`. O claim ANTIGO não escreve token,
+    então chamar sem token funciona lá. O claim POR REFERÊNCIA escreve — e aí
+    chamar sem token não casa com nenhum dos dois lados: zero linhas, e a
+    notificação fica presa em `processando` com a mensagem já entregue.
+    Aconteceu na primeira oferta real (03/08/2026). Por isso o retorno agora é
+    verificado em vez de ignorado.
+    """
+    corpo: Dict[str, Any] = {"p_notificacao_id": notification_id}
+    if lease_token:
+        corpo["p_lease_token"] = lease_token
+    return bool(rpc("fabio_marcar_notificacao_enviada", corpo))
 
 
-def mark_failed(notification_id: str, error: str) -> None:
-    rpc("fabio_marcar_notificacao_falhou", {"p_notificacao_id": notification_id, "p_erro": error[:1000]})
+def mark_failed(notification_id: str, error: str, lease_token: Optional[str] = None) -> bool:
+    corpo: Dict[str, Any] = {"p_notificacao_id": notification_id, "p_erro": error[:1000]}
+    if lease_token:
+        corpo["p_lease_token"] = lease_token
+    return bool(rpc("fabio_marcar_notificacao_falhou", corpo))
 
 
 def deliver(pid: int, channel: str, content: str) -> None:
@@ -547,12 +563,19 @@ def run_devolutivas(channel: str, dry_run: bool, professor_id: Optional[int] = N
             continue
 
         notificacao_id = claim.get("notificacao_id")
+        lease_token = claim.get("lease_token")
         try:
             deliver(pid, channel, corpo)
-            mark_sent(notificacao_id)
+            if not mark_sent(notificacao_id, lease_token):
+                # A mensagem JÁ foi entregue. Não dá pra desfazer, mas o
+                # registro tem que dizer isso alto — senão a casa acha que
+                # nada saiu.
+                log("notificacao_enviada_mas_nao_fechada",
+                    notificacao_id=str(notificacao_id), professor_id=pid)
+                resultado["aviso"] = "entregue_mas_nao_fechada"
         except Exception as exc:
             try:
-                mark_failed(notificacao_id, str(exc))
+                mark_failed(notificacao_id, str(exc), lease_token)
             finally:
                 resultado["status"] = "failed"
                 resultado["error"] = str(exc)[:500]
