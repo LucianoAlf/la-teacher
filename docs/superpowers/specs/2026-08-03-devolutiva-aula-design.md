@@ -1,7 +1,7 @@
 # Devolutiva de aula — design
 
 **Data:** 03/08/2026
-**Status:** design aprovado pelo Alf; revisão do Alfredo incorporada (4 ajustes de contrato: gatilho 1:1, `oferecida` vs `entregue`, lease na fila, projeção family-safe) + 1 achado próprio na conferência (§2.5). Aguardando auditoria do diff antes da migration.
+**Status:** design aprovado pelo Alf. Duas rodadas de auditoria do Alfredo incorporadas — 1ª: gatilho 1:1, `oferecida` vs `entregue`, lease, projeção family-safe. 2ª: conserto na origem (§2.6), fencing do lease (§7.2), `aguardando_destinatario` (§4.5), outbox atômico + recibo (§7.4). Achados próprios na conferência: o ramo 1:1 não checa ausência (§2.5), 100% dos registros não têm a chave `presenca` (§2.6) e o conserto pode travar o piloto se subir fora de ordem (§2.7). Aguardando auditoria do diff antes da migration.
 **Escopo:** primeira fatia do sistema de relatórios do Fábio. As outras três (relatório completo do período, versão pra colar no Emusys, painel de coordenação) ficam para specs próprias.
 
 ---
@@ -69,7 +69,40 @@ Ou seja: numa aula 1:1, um aluno marcado ausente **termina em `gravado_emusys` d
 
 *Nota de nomenclatura:* `gravado_emusys` hoje mente — o texto do Fábio não chega ao campo `anotacoes` do Emusys (auditoria pendente, thread separada). Isso não afeta este design: o que o predicado usa é "o professor confirmou e havia conteúdo", e disso o status é prova. Se o nome do status for corrigido depois, este é um dos pontos a atualizar junto.
 
-### 2.6 Estado hoje
+### 2.6 O conserto na origem vem antes da devolutiva
+
+O predicado do §2.4 protege **a devolutiva**. Ele não conserta o problema — só desvia dele. Na origem continuam duas coisas erradas, e as duas são pré-requisito deste projeto, não consequência dele:
+
+**a) A aula 1:1 do aluno ausente é gravada como aula dada.** O ramo individual da RPC não olha presença: manda para `registrar_aula_fabio` e marca `gravado_emusys`. Uma aula que não aconteceu vira registro pedagógico. A devolutiva não sairia — mas o prontuário do aluno já teria mentido.
+
+**b) Presença faltando vira "presente" por omissão.** Os dois ramos usam `coalesce(campos->>'presenca', 'presente')`. Campo ausente não é tratado como desconhecido: é tratado como presença afirmada.
+
+E o dado é mais duro do que parece:
+
+| Forma | Registros | Com a chave `presenca` |
+|---|---|---|
+| Tronco | 12 | **0** |
+| Fatia | 19 | **0** |
+
+**31 de 31 registros, 100%, nunca tiveram a chave.** Todo `presente` que esse sistema já afirmou foi por `coalesce`, nenhum por evidência. Os 31 são todos anteriores ao patch `ba1ca01` do normalizador do Hermes (13–18/07; nenhum registro novo desde então, férias). Ou seja: **não existe uma única prova em produção de que `campos.presenca` chegue preenchido.** O default nunca foi exercitado contra um registro que carregasse a chave de verdade.
+
+Isso é a mesma família do problema que a gente já matou na presença — lá "não-marcado" virava falta fantasma; aqui "não-informado" vira presença fantasma. Mesma raiz: **ausência de dado sendo lida como afirmação.**
+
+**O contrato do conserto:**
+
+1. Ramo 1:1 passa a checar `presenca = 'ausente'` igual ao de turma: não grava no prontuário, não vira `gravado_emusys`, não enfileira devolutiva.
+2. Chave `presenca` **ausente** deixa de virar `presente`. Vira pendência — o mesmo mecanismo que a turma já usa para fatia sem aluno ou sem texto — com motivo `presença não informada`, e o app pede ao professor que marque.
+3. O ramo 1:1 hoje não tem mecanismo de pendência (ele levanta exceção). Ganha um.
+
+### 2.7 Sequência: esse conserto pode brickar o Confirmar
+
+Se a regra 2 subir antes de existir prova de que o Hermes preenche `campos.presenca`, **toda confirmação vira pendência** — e o Matheus, no piloto, aperta "Confirmar" e não acontece nada. A gente teria trocado um erro silencioso por uma parada barulhenta em cima do único professor que está usando o produto.
+
+**Gate obrigatório:** a regra 2 só sobe depois de um registro real, pós-patch, ser observado com `campos ? 'presenca'` verdadeiro. Até lá sobem só as regras 1 e 3, que não dependem do preenchimento.
+
+Isso não é cautela genérica: é a única parte deste plano que pode derrubar o piloto.
+
+### 2.8 Estado hoje
 
 15 fatias já passaram por esse caminho (13–17/07/2026), todas terminando em `gravado_emusys`. **Zero** raízes 1:1 e **zero** fatias em `confirmado` — ou seja, nem o caminho da aula individual nem o do aluno ausente jamais rodaram em produção. Os dois precisam de teste explícito, não de confiança.
 
@@ -157,7 +190,11 @@ Sem `responsavel_nome`, o texto fala com a família **sem vocativo nominal** ("P
 
 Ao puxar os 6 do Emusys apareceu um caso que o desenho não previa: **Tiago Dos Santos Manoel** estava no LA com nascimento em **18/02/2026** — um bebê de 5 meses matriculado em Canto. No Emusys a data é **18/02/1989**: um adulto de 37 anos. O ano se perdeu na importação.
 
-A lição para este design: `data_nascimento` é confiável para **decidir o destinatário**, mas não é imune a lixo. Idade impossível para o contexto — abaixo de 2 anos, acima de 100 — **não escolhe destinatário sozinha**. Nesses casos o Fábio gera a devolutiva e pergunta ao professor para quem ela vai, em vez de escrever para uma mãe que talvez não exista.
+A lição para este design: `data_nascimento` é confiável para **decidir o destinatário**, mas não é imune a lixo. Idade impossível para o contexto — abaixo de 2 anos, acima de 100 — **não escolhe destinatário sozinha**.
+
+**E isso tem que barrar antes do LLM, não depois.** Se a devolutiva fosse gerada e só então alguém perguntasse para quem ela vai, o texto já teria sido escrito com um vocativo inventado ("Oi, mãe do Tiago") — e o professor receberia uma mensagem pronta que só piora se ele mandar. Pior: cada tentativa queima uma chamada de LLM para produzir algo inútil.
+
+Por isso existe o estado `aguardando_destinatario`: o worker resolve o destinatário **antes** de montar o prompt, e se não conseguir decidir, para ali. O Fábio pergunta ao professor para quem é, e a linha só volta para `pendente` com a resposta. Nada de texto gerado no escuro.
 
 ---
 
@@ -228,11 +265,12 @@ Uma linha por fatia confirmada.
 | `texto_apoio_casa` | text | versão 2 |
 | `skill_id` | uuid → `fabio_skills(id)` | quem escreveu |
 | `skill_versao` | integer | cópia do número da versão, para ler sem join |
-| `status` | text | `pendente` \| `gerando` \| `gerada` \| `oferecida` \| `falhou` \| `descartada` |
-| `lease_token` | uuid | dono do trabalho em `gerando` (§7.3) |
-| `lease_expira_em` | timestamptz | prazo do lease; expirou, volta para `pendente` |
+| `status` | text | `pendente` \| `gerando` \| `aguardando_destinatario` \| `gerada` \| `oferecida` \| `falhou` \| `descartada` |
+| `lease_token` | uuid | dono do trabalho em `gerando`; **toda** escrita exige (§7.2) |
+| `lease_expira_em` | timestamptz | prazo do lease |
+| `proxima_tentativa_em` | timestamptz | backoff real; o claim ignora quem ainda não venceu (§7.2) |
 | `erro` | text | quando `falhou` |
-| `tentativas` | integer | backoff do worker |
+| `tentativas` | integer | contador do backoff |
 | `oferecida_em` | timestamptz | quando o Fábio ofereceu **ao professor** |
 | `copiada_em` | timestamptz | professor copiou o texto |
 | `editada_em` | timestamptz | professor editou antes de mandar (primeira edição) |
@@ -257,16 +295,59 @@ Gerar a devolutiva é chamada de LLM: leva segundos e roda **fora** da transaç�
 O ciclo é:
 
 ```
-pendente ──claim──► gerando ──sucesso──► gerada ──oferta──► oferecida
-   ▲                   │                    │
-   └── lease expirou ──┘                    └── falhou (tentativas++, volta a pendente com backoff)
+pendente ──claim──► gerando ──sucesso──► gerada ──recibo do canal──► oferecida
+   ▲                   │                    
+   │                   ├── falhou ──► pendente, tentativas++, proxima_tentativa_em = now()+backoff
+   │                   │
+   │                   └── idade impossível ──► aguardando_destinatario (§4.5)
+   └── lease expirou (o token velho já não vale nada)
 ```
 
-`fabio_devolutiva_claim(p_worker text, p_lote int)` pega N linhas com `for update skip locked`, marca `gerando`, grava `lease_token` e `lease_expira_em = now() + interval '5 minutes'`, e devolve as linhas. Worker que morre no meio não trava a fila: passados os 5 minutos, a linha volta a ser elegível. É o mesmo desenho de `fabio_claim_notificacao`, que já roda em produção.
+`fabio_devolutiva_claim(p_worker text, p_lote int)` pega N linhas com `for update skip locked`, marca `gerando`, grava um `lease_token` **novo** e `lease_expira_em = now() + interval '5 minutes'`, e devolve as linhas com o token. Mesmo desenho de `fabio_claim_notificacao`, que já roda em produção.
+
+#### O lease sozinho não basta — precisa cercar
+
+Expirar o lease libera a linha, mas **não desarma o worker velho**. O roteiro que quebra:
+
+```
+10:00  worker A dá claim, começa a gerar
+10:05  lease de A expira (A travou numa chamada lenta de LLM)
+10:06  worker B dá claim, gera, grava 'gerada'
+10:07  worker A volta do timeout e grava o texto DELE por cima
+```
+
+O professor recebe um texto que ninguém revisou, produzido por uma execução que o sistema já tinha dado como perdida. E não sobra rastro: os dois escreveram na mesma linha.
+
+**Cerca (fencing):** `claim`, `finish` e `fail` **todos** exigem o `lease_token`. A escrita final é condicional:
+
+```sql
+update fabio_devolutivas
+   set status = 'gerada', ...
+ where id = p_id
+   and lease_token = p_token          -- é meu?
+   and lease_expira_em > now()        -- ainda estou no prazo?
+   and status = 'gerando'
+```
+
+Zero linhas afetadas = **o trabalho não é mais meu**. O worker descarta o que gerou e segue — não tenta de novo, não força. Sem essas três condições juntas, o lease é decoração: ele avisa que o tempo acabou e não impede nada.
+
+#### `proxima_tentativa_em`, senão o backoff é ficção
+
+`tentativas++` sozinho não espaça nada: o próximo tick do timer pega a mesma linha imediatamente e a gente tem uma linha quebrada consumindo LLM a cada minuto. O claim só considera linhas com `proxima_tentativa_em is null or proxima_tentativa_em <= now()`, e o `fail` escreve `now() + backoff(tentativas)`. Passado o teto de tentativas, a linha vai para `falhou` e para de ser reivindicada.
 
 **A oferta tem chave própria.** A notificação da devolutiva usa `referencia_tipo='devolutiva'` + `referencia_id=<devolutiva_id>`, com índice único **por devolutiva**, não por dia. O índice único que existe hoje em `fabio_notificacoes` é `(professor_id, tipo, dia_referencia, canal)` — errado para isto, porque um professor tem várias devolutivas no mesmo dia e o segundo aluno seria engolido pelo primeiro.
 
 > ⚠️ Índice novo = `ON CONFLICT` novo, na mesma leva. Ver o aviso em 7.1.
+
+### 7.4 A oferta nasce junto com o texto, e só conta quando chega
+
+Duas coisas separadas, as duas erradas se ficarem soltas:
+
+**a) O outbox é atômico com `gerada`.** Se o worker marcasse `gerada` e só depois inserisse a notificação, uma queda entre as duas deixaria a devolutiva **pronta e órfã**: texto gerado, ninguém avisado, e nada na fila para reparar — porque `gerada` é estado terminal do worker de geração. Ela sumiria em silêncio, que é o pior jeito de falhar. Então: `status='gerada'` **e** a linha em `fabio_notificacoes` entram **na mesma transação**. Ou existem as duas, ou nenhuma.
+
+**b) `oferecida` só depois do recibo do canal.** Enfileirar não é entregar. `oferecida`/`oferecida_em` são escritos quando o canal confirma o envio — o mesmo recibo que o worker de notificação já usa hoje para escrever `enviada`. Enquanto o WhatsApp não confirmou, o estado é `gerada`, e a fila continua responsável por ela.
+
+O par resolve os dois lados: (a) impede perder devolutiva pronta, (b) impede contar como oferecida uma que nunca saiu.
 
 ### 7.3 `fabio_skills`
 
@@ -299,19 +380,21 @@ app_confirmar_registro
         │                        gravado_emusys, confirmado, não-ausente
         ▼
 fabio_devolutiva_worker.py (VPS, timer systemd user)
-  ├─ claim com lease ──────────► status='gerando' (§7.2)
+  ├─ claim com lease + token ──► status='gerando' (§7.2)
+  ├─ resolve o destinatário PRIMEIRO
+  │     └─ idade impossível ──► aguardando_destinatario e PARA (§4.5)
   ├─ lê a fonte FILTRADA via fn_devolutiva_fonte  ← sem observação (§3.2)
-  ├─ calcula idade de data_nascimento → destinatário
   ├─ carrega fabio_skills ativa de devolutiva_aula
   ├─ gera as DUAS versões numa chamada
-  └─ status='gerada', skill_id/skill_versao
+  └─ numa transação só, com o token ainda válido:
+        status='gerada' + linha em fabio_notificacoes  (§7.4a)
         │
         ▼
 fabio_notification_worker.py, evento devolutiva_pronta
   respeita canal_preferido, silêncio, pausa_ate; único por devolutiva_id
   "Terminei o registro do Gustavo. Quer a devolutiva pra mandar pra mãe dele?"
         │
-        └─ status='oferecida', oferecida_em
+        └─ recibo do canal ──► status='oferecida', oferecida_em  (§7.4b)
         ▼
 professor lê, ajusta se quiser, encaminha
         └─ app carimba copiada_em / editada_em / compartilhada_em / envio_confirmado_em
@@ -352,7 +435,14 @@ O Fábio oferece; não empurra. Vale a preferência que já existe em `fabio_pro
 | **Recado interno vazar para a família** | `fn_devolutiva_fonte` com lista de permissão; `observacao`/`obs_gerais` não chegam ao LLM (§3.2) |
 | **Aula 1:1 ficar invisível** | Predicado por `aluno_id is not null`, não por `parent_id` (§2.3); teste obrigatório do caminho individual |
 | Gatilho pegar aluno ausente | Predicado checa `campos->>'presenca'` explicitamente — o status não protege no ramo 1:1 (§2.5) |
+| **Aula 1:1 do ausente virar registro pedagógico** | Conserto na origem (§2.6) — é pré-requisito, o predicado da devolutiva só desviava |
+| **Presença faltando virar "presente"** | `coalesce` sai; ausência vira pendência. **Gate de sequência em §2.7** — pode travar o Confirmar do piloto |
 | **Devolutiva gerada duas vezes** | Claim com lease de 5 min (§7.2); worker morto libera a linha sozinho |
+| **Worker expirado sobrescrever texto novo** | Fencing: toda escrita exige `lease_token` + lease vivo; zero linhas = o trabalho não é mais meu (§7.2) |
+| **Linha quebrada queimar LLM a cada tick** | `proxima_tentativa_em` com backoff; teto de tentativas leva a `falhou` (§7.2) |
+| **Devolutiva pronta e órfã** (gerada, ninguém avisado) | Outbox atômico com `gerada` — ou as duas, ou nenhuma (§7.4a) |
+| **Contar como oferecida o que não saiu** | `oferecida` só com recibo do canal (§7.4b) |
+| **Texto gerado com vocativo inventado** | Destinatário resolvido antes do prompt; `aguardando_destinatario` barra (§4.5) |
 | **Oferta repetida ao professor** | Índice único da notificação por `devolutiva_id`, não por dia (§7.2) |
 | Texto sair acusatório | Regra escrita na skill + revisão do Alf antes de ligar para qualquer professor além do piloto |
 | LLM inventar fato que não estava no registro | Fonte é a projeção do registro confirmado; a skill proíbe acrescentar conteúdo |
@@ -372,5 +462,9 @@ Piloto com o Matheus, mesmo professor do briefing matinal.
 3. Aluno marcado ausente → **nenhuma** devolutiva. Testar **nos dois ramos**: turma e 1:1 (§2.5) — o 1:1 é o que não tem proteção no status.
 4. **Aula individual gera devolutiva.** Nunca rodou em produção; sem esse teste, o produto pode nascer cego para metade do formato de aula (§2.3).
 5. Um registro com texto na Observação gera devolutiva **sem nenhum traço dele** — comparar o prontuário e a devolutiva lado a lado (§3.2).
-6. O Alf lê os primeiros textos e aprova o tom antes de qualquer professor além do Matheus.
-7. Com os carimbos de §7.1: o professor encaminha sem editar em pelo menos metade dos casos. Se ele reescreve sempre, o texto está errado — não o professor.
+6. **Aula 1:1 com aluno ausente não vira registro no prontuário** — o conserto da origem (§2.6), não só o desvio da devolutiva.
+7. **Registro sem a chave `presenca` vira pendência, não "presente"** — e o gate do §2.7 foi cumprido: existe registro real pós-patch com a chave preenchida **antes** dessa regra subir.
+8. **Fencing:** simular worker expirado voltando depois de outro ter concluído — a escrita velha afeta **zero linhas** e é descartada (§7.2).
+9. **Outbox:** derrubar o worker entre gerar e notificar — não existe devolutiva `gerada` sem linha de notificação (§7.4a).
+10. O Alf lê os primeiros textos e aprova o tom antes de qualquer professor além do Matheus.
+11. Com os carimbos de §7.1: o professor encaminha sem editar em pelo menos metade dos casos. Se ele reescreve sempre, o texto está errado — não o professor.
