@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "teste:018": "node scripts/rodar-teste-sql.mjs supabase/migrations/018-notificacoes-lease-e-referencia.sql supabase/migrations/018-notificacoes-lease-e-referencia.test.sql",
-    "teste:019": "node scripts/rodar-teste-sql.mjs supabase/migrations/019-presenca-declarada-e-pendencia-por-alvo.sql supabase/migrations/019-presenca-declarada-e-pendencia-por-alvo.test.sql"
+    "teste:019": "node scripts/rodar-teste-sql.mjs supabase/migrations/019-presenca-declarada-e-pendencia-por-alvo.sql supabase/migrations/019-presenca-declarada-e-pendencia-por-alvo.test.sql",
+    "teste:020": "node scripts/rodar-teste-sql.mjs supabase/migrations/020-devolutiva-aula-fila-e-skill.sql supabase/migrations/020-devolutiva-aula-fila-e-skill.test.sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
