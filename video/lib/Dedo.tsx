@@ -39,6 +39,23 @@ const MAOS = {
  *  cima pra baixo, que é a que o Alf aprovou como padrão. */
 const Y_VIRA = 700
 
+/**
+ * DESCANSO — onde a mão espera entre um toque e outro: FORA de cena, pelo lado
+ * de onde ela veio.
+ *
+ * Antes ela ia pra um ponto no meio-direito da tela, o que fazia sentido quando
+ * ela só vinha de cima (parada ali, o corpo dela ficava acima do conteúdo).
+ * Com a mão que vem de baixo isso virou defeito: a unha ficava parada na mesma
+ * altura do botão, do lado dele, apontando pro nada por 6 segundos — e lê como
+ * toque errado. O Alf flagrou no "Continuar" da abertura.
+ *
+ * A coreografia continua escrita em Onboarding.tsx com as posições de saída
+ * que ela sempre teve; o que muda é que o `y` delas é substituído aqui, porque
+ * só aqui se sabe de que lado a mão está entrando.
+ */
+const FORA_CIMA = 880 // mão que vem de baixo: desce e some
+const FORA_BAIXO = -80 // mão que vem de cima: sobe e some
+
 export const Dedo: React.FC<{
   keyframes: CursorKeyframe[]
   /** largura da mão em px (no espaço do telefone) */
@@ -49,6 +66,7 @@ export const Dedo: React.FC<{
   if (keyframes.length < 2) return null
 
   const ordenados = [...keyframes].sort((a, b) => a.frame - b.frame)
+  const cliques = ordenados.filter((k) => k.click)
 
   // POUSAR E SEGURAR: depois de apertar, a mão fica no botão POUSADA_F frames
   // (~0,5s) e só então viaja, com VIAGEM_MIN de folga pra não "teleportar".
@@ -65,13 +83,21 @@ export const Dedo: React.FC<{
   // Só o keyframe de SAÍDA (o logo após um clique) é adiado — nunca um clique,
   // senão a mão descasa das mudanças de tela, que são presas a frames fixos.
   // O adiamento respeita o keyframe seguinte, então nada atropela nada.
+  //
+  // E todo keyframe que não é toque vira descanso fora de cena, na direção de
+  // onde a mão veio — a referência é o toque mais recente (o primeiro, se ela
+  // ainda não tocou em nada). Cena sem toque nenhum fica como foi escrita.
   const espacados = ordenados.map((k, i) => {
+    if (k.click) return k
+    const referencia = [...cliques].reverse().find((c) => c.frame <= k.frame) ?? cliques[0]
+    if (!referencia) return k
+    const y = referencia.y >= Y_VIRA ? FORA_CIMA : FORA_BAIXO
     const anterior = ordenados[i - 1]
-    if (!anterior?.click || k.click) return k
+    if (!anterior?.click) return { ...k, y }
     const depois = ordenados[i + 1]
     const desejado = anterior.frame + POUSADA_F + VIAGEM_MIN
     const teto = depois ? depois.frame - 4 : desejado
-    return { ...k, frame: Math.max(k.frame, Math.min(desejado, teto)) }
+    return { ...k, y, frame: Math.max(k.frame, Math.min(desejado, teto)) }
   })
 
   const comPousada: CursorKeyframe[] = []
@@ -108,14 +134,20 @@ export const Dedo: React.FC<{
   const vy = y - anterior.y
   const velocidade = Math.hypot(vx, vy)
 
-  const cliques = ordenados.filter((k) => k.click)
   const noClique = cliques.find((k) => frame >= k.frame && frame <= k.frame + 12)
 
   /**
-   * A VIRADA. `mistura` vai de 0 (mão pra baixo) a 1 (mão pra cima) e troca NO
-   * MEIO da viagem entre um toque e o seguinte, com cross-fade curto. Como as
-   * duas pontas coincidem (x ≈ 0,085) e o pivô do transform é a unha, o giro
-   * acontece em volta da própria ponta e lê como giro de pulso, não como corte.
+   * A VIRADA. `mistura` vai de 0 (mão pra baixo) a 1 (mão pra cima).
+   *
+   * ⚠️ A troca é um CORTE SECO, feito no descanso — com a mão fora de cena.
+   * Eu tinha apostado num cross-fade no meio da viagem, achando que, como as
+   * duas pontas coincidem e o pivô é a unha, ia ler como giro de pulso. Não lê:
+   * as silhuetas são diferentes (punho fechado × dorso da mão), então durante o
+   * cruzamento aparecem DUAS MÃOS na tela. Flagrado no quadro agenda@100.
+   *
+   * Só dá pra cortar assim porque o descanso agora é fora de cena — a mão
+   * some, vira, e volta virada. Se não houver descanso entre os dois toques,
+   * cai no meio da viagem, que é o menos pior.
    */
   const ehCima = (k: CursorKeyframe) => k.y >= Y_VIRA
   const rampa: { frame: number; v: number }[] = []
@@ -125,11 +157,15 @@ export const Dedo: React.FC<{
       const a = ehCima(cliques[i])
       const b = ehCima(cliques[i + 1])
       if (a === b) continue
-      const saida = cliques[i].frame + POUSADA_F
       const chegada = cliques[i + 1].frame
-      const meio = (saida + chegada) / 2
-      rampa.push({ frame: Math.max(saida, Math.min(meio - 4, chegada - 6)), v: a ? 1 : 0 })
-      rampa.push({ frame: Math.min(meio + 4, chegada - 2), v: b ? 1 : 0 })
+      const descanso = espacados.find(
+        (k) => !k.click && k.frame > cliques[i].frame && k.frame < chegada,
+      )
+      const corte = descanso ? descanso.frame : (cliques[i].frame + POUSADA_F + chegada) / 2
+      // Janela de 1 frame: como frame é inteiro, não existe quadro intermediário
+      // — nenhum instante com as duas mãos meio transparentes na tela.
+      rampa.push({ frame: Math.max(cliques[i].frame + 1, corte - 1), v: a ? 1 : 0 })
+      rampa.push({ frame: Math.min(chegada - 1, corte), v: b ? 1 : 0 })
     }
     rampa.push({ frame: rampa[rampa.length - 1].frame + 1, v: rampa[rampa.length - 1].v })
   }
