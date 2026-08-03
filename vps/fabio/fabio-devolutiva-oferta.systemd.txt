@@ -1,0 +1,51 @@
+# Timer da OFERTA da devolutiva ao professor
+#
+# Instalar em ~/.config/systemd/user/ na VPS (usuário fabio, sem sudo):
+#
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now fabio-devolutiva-oferta.timer
+#   systemctl --user list-timers | grep devolutiva
+#
+# POR QUE UM TIMER SÓ PRA ISSO, E NÃO O fabio-notification-worker.timer
+#
+# Já existe um fabio-notification-worker.service com `--event all` e um timer
+# de 5 minutos — mas o timer está `disabled` e nunca rodou (03/08/2026).
+# Ligar aquele resolveria a devolutiva E acionaria a pendência de registro das
+# 18h30, que nunca disparou na vida. Isso mandaria mensagem nova pra todo
+# professor ativo sem ninguém ter pedido. Um timer dedicado liga só o que foi
+# combinado.
+#
+# A devolutiva NÃO tem hora marcada: ela fica pronta quando o professor
+# confirma o registro. Por isso a varredura de 5 em 5 minutos, e por isso o
+# evento passa longe do is_due().
+#
+# Duas travas impedem oferecer duas vezes, e as duas são exercidas por
+# `npm run teste:023`:
+#   1. fabio_claim_notificacao_por_referencia (018) — índice único parcial
+#   2. fabio_devolutiva_oferecida (023) — carimbo atômico gerada -> oferecida
+
+# ─── ~/.config/systemd/user/fabio-devolutiva-oferta.service ─────────────────
+[Unit]
+Description=Fabio — oferece ao professor as devolutivas prontas
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+EnvironmentFile=/home/fabio/.hermes/.env
+ExecStart=/usr/bin/flock -n /tmp/fabio-devolutiva-oferta.lock /usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event devolutiva --channel whatsapp --json
+StandardOutput=append:/home/fabio/.hermes/logs/fabio-devolutiva-oferta.out.log
+StandardError=append:/home/fabio/.hermes/logs/fabio-devolutiva-oferta.err.log
+
+# ─── ~/.config/systemd/user/fabio-devolutiva-oferta.timer ───────────────────
+[Unit]
+Description=Varre a fila de devolutivas prontas a cada 5 minutos
+
+[Timer]
+OnCalendar=*:0/5
+AccuracySec=30s
+Persistent=false
+Unit=fabio-devolutiva-oferta.service
+
+[Install]
+WantedBy=timers.target

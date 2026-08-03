@@ -436,9 +436,152 @@ def run_event(event: str, prof: Dict[str, Any], channel: str, dry_run: bool, tar
     return result
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Devolutiva pronta — o único evento que NÃO tem hora marcada.
+#
+# briefing e pendência disparam por relógio (is_due(agora, "08:00", janela)).
+# A devolutiva fica pronta quando o professor confirma o registro, a qualquer
+# hora do dia. Por isso ela é uma varredura de fila e passa longe do is_due.
+#
+# A trava contra oferecer duas vezes é dupla, de propósito:
+#   1. fabio_claim_notificacao_por_referencia (018) — índice único parcial na
+#      referência devolutiva:<id>. Dois workers no mesmo ciclo: só um reivindica.
+#   2. fabio_devolutiva_oferecida (023) — carimba oferecida_em movendo
+#      gerada -> oferecida, e devolve ok=false se alguém chegou antes.
+# O timer roda de 5 em 5 minutos; sem isso o professor levaria a mesma
+# mensagem a cada ciclo, pra sempre.
+
+
+def devolutivas_a_oferecer(limite: int = 50) -> list[Dict[str, Any]]:
+    data = rpc("fabio_devolutivas_a_oferecer", {"p_limite": int(limite)})
+    return data if isinstance(data, list) else []
+
+
+def format_oferta_devolutiva(prof: Dict[str, Any], devolutivas: list[Dict[str, Any]]) -> str:
+    """Monta o aviso. NÃO carrega o texto da devolutiva.
+
+    A RPC nem devolve texto_normal — o professor lê e edita no app, onde ele
+    vê o que vai sair antes de mandar. Despejar o texto aqui faria a versão do
+    WhatsApp virar a versão real, sem passagem pela tela de revisão.
+    """
+    nome = first_name(prof)
+    quantas = len(devolutivas)
+    plural = "as devolutivas" if quantas > 1 else "a devolutiva"
+    aulas = f"*{quantas} aulas*" if quantas > 1 else "*1 aula*"
+
+    linhas = [f"Oi, {nome}! 🎵", "", f"Escrevi {plural} de {aulas} de hoje:", ""]
+    for d in devolutivas:
+        aluno = (d.get("aluno_nome") or "Aluno").strip()
+        para = (d.get("destinatario_nome") or "").strip()
+        if para:
+            linhas.append(f"👤 *{aluno}* → para {para}")
+        else:
+            linhas.append(f"👤 *{aluno}*")
+    linhas += [
+        "",
+        "Abre o app em *Devolutivas* pra ler, ajustar o que quiser e compartilhar.",
+        "",
+        "Eu escrevi, mas quem manda é você. 😉",
+    ]
+    return "\n".join(linhas)
+
+
+def run_devolutivas(channel: str, dry_run: bool, professor_id: Optional[int] = None) -> list[Dict[str, Any]]:
+    spec_tipo, spec_categoria = "devolutiva_pronta", "informativa"
+    resultados: list[Dict[str, Any]] = []
+
+    grupos = devolutivas_a_oferecer()
+    if professor_id is not None:
+        grupos = [g for g in grupos if int(g.get("professor_id") or 0) == int(professor_id)]
+    if not grupos:
+        return resultados
+
+    por_id = {int(p["id"]): p for p in active_professors()}
+
+    for grupo in grupos:
+        pid = int(grupo.get("professor_id") or 0)
+        devolutivas = grupo.get("devolutivas") or []
+        resultado: Dict[str, Any] = {
+            "professor_id": pid, "event": "devolutiva", "tipo": spec_tipo,
+            "quantas": len(devolutivas), "status": "init",
+        }
+        prof = por_id.get(pid)
+        if not prof:
+            resultado["status"] = "professor_inativo_skip"
+            resultados.append(resultado)
+            continue
+        if channel == "whatsapp" and not bridge.canonical_phone(prof.get("telefone_whatsapp") or ""):
+            resultado["status"] = "missing_phone_skip"
+            resultados.append(resultado)
+            continue
+        if not can_notify(pid, spec_categoria) and not dry_run:
+            resultado["status"] = "blocked_by_preferences"
+            resultados.append(resultado)
+            continue
+
+        corpo = format_oferta_devolutiva(prof, devolutivas)
+        if dry_run:
+            resultado["status"] = "dry_run_ready"
+            resultado["content_preview"] = corpo
+            resultados.append(resultado)
+            continue
+
+        # A referência é a PRIMEIRA devolutiva do lote. Um aviso cobre várias,
+        # mas cada uma é carimbada individualmente logo abaixo — quem entrar na
+        # fila depois deste envio vira o lote do próximo ciclo.
+        referencia_id = str(devolutivas[0]["id"])
+        claim = rpc("fabio_claim_notificacao_por_referencia", {
+            "p_professor_id": pid,
+            "p_tipo": spec_tipo,
+            "p_categoria": spec_categoria,
+            "p_canal": channel,
+            "p_corpo": corpo,
+            "p_referencia_tipo": "devolutiva",
+            "p_referencia_id": referencia_id,
+            "p_titulo": "Devolutiva pronta",
+            "p_lease_minutos": 10,
+        }) or {}
+        if not claim.get("claimed"):
+            resultado["status"] = "already_claimed_or_sent"
+            resultados.append(resultado)
+            continue
+
+        notificacao_id = claim.get("notificacao_id")
+        try:
+            deliver(pid, channel, corpo)
+            mark_sent(notificacao_id)
+        except Exception as exc:
+            try:
+                mark_failed(notificacao_id, str(exc))
+            finally:
+                resultado["status"] = "failed"
+                resultado["error"] = str(exc)[:500]
+            resultados.append(resultado)
+            continue
+
+        # Enviou: carimba cada devolutiva do lote. Se o carimbo falhar, a
+        # devolutiva volta na próxima varredura — o claim por referência é que
+        # impede o professor de receber o aviso repetido.
+        carimbadas = 0
+        for d in devolutivas:
+            try:
+                if (rpc("fabio_devolutiva_oferecida", {
+                    "p_id": str(d["id"]),
+                    "p_notificacao_id": notificacao_id,
+                }) or {}).get("ok"):
+                    carimbadas += 1
+            except Exception as exc:
+                log("devolutiva_carimbo_falhou", devolutiva_id=str(d.get("id")), error=str(exc)[:300])
+        resultado["status"] = "sent"
+        resultado["carimbadas"] = carimbadas
+        resultados.append(resultado)
+
+    return resultados
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--event", choices=["briefing", "pendencia", "all"], default="all")
+    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "all"], default="all")
     parser.add_argument("--professor-id", type=int)
     parser.add_argument("--channel", choices=["whatsapp", "app"], default=DEFAULT_CHANNEL)
     parser.add_argument("--dry-run", action="store_true")
@@ -450,19 +593,32 @@ def main() -> int:
 
     now = datetime.now(BRT)
     target_date = args.date or now.date().isoformat()
-    selected = ["briefing", "pendencia"] if args.event == "all" else [args.event]
+    selected = ["briefing", "pendencia", "devolutiva"] if args.event == "all" else [args.event]
+
+    results = []
+
+    # A devolutiva sai da lógica de horário: varre a fila sempre que rodar.
+    if "devolutiva" in selected:
+        try:
+            devolutiva_results = run_devolutivas(args.channel, args.dry_run, args.professor_id)
+        except Exception as exc:
+            devolutiva_results = [{"event": "devolutiva", "status": "error", "error": str(exc)[:500]}]
+        for r in devolutiva_results:
+            log("event_result", **r)
+        results.extend(devolutiva_results)
+
+    por_relogio = [e for e in selected if e in EVENTS]
     due_events = []
-    for event in selected:
+    for event in por_relogio:
         spec = EVENTS[event]
         if args.force or is_due(now, spec.target_time, args.window_minutes):
             due_events.append(event)
-    if not due_events:
+    if not due_events and not results:
         payload = {"ok": True, "status": "nothing_due", "now_brt": now.isoformat(), "events_checked": selected}
         print(json.dumps(payload, ensure_ascii=False) if args.json else payload)
         return 0
 
-    rows = active_professors(args.professor_id)
-    results = []
+    rows = active_professors(args.professor_id) if due_events else []
     for prof in rows:
         # WhatsApp delivery needs a phone. App delivery can work without phone.
         if args.channel == "whatsapp" and not bridge.canonical_phone(prof.get("telefone_whatsapp") or ""):
