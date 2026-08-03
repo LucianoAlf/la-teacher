@@ -1,7 +1,7 @@
 # Devolutiva de aula — design
 
 **Data:** 03/08/2026
-**Status:** design aprovado pelo Alf. Quatro rodadas de auditoria do Alfredo incorporadas — 4ª (relatório `fabio-devolutiva-auditoria-2026-08-03.md`): predicado passa a **falhar fechado** (§2.4 — a versão anterior carregava o mesmo `coalesce` que a spec condena), enum obrigatório no produtor e pendência com contrato genérico por alvo (§2.8), claim na entrega + `entrega_incerta` em vez de reenvio automático (§7.4c), `destinatario_override` separado da inferência (§4.5). 3ª: o cliente repete a mentira da presença (§2.7), a pendência não tem resposta possível na tela (§2.8), idempotência entre envio e recibo (§7.4c), saída durável de `aguardando_destinatario` (§4.5). Anteriores — 1ª: gatilho 1:1, `oferecida` vs `entregue`, lease, projeção family-safe. 2ª: conserto na origem (§2.6), fencing do lease (§7.2), `aguardando_destinatario` (§4.5), outbox atômico + recibo (§7.4). Achados próprios na conferência: o ramo 1:1 não checa ausência (§2.5), 100% dos registros não têm a chave `presenca` (§2.6) e o conserto pode travar o piloto se subir fora de ordem (§2.7). Aguardando auditoria do diff antes da migration.
+**Status:** design aprovado pelo Alf; **liberado para implementação** após a 5ª rodada. 5ª: o claim da entrega ganhou casa no schema (§7.5) — ao procurar o lease de `fabio_notificacoes` para apontar, descobriu-se que ele não existe: claim por status, janela medindo `criado_em` em vez da hora do claim, sem token, e `ON CONFLICT` que não cobre tipo novo. Cinco rodadas de auditoria do Alfredo incorporadas — 4ª (relatório `fabio-devolutiva-auditoria-2026-08-03.md`): predicado passa a **falhar fechado** (§2.4 — a versão anterior carregava o mesmo `coalesce` que a spec condena), enum obrigatório no produtor e pendência com contrato genérico por alvo (§2.8), claim na entrega + `entrega_incerta` em vez de reenvio automático (§7.4c), `destinatario_override` separado da inferência (§4.5). 3ª: o cliente repete a mentira da presença (§2.7), a pendência não tem resposta possível na tela (§2.8), idempotência entre envio e recibo (§7.4c), saída durável de `aguardando_destinatario` (§4.5). Anteriores — 1ª: gatilho 1:1, `oferecida` vs `entregue`, lease, projeção family-safe. 2ª: conserto na origem (§2.6), fencing do lease (§7.2), `aguardando_destinatario` (§4.5), outbox atômico + recibo (§7.4). Achados próprios na conferência: o ramo 1:1 não checa ausência (§2.5), 100% dos registros não têm a chave `presenca` (§2.6) e o conserto pode travar o piloto se subir fora de ordem (§2.7). Aguardando auditoria do diff antes da migration.
 **Escopo:** primeira fatia do sistema de relatórios do Fábio. As outras três (relatório completo do período, versão pra colar no Emusys, painel de coordenação) ficam para specs próprias.
 
 ---
@@ -343,7 +343,7 @@ Uma linha por fatia confirmada.
 | `skill_id` | uuid → `fabio_skills(id)` | quem escreveu |
 | `skill_versao` | integer | cópia do número da versão, para ler sem join |
 | `status` | text | `pendente` \| `gerando` \| `aguardando_destinatario` \| `gerada` \| `oferecida` \| `entrega_incerta` \| `falhou` \| `descartada` |
-| `lease_token` | uuid | dono do trabalho em `gerando`; **toda** escrita exige (§7.2) |
+| `lease_token` | uuid | dono da **geração** (`gerando`); toda escrita exige (§7.2). O lease da **entrega** mora em `fabio_notificacoes` (§7.5) |
 | `lease_expira_em` | timestamptz | prazo do lease |
 | `proxima_tentativa_em` | timestamptz | backoff real; o claim ignora quem ainda não venceu (§7.2) |
 | `aguardando_desde` | timestamptz | quando entrou em `aguardando_destinatario`; sustenta o prazo de 7 dias (§4.5) |
@@ -462,7 +462,51 @@ A garantia que este desenho oferece, escrita sem enfeite: **no máximo um envio 
 
 Sem isso, `oferecida` só descreve o que a gente **conseguiu anotar** — não o que o professor **recebeu**. As duas coisas divergem exatamente nas falhas, que é quando a informação importa.
 
-### 7.3 `fabio_skills`
+### 7.5 O claim da entrega: onde ele mora de verdade
+
+A auditoria pediu para o claim/token da entrega ficar explícito no schema **ou** apontar para o lease que já existe em `fabio_notificacoes`. Fui conferir se dava pra apontar. **Não dá: não existe lease lá.**
+
+`fabio_claim_notificacao` reivindica por **troca de status** (`'processando'`), e a janela de reivindicação é esta:
+
+```sql
+or (fabio_notificacoes.status = 'processando'
+    and fabio_notificacoes.criado_em < now() - interval '10 minutes')
+```
+
+Três problemas, em ordem de gravidade:
+
+**a) O relógio está errado.** A janela mede `criado_em` — quando a **linha nasceu** — e não quando ela foi reivindicada. Uma notificação criada há 11 minutos e reivindicada há 5 segundos já é considerada abandonada: o worker seguinte a rouba na hora, com o primeiro ainda enviando. Não é uma corrida improvável, é o comportamento normal de qualquer linha que passou dez minutos na fila.
+
+**b) Não há token, então não há cerca.** Nada impede o worker antigo de escrever `enviada` depois que o novo já enviou. Os dois escrevem na mesma linha e não sobra rastro — é o mesmo defeito que a auditoria da rodada 2 apontou na devolutiva, vivo aqui desde sempre.
+
+**c) A chave de deduplicação não cobre um tipo novo.** O `on conflict` mira o índice parcial `where tipo in ('briefing_matinal','pendencia_registro')`. Uma linha `devolutiva_pronta` simplesmente **nunca conflita** — insere de novo a cada tentativa, sem dedupe nenhum.
+
+Ou seja: a promessa do §7.4c não tinha casa, e a casa que eu ia apontar tem o mesmo buraco.
+
+#### O contrato
+
+**Uma dona só do fato "esta entrega está sendo tentada": `fabio_notificacoes`.** É lá que a entrega acontece; duplicar lease em `fabio_devolutivas` criaria dois donos da mesma verdade, que é como se perde a coerência.
+
+Colunas novas em `fabio_notificacoes` (aditivas, nenhuma quebra):
+
+| Coluna | Papel |
+|---|---|
+| `lease_token` | uuid do dono da tentativa; **toda** escrita de conclusão exige |
+| `lease_expira_em` | prazo real — carimbado **na reivindicação**, não na criação |
+| `proxima_tentativa_em` | backoff; o claim ignora quem ainda não venceu |
+| `envio_recibo` | id da mensagem devolvido pelo canal (§7.4c) |
+
+E os índices/RPCs:
+
+1. **Índice único parcial novo** para notificação de referência: `(referencia_tipo, referencia_id, canal) where referencia_tipo = 'devolutiva'`. A chave atual é por dia, e um professor tem várias devolutivas no mesmo dia.
+2. **RPC própria** `fabio_claim_notificacao_por_referencia(...)`, com `ON CONFLICT` nesse índice. Não dá pra reaproveitar a RPC atual: **um `INSERT` só tem um alvo de conflito**, e os dois tipos de chave são incompatíveis.
+3. **`fabio_claim_notificacao` é corrigida na mesma leva** — `lease_expira_em` no lugar de `criado_em`, token exigido na conclusão. O briefing sofre do mesmo defeito hoje, e já caiu uma vez por conta de contrato de chave (03/08). Consertar só o caminho novo deixaria o caminho antigo quebrado com a desculpa de que "sempre foi assim".
+
+> ⚠️ Índice novo = `ON CONFLICT` novo, **na mesma leva**. Já custou o briefing inteiro uma vez (`42P10`). E a mudança de `fabio_claim_notificacao` roda no harness de `BEGIN; … ROLLBACK;` com duas conexões simultâneas antes de ser aplicada — claim é código de concorrência, e concorrência não se testa lendo.
+
+`fabio_devolutivas.envio_chave` continua onde está: ela é a chave de idempotência **daquela devolutiva**, o que a linha de notificação não pode saber. O recibo mora nas duas: em `fabio_notificacoes` como fato do transporte, e espelhado em `fabio_devolutivas.envio_recibo` como prova ligada à devolutiva.
+
+### 7.6 `fabio_skills`
 
 | Coluna | Tipo | Papel |
 |---|---|---|
@@ -553,7 +597,9 @@ O Fábio oferece; não empurra. Vale a preferência que já existe em `fabio_pro
 | **Professor endossar presença que ninguém apurou** | O selo para de dizer "presente" sem evidência; a pergunta vai pro card do aluno, antes do Confirmar (§2.7, §2.8) |
 | **Pendência sem resposta possível na tela** | Payload por `registro_id` (serve fatia e 1:1) + ação Esteve/Faltou; hoje é `<li>` sem botão (§2.8) |
 | **Predicado deixar passar quem nunca foi marcado presente** | `= 'presente'`, nunca `<> 'ausente'`. Falha fechada no predicado **e** no outbox (§2.4) |
-| **Mesma devolutiva enviada duas vezes** | Claim/token na entrega + chave reservada antes do envio + recibo do canal; ambiguidade vira `entrega_incerta`, não reenvio (§7.4c) |
+| **Mesma devolutiva enviada duas vezes** | Claim/token na entrega, com colunas reais em `fabio_notificacoes` (§7.5) + chave reservada antes do envio; ambiguidade vira `entrega_incerta`, não reenvio (§7.4c) |
+| **Worker roubar entrega que outro está fazendo** | Hoje a janela de reivindicação mede `criado_em`, não a hora do claim — qualquer linha com mais de 10 min é roubável na hora. Passa a medir `lease_expira_em` (§7.5a) |
+| **Notificação de devolutiva sem deduplicação** | O `ON CONFLICT` atual só cobre `briefing_matinal`/`pendencia_registro`; um tipo novo nunca conflita e insere a cada tentativa. Índice parcial + RPC próprios (§7.5c) |
 | **Decisão do professor sobre destinatário ser sobrescrita** | `destinatario_override` em campo separado da inferência, com origem e recibo (§4.5) |
 | **Devolutiva presa em `aguardando_destinatario` pra sempre** | Pergunta com recibo, resposta que grava decisão, prazo de 7 dias e visibilidade na auditoria (§4.5) |
 | **Devolutiva gerada duas vezes** | Claim com lease de 5 min (§7.2); worker morto libera a linha sozinho |
@@ -588,7 +634,8 @@ Piloto com o Matheus, mesmo professor do briefing matinal.
 7c. **Registro sem presença declarada não enfileira devolutiva** — nem com a chave ausente, nem com valor estranho. Só `= 'presente'` passa (§2.4).
 7d0. **Enviar e falhar ao anotar não duplica a mensagem:** matar o worker entre o envio e a escrita de `oferecida`; no retry o professor **não** recebe de novo — a linha vira `entrega_incerta` e aparece na auditoria (§7.4c).
 7d. **`aguardando_destinatario` tem saída:** a pergunta sai com recibo, a resposta devolve à fila, e passados 7 dias sem resposta a linha vira `descartada` — nunca fica parada em silêncio (§4.5).
-8. **Fencing:** simular worker expirado voltando depois de outro ter concluído — a escrita velha afeta **zero linhas** e é descartada (§7.2).
+8. **Fencing da geração:** simular worker expirado voltando depois de outro ter concluído — a escrita velha afeta **zero linhas** e é descartada (§7.2).
+8b. **Fencing da entrega, com duas conexões de verdade:** `BEGIN; … ROLLBACK;` em duas sessões simultâneas provando que (i) o segundo worker **não** rouba uma linha reivindicada há segundos, mesmo que a linha tenha nascido há mais de 10 minutos; (ii) o worker velho não consegue escrever conclusão sem o token vigente (§7.5). Claim é código de concorrência — ler o SQL não prova nada.
 9. **Outbox:** derrubar o worker entre gerar e notificar — não existe devolutiva `gerada` sem linha de notificação (§7.4a).
 10. O Alf lê os primeiros textos e aprova o tom antes de qualquer professor além do Matheus.
 11. Com os carimbos de §7.1: o professor encaminha sem editar em pelo menos metade dos casos. Se ele reescreve sempre, o texto está errado — não o professor.
