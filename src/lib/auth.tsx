@@ -1,6 +1,31 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { Session } from '@supabase/supabase-js'
+import type { AuthError, Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+
+/**
+ * Por que o login precisa distinguir tipo de falha (03/08/2026):
+ *
+ * O app dizia "E-mail ou senha incorretos" pra QUALQUER erro — inclusive pra
+ * "não consegui falar com o servidor". No primeiro dia do piloto a internet do
+ * Matheus oscilou, ele leu que a senha estava errada e passou meia hora
+ * caçando senha. Eu também: fui atrás de senha salva no navegador. O problema
+ * era rede, e ele resolveu reiniciando o note.
+ *
+ * Uma mensagem de erro que chuta a causa custa mais caro que uma que admite não
+ * saber. Aqui a gente classifica antes de falar.
+ */
+export type FalhaLogin = 'credenciais' | 'conexao' | 'muitas_tentativas' | 'inesperado'
+
+export function classificarFalhaAuth(error: AuthError): FalhaLogin {
+  // Navegador já sabe que está sem rede: não precisa nem olhar o erro.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'conexao'
+  // Sem rede o supabase-js nem chega no servidor — devolve AuthRetryableFetchError,
+  // que vem sem status HTTP (ou com 0). Isso NÃO é senha errada.
+  if (error.name === 'AuthRetryableFetchError' || !error.status) return 'conexao'
+  if (error.status === 429) return 'muitas_tentativas'
+  if (error.status === 400 || error.status === 401 || error.status === 422) return 'credenciais'
+  return 'inesperado'
+}
 
 interface AuthValue {
   session: Session | null
@@ -17,7 +42,7 @@ interface AuthValue {
   recuperacao: boolean
   /** Chamado quando a senha nova já foi salva: a viagem de recuperação acabou. */
   encerrarRecuperacao: () => void
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  signIn: (email: string, password: string) => Promise<{ falha: FalhaLogin | null }>
   signOut: () => Promise<void>
 }
 
@@ -67,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error ? error.message : null }
+    return { falha: error ? classificarFalhaAuth(error) : null }
   }
 
   async function signOut() {

@@ -1,9 +1,21 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/ui'
-import { useAuth } from '../../lib/auth'
+import { classificarFalhaAuth, useAuth, type FalhaLogin } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { CapaLogin, FaixaCapa, RotuloCapa, campoCapa, campoCapaStyle } from './CapaLogin'
+
+/**
+ * Cada falha tem a sua frase, e cada frase leva a uma ação diferente: conferir
+ * a senha, conferir a internet, esperar. Uma frase só pra tudo manda o
+ * professor procurar no lugar errado — foi o que aconteceu no piloto.
+ */
+const RECADO: Record<FalhaLogin, string> = {
+  credenciais: 'E-mail ou senha incorretos. Confere e tenta de novo.',
+  conexao: 'Não consegui falar com o servidor. Confere a internet e tenta de novo.',
+  muitas_tentativas: 'Muitas tentativas seguidas. Espera um minutinho e tenta de novo.',
+  inesperado: 'Deu um problema do nosso lado. Tenta de novo em um minutinho.',
+}
 
 /**
  * /app/login — entrar, e pedir link de nova senha.
@@ -31,10 +43,10 @@ export default function LoginPage() {
     e.preventDefault()
     setErro(null)
     setEnviando(true)
-    const { error } = await signIn(email.trim(), senha)
+    const { falha } = await signIn(email.trim(), senha)
     setEnviando(false)
-    if (error) {
-      setErro('E-mail ou senha incorretos. Confere e tenta de novo.')
+    if (falha) {
+      setErro(RECADO[falha])
       return
     }
     navigate('/app', { replace: true })
@@ -50,7 +62,15 @@ export default function LoginPage() {
     })
     setEnviando(false)
     if (error) {
-      setErro('Não consegui enviar agora. Tenta de novo em um minutinho.')
+      // Mesmo cuidado do login: sem rede não é "não consegui enviar", é "não
+      // cheguei a tentar". Mas aqui não existe senha errada — 'credenciais'
+      // num pedido de link só pode ser e-mail malformado.
+      const falha = classificarFalhaAuth(error)
+      setErro(
+        falha === 'credenciais'
+          ? 'Confere se o e-mail está escrito certo.'
+          : RECADO[falha],
+      )
       return
     }
     // Resposta idêntica exista ou não a conta: quem digita um e-mail alheio não
