@@ -35,13 +35,16 @@ const fonte = readFileSync(resolve(root, 'video/Onboarding.tsx'), 'utf-8')
 // envelhecem calados. Leio da fonte.
 const dedoSrc = readFileSync(resolve(root, 'video/lib/Dedo.tsx'), 'utf-8')
 const Y_VIRA = Number(dedoSrc.match(/^const Y_VIRA = (\d+)/m)?.[1])
+const X_VIRA = Number(dedoSrc.match(/^const X_VIRA = (\d+)/m)?.[1])
 const TAMANHO = Number(dedoSrc.match(/tamanho = (\d+)/)?.[1])
-const cmp = dedoSrc.match(/const ehCima = \(k: CursorKeyframe\) => k\.y (<|>=) Y_VIRA/)?.[1]
 const maosBloco = dedoSrc.slice(dedoSrc.indexOf('const MAOS = {'))
 // eslint-disable-next-line no-eval
 const MAOS = eval(`(${maosBloco.slice(maosBloco.indexOf('{'), maosBloco.indexOf('} as const') + 1).replace(/\/\/[^\n]*/g, '')})`)
-if (!Y_VIRA || !TAMANHO || !cmp || !MAOS?.cima) throw new Error('não li a geometria da mão no Dedo.tsx')
-const ehCima = (y) => (cmp === '<' ? y < Y_VIRA : y >= Y_VIRA)
+if (!Y_VIRA || !X_VIRA || !TAMANHO || Object.keys(MAOS ?? {}).length !== 4) {
+  throw new Error('não li a geometria das quatro mãos no Dedo.tsx')
+}
+/** Mesma regra do Dedo.tsx: o dedo aponta pra fora, o corpo fica pro centro. */
+const maoDe = (x, y) => `${y < Y_VIRA ? 'cima' : 'baixo'}-${x > X_VIRA ? 'dir' : 'esq'}`
 
 // A tela do telefone, em coordenadas do conteúdo (o mesmo espaço dos keyframes).
 const TELA_W = 410
@@ -49,13 +52,13 @@ const TELA_H = 816
 
 /** Retângulo que a mão ocupa quando a ponta está em (x,y). */
 function caixaDaMao(x, y) {
-  const m = ehCima(y) ? MAOS.cima : MAOS.baixo
-  const largura = TAMANHO
+  const qual = maoDe(x, y)
+  const m = MAOS[qual]
   const altura = TAMANHO / m.razao
   return {
-    qual: ehCima(y) ? 'cima' : 'baixo',
-    esq: x - m.pontaX * largura,
-    dir: x - m.pontaX * largura + largura,
+    qual,
+    esq: x - m.pontaX * TAMANHO,
+    dir: x - m.pontaX * TAMANHO + TAMANHO,
     topo: y - m.pontaY * altura,
     base: y - m.pontaY * altura + altura,
   }
@@ -146,19 +149,24 @@ for (const c of cenas) {
  * folhas de contato e julguei que estava bom; o Alf reprovou e estava certo.
  * Julgamento meu não serve aqui, então virou conta.
  */
-const vazando = alvos.filter((a) => a.caixa.topo < -2 || a.caixa.base > TELA_H + 2)
+const vazando = alvos.filter(
+  (a) =>
+    a.caixa.topo < -2 || a.caixa.base > TELA_H + 2 || a.caixa.esq < -2 || a.caixa.dir > TELA_W + 2,
+)
 if (vazando.length) {
-  console.error(`\n❌ ${vazando.length} toque(s) com a mão saindo da tela (0..${TELA_H}):`)
+  console.error(`\n❌ ${vazando.length} toque(s) com a mão saindo da tela (${TELA_W}×${TELA_H}):`)
   for (const a of vazando) {
     console.error(
-      `   ${a.nome.padEnd(16)} alvo y=${a.alvoY} · mão ${a.caixa.qual} ocupa ` +
-        `${a.caixa.topo.toFixed(0)}..${a.caixa.base.toFixed(0)}`,
+      `   ${a.nome.padEnd(16)} alvo (${a.alvoX},${a.alvoY}) · mão ${a.caixa.qual} ocupa ` +
+        `x ${a.caixa.esq.toFixed(0)}..${a.caixa.dir.toFixed(0)} · ` +
+        `y ${a.caixa.topo.toFixed(0)}..${a.caixa.base.toFixed(0)}`,
     )
   }
-  console.error('\nNÃO renderizar — corrigir Y_VIRA/tamanho ou a altura do alvo.\n')
+  console.error('\nNÃO renderizar — corrigir X_VIRA/Y_VIRA/tamanho ou a posição do alvo.\n')
   process.exit(1)
 }
-console.log(`mão dentro da tela nos ${alvos.length} toques ✅`)
+const usadas = [...new Set(alvos.map((a) => a.caixa.qual))].sort()
+console.log(`mão dentro da tela nos ${alvos.length} toques ✅  ·  usando: ${usadas.join(', ')}`)
 // Quadros extras que não são toque, mas que eu quero olhar (estado da tela
 // depois da ação): --tambem whatsapp:250,whatsapp:320
 for (const par of arg('--tambem', '').split(',').filter(Boolean)) {
