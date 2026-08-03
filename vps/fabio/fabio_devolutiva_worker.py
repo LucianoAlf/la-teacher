@@ -189,12 +189,27 @@ def processar(item: Dict[str, Any], token: str, dry_run: bool) -> Dict[str, Any]
 
 
 def rodar(lote: int, dry_run: bool) -> Dict[str, Any]:
+    # Antes de reivindicar: tira da fila quem ja derrubou o worker vezes demais.
+    # Sem isto a retomada de lease vencido (020e) vira loop -- a linha venenosa
+    # e' retomada pra sempre, queimando LLM a cada passada.
+    #
+    # Nao e' opcional: a RPC existir e ninguem chamar e' o mesmo defeito da 020b
+    # (gancho criado, ninguem chamando), que eu repeti aqui duas horas depois.
+    ceifadas = 0
+    if not dry_run:
+        try:
+            ceifadas = rpc("fabio_devolutiva_ceifar_travadas", {"p_teto": 5}) or 0
+            if ceifadas:
+                log("ceifadas", quantidade=ceifadas)
+        except Exception as e:  # noqa: BLE001
+            log("ceifar_falhou", erro=str(e)[:200])
+
     claim = rpc("fabio_devolutiva_claim", {
         "p_worker": WORKER, "p_lote": lote, "p_lease_minutos": LEASE_MIN})
     itens: List[Dict[str, Any]] = (claim or {}).get("itens") or []
     token = (claim or {}).get("lease_token")
     if not itens:
-        return {"ok": True, "reivindicadas": 0, "resultados": []}
+        return {"ok": True, "reivindicadas": 0, "ceifadas": ceifadas, "resultados": []}
 
     resultados = []
     for item in itens:
@@ -221,7 +236,8 @@ def rodar(lote: int, dry_run: bool) -> Dict[str, Any]:
                 except Exception as e:  # noqa: BLE001
                     log("devolver_falhou", devolutiva_id=item.get("id"), erro=str(e)[:200])
 
-    return {"ok": True, "dry_run": dry_run, "reivindicadas": len(itens), "resultados": resultados}
+    return {"ok": True, "dry_run": dry_run, "ceifadas": ceifadas,
+            "reivindicadas": len(itens), "resultados": resultados}
 
 
 def main() -> int:
