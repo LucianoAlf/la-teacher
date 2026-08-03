@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, EmptyState, FabioCard, FabioMark, Skeleton, Toast, useToast } from '../../components/ui'
 import { AppHeader } from './AppHeader'
 import { formatDiaCurto, hojeBRT } from '../../lib/date'
-import { meuPonto, registrosPendentes, type PontoDia, type RegistroRow, type SessaoAula } from '../../lib/api'
+import { devolutivasPendentes, meuPonto, registrosPendentes, type PontoDia, type RegistroRow, type SessaoAula } from '../../lib/api'
 import { fmtMinutos } from './Ponto'
 import { SessaoRow } from '../../features/agenda/SessaoRow'
 import { CardSessoesDoDia } from '../../features/agenda/CardSessoesDoDia'
@@ -74,6 +74,9 @@ export default function HomePage() {
             onGravar={gravarAula}
           />
         </div>
+
+        {/* Devolutivas que o Fábio escreveu e esperam o professor */}
+        <DevolutivasCard onAbrir={() => navigate('/app/devolutivas')} />
 
         {/* 4 · Chamadas pendentes de ontem */}
         <PendenciasCard onAbrir={abrirChamada} onGravar={gravarAula} />
@@ -265,5 +268,45 @@ function PendenciasCard({
         <span>A chamada fecha 3 dias depois da aula — depois disso, só a coordenação lança. ⏳</span>
       </p>
     </Card>
+  )
+}
+
+/**
+ * Aviso de devolutivas prontas.
+ *
+ * A tela /app/devolutivas e o aviso do Fábio no WhatsApp ("abre o app em
+ * Devolutivas") não servem de nada se não houver por onde chegar lá. Este
+ * card é a porta — e só aparece quando existe algo esperando, pra não virar
+ * mais um bloco morto na Home.
+ */
+function DevolutivasCard({ onAbrir }: { onAbrir: () => void }) {
+  const [quantas, setQuantas] = useState<number | null>(null)
+
+  useEffect(() => {
+    let vivo = true
+    devolutivasPendentes()
+      .then((lista) => vivo && setQuantas(lista.length))
+      .catch(() => vivo && setQuantas(0))
+    return () => {
+      vivo = false
+    }
+  }, [])
+
+  if (!quantas) return null
+
+  return (
+    <button type="button" onClick={onAbrir} className="mb-3 w-full text-left">
+      <Card title="Devolutivas prontas" icon="fa-solid fa-comment-dots" right={`${quantas}`}>
+        <div className="flex items-center justify-between gap-3 px-1 py-2">
+          <p className="text-[13px] text-text-secondary">
+            {quantas === 1
+              ? 'Escrevi 1 devolutiva a partir do seu registro.'
+              : `Escrevi ${quantas} devolutivas a partir dos seus registros.`}{' '}
+            Confere e manda quando quiser.
+          </p>
+          <i className="fa-solid fa-chevron-right text-text-muted" aria-hidden="true" />
+        </div>
+      </Card>
+    </button>
   )
 }

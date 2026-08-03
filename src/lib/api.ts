@@ -773,3 +773,56 @@ export async function atualizarPreferenciaFabio(
   const { error } = await rpcSolta('app_atualizar_preferencia_fabio', args)
   if (error) throw error
 }
+
+// ---------------------------------------------------------------------------
+// Devolutiva de aula — o que o Fábio escreveu e o professor manda
+// ---------------------------------------------------------------------------
+
+export interface DevolutivaPendente {
+  id: string
+  aluno_id: number
+  aluno_nome: string
+  aluno_primeiro_nome: string
+  curso: string | null
+  /** 'responsavel' | 'aluno' — decidido pela idade no momento da geração. */
+  destinatario: 'responsavel' | 'aluno'
+  destinatario_nome: string | null
+  idade_na_geracao: number | null
+  /** A versão que vai pra família. É esta que ele edita. */
+  texto_normal: string
+  /** A mesma coisa + um pedido de prática em casa. Ele escolhe qual mandar. */
+  texto_apoio_casa: string | null
+  status: string
+  criado_em: string
+  oferecida_em: string | null
+  copiada_em: string | null
+  editada_em: string | null
+  compartilhada_em: string | null
+  envio_confirmado_em: string | null
+}
+
+/** Ações que viram carimbo. Espelha a allowlist da migration 024 — ação fora
+ *  desta lista o banco recusa com erro, não em silêncio. */
+export type AcaoDevolutiva = 'copiada' | 'editada' | 'compartilhada' | 'enviada'
+
+/**
+ * Devolutivas do professor logado que ele ainda não confirmou como enviadas.
+ * O banco filtra por fn_professor_do_usuario() — o cliente não escolhe de quem.
+ */
+export async function devolutivasPendentes(): Promise<DevolutivaPendente[]> {
+  const { data: res, error } = await rpcSolta('app_devolutivas_pendentes')
+  if (error) throw error
+  return (res as DevolutivaPendente[]) ?? []
+}
+
+/** Carimba uma ação do professor sobre a devolutiva. */
+export async function marcarDevolutiva(id: string, acao: AcaoDevolutiva): Promise<void> {
+  const { error } = await rpcSolta('app_devolutiva_marcar', { p_id: id, p_acao: acao })
+  if (error) throw error
+}
+
+/** Salva o texto ajustado pelo professor (também carimba `editada_em`). */
+export async function salvarTextoDevolutiva(id: string, texto: string): Promise<void> {
+  const { error } = await rpcSolta('app_devolutiva_salvar_texto', { p_id: id, p_texto: texto })
+  if (error) throw error
+}

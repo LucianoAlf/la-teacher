@@ -11,6 +11,7 @@ import ProcessandoPage from './features/registro/Processando'
 import ConfirmarPage from './features/registro/Confirmar'
 import ChamadaPage from './features/chamada/Chamada'
 import ChatFabioPage from './features/fabio/ChatFabio'
+import DevolutivasPage from './pages/app/Devolutivas'
 import PontoPage from './pages/app/Ponto'
 import PerfilPage from './pages/app/Perfil'
 import AlunoDetalhePage from './pages/app/AlunoDetalhe'
@@ -80,6 +81,7 @@ export const router = createBrowserRouter(
             { path: '/app/turma/:turmaNome', element: <TurmaHistoricoPage /> },
             { path: '/app/chamada/:aulaId', element: <ChamadaPage /> },
             { path: '/app/fabio', element: <ChatFabioPage /> },
+            { path: '/app/devolutivas', element: <DevolutivasPage /> },
             { path: '/app/ponto', element: <PontoPage /> },
             { path: '/app/perfil', element: <PerfilPage /> },
             { path: '/app/gravar', element: <GravarAulaPage /> },
