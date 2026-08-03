@@ -50,6 +50,14 @@
 -- instante em que um worker que entende token a reivindica. Não existe janela
 -- em que uma linha esteja com token e desprotegida.
 --
+-- ⚠️ E o corte precisa valer nos DOIS lados — finalização E claim. A primeira
+-- versão só cercava a finalização, o que deixava um bypass em duas etapas:
+-- worker novo cerca (token A) → a linha falha ou o lease vence → worker antigo
+-- reivindica → o `DO UPDATE` grava `lease_token = null` e **desarma a cerca**;
+-- daí ele conclui numa boa, porque a finalização aceita token nulo em linha sem
+-- token. Por isso o claim legado é barrado em linha já tokenizada (a "catraca",
+-- lá embaixo). Cercar só a saída não adianta se a entrada devolve a chave.
+--
 -- Fase 2, depois do worker novo no ar: `p_com_token` vira default true e o
 -- caminho de token nulo é removido. O conserto do relógio vale desde já pra
 -- todo mundo, com ou sem token.
@@ -240,13 +248,29 @@ begin
     lease_token     = excluded.lease_token,                           -- <<< 018
     lease_expira_em = excluded.lease_expira_em,                       -- <<< 018
     last_error      = null
-  where fabio_notificacoes.status = 'falhou'
-     -- <<< 018: era `criado_em < now() - interval '10 minutes'`, que mede a hora
-     --          em que a LINHA NASCEU. Agora mede o prazo do lease, carimbado
-     --          na reivindicação. Ver o cabeçalho desta migration.
-     or (fabio_notificacoes.status = 'processando'
-         and fabio_notificacoes.lease_expira_em is not null
-         and fabio_notificacoes.lease_expira_em < now())
+  where
+    -- <<< 018: A CATRACA. Linha já cercada só volta pra quem entende token.
+    --
+    -- Sem esta condição existia um bypass em duas etapas: o worker novo cercava
+    -- (token A), a linha falhava ou o lease vencia, e aí o worker antigo
+    -- reivindicava de novo — o `lease_token = excluded.lease_token` acima
+    -- gravaria NULL e **removeria a cerca**. Em seguida ele concluiria numa boa,
+    -- porque a finalização aceita token nulo em linha sem token. O corte da
+    -- finalização estava certo; a porta aberta era o claim.
+    --
+    -- É de mão única de propósito: uma vez cercada, a linha não rebaixa
+    -- sozinha. Se algum dia o worker novo sair de operação, a saída é explícita
+    -- e humana (`update ... set lease_token = null`), não um efeito colateral.
+    (p_com_token or fabio_notificacoes.lease_token is null)
+    and (
+      fabio_notificacoes.status = 'falhou'
+      -- <<< 018: era `criado_em < now() - interval '10 minutes'`, que mede a hora
+      --          em que a LINHA NASCEU. Agora mede o prazo do lease, carimbado
+      --          na reivindicação. Ver o cabeçalho desta migration.
+      or (fabio_notificacoes.status = 'processando'
+          and fabio_notificacoes.lease_expira_em is not null
+          and fabio_notificacoes.lease_expira_em < now())
+    )
   returning id into v_id;
 
   if v_id is null then

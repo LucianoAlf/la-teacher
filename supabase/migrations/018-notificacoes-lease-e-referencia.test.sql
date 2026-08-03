@@ -109,6 +109,58 @@ begin
   insert into res values (18,'dono com token conclui','true',ok::text);
 end $t$;
 
+-- ============================================================================
+-- PARTE 3 — o bypass em DUAS ETAPAS, pelo claim
+--
+-- A Parte 2 só cobria "legado tenta finalizar logo depois do novo cercar".
+-- Faltava o caminho que estava realmente aberto: o legado REIVINDICANDO de
+-- novo depois de falha/expiração. O `DO UPDATE` gravava lease_token = null e
+-- desarmava a cerca; daí ele concluía numa boa.
+--
+-- Passos 22 e 23 são a prova: o legado é recusado E o token não é rebaixado.
+-- Sem a catraca no claim, o 22 daria claimed=true e o 23 devolveria null.
+-- ============================================================================
+
+do $t$
+declare a jsonb; b jsonb; c jsonb;
+        v_id uuid; v_tokA uuid; v_tokB uuid; ok boolean;
+        v_prof integer := 25;
+begin
+  delete from public.fabio_notificacoes
+   where professor_id=v_prof and tipo='briefing_matinal' and dia_referencia=current_date;
+
+  -- worker NOVO cerca a linha
+  a := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','c1',null,true);
+  v_id := (a->>'notificacao_id')::uuid;
+  v_tokA := (a->>'lease_token')::uuid;
+  insert into res values (21,'novo reivindica e cerca','true',a->>'claimed');
+
+  -- a linha falha E o lease vence: as duas portas do DO UPDATE abertas
+  update public.fabio_notificacoes
+     set status='falhou', lease_expira_em = now() - interval '1 minute' where id=v_id;
+
+  -- ===== O BYPASS EM DUAS ETAPAS =====
+  b := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','c2');
+  insert into res values (22,'legado reivindica linha cercada','false',b->>'claimed');
+  insert into res select 23,'token NAO foi rebaixado', v_tokA::text, lease_token::text
+    from public.fabio_notificacoes where id=v_id;
+  insert into res select 24,'status intacto (legado nao mexeu)','falhou',status
+    from public.fabio_notificacoes where id=v_id;
+
+  -- só quem entende token retoma
+  c := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','c3',null,true);
+  v_tokB := (c->>'lease_token')::uuid;
+  insert into res values (25,'novo retoma','true',c->>'claimed');
+  insert into res values (26,'token trocou',(v_tokA is distinct from v_tokB)::text,'true');
+
+  ok := public.fabio_marcar_notificacao_enviada(v_id);
+  insert into res values (27,'legado conclui linha cercada','false',ok::text);
+  ok := public.fabio_marcar_notificacao_enviada(v_id, v_tokA, 'wamid.VELHO');
+  insert into res values (28,'token A (morto) conclui','false',ok::text);
+  ok := public.fabio_marcar_notificacao_enviada(v_id, v_tokB, 'wamid.OK');
+  insert into res values (29,'token B (vivo) conclui','true',ok::text);
+end $t$;
+
 select n, passo, esperado, obtido,
        case when esperado = obtido then 'PASSOU' else '*** FALHOU ***' end as veredito
 from res order by n;
