@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import DesignSystemPage from './pages/dev/DesignSystem'
 import LoginPage from './pages/app/Login'
+import NovaSenhaPage from './pages/app/NovaSenha'
 import IntroPage from './pages/app/Intro'
 import HomePage from './pages/app/Home'
 import AgendaPage from './pages/app/Agenda'
@@ -36,6 +37,11 @@ export const router = createBrowserRouter(
     { path: '/', element: <Navigate to="/app" replace /> },
     { path: '/app/intro', element: <IntroRoute /> },
     { path: '/app/login', element: <LoginRoute /> },
+    // Fora do guard de propósito: o link de recuperação chega COM sessão, então
+    // tanto o RequireProfessor quanto o redirect do LoginRoute jogariam o
+    // professor pro /app antes de ele digitar a senha nova — e o link é de uso
+    // único, não daria pra tentar de novo.
+    { path: '/app/nova-senha', element: <NovaSenhaPage /> },
     {
       // Guard por sessão + vínculo de professor.
       element: <RequireProfessor />,
