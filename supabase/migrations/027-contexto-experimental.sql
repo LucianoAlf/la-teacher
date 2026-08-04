@@ -19,6 +19,75 @@ comment on column public.lead_experimentais.contexto_ia is
 'Contexto pedagogico extraido da conversa da Mila + observacoes, por IA. Escrito SO pelo extrator. Nunca confundir com observacoes, que e do Emusys.';
 
 -- ─────────────────────────────────────────────────────────────────────────
+-- Dois auxiliares que existem por causa de defeitos reais
+--
+-- `fn_texto_para_bigint`: o id da última mensagem chega como TEXTO dentro de um
+-- JSON escrito por um LLM. `'abc'::bigint` levanta invalid_text_representation
+-- -- e uma função que promete `returns boolean` passa a estourar exceção, o que
+-- quebra o contrato com a edge function. Pior: dentro da SELEÇÃO, uma única
+-- linha com lixo em `contexto_ia` derrubava a consulta inteira, e ninguém mais
+-- era extraído. Aqui lixo vira NULL, que é a resposta honesta: "não sei até
+-- onde li". `numeric_value_out_of_range` entra na mesma rede -- um id absurdo é
+-- tão inútil quanto uma palavra.
+--
+-- `fn_bloco_tem_conteudo`: a guarda de conteúdo precisa ser SEMÂNTICA, não
+-- estrutural. Ver o comentário na gravação, abaixo.
+
+create or replace function public.fn_texto_para_bigint(p_texto text)
+returns bigint
+language plpgsql
+immutable
+parallel safe
+set search_path to 'public'
+as $function$
+begin
+  return nullif(btrim(p_texto), '')::bigint;
+exception when invalid_text_representation or numeric_value_out_of_range then
+  return null;
+end
+$function$;
+
+revoke all on function public.fn_texto_para_bigint(text) from public, anon, authenticated;
+grant execute on function public.fn_texto_para_bigint(text) to service_role;
+
+comment on function public.fn_texto_para_bigint(text) is
+'Cast text->bigint que devolve NULL em vez de levantar excecao. Existe porque o id da ultima mensagem vem de JSON de LLM.';
+
+-- Um bloco "tem conteúdo" quando traz pelo menos um campo com valor de
+-- verdade. Objeto vazio, array vazio, string vazia e null NÃO contam -- em
+-- nenhum dos dois níveis.
+--
+-- O CASE é obrigatório, não estilo: `jsonb_each` levanta "cannot deconstruct a
+-- scalar" se receber uma string, e o AND do SQL não promete curto-circuito.
+-- Dentro do CASE a ordem de avaliação é garantida, então `jsonb_each` só é
+-- alcançado depois de confirmado que o bloco é objeto.
+create or replace function public.fn_bloco_tem_conteudo(p_bloco jsonb)
+returns boolean
+language sql
+immutable
+parallel safe
+set search_path to 'public'
+as $function$
+  select case
+    when p_bloco is null                   then false
+    when jsonb_typeof(p_bloco) = 'array'   then jsonb_array_length(p_bloco) > 0
+    when jsonb_typeof(p_bloco) <> 'object' then false
+    else (select count(*) > 0
+            from jsonb_each(p_bloco) as e(chave, valor)
+           where jsonb_typeof(e.valor) <> 'null'
+             and e.valor <> '""'::jsonb
+             and e.valor <> '{}'::jsonb
+             and e.valor <> '[]'::jsonb)
+  end;
+$function$;
+
+revoke all on function public.fn_bloco_tem_conteudo(jsonb) from public, anon, authenticated;
+grant execute on function public.fn_bloco_tem_conteudo(jsonb) to service_role;
+
+comment on function public.fn_bloco_tem_conteudo(jsonb) is
+'True so se o bloco jsonb tiver ao menos um campo com valor util. Esqueleto de schema (chaves presentes, valores vazios) e false.';
+
+-- ─────────────────────────────────────────────────────────────────────────
 -- Quem precisa de extração agora
 --
 -- Releitura é por ID de mensagem, não por data: a conversa continua depois do
@@ -52,7 +121,7 @@ as $function$
          le.data_experimental,
          c.nome::text,
          nullif(btrim(le.observacoes), '')::text,
-         nullif(le.contexto_ia -> 'procedencia' ->> 'ultima_mensagem_id', '')::bigint
+         public.fn_texto_para_bigint(le.contexto_ia -> 'procedencia' ->> 'ultima_mensagem_id')
     from lead_experimentais le
     left join leads  l on l.id = le.lead_id
     left join cursos c on c.id = le.curso_interesse_id
@@ -86,50 +155,52 @@ set search_path to 'public'
 as $function$
 declare
   v_novo_id  bigint;
-  v_atual_id bigint;
   v_tem_algo boolean;
 begin
   if p_contexto is null or jsonb_typeof(p_contexto) <> 'object' then
     return false;
   end if;
 
-  -- conteúdo de verdade: pelo menos um dos blocos úteis preenchido.
+  -- Conteúdo de verdade: pelo menos um dos blocos úteis preenchido.
   -- `procedencia` sozinha não conta -- senão uma extração que não achou nada
   -- passaria por cima de uma que achou.
-  -- coalesce no array_length: sem essa rede, jsonb_typeof(chave ausente) e
-  -- NULL, "NULL = 'array'" e NULL, e NULL entra no OR abaixo -- v_tem_algo
-  -- vira NULL (nao false) e o "if not v_tem_algo" seguinte NAO dispara,
-  -- porque PL/pgSQL so entra no IF quando a condicao e TRUE. Isso deixava a
-  -- extracao vazia passar (fail open), o mesmo defeito do mutante 1.
-  v_tem_algo := (p_contexto -> 'recepcao'          is not null and p_contexto -> 'recepcao' <> 'null'::jsonb)
-             or (p_contexto -> 'quem_e_esse_aluno' is not null and p_contexto -> 'quem_e_esse_aluno' <> 'null'::jsonb)
-             or (jsonb_typeof(p_contexto -> 'ganchos_de_conexao') = 'array'
-                 and coalesce(jsonb_array_length(p_contexto -> 'ganchos_de_conexao'), 0) > 0)
-             or (jsonb_typeof(p_contexto -> 'alertas') = 'array'
-                 and coalesce(jsonb_array_length(p_contexto -> 'alertas'), 0) > 0);
+  --
+  -- A checagem é SEMÂNTICA, não estrutural. A versão anterior perguntava só se
+  -- a chave existia, e o modo de falha mais provável de um LLM é justamente
+  -- devolver o esqueleto do schema com tudo vazio:
+  --     {"recepcao": {}, "quem_e_esse_aluno": {}, "procedencia": {...}}
+  -- Isso passava pela guarda e APAGAVA uma extração boa. `{"recepcao": ""}`
+  -- também. `fn_bloco_tem_conteudo` olha dentro do bloco, nos dois níveis.
+  --
+  -- O coalesce externo é rede: se algum dia essa expressão voltar a produzir
+  -- NULL, "if not NULL" NÃO dispara (PL/pgSQL só entra no IF quando a condição
+  -- é TRUE) e a gravação vazia passa -- fail open, o defeito do mutante 1.
+  v_tem_algo := coalesce(
+       public.fn_bloco_tem_conteudo(p_contexto -> 'recepcao')
+    or public.fn_bloco_tem_conteudo(p_contexto -> 'quem_e_esse_aluno')
+    or public.fn_bloco_tem_conteudo(p_contexto -> 'ganchos_de_conexao')
+    or public.fn_bloco_tem_conteudo(p_contexto -> 'alertas'), false);
 
   if not v_tem_algo then
     return false;
   end if;
 
-  v_novo_id := nullif(p_contexto -> 'procedencia' ->> 'ultima_mensagem_id', '')::bigint;
+  v_novo_id := public.fn_texto_para_bigint(p_contexto -> 'procedencia' ->> 'ultima_mensagem_id');
   if v_novo_id is null then
     return false;
   end if;
 
-  select nullif(contexto_ia -> 'procedencia' ->> 'ultima_mensagem_id', '')::bigint
-    into v_atual_id
-    from lead_experimentais
-   where id = p_lead_experimental_id;
-
-  if v_atual_id is not null and v_novo_id <= v_atual_id then
-    return false;
-  end if;
-
+  -- A recência mora no WHERE do próprio UPDATE, não num SELECT antes dele.
+  -- Com duas chamadas concorrentes (ids 3000 e 2000) o SELECT separado lia o
+  -- MESMO valor atual nas duas, as duas passavam a guarda, e a mais velha podia
+  -- escrever por último: o contexto REGREDIA. No WHERE, o segundo UPDATE relê a
+  -- linha já travada pelo primeiro e simplesmente não casa -- devolve false.
   update lead_experimentais
      set contexto_ia    = p_contexto,
          contexto_ia_em = now()
-   where id = p_lead_experimental_id;
+   where id = p_lead_experimental_id
+     and (public.fn_texto_para_bigint(contexto_ia -> 'procedencia' ->> 'ultima_mensagem_id') is null
+          or public.fn_texto_para_bigint(contexto_ia -> 'procedencia' ->> 'ultima_mensagem_id') < v_novo_id);
 
   return found;
 end
@@ -139,4 +210,4 @@ revoke all on function public.fabio_gravar_contexto_experimental(integer, jsonb)
 grant execute on function public.fabio_gravar_contexto_experimental(integer, jsonb) to service_role;
 
 comment on function public.fabio_gravar_contexto_experimental(integer, jsonb) is
-'Grava contexto_ia. Recusa payload vazio, sem procedencia.ultima_mensagem_id, ou mais velho que o ja gravado. Extracao ruim nunca apaga extracao boa.';
+'Grava contexto_ia. Recusa payload vazio (inclusive esqueleto de schema so com chaves), sem procedencia.ultima_mensagem_id, com id nao-numerico, ou mais velho que o ja gravado. A recencia e conferida no WHERE do UPDATE, entao chamadas concorrentes nao fazem o contexto regredir. Extracao ruim nunca apaga extracao boa.';
