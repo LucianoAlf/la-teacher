@@ -6,6 +6,24 @@ Em **03/08/2026** o Alf passou o bastão: o Alfredo saiu para outras frentes e *
 
 Antes disso o combinado era read-only, e essa memória velha já me fez recusar trabalho que era meu. Se bater a dúvida "será que eu posso mexer?": pode.
 
+### Mexeu no Fábio? Pergunta pra ele antes de dizer que está pronto
+
+Prática do Alfredo, que o Alf me passou em **04/08/2026**: ele conversa com os agentes — manda a pergunta, lê a resposta, e só então decide se está certo. Não valida só a arquitetura.
+
+```bash
+ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 \
+  'cd ~/fabio-chat-bridge && set -a && . ~/.hermes/.env && set +a && \
+   python3 falar_com_fabio.py "quem é a aluna Fernanda?" --sem-historico'
+```
+
+`vps/fabio/falar_com_fabio.py` chama o mesmo `generate_answer()` da fila e **não** envia WhatsApp nem grava na `fabio_chat_mensagens`.
+
+**A resposta é o produto; o contexto é insumo.** Eu já provei que o dado certo chegava no prompt e reportei como resolvido sem nunca ter perguntado nada pro Fábio. Três coisas que o teste precisa ter:
+
+- **`--sem-historico`** — com histórico ele pode estar lendo o briefing das 8h em vez de consultar de verdade
+- **o caso oposto** — aluno novo acertar é metade; aluno antigo não pode virar "novo"
+- **uma pergunta comum** — pra provar que o gatilho novo não deixou o Fábio ruidoso
+
 ## Acesso à VPS (o que eu já esqueci uma vez)
 
 ```bash
