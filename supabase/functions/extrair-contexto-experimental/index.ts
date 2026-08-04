@@ -266,13 +266,21 @@ Deno.serve(async (req) => {
   // Falha silenciosa com HTTP 200 já custou caro duas vezes neste projeto
   // (o Fábio surdo a áudio e a notificar-anamnese com o canal morto desde
   // 11/07). Toda rodada deixa rastro.
-  await sb.from("automacao_log").insert({
+  // `aluno_nome` é NOT NULL sem default nesta tabela — o insert sem ela falha, e
+  // como o retorno não era checado, a rodada inteira ficava sem rastro em
+  // silêncio. Que é exatamente o defeito que este log existe para evitar.
+  // O log é por RODADA, não por aluno, então o rótulo diz isso.
+  const { error: erroLog } = await sb.from("automacao_log").insert({
     evento: "contexto_experimental",
     acao: DRY_RUN ? "extraido_sombra" : "extraido",
+    aluno_nome: `(rodada: ${(alvos ?? []).length} experimentais)`,
     detalhes: { processados: (alvos ?? []).length, gravados, pulados, erros, itens: detalhes },
     workflow_id: "extrair-contexto-experimental",
     execution_id: new Date().toISOString(),
   });
+  if (erroLog) {
+    console.error("[extrator] FALHA AO GRAVAR O RASTRO:", erroLog.message);
+  }
 
   return new Response(
     JSON.stringify({ dry_run: DRY_RUN, processados: (alvos ?? []).length, gravados, pulados, erros, detalhes }),
