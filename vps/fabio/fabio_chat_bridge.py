@@ -584,6 +584,32 @@ def _has_pedagogical_history_intent(current_text: str, hist: list[Dict[str, Any]
     return any(p in hay for p in patterns)
 
 
+# "Quem é essa aluna?" NÃO é pergunta de histórico, e por isso não acionava
+# nada. Em 04/08/2026 o Matheus perguntou exatamente isso sobre a Fernanda e o
+# Fábio respondeu que não sabia dizer se ela era nova — com a data de matrícula
+# do dia anterior gravada no banco. O prontuário nunca chegou a ser consultado.
+#
+# Aqui é regex com \b, não substring como na lista acima: "quem e" solto casaria
+# dentro de "quem escreveu", "quem estava". O prefetch é barato e falha benigno,
+# mas gatilho impreciso vira ruído no prompt de toda conversa.
+_STUDENT_IDENTITY_PATTERNS = [
+    r"\bquem (e|eh|sao|seria|seriam)\b",
+    r"\bnao (faco|tenho) ideia\b",
+    r"\bnao (conheco|sei quem|lembro quem)\b",
+    r"\bnunca vi\b",
+    r"\bme (fala|fale|conta|conte) (da|do|sobre)\b",
+    r"\balun[oa] nov[oa]\b",
+    r"\bnov[oa] na (escola|turma)\b",
+    r"\bprimeira aula\b",
+]
+
+
+def _has_student_identity_intent(current_text: str, hist: list[Dict[str, Any]]) -> bool:
+    recent = "\n".join((h.get("content") or "") for h in hist[-6:] if h.get("role") == "professor")
+    hay = _norm_text(current_text + "\n" + recent)
+    return any(re.search(p, hay) for p in _STUDENT_IDENTITY_PATTERNS)
+
+
 def _fetch_professor_roster(professor_id: int) -> list[Dict[str, Any]]:
     rows = sb_get("/rest/v1/vw_fabio_carteira_professor", {
         "select": "aluno_id,aluno_nome,curso_nome,professor_id,professor_nome,unidade_nome",
@@ -690,16 +716,24 @@ def _latest_chronological_class(professor_id: int, aluno_id: int, course_name: s
     return None
 
 
-def _latest_registered_content(professor_id: int, aluno_id: int, course_name: str) -> Optional[Dict[str, Any]]:
+def _fetch_prontuario(professor_id: int, aluno_id: int, limite: int = 30) -> Dict[str, Any]:
     r = sb_post("/rest/v1/rpc/fabio_prontuario_aluno", {
         "p_aluno_id": int(aluno_id),
         "p_professor_id": int(professor_id),
-        "p_limite": 30,
+        "p_limite": int(limite),
     })
     if r.status_code >= 400:
         raise RuntimeError(f"fabio_prontuario_aluno {r.status_code}: {r.text[:500]}")
     data = r.json()
-    timeline = data.get("linha_do_tempo") if isinstance(data, dict) else []
+    return data if isinstance(data, dict) else {}
+
+
+def _latest_registered_content(prontuario: Dict[str, Any], course_name: str) -> Optional[Dict[str, Any]]:
+    # Recebe o prontuário já buscado em vez de chamar a RPC de novo. Antes esta
+    # função fazia a chamada, lia SÓ `linha_do_tempo` e descartava o resto do
+    # JSON -- inclusive o bloco `cadastro` da migration 026, que é justamente
+    # quem responde "quem é essa aluna".
+    timeline = prontuario.get("linha_do_tempo")
     base = _course_base(course_name)
     seen: set[tuple[Any, Any, str]] = set()
     for item in timeline or []:
@@ -725,23 +759,32 @@ def _latest_registered_content(professor_id: int, aluno_id: int, course_name: st
 
 
 def pedagogical_prefetch(professor_id: int, current_text: str, hist: list[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    if not _has_pedagogical_history_intent(current_text, hist):
+    quer_historico = _has_pedagogical_history_intent(current_text, hist)
+    quer_identidade = _has_student_identity_intent(current_text, hist)
+    if not (quer_historico or quer_identidade):
         return None
+    # "quem é" é a pergunta mais fraca das duas: quem pede histórico também quer
+    # saber quem é, mas não o contrário.
+    intent = "historico_pedagogico" if quer_historico else "identidade_aluno"
     resolved = _resolve_student_course_from_chat(professor_id, current_text, hist)
     if not resolved:
-        return {"intent": "historico_pedagogico", "resolved": None, "erro": "aluno/curso não resolvido pelo contexto recente"}
+        return {"intent": intent, "resolved": None, "erro": "aluno/curso não resolvido pelo contexto recente"}
     aluno_id = int(resolved["aluno_id"])
     course = resolved.get("curso_nome") or ""
+    prontuario = _fetch_prontuario(professor_id, aluno_id)
     latest_class = _latest_chronological_class(professor_id, aluno_id, course)
-    latest_content = _latest_registered_content(professor_id, aluno_id, course)
+    latest_content = _latest_registered_content(prontuario, course)
     return {
-        "intent": "historico_pedagogico",
+        "intent": intent,
         "resolved": {
             "aluno_id": aluno_id,
             "aluno_nome": resolved.get("aluno_nome"),
             "curso_nome": course,
             "professor_id": professor_id,
         },
+        # Vai nas DUAS intenções: linha do tempo vazia sem dizer que a pessoa
+        # chegou ontem é a resposta verdadeira e inútil que o Fábio deu.
+        "cadastro": prontuario.get("cadastro") or {},
         "ultima_aula_cronologica": latest_class,
         "ultimo_registro_com_conteudo": latest_content,
     }
@@ -1352,6 +1395,9 @@ Regras obrigatórias para esta conversa 1:1:
 - Se identidade_tipo=professor e perguntarem agenda de hoje, alunos de hoje, carteira, unidade ou pendências, use o contexto_json antes de perguntar qualquer coisa.
 - Se identidade_tipo=professor e perguntarem conteúdo da última aula, continuidade, prontuário ou “pra relembrar”, use o CONTEXTO PEDAGÓGICO PRÉ-BUSCADO.
 - Se a última aula cronológica estiver sem registro, mas existir ultimo_registro_com_conteudo mais antigo, diga as duas coisas: “a última aula em DATA está sem registro; o último conteúdo registrado que encontrei foi em DATA...”. Nunca diga apenas que não tem conteúdo quando houver registro anterior.
+- Se perguntarem QUEM É um aluno (“quem é a Fernanda?”, “não faço ideia de quem seja”), responda pelo bloco `cadastro` do CONTEXTO PEDAGÓGICO: quem é, curso, dia e horário, e há quanto tempo está na escola. Nunca responda só pelo histórico de aula.
+- Se cadastro.e_aluno_novo for true, diga isso de saída e em linguagem de gente (“entrou ontem”, “está há 5 dias na escola”), usando dias_desde_matricula. Aluno novo muda como o professor conduz a aula — é a informação mais útil que você tem ali.
+- Nunca conclua “é aluno novo” a partir de histórico vazio, e nunca diga que não sabe se é novo quando cadastro.data_matricula existir. aulas_registradas=0 significa que ninguém registrou aula dele ainda, o que é diferente de ser aluno recém-chegado.
 - Se o contexto_json vier ok=false ou incompleto, explique a limitação de forma curta e peça só a informação mínima.
 
 Contexto da conversa recente:
