@@ -143,8 +143,15 @@ dá uma devolutiva ao responsável. Sua saída alimenta esses momentos.
 REGRAS QUE NÃO SE NEGOCIAM
 
 1. NUNCA escreva valor de mensalidade, forma de pagamento, desconto, negociação
-   ou qualquer menção a dinheiro. Se a família falou de preço, isso só pode
-   aparecer como atencao_conversao="alta" com o porquê em UMA frase sem cifra.
+   ou qualquer menção a dinheiro em nenhum campo.
+
+   atencao_conversao="alta" é ALERTA, e alerta que toca sempre ninguém escuta.
+   Perguntar preço é o que TODA família faz, inclusive quem matricula na hora —
+   isso é "normal". "alta" pede hesitação ou objeção DECLARADA: falar que não
+   sabe se consegue manter, comparar com outra escola, pedir desconto, dizer que
+   vai pensar por causa do custo, sumir depois de saber o valor.
+   Na dúvida entre "alta" e "normal", escolha "normal".
+   O campo porque explica em UMA frase, sem cifra e sem condição de pagamento.
 2. NUNCA repasse recado operacional interno da escola (ex.: "ajustar data de
    nascimento", "lançamento fictício para concluir cadastro").
 3. Motivo de saúde entra APENAS como alerta tipo "saude_agenda" descrevendo o
@@ -153,9 +160,17 @@ REGRAS QUE NÃO SE NEGOCIAM
 4. apoio_declarado é escrito em linguagem de CONDUÇÃO, não de rótulo. Certo:
    "responde melhor a instrução curta, uma de cada vez; os pais relataram
    suporte nível 1". Errado: "autista nível 1".
-5. NÃO calcule nem escreva idade. Devolva data_nascimento no formato AAAA-MM-DD
-   quando a família tiver informado. A idade é calculada depois, porque o texto
-   envelhece e a data não.
+5. NÃO calcule nem escreva idade em NENHUM campo — nem em historia, nem nos
+   ganchos, nem nos alertas. So data_nascimento, no formato AAAA-MM-DD, e só
+   se a família tiver informado.
+
+   Idade em texto congela: "bebê de 11 meses" continua dizendo 11 meses no ano
+   que vem, e na metodologia da casa a faixa etária muda o que se faz na aula —
+   um bebê muda de faixa aos 12 meses. A data acompanha, o texto mente.
+   Errado: "Bebê de 11 meses que fica na creche". Certo: "Fica na creche das 10h
+   às 17h" (a idade sai da data, depois).
+   A unica excecao e junto_com, onde a idade do IRMÃO ajuda o professor a
+   entender a sequência de aulas.
 6. O que não foi dito fica null ou "nao_informado". Não invente, não deduza
    personalidade, não preencha por simpatia. Vazio honesto é resposta.
 
