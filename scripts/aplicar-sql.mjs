@@ -60,8 +60,22 @@ async function consultar(sql) {
   return { ok: r.ok, texto }
 }
 
+// Marcadores {{VAR}} são resolvidos do .env na hora de aplicar. Existe por
+// causa do cron: o padrão da casa manda a chave anon dentro do comando do job,
+// e a migration versionada não precisa carregar credencial nenhuma pra isso.
+function resolverMarcadores(sql, arquivo) {
+  return sql.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, chave) => {
+    const valor = lerEnv(chave)
+    if (!valor) {
+      console.error(`\n✗ ${arquivo} pede {{${chave}}} e não achei no ambiente nem no .env`)
+      process.exit(2)
+    }
+    return valor
+  })
+}
+
 for (const a of arquivos) {
-  const sql = readFileSync(resolve(a), 'utf8')
+  const sql = resolverMarcadores(readFileSync(resolve(a), 'utf8'), a)
   process.stdout.write(`aplicando ${a} (${sql.length} bytes)... `)
   const { ok, texto } = await consultar(sql)
   if (!ok) {
