@@ -127,7 +127,12 @@ const SCHEMA_SAIDA = {
   required: ["recepcao", "quem_e_esse_aluno", "ganchos_de_conexao", "para_a_devolutiva", "alertas"],
 };
 
-function prompt(transcricao: string, observacoes: string | null, curso: string | null): string {
+function prompt(
+  transcricao: string,
+  observacoes: string | null,
+  curso: string | null,
+  nomeAluno: string | null,
+): string {
   return `Você lê a conversa de agendamento de uma aula experimental na LA Music
 e prepara o professor que vai dar essa aula.
 
@@ -163,6 +168,15 @@ O QUE PROCURAR
 - para_a_devolutiva: o que a família espera ouvir no fim.
 - alertas: mudanças de agenda, cancelamentos, restrição de horário.
 
+ESTA EXTRAÇÃO É SOBRE UM ALUNO SÓ: ${nomeAluno ?? "(nome não informado)"}
+
+Uma mesma conversa pode agendar aula para mais de um filho — irmãos entram na
+mesma conversa e cada um tem a sua aula. Extraia APENAS o que é desse aluno.
+Se a conversa citar outros, não misture: recepcao.aluno recebe só o nome
+acima, e data_nascimento só a data dele. Os irmãos entram em junto_com
+("irmão Pedro, 9 anos, na aula seguinte"), nunca o responsável — o responsável
+tem campo próprio.
+
 Curso da experimental: ${curso ?? "não informado"}
 
 Observação que a recepção digitou (pode estar vazia ou desatualizada):
@@ -172,16 +186,25 @@ Conversa completa:
 ${transcricao}`;
 }
 
-async function extrair(transcricao: string, observacoes: string | null, curso: string | null) {
+async function extrair(transcricao: string, observacoes: string | null, curso: string | null, nomeAluno: string | null) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
   const r = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt(transcricao, observacoes, curso) }] }],
+      contents: [{ parts: [{ text: prompt(transcricao, observacoes, curso, nomeAluno) }] }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 1200,
+        // O thinking dos modelos 3.x sai do MESMO orçamento da resposta. Com
+        // maxOutputTokens 1200 a primeira rodada real gastou 1153 em pensamento
+        // e sobraram 32 para o JSON: finishReason=MAX_TOKENS e a saída cortada
+        // no meio de uma string. Não é resposta malformada, é resposta abortada.
+        //
+        // `thinkingConfig: {thinkingBudget: 0}` seria o corte limpo, mas este
+        // modelo devolve 400 "invalid argument" — não dá para desligar. Então o
+        // caminho é orçamento que caiba nos dois: ~1200 de pensamento medidos na
+        // rodada real, mais folga para o JSON de uma conversa de 56 mensagens.
+        maxOutputTokens: 4096,
         responseMimeType: "application/json",
         responseSchema: SCHEMA_SAIDA,
       },
@@ -189,10 +212,25 @@ async function extrair(transcricao: string, observacoes: string | null, curso: s
   });
   if (!r.ok) throw new Error(`gemini HTTP ${r.status}: ${(await r.text()).slice(0, 300)}`);
   const j = await r.json();
-  const partes: any[] = j?.candidates?.[0]?.content?.parts ?? [];
+  const cand = j?.candidates?.[0];
+  const partes: any[] = cand?.content?.parts ?? [];
   const texto = partes.map((p) => (typeof p?.text === "string" ? p.text : "")).join("").trim();
-  if (!texto) throw new Error("gemini devolveu vazio");
-  return JSON.parse(texto);
+  if (!texto) throw new Error(`gemini devolveu vazio (finishReason=${cand?.finishReason})`);
+  try {
+    return JSON.parse(texto);
+  } catch (e) {
+    // "Unterminated string" quer dizer resposta CORTADA, não malformada. A causa
+    // provável nos modelos 3.x é o thinking consumir o orçamento de saída antes
+    // de o JSON terminar. Sem finishReason e sem contagem de tokens no erro, a
+    // gente fica adivinhando — então o erro carrega as duas coisas.
+    const u = j?.usageMetadata ?? {};
+    throw new Error(
+      `gemini JSON invalido (${String((e as Error).message).slice(0, 60)}) ` +
+      `finishReason=${cand?.finishReason} ` +
+      `tokens=prompt:${u.promptTokenCount}/saida:${u.candidatesTokenCount}/pensamento:${u.thoughtsTokenCount ?? 0} ` +
+      `fim_do_texto=${JSON.stringify(texto.slice(-80))}`,
+    );
+  }
 }
 
 Deno.serve(async (req) => {
@@ -232,7 +270,7 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const bruto = await extrair(transcrever(conv.mensagens), alvo.observacoes, alvo.curso);
+      const bruto = await extrair(transcrever(conv.mensagens), alvo.observacoes, alvo.curso, alvo.nome_aluno);
       const contexto = {
         ...bruto,
         procedencia: {
