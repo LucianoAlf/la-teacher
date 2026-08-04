@@ -763,16 +763,18 @@ Deno.serve(async (req) => {
 
 - [ ] **Step 2: Configurar os secrets**
 
-Pedir ao Hugo um usuário do Chatwoot com papel **apenas de leitura** e usar o token dele. Configurar no projeto `ouqwbbermlzqqvtqwlul`:
+Configurar no projeto `ouqwbbermlzqqvtqwlul`:
 
-- `CHATWOOT_TOKEN` — token do usuário de leitura
+- `CHATWOOT_TOKEN` — o token que o Hugo passou (admin; a API v1 recusa token de bot com `401 not authorized for bots`)
 - `CHATWOOT_URL` — `https://crmchat.agenticflowio.com.br`
 - `CHATWOOT_ACCOUNT_ID` — `5`
 - `EXTRATOR_DRY_RUN` — `true`
 
 `GEMINI_API_KEY` já existe no projeto (usada pela `notificar-anamnese`).
 
-Nunca colocar valor de token no arquivo `index.ts`.
+**Nunca colocar valor de token no arquivo `index.ts`** — a `notificar-anamnese`
+tem a chave do WhatsApp hardcoded e é o que não se repete. O código lê só de
+`Deno.env.get`.
 
 - [ ] **Step 3: Deploy da função**
 
