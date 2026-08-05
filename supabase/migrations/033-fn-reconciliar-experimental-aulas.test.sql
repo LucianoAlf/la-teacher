@@ -15,16 +15,20 @@ insert into public.leads (id, unidade_id, whatsapp, status) values
   (-33001, '00000000-0000-4000-8000-000000000330', '5521999330001', 'novo'), -- casa exato
   (-33002, '00000000-0000-4000-8000-000000000330', '5521999330002', 'novo'), -- sem par
   (-33003, '00000000-0000-4000-8000-000000000330', '5521999330003', 'novo'), -- 180min deslocado
-  (-33004, '00000000-0000-4000-8000-000000000331', '5521999330004', 'novo'); -- so nao casa se filtrar unidade
+  (-33004, '00000000-0000-4000-8000-000000000331', '5521999330004', 'novo'), -- so nao casa se filtrar unidade
+  (-33005, '00000000-0000-4000-8000-000000000330', '5521999330005', 'novo'), -- sem par HOJE, casa DEPOIS (achado do Alfredo)
+  (-33006, '00000000-0000-4000-8000-000000000330', '5521999330006', 'novo'); -- faltou + matricula depois
 
 insert into public.lead_experimentais
   (id, lead_id, nome_aluno, unidade_id, data_experimental, horario_experimental,
    status, professor_experimental_id)
 values
-  (-33001, -33001, 'ZZTESTE Casa Exato',    '00000000-0000-4000-8000-000000000330', current_date+2, '10:00', 'experimental_agendada', -33001),
-  (-33002, -33002, 'ZZTESTE Sem Par',       '00000000-0000-4000-8000-000000000330', current_date+2, '15:00', 'experimental_agendada', -33001),
-  (-33003, -33003, 'ZZTESTE Deslocado',     '00000000-0000-4000-8000-000000000330', current_date+2, '13:00', 'experimental_agendada', -33001),
-  (-33004, -33004, 'ZZTESTE Outra Unidade', '00000000-0000-4000-8000-000000000331', current_date+2, '10:00', 'experimental_agendada', -33001);
+  (-33001, -33001, 'ZZTESTE Casa Exato',      '00000000-0000-4000-8000-000000000330', current_date+2, '10:00', 'experimental_agendada', -33001),
+  (-33002, -33002, 'ZZTESTE Sem Par',         '00000000-0000-4000-8000-000000000330', current_date+2, '15:00', 'experimental_agendada', -33001),
+  (-33003, -33003, 'ZZTESTE Deslocado',       '00000000-0000-4000-8000-000000000330', current_date+2, '13:00', 'experimental_agendada', -33001),
+  (-33004, -33004, 'ZZTESTE Outra Unidade',   '00000000-0000-4000-8000-000000000331', current_date+2, '10:00', 'experimental_agendada', -33001),
+  (-33005, -33005, 'ZZTESTE Casa Depois',     '00000000-0000-4000-8000-000000000330', current_date+2, '09:00', 'experimental_agendada', -33001),
+  (-33006, -33006, 'ZZTESTE Faltou+Matricula','00000000-0000-4000-8000-000000000330', current_date+2, '08:00', 'experimental_faltou',    -33001);
 
 insert into public.aulas_emusys
   (id, emusys_id, unidade_id, data_aula, data_hora_inicio, categoria, professor_id, cancelada)
@@ -34,7 +38,10 @@ values
    (current_date+2 + time '10:00') at time zone 'America/Sao_Paulo', 'experimental', -33001, false),
   -- 180min de diferenca do lead -33003 (que pede 13:00) — NAO deve casar
   (-33002, -933002, '00000000-0000-4000-8000-000000000330', current_date+2,
-   (current_date+2 + time '16:00') at time zone 'America/Sao_Paulo', 'experimental', -33001, false);
+   (current_date+2 + time '16:00') at time zone 'America/Sao_Paulo', 'experimental', -33001, false),
+  -- fixture p/ o lead -33006 (faltou): aula ja aconteceu, so precisa existir
+  (-33006, -933006, '00000000-0000-4000-8000-000000000330', current_date+2,
+   (current_date+2 + time '08:00') at time zone 'America/Sao_Paulo', 'experimental', -33001, false);
 -- Nao existe NENHUMA aula na unidade 331: e o "-33001, 10:00, unidade 330"
 -- acima que serve de ISCA — mesmo professor, MESMO horario, unidade errada.
 -- Se o lead -33004 (unidade 331) casar com ela, a chave natural nao esta
@@ -141,6 +148,77 @@ insert into _res
 select 'matricula com recibo: quem/como gravado', 'reconciliador:emusys_sync',
        coalesce((select aluno_vinculado_por from lead_experimental_aulas
                   where lead_experimental_id=-33001 and substituido_em is null), '(nulo)');
+
+-- ── Achado do Alfredo: pendente/sem_par que casa DEPOIS tem que ser ────────
+-- promovido na MESMA linha (UPDATE), nunca por INSERT de uma segunda linha.
+-- O lead -33005 ja rodou uma vez (nas duas chamadas de reconciliador la em
+-- cima) sem nenhuma aula -33005 existir ainda: ficou pendente/sem_par, e
+-- essa linha E a vigente do lead. Se o codigo tentar INSERT em vez de
+-- UPDATE aqui, o indice uq_lead_exp_aula_vigente rejeita (unique_violation)
+-- e o reconciliador confunde isso com "aula ocupada por outro lead".
+insert into _res
+select 'pre-condicao: -33005 ja esta pendente/sem_par', 'pendente/sem_par',
+       coalesce((select estado||'/'||motivo_pendencia from lead_experimental_aulas
+                  where lead_experimental_id=-33005 and substituido_em is null), '(nenhum)');
+
+insert into public.aulas_emusys
+  (id, emusys_id, unidade_id, data_aula, data_hora_inicio, categoria, professor_id, cancelada)
+values
+  (-33005, -933005, '00000000-0000-4000-8000-000000000330', current_date+2,
+   (current_date+2 + time '09:00') at time zone 'America/Sao_Paulo', 'experimental', -33001, false);
+select public.fn_reconciliar_experimental_aulas(30, 500);
+
+insert into _res
+select 'pendente casado depois: 1 unica linha vigente (nao duplicou)', '1',
+       (select count(*)::text from lead_experimental_aulas
+         where lead_experimental_id=-33005 and substituido_em is null);
+insert into _res
+select 'pendente casado depois: estado vira vinculado', 'vinculado',
+       coalesce((select estado from lead_experimental_aulas
+                  where lead_experimental_id=-33005 and substituido_em is null), '(nenhum)');
+insert into _res
+select 'pendente casado depois: aula_local_id preenchido', 'presente',
+       case when (select aula_local_id from lead_experimental_aulas
+                    where lead_experimental_id=-33005 and substituido_em is null) is not null
+            then 'presente' else 'ausente' end;
+insert into _res
+select 'pendente casado depois: motivo_pendencia limpo', 'ausente',
+       case when (select motivo_pendencia from lead_experimental_aulas
+                    where lead_experimental_id=-33005 and substituido_em is null) is null
+            then 'ausente' else 'presente' end;
+insert into _res
+select 'pendente casado depois: erros=0 na rodada', '0',
+       (select (public.fn_reconciliar_experimental_aulas(30, 500)->>'erros'));
+
+-- ── Ponto de decisao explicito: 'faltou' + matricula NAO e capitulo pedagogico ─
+-- Comercialmente a matricula aconteceu (aluno_id preenchido), entao o recibo
+-- tem que ser gravado — mas a aula que gerou o recibo NUNCA aconteceu do
+-- lado pedagogico. aluno_origem diferencia os dois: 'conversao_sem_aula'
+-- avisa Task 4 (molde do registro) pra NAO tratar esta linha como o
+-- primeiro capitulo pedagogico do aluno.
+-- Nao insere o vinculo manualmente: como a aula -33006 casa pela chave
+-- natural desde a PRIMEIRA rodada do reconciliador la em cima, o proprio
+-- reconciliador ja vinculou e sincronizou -33006 para 'faltou' — e essa e
+-- a fixture que faz sentido (o vinculo veio do fluxo real, nao de um
+-- atalho de teste).
+insert into _res
+select 'pre-condicao: -33006 ja sincronizado como faltou', 'faltou',
+       coalesce((select estado from lead_experimental_aulas
+                  where lead_experimental_id=-33006 and substituido_em is null), '(nenhum)');
+
+insert into public.alunos (id, nome, unidade_id)
+values (-33006, 'ZZTESTE Aluno Faltou Convertido', '00000000-0000-4000-8000-000000000330');
+update public.lead_experimentais set aluno_id = -33006, status='convertido' where id=-33006;
+select public.fn_reconciliar_experimental_aulas(30, 500);
+
+insert into _res
+select 'faltou+matricula: recibo E gravado (comercial aconteceu)', '-33006',
+       coalesce((select aluno_id::text from lead_experimental_aulas
+                  where lead_experimental_id=-33006 and substituido_em is null), '(nulo)');
+insert into _res
+select 'faltou+matricula: origem NAO e pedagogica', 'conversao_sem_aula',
+       coalesce((select aluno_origem from lead_experimental_aulas
+                  where lead_experimental_id=-33006 and substituido_em is null), '(nulo)');
 
 select json_build_object(
   'falhas',  (select count(*) from _res where esperado is distinct from obtido),

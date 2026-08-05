@@ -86,7 +86,13 @@ begin
         v_estado_sincronizado := v_estado_sincronizado + 1;
 
       elsif v_lead.status in ('experimental_realizada', 'convertido') and v_vinculo.id is not null
-            and v_vinculo.estado <> 'realizado' then
+            and v_vinculo.estado not in ('realizado', 'faltou') then
+        -- 'faltou' fica de fora do alvo: 'convertido' e um status
+        -- COMERCIAL (a familia matriculou) e nao apaga o que aconteceu do
+        -- lado PEDAGOGICO (a familia faltou na experimental). Promover
+        -- 'faltou' pra 'realizado' aqui mentiria que a aula aconteceu —
+        -- achado par ao bug do aluno_origem (revisao do Alfredo, d2cb186):
+        -- sem esta exclusao, o Contrato 3 nunca via t.estado='faltou'.
         update lead_experimental_aulas set estado = 'realizado' where id = v_vinculo.id;
         v_estado_sincronizado := v_estado_sincronizado + 1;
 
@@ -140,6 +146,14 @@ begin
              and (ae.data_hora_inicio at time zone 'America/Sao_Paulo')
                  = (v_lead.data_experimental + v_lead.horario_experimental);
 
+          -- Se ja existe uma linha vigente e ela esta 'pendente', essa
+          -- linha JA E o lugar certo pra guardar o resultado — o unico
+          -- caminho e UPDATE nela. Tentar INSERT aqui bate direto no
+          -- indice de vigencia (a linha pendente conta como vigente) e o
+          -- unique_violation resultante seria mal-interpretado como "aula
+          -- ocupada por outro lead": achado do Alfredo (revisao do commit
+          -- d2cb186) — pendente/sem_par que casa numa rodada seguinte
+          -- gerava erro em vez de promocao.
           if v_qtd_par = 1 then
             select ae.id into v_par_id
               from aulas_emusys ae
@@ -149,38 +163,54 @@ begin
                and (ae.data_hora_inicio at time zone 'America/Sao_Paulo')
                    = (v_lead.data_experimental + v_lead.horario_experimental);
 
-            begin
-              insert into lead_experimental_aulas
-                (lead_experimental_id, aula_local_id, estado, casado_por, vinculado_em, vinculado_por)
-              values
-                (v_lead.id, v_par_id, 'vinculado', 'chave_natural', now(), 'reconciliador');
-              if v_vinculo.id is not null then
-                v_revinculados := v_revinculados + 1;
-              else
-                v_vinculados := v_vinculados + 1;
-              end if;
-            exception when unique_violation then
-              -- a aula ja esta ocupada por OUTRO lead vigente: fila de
-              -- trabalho, nao susto silencioso nem escolha arbitraria
-              if v_vinculo.id is null or v_vinculo.estado <> 'pendente'
-                 or v_vinculo.motivo_pendencia is distinct from 'ambiguo' then
+            if v_vinculo.id is not null and v_vinculo.estado = 'pendente' then
+              update lead_experimental_aulas
+                 set aula_local_id = v_par_id,
+                     estado = 'vinculado',
+                     casado_por = 'chave_natural',
+                     motivo_pendencia = null,
+                     vinculado_em = now(),
+                     vinculado_por = 'reconciliador'
+               where id = v_vinculo.id;
+              v_vinculados := v_vinculados + 1;
+            else
+              begin
+                insert into lead_experimental_aulas
+                  (lead_experimental_id, aula_local_id, estado, casado_por, vinculado_em, vinculado_por)
+                values
+                  (v_lead.id, v_par_id, 'vinculado', 'chave_natural', now(), 'reconciliador');
+                if v_vinculo.id is not null then
+                  v_revinculados := v_revinculados + 1;
+                else
+                  v_vinculados := v_vinculados + 1;
+                end if;
+              exception when unique_violation then
+                -- so chega aqui quando v_vinculo NAO era 'pendente' (ramo
+                -- acima ja tratou esse caso) — ou seja, a aula realmente
+                -- esta ocupada por OUTRO lead vigente.
                 insert into lead_experimental_aulas (lead_experimental_id, estado, motivo_pendencia)
                 values (v_lead.id, 'pendente', 'ambiguo');
-              end if;
-              v_pendentes_ambiguo := v_pendentes_ambiguo + 1;
-            end;
+                v_pendentes_ambiguo := v_pendentes_ambiguo + 1;
+              end;
+            end if;
 
           elsif v_qtd_par = 0 then
-            if v_vinculo.id is null or v_vinculo.estado <> 'pendente'
-               or v_vinculo.motivo_pendencia is distinct from 'sem_par' then
+            if v_vinculo.id is not null and v_vinculo.estado = 'pendente' then
+              if v_vinculo.motivo_pendencia is distinct from 'sem_par' then
+                update lead_experimental_aulas set motivo_pendencia = 'sem_par' where id = v_vinculo.id;
+              end if;
+            else
               insert into lead_experimental_aulas (lead_experimental_id, estado, motivo_pendencia)
               values (v_lead.id, 'pendente', 'sem_par');
             end if;
             v_pendentes_sem_par := v_pendentes_sem_par + 1;
 
           else -- mais de uma aula bate (nao visto em producao, mas nao e chute)
-            if v_vinculo.id is null or v_vinculo.estado <> 'pendente'
-               or v_vinculo.motivo_pendencia is distinct from 'ambiguo' then
+            if v_vinculo.id is not null and v_vinculo.estado = 'pendente' then
+              if v_vinculo.motivo_pendencia is distinct from 'ambiguo' then
+                update lead_experimental_aulas set motivo_pendencia = 'ambiguo' where id = v_vinculo.id;
+              end if;
+            else
               insert into lead_experimental_aulas (lead_experimental_id, estado, motivo_pendencia)
               values (v_lead.id, 'pendente', 'ambiguo');
             end if;
@@ -196,12 +226,22 @@ begin
 
     -- 5) Contrato 3 — matricula com recibo, observando lead_experimentais.aluno_id
     -- (a coluna PROPRIA de lead_experimentais, nao leads.aluno_id)
+    --
+    -- Decisao explicita (revisao do Alfredo, commit d2cb186): 'faltou' e
+    -- terminal do lado PEDAGOGICO (a aula nao aconteceu pro aluno), mas o
+    -- COMERCIAL pode converter mesmo assim (matriculou apesar de ter
+    -- faltado na experimental). O recibo tem que ser gravado — bloquear
+    -- perderia rastro de uma matricula real — mas aluno_origem avisa quem
+    -- ler depois (Task 4, molde do registro) que esta linha NAO e o
+    -- primeiro capitulo pedagogico do aluno.
     if v_lead.aluno_id is not null then
       update lead_experimental_aulas t
          set aluno_id = v_lead.aluno_id,
              aluno_vinculado_em = now(),
              aluno_vinculado_por = 'reconciliador:emusys_sync',
-             aluno_origem = 'lead_experimentais.aluno_id'
+             aluno_origem = case when t.estado = 'faltou'
+                                  then 'conversao_sem_aula'
+                                  else 'lead_experimentais.aluno_id' end
        where t.lead_experimental_id = v_lead.id
          and t.substituido_em is null
          and t.aluno_id is null;
