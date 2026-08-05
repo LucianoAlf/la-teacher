@@ -377,15 +377,31 @@ Responda APENAS com o briefing formatado, sem introdução ou comentários.`;
     return { texto: "", vazou: null, tentativas: 0 };
   }
 }
-function montarMensagemFinal(estrutura, briefing, token) {
+function montarMensagemFinal(estrutura, briefing, _token) {
   let msg = estrutura;
   if (briefing) {
     msg += `\n\n${SEPARADOR}\n💡 *INSIGHTS PEDAGÓGICOS*\n${SEPARADOR}\n\n${briefing}\n\n${SEPARADOR}`;
   }
-  if (token) {
-    msg += `\n\n🔗 *Ver anamnese completa:*\n${PUBLIC_BASE_URL}/perfil/${token}`;
-  }
+  // O LINK DA FICHA COMPLETA FOI REMOVIDO DAQUI (Alf decidiu em 05/08/2026).
+  //
+  // Ele apontava para `${PUBLIC_BASE_URL}/perfil/<share_token>`, e a pagina le
+  // por `get_anamnese_publica` / `get_anamnese_by_token` — as duas SECURITY
+  // DEFINER com EXECUTE para `anon`. Testado com a chave publica e SEM login
+  // nenhum: HTTP 200 devolvendo 42 e 49 campos, com `diagnosticos`,
+  // `cuidado_medico`, `medicacao_continua` e `necessidade_apoio`.
+  //
+  // Ou seja: fechar so o texto desta mensagem era meia fronteira. O token
+  // viajava dentro dela, e mensagem de WhatsApp e encaminhavel — bastava um
+  // repasse para o dado de saude de um menor sair do time pedagogico.
+  //
+  // O `share_token` continua existindo e a rota autenticada segue servindo a
+  // coordenacao. O que mudou e que ele nao vai mais no WhatsApp do professor.
+  //
+  // ⚠️ Os links JA ENVIADOS continuam valendo: os tokens nao foram rotacionados
+  // (rotacionar quebraria a pagina para quem usa legitimamente). Se isso
+  // incomodar, a rotacao e uma decisao a parte.
   msg += "\n\n_Informações confidenciais — uso exclusivo do time pedagógico LA Music._";
+  msg += "\n_Precisa de mais detalhe sobre esse aluno? Fale com a coordenação._";
   return msg;
 }
 Deno.serve(async (req)=>{
