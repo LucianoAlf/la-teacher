@@ -175,9 +175,24 @@ Colunas novas em `lead_experimental_aulas`:
 | coluna | papel |
 |---|---|
 | `presenca_status` | `presente` / `falta` |
-| `presenca_respondido_por` | `professor_app`, `fabio_audio`, `emusys`, `manual` |
+| `presenca_respondido_por` | `professor_la_teacher`, `fabio_audio`, `professor_whatsapp`, `manual`, `emusys`, `sistema` |
 | `presenca_respondido_em` | quando |
 | `presenca_bruta_emusys` | o que o Emusys disse, preservado |
+
+**O vocabulário de fonte é o mesmo do aluno, sem inventar valor novo.** A primeira versão
+deste spec escreveu `professor_app` — valor que **não existe** na casa. Medido em
+05/08/2026: `fn_presenca_e_forte('professor_app')` devolve `false`, e o CHECK de
+`aluno_presenca.respondido_por` sequer o aceita. Presença vinda do app nasceria **fraca em
+silêncio** — o fantasma que este spec existe para matar. Achado do Alfredo na revisão do
+`4f00e94`.
+
+Os valores válidos são exatamente os do CHECK existente:
+`professor_whatsapp`, `professor_la_teacher`, `manual`, `sistema`, `emusys`, `fabio_audio`.
+Registro pelo app grava `professor_la_teacher`; registro por áudio grava `fabio_audio`.
+Ambos passam em `fn_presenca_e_forte`.
+
+O CHECK da coluna nova **copia essa lista verbatim** — assim, um valor inventado é
+rejeitado na escrita, em vez de virar presença fraca silenciosa.
 
 Mesma `fn_presenca_e_forte`, mesma semântica de selo honesto. Quem sabe ler presença de
 aluno lê esta igual.
@@ -191,6 +206,30 @@ gradual. A precedência resolve isso sem ninguém precisar combinar nada.
 Quando o professor registra presença forte, o reconciliador (033) passa a respeitá-la:
 `presenca_status='presente'` promove `estado` para `realizado`, e o status do lead vindo
 do comercial não regride isso — mesma regra que já protege `manual`.
+
+#### Isto é migration própria, não efeito colateral
+
+As 032 e 033 estão **aplicadas e carimbadas**. Mexer nelas exige migration nova e
+declarada — o plano de implementação terá uma task só para isto, e ela não pode ficar
+embutida em outra:
+
+**Migration 034 — presença no vínculo.** Escopo fechado:
+
+1. `alter table lead_experimental_aulas add column` para as quatro colunas
+   (`presenca_status`, `presenca_respondido_por`, `presenca_respondido_em`,
+   `presenca_bruta_emusys`), com o CHECK de fonte copiado verbatim do
+   `aluno_presenca_respondido_por_check`.
+2. `create or replace` da `fn_reconciliar_experimental_aulas` para respeitar fonte forte:
+   presença forte do professor promove `estado` e **não é rebaixada** pelo status
+   comercial — a mesma posição de guarda que hoje protege `manual` (primeiro `if` do laço,
+   não um ramo do meio; ver o achado do commit `f42203e`).
+3. Teste com fixtures `ZZTESTE` e os mutantes de §7 — obrigatoriamente incluindo o de
+   **regressão comercial**: lead vira `cancelada`/`experimental_faltou` depois de o
+   professor ter afirmado presença forte, e o `estado` **não** pode regredir.
+
+A 033 já tem histórico de bug exatamente nessa área: o ramo de sync de
+`experimental_realizada`/`convertido` promovia `faltou` para `realizado` porque só excluía
+`realizado` do alvo. Toda alteração ali entra com mutante próprio.
 
 ### 4.3 Componente 3 — aviso ao comercial pelo Fábio
 
@@ -241,13 +280,19 @@ create view public.vw_experimental_registro_comercial as
 select ...   -- inclui leitura_de_conversao (consumidor interno)
 ```
 
-E uma view irmã, **sem** a coluna de conversão, para qualquer superfície que possa chegar
-perto da família:
+E uma view irmã, **sem** a coluna de conversão:
 
 ```sql
-create view public.vw_experimental_registro_familia as
+create view public.vw_experimental_registro_family_safe as
 select ...   -- NUNCA seleciona leitura_de_conversao
 ```
+
+**O nome descreve a garantia, não o destinatário** — e isso é deliberado. A primeira
+versão chamava `..._familia`, o que sugeria que existe um caminho do Fábio para a família
+nesta fase; não existe (D1), e um nome assim convida alguém a criar um depois, achando que
+estava previsto. `family_safe` afirma a propriedade do conteúdo — *é seguro se chegar à
+família* — sem prometer entrega. O destinatário operacional continua sendo o consultor.
+Achado do Alfredo na revisão do `4f00e94`.
 
 Duas views, não um parâmetro booleano: um flag errado vira vazamento; uma view que não
 tem a coluna não pode vazá-la.
@@ -322,6 +367,8 @@ e **cada defesa tem um mutante que a mata** — verde não-falsificado é decora
 | Presença forte do professor promove `estado` p/ `realizado` | Remover a promoção |
 | Status comercial não regride presença forte | Remover a exclusão no ramo de sync da 033 |
 | Declarar falta grava fonte forte e promove `estado` | Fazer a declaração gravar sem fonte (viraria fantasma) |
+| Fonte inventada é rejeitada na escrita | Afrouxar o CHECK de `presenca_respondido_por` — o teste tenta gravar `professor_app` e exige rejeição |
+| Toda fonte aceita pelo CHECK que representa professor passa em `fn_presenca_e_forte` | Trocar o valor gravado pelo app por um fora da lista forte |
 | Falta gera aviso **sem** blocos pedagógicos | Fazer o aviso da falta montar o corpo completo |
 
 **Asserções medem a rodada certa.** Onde houver função que devolve resumo, o teste guarda
