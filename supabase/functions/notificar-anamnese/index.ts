@@ -3,32 +3,45 @@
 // Body esperado: { anamnese_id: number, dry_run?: boolean }
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// A FRONTEIRA DO DADO DE SAUDE (05/08/2026)
+// O QUE O PROFESSOR RECEBE DE SAUDE (05/08/2026)
 //
-// O professor precisa saber COMO APOIAR. Nao precisa saber o NOME do
-// diagnostico, nem a condicao medica literal. Essa foi a decisao do Alf
-// ("letra B"): conteudo pedagogico + uma linha traduzida sobre necessidade de
-// apoio, nunca o rotulo.
+// A REGRA: o que a familia informou de saude VAI para o professor, e o briefing
+// diz o que fazer com isso na aula.
 //
-// O vazamento tinha DUAS fontes, e so uma era obvia:
+// Cheguei aqui pelo caminho errado, e o registro importa mais que o codigo.
 //
-//   1. DETERMINISTICA — `buildEstrutura` imprimia `⚠️ *Diagnostico:* <lista>`
-//      literal, antes do briefing. Sempre que houvesse diagnostico, vazava.
+// De manha eu cortei o bloco de saude inteiro, por privacidade. O Alf reverteu,
+// e o argumento derruba o meu: se a familia RELATOU na anamnese, ela espera que
+// o professor saiba. O professor descobrir numa conversa com o pai que ninguem
+// o avisou e pior por todos os lados — para a crianca, para ele e para a
+// escola. E parte disto nem e conducao de aula, e seguranca fisica: no banco ha
+// "Anafilaxia a formiga" e "Cardiopata". Esconder isso de quem fica sozinho uma
+// hora por semana com a crianca e o oposto de proteger.
 //
-//   2. PROBABILISTICA — o rotulo e o `cuidado_medico` iam para a IA, e o prompt
-//      pedia "foque em adaptacao, nao em rotulos". Medido nas mensagens ja
-//      geradas: 1 de 3 briefings repetiu o rotulo do diagnostico e 1 de 4
-//      repetiu a condicao medica literal ("Tratamento psiquiatrico de..."),
-//      COM a regra escrita no prompt.
+// O QUE SOBROU DA PASSAGEM CONSERVADORA, e que valia a pena:
 //
-// Por isso a defesa aqui nao e uma instrucao melhor: e uma VARREDURA
-// DETERMINISTICA na saida (`briefingVazou`). O prompt pede a traducao; o codigo
-// e quem garante. Se vazar mesmo assim, o briefing e descartado inteiro — o
-// professor recebe menos, nunca a mais. Fail closed.
+//   • `sinaisDeSaude` so imprime campo com CONTEUDO. Antes saia
+//     `Medicacao: nao / Cuidado medico: nao / Apoio necessario: nao` — tres
+//     linhas de nada, no meio das quais a informacao real se perdia.
+//   • O briefing nao repete o rotulo: ele diz o que FAZER. O professor ja leu a
+//     linha logo acima; repetir nao ajuda ninguem.
 //
-// Nada disso foi entregue a ninguem ainda: as 3 mensagens com diagnostico cru
-// que existiam estavam todas com status `erro` (o canal WAHA estava morto). O
-// canal foi religado em 04/08 pelo Alfredo, e e por isso que isto virou urgente.
+// O QUE FOI EMBORA, e por que:
+//
+//   Havia uma varredura deterministica que descartava o briefing se ele citasse
+//   o diagnostico. Ela existia porque o prompt sozinho nao segurava — medido:
+//   1 de 3 briefings repetia o rotulo mesmo com a proibicao em maiusculas.
+//   Com a saude indo na estrutura, nao ha o que varrer: bloquear o briefing por
+//   citar o que o professor acabou de ler seria teatro, e descartaria
+//   orientacao util ("como ela e cardiopata, evite respiracao intensa").
+//
+//   O que continua fora nao depende de varredura: `sanitizeForAI` nao manda
+//   filiacao nem situacao conjugal dos pais para a IA. Ela nao pode citar o que
+//   nunca recebeu — estrutura, nao instrucao.
+//
+// O link da ficha completa continua fora daqui (ver `montarMensagemFinal`), e
+// isso e outra coisa: nao e sobre esconder saude, e sobre nao mandar por
+// WhatsApp uma credencial de acesso a ficha inteira.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const PUBLIC_BASE_URL = "https://anamnese-la-music.vercel.app";
 const QUEUE_TABLE = "fila_anamnese_sol_hermes";
@@ -61,35 +74,23 @@ function ehVazioOuNegativo(v) {
   return NEGATIVAS.has(String(v ?? "").trim().toLowerCase().replace(/[.!]+$/, ""));
 }
 
-// Termos que NAO podem aparecer no texto que vai pro professor. Sao os dados
-// desta anamnese especifica — nao uma lista fixa de doencas, que envelheceria e
-// nunca cobriria o que a familia escreveu com as palavras dela.
-function termosProibidos(a) {
-  const termos = [];
-  const push = (v)=>{
+// O que a familia informou de saude, ja limpo do ruido. Devolve [] quando nao
+// ha nada — e "nada" inclui os "n", "nao ", "teste" que chegam nesses campos de
+// texto livre, e que viravam linhas inuteis tipo `Medicacao: nao`.
+function sinaisDeSaude(a) {
+  const itens = [];
+  const add = (rotulo, v)=>{
     const s = String(v ?? "").trim();
-    if (s.length >= 4 && !ehVazioOuNegativo(s)) termos.push(s);
+    if (s && !ehVazioOuNegativo(s)) itens.push({ rotulo, valor: s });
   };
-  (Array.isArray(a.diagnosticos) ? a.diagnosticos : []).forEach(push);
-  push(a.cuidado_medico);
-  push(a.medicacao_continua);
-  return termos;
-}
-
-function briefingVazou(briefing, termos) {
-  const alvo = (briefing || "").toLowerCase();
-  for (const t of termos){
-    const termo = t.toLowerCase();
-    if (alvo.includes(termo)) return t;
-    // Texto livre longo ("Tratamento psiquiatrico de depressao e ansiedade")
-    // dificilmente reaparece inteiro, mas as palavras clinicas dele sim. Cada
-    // palavra com 6+ letras conta: e assim que "psiquiatrico" e "depressao"
-    // sao pegos mesmo quando a IA reescreve a frase em volta.
-    for (const palavra of termo.split(/\W+/)){
-      if (palavra.length >= 6 && alvo.includes(palavra)) return palavra;
-    }
-  }
-  return null;
+  const diags = (Array.isArray(a.diagnosticos) ? a.diagnosticos : [])
+    .map((d)=>String(d ?? "").trim())
+    .filter((d)=>d && !ehVazioOuNegativo(d));
+  if (diags.length) itens.push({ rotulo: "Diagnóstico", valor: diags.join(", ") });
+  add("Cuidado médico", a.cuidado_medico);
+  add("Medicação contínua", a.medicacao_continua);
+  add("Apoio necessário", a.necessidade_apoio);
+  return itens;
 }
 
 function buildEstrutura(a) {
@@ -158,12 +159,26 @@ function buildEstrutura(a) {
   if (isLamk && a.comunicacao_crianca) {
     out.push("", `💬 *Comunicação:* ${a.comunicacao_crianca}`);
   }
-  // O bloco `⚠️ *Diagnostico:*` MORAVA AQUI e foi removido de proposito. O que
-  // o professor precisa — como apoiar — vem traduzido no briefing, e a
-  // coordenacao continua com o dado completo na ficha.
+  // SAUDE VAI, SIM — e o Alf corrigiu isto em 05/08/2026, com razao.
   //
-  // `necessidade_apoio` tambem nao vai mais cru: e texto livre da familia, e
-  // pode conter o rotulo. Vira sinal para a IA traduzir.
+  // Eu tinha cortado o bloco inteiro por privacidade. O argumento que derruba
+  // isso: se a familia RELATOU na anamnese, ela espera que o professor saiba.
+  // O professor descobrir numa conversa com o pai que ninguem o avisou e pior
+  // por todos os lados. E parte disto nem e conducao de aula, e seguranca
+  // fisica: no banco ha "Anafilaxia a formiga" e "Cardiopata" — esconder de
+  // quem fica sozinho uma hora por semana com a crianca e o oposto de
+  // proteger.
+  //
+  // O que continua valendo do conserto anterior e o COMO: nada de despejo de
+  // campo vazio. Antes saia `Medicacao: nao / Cuidado medico: nao / Apoio
+  // necessario: nao` — tres linhas de nada que faziam a informacao de verdade
+  // se perder no meio. `sinaisDeSaude` so devolve o que tem conteudo, e o
+  // briefing complementa com o que FAZER na aula.
+  const saude = sinaisDeSaude(a);
+  if (saude.length) {
+    out.push("", "⚠️ *Saúde e necessidades*");
+    for (const s of saude) out.push(`• *${s.rotulo}:* ${s.valor}`);
+  }
   out.push("", `📝 *Obs:* ${a.observacoes_entrevistador || "Nenhuma"}`);
   return out.join("\n");
 }
@@ -220,9 +235,9 @@ function sanitizeForAI(a, respostas, idadeAnos) {
       interesse_instrumento_cantar: a.interesse_instrumento_cantar,
       fonte_exposicao_musical: a.fonte_exposicao_musical
     } : undefined,
-    // O bloco `saude` continua chegando na IA: sem ele, ela nao tem como
-    // TRADUZIR a necessidade de apoio, e a traducao e o produto. O que garante
-    // que o rotulo nao volte na saida e o `briefingVazou`, nao esta confianca.
+    // O bloco `saude` chega na IA para ela dizer o que FAZER com aquilo na
+    // aula. O professor ja recebe os dados na estrutura, entao aqui o valor e
+    // a orientacao, nao a repeticao.
     saude: {
       diagnosticos: a.diagnosticos,
       cuidado_medico: a.cuidado_medico,
@@ -280,12 +295,10 @@ async function chamarGemini(prompt) {
   return texto;
 }
 async function gerarBriefing(a, respostas, idadeAnos) {
-  if (!GEMINI_API_KEY) return { texto: "", vazou: null, tentativas: 0 };
+  if (!GEMINI_API_KEY) return { texto: "", tentativas: 0 };
   const isLamk = a.tipo_formulario === "LAMK";
   const dadosLimpos = sanitizeForAI(a, respostas, idadeAnos);
-  const temApoio = !ehVazioOuNegativo(a.necessidade_apoio)
-    || (Array.isArray(a.diagnosticos) && a.diagnosticos.some((d)=>!ehVazioOuNegativo(d)))
-    || !ehVazioOuNegativo(a.cuidado_medico);
+  const temApoio = sinaisDeSaude(a).length > 0;
   const prompt = `Você é o assistente pedagógico da LA Music, uma rede de escolas de música no Rio de Janeiro.
 
 Com base nos dados da anamnese abaixo, gere um BRIEFING PEDAGÓGICO curto para o professor que vai dar aula pra esse aluno.
@@ -307,23 +320,30 @@ Referência dos temperamentos:
 ${isLamk ? "IMPORTANTE: é uma criança (LA Music Kids). Considere comunicação, telas, sono e estereotipias." : "IMPORTANTE: é adolescente/adulto (LA Music School). Considere autonomia, gostos musicais e nivelamento."}
 
 ════════════════════════════════════════════════
-REGRA DE PRIVACIDADE — A MAIS IMPORTANTE DESTE PROMPT
+SOBRE O BLOCO "saude" — LEIA COM ATENÇÃO
 
-O bloco "saude" existe para você TRADUZIR, não para repetir. O professor NUNCA
-pode ler o nome de um diagnóstico, de uma condição médica ou de um medicamento.
-Ele precisa saber o que FAZER na aula.
+O professor JÁ RECEBEU, logo acima deste briefing, o que a família informou de
+saúde, com as palavras dela. Se a família escreveu que a criança é autista, o
+professor leu isso. Você NÃO precisa esconder, e NÃO deve fingir que não sabe.
 
-Está PROIBIDO escrever: nome de diagnóstico ou sigla (TEA, TDAH, TOD, dislexia,
-etc.), nome de condição médica ou tratamento, nome de medicamento, e as
-palavras "diagnóstico", "laudo", "transtorno", "síndrome" e "medicação".
+Seu trabalho aqui é o passo seguinte: dizer o que FAZER na aula. Repetir o
+rótulo sozinho não ajuda ninguém — o professor já tem essa linha.
 
-Em vez disso, escreva a NECESSIDADE em linguagem de sala de aula:
-  ✗ "Tem TEA nível 1"           ✓ "Responde melhor a uma rotina previsível: avise antes de mudar de atividade"
-  ✗ "Faz tratamento para ansiedade"  ✓ "Pode se cobrar demais; comece por algo que ela já consiga executar bem"
-  ✗ "Tem dislexia"              ✓ "Prefira demonstrar e tocar junto a depender de leitura de partitura"
+  ✗ inútil:  "Ela tem TEA nível 1."
+  ✓ útil:    "Responde melhor a uma rotina previsível: diga no começo o que vão
+              fazer e avise antes de trocar de atividade."
 
-Se o texto da família não deixar claro o que fazer, escreva algo geral e útil
-("vale combinar com a coordenação como adaptar") em vez de nomear a condição.
+  ✗ inútil:  "Faz tratamento para ansiedade."
+  ✓ útil:    "Pode se cobrar demais; comece por algo que ela já execute bem e
+              feche a aula com uma pequena vitória."
+
+Pode nomear a condição quando isso tornar a orientação mais clara ("como ela é
+cardiopata, evite exercícios de respiração muito intensos"). O que não pode é
+o briefing virar uma repetição da lista que ele acabou de ler.
+
+Se o que a família escreveu não deixar claro o que fazer, diga isso com
+honestidade — "vale combinar com a coordenação como adaptar" — em vez de
+inventar uma adaptação que você não tem como saber se serve.
 ════════════════════════════════════════════════
 
 ESTRUTURA SUGERIDA (use exatamente esse formato, com emojis e *negrito*):
@@ -331,7 +351,7 @@ ESTRUTURA SUGERIDA (use exatamente esse formato, com emojis e *negrito*):
 
 *Como ela/ele aprende:* (2-3 linhas, perfil em linguagem prática)
 
-${temApoio ? "🤝 *Como apoiar:* (1-2 linhas — o que FAZER na aula, seguindo a regra de privacidade acima. Nunca o nome da condição.)\n\n" : ""}🎯 *O que esperam:* (resumo do que os pais/aluno querem)
+${temApoio ? "🤝 *Como apoiar:* (1-2 linhas — o que FAZER na aula por causa do que a família relatou. Ação, não repetição do rótulo.)\n\n" : ""}🎯 *O que esperam:* (resumo do que os pais/aluno querem)
 
 💡 *Primeiras aulas:*
 - (dica 1 acionável)
@@ -342,7 +362,7 @@ ${temApoio ? "🤝 *Como apoiar:* (1-2 linhas — o que FAZER na aula, seguindo 
 
 REGRAS:
 - NÃO mencionar filiação (adotivo/biológico) nem situação conjugal dos pais
-${temApoio ? "- Inclua o bloco 🤝 *Como apoiar*, sempre traduzido em ação" : "- NÃO inclua o bloco 🤝 *Como apoiar*: não há necessidade registrada"}
+${temApoio ? "- Inclua o bloco 🤝 *Como apoiar*, sempre em forma de AÇÃO" : "- NÃO inclua o bloco 🤝 *Como apoiar*: não há nada registrado"}
 - Termine com uma frase motivacional curta pro professor
 
 DADOS DO ALUNO (JSON, ignore campos null):
@@ -352,29 +372,28 @@ RESPOSTAS COMPORTAMENTAIS (pergunta_numero, resposta_posicao). Posição: 1=Col�
 ${JSON.stringify(respostas)}
 
 Responda APENAS com o briefing formatado, sem introdução ou comentários.`;
-  const proibidos = termosProibidos(a);
+  // A VARREDURA DE ROTULO SAIU DAQUI, e vale registrar por que ela existiu.
+  //
+  // Enquanto a regra era "o professor nunca le o nome da condicao", o prompt
+  // sozinho nao segurava: medido nas mensagens ja geradas, 1 de 3 briefings
+  // repetia o rotulo e 1 de 4 repetia a condicao medica literal, COM a proibicao
+  // escrita em maiusculas. Por isso havia uma varredura deterministica que
+  // regerava e, na segunda falha, descartava o briefing.
+  //
+  // Com a saude indo na estrutura por decisao do Alf, nao ha mais o que varrer:
+  // o professor ja leu a linha logo acima. Bloquear o briefing por citar o que
+  // o proprio professor acabou de ler seria teatro — e pior, descartaria
+  // orientacao util ("como ela e cardiopata, evite respiracao intensa").
+  //
+  // O que continua protegido nao depende de varredura: `sanitizeForAI` nao
+  // manda filiacao nem situacao conjugal dos pais para a IA. Ela nao pode citar
+  // o que nunca recebeu — estrutura, nao instrucao.
   try {
-    let texto = await chamarGemini(prompt);
-    let vazou = briefingVazou(texto, proibidos);
-    let tentativas = 1;
-    if (vazou) {
-      // Uma segunda chance, com o termo exato que ela deixou escapar. Medido em
-      // producao: a IA repetia o rotulo em 1 de 3 mesmo com a regra escrita.
-      console.error(`[privacidade] briefing vazou "${vazou}" — regerando`);
-      texto = await chamarGemini(`${prompt}\n\nATENÇÃO: sua resposta anterior continha "${vazou}", que é PROIBIDO. Reescreva dizendo o que o professor deve FAZER, sem nomear nada.`);
-      vazou = briefingVazou(texto, proibidos);
-      tentativas = 2;
-    }
-    if (vazou) {
-      // Fail closed: sem briefing é pior do que com briefing, mas vazar dado de
-      // saúde de criança é MUITO pior do que os dois.
-      console.error(`[privacidade] briefing vazou "${vazou}" de novo — DESCARTADO`);
-      return { texto: "", vazou, tentativas };
-    }
-    return { texto, vazou: null, tentativas };
+    const texto = await chamarGemini(prompt);
+    return { texto, tentativas: 1 };
   } catch (e) {
     console.error("[gemini] exception:", e);
-    return { texto: "", vazou: null, tentativas: 0 };
+    return { texto: "", tentativas: 0 };
   }
 }
 function montarMensagemFinal(estrutura, briefing, _token) {
@@ -523,27 +542,6 @@ Deno.serve(async (req)=>{
     const briefing = briefingRes.texto;
     const message = montarMensagemFinal(estrutura, briefing, anamnese.share_token ?? null);
 
-    // Ultima linha de defesa: a mensagem INTEIRA, ja montada, nao pode conter
-    // termo proibido. Cobre tambem a estrutura — se um campo novo aparecer no
-    // formulario amanha e alguem o imprimir sem pensar, isto acusa antes de o
-    // WhatsApp sair.
-    const vazamentoFinal = briefingVazou(message, termosProibidos(anamnese));
-    if (vazamentoFinal) {
-      console.error(`[privacidade] MENSAGEM FINAL vazou "${vazamentoFinal}" — nao enfileira`);
-      return new Response(JSON.stringify({
-        status: "bloqueado_privacidade",
-        motivo: "mensagem final continha termo de saude protegido",
-        anamnese_id: anamnese.id,
-        professor_id: professor.id
-      }), {
-        status: 200,
-        headers: {
-          ...cors,
-          "Content-Type": "application/json"
-        }
-      });
-    }
-
     const telefone = normalizePhone(professor.telefone_whatsapp);
     const jid = telefone ? `${telefone}@s.whatsapp.net` : null;
     if (dry_run) {
@@ -557,7 +555,7 @@ Deno.serve(async (req)=>{
         briefing_ok: Boolean(briefing),
         briefing_chars: briefing.length,
         briefing_tentativas: briefingRes.tentativas,
-        briefing_vazou: briefingRes.vazou,
+        briefing_saude_itens: sinaisDeSaude(anamnese).length,
         message_chars: message.length,
         message_preview: message
       }), {
