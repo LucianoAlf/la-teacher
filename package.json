@@ -16,7 +16,9 @@
     "teste:025": "node scripts/rodar-teste-sql.mjs supabase/migrations/025-devolutiva-destinatario-e-entrega-incerta.sql supabase/migrations/025-devolutiva-destinatario-e-entrega-incerta.test.sql",
     "teste:026": "node scripts/rodar-teste-sql.mjs supabase/migrations/026-carteira-sabe-quem-e-aluno-novo.sql supabase/migrations/026-carteira-sabe-quem-e-aluno-novo.test.sql",
     "teste:027": "node scripts/rodar-teste-sql.mjs supabase/migrations/027-contexto-experimental.sql supabase/migrations/027-contexto-experimental.test.sql",
-    "mutantes:027": "node scripts/mutantes-027.mjs"
+    "mutantes:027": "node scripts/mutantes-027.mjs",
+    "teste:028": "node scripts/rodar-teste-sql.mjs supabase/migrations/028-fabio-le-contexto-experimental.sql supabase/migrations/028-fabio-le-contexto-experimental.test.sql",
+    "mutantes:028": "node scripts/mutantes-028.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
