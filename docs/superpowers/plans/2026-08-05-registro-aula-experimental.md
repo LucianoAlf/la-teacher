@@ -23,6 +23,10 @@
 - **A tabela de registro só é escrita por RPC**; escrita direta fica sem `GRANT`.
 - **`unidade_id`/`professor_id` do registro são derivados do vínculo**, e a RPC ignora o que o chamador mandar nesses campos.
 - **Migrations 032 e 033 estão aplicadas e carimbadas** — alterá-las exige migration nova e declarada, nunca edição do arquivo antigo.
+- **Padrão de segurança da casa (escrito na 001, seção 6): "o professor NUNCA passa o próprio id; tudo resolve via `auth.uid()` → `fn_professor_do_usuario()`".** Nenhuma RPC `app_*` recebe `professor_id` como parâmetro, e toda escrita confere que a aula é do professor logado. `security definer` + `grant authenticated` + id cru é escalada de privilégio.
+- **Funções que fazem o trabalho (`fn_*_interno`) são `service_role` apenas.** As `app_*` validam e delegam. Testes montam cenário pela interna; a guarda se testa forjando `request.jwt.claims`.
+- **Nenhuma view com dado de lead recebe `grant` a `authenticated`.** "Family-safe" descreve conteúdo, não autorização — a linha ainda tem nome de lead e unidade. Leitura por tela passa por RPC que filtra pelo professor logado.
+- **Aviso ao comercial entra por claim com lease**, no formato de `fabio_claim_notificacao_por_referencia` (018): `tentativas`, `lease_token`, `lease_expira_em`, retorno `{claimed, lease_token}`. A idempotência é estrutural (índice `uq_fabio_notif_por_referencia`), nunca reimplementada.
 
 ---
 
@@ -369,7 +373,10 @@ git log --oneline origin/main..HEAD | wc -l   # tem que dar 0
 
 **Interfaces:**
 - Consumes: `public.lead_experimental_aulas` com as colunas da Task 1; `public.fn_registrar_presenca_experimental(bigint,text,text,text)`.
-- Produces: tabela `public.lead_experimental_registros`; RPC `public.app_registrar_experimental(p_vinculo_id bigint, p_anotacao_pedagogica text, p_devolutiva_familia text, p_proximos_passos text, p_leitura_de_conversao text, p_origem text default 'app') returns uuid` (devolve o id do registro, criando ou editando o vigente).
+- Produces:
+  - tabela `public.lead_experimental_registros`;
+  - `public.fn_registrar_experimental_interno(p_vinculo_id bigint, p_anotacao_pedagogica text, p_devolutiva_familia text, p_proximos_passos text, p_leitura_de_conversao text, p_origem text default 'app') returns uuid` — faz o trabalho, **só `service_role`**;
+  - `public.app_registrar_experimental(...)` — mesma assinatura, resolve `auth.uid()` → `fn_professor_do_usuario()`, exige que a aula seja do professor logado, delega para a interna. `service_role` + `authenticated`.
 
 - [ ] **Passo 1: Escrever a migration**
 
@@ -421,7 +428,16 @@ comment on column public.lead_experimental_registros.leitura_de_conversao is
 -- unidade_id/professor_id sao DERIVADOS do vinculo: se viessem do cliente,
 -- nasceria registro de aula de uma unidade carimbado em outra. (Achado do
 -- Alfredo na revisao do 3aed455.)
-create or replace function public.app_registrar_experimental(
+--
+-- SEGURANCA: security definer + grant a authenticated + id cru = qualquer
+-- usuario logado registrando a experimental de qualquer professor. A primeira
+-- versao deste plano fazia exatamente isso (achado do Alfredo). O padrao da
+-- casa esta escrito na 001, secao 6: "o professor NUNCA passa o proprio id;
+-- tudo resolve via auth.uid() -> fn_professor_do_usuario".
+--
+-- Dai a divisao: a funcao INTERNA faz o trabalho e so service_role executa; a
+-- app_ resolve quem e o usuario, confere que a aula e DELE, e chama a interna.
+create or replace function public.fn_registrar_experimental_interno(
   p_vinculo_id            bigint,
   p_anotacao_pedagogica   text,
   p_devolutiva_familia    text,
@@ -489,9 +505,55 @@ begin
 end
 $function$;
 
+-- Camada publica: resolve o usuario, confere posse, delega. NAO recebe
+-- professor_id — quem o informa e o auth.uid().
+create or replace function public.app_registrar_experimental(
+  p_vinculo_id            bigint,
+  p_anotacao_pedagogica   text,
+  p_devolutiva_familia    text,
+  p_proximos_passos       text,
+  p_leitura_de_conversao  text,
+  p_origem                text default 'app'
+)
+returns uuid
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_prof      integer := public.fn_professor_do_usuario();
+  v_prof_aula integer;
+begin
+  if v_prof is null then
+    raise exception 'sem_professor_vinculado';
+  end if;
+
+  select ae.professor_id into v_prof_aula
+    from lead_experimental_aulas v
+    join aulas_emusys ae on ae.id = v.aula_local_id
+   where v.id = p_vinculo_id and v.substituido_em is null;
+
+  if not found then
+    raise exception 'vinculo_inexistente_ou_sem_aula: %', p_vinculo_id;
+  end if;
+
+  -- A aula tem que ser DELE. Sem isto, qualquer autenticado registra a
+  -- experimental de qualquer professor.
+  if v_prof_aula is distinct from v_prof then
+    raise exception 'aula_de_outro_professor';
+  end if;
+
+  return public.fn_registrar_experimental_interno(
+           p_vinculo_id, p_anotacao_pedagogica, p_devolutiva_familia,
+           p_proximos_passos, p_leitura_de_conversao, p_origem);
+end
+$function$;
+
 -- A garantia e de PERMISSAO, nao de convencao.
 revoke all on table public.lead_experimental_registros from public, anon, authenticated;
 grant select on table public.lead_experimental_registros to service_role;
+revoke all on function public.fn_registrar_experimental_interno(bigint,text,text,text,text,text) from public, anon, authenticated;
+grant execute on function public.fn_registrar_experimental_interno(bigint,text,text,text,text,text) to service_role;
 revoke all on function public.app_registrar_experimental(bigint,text,text,text,text,text) from public, anon;
 grant execute on function public.app_registrar_experimental(bigint,text,text,text,text,text) to service_role, authenticated;
 ```
@@ -540,7 +602,7 @@ do $$
 declare v_vinc bigint; v_reg uuid;
 begin
   select id into v_vinc from lead_experimental_aulas where lead_experimental_id=-35001;
-  select public.app_registrar_experimental(
+  select public.fn_registrar_experimental_interno(
            v_vinc, 'Trabalhou acordes basicos', 'Ele pegou rapido, se divertiu',
            'Comecar por musica que ele gosta', 'Mae perguntou preco 2x — quente')
     into v_reg;
@@ -558,7 +620,7 @@ declare v_vinc bigint; v_reg uuid;
 begin
   select id into v_vinc from lead_experimental_aulas where lead_experimental_id=-35001;
   begin
-    select public.app_registrar_experimental(
+    select public.fn_registrar_experimental_interno(
              v_vinc, 'TEXTO EDITADO', 'idem', 'idem', 'idem') into v_reg;
     insert into _res values ('2a chamada nao estoura', 'ok', 'ok');
   exception when unique_violation then
@@ -583,7 +645,7 @@ declare v_vinc bigint;
 begin
   select id into v_vinc from lead_experimental_aulas where lead_experimental_id=-35002;
   begin
-    perform public.app_registrar_experimental(v_vinc, 'a','b','c','d');
+    perform public.fn_registrar_experimental_interno(v_vinc, 'a','b','c','d');
     insert into _res values ('faltou nao aceita registro', 'bloqueado', 'ACEITOU');
   exception when others then
     insert into _res values ('faltou nao aceita registro', 'bloqueado', 'bloqueado');
@@ -591,12 +653,59 @@ begin
 
   select id into v_vinc from lead_experimental_aulas where lead_experimental_id=-35003;
   begin
-    perform public.app_registrar_experimental(v_vinc, 'a','b','c','d');
+    perform public.fn_registrar_experimental_interno(v_vinc, 'a','b','c','d');
     insert into _res values ('pendente nao aceita registro', 'bloqueado', 'ACEITOU');
   exception when others then
     insert into _res values ('pendente nao aceita registro', 'bloqueado', 'bloqueado');
   end;
 end $$;
+
+-- ── AUTORIZACAO: professor errado e BARRADO ────────────────────────────────
+-- O teste roda como service_role, onde auth.uid() e nulo. Pra exercitar a
+-- guarda de verdade, forja-se o claim JWT (padrao do Supabase) apontando pro
+-- auth_user_id de cada usuario ZZTESTE.
+insert into public.usuarios (id, nome, email, auth_user_id) values
+  (-35901, 'ZZTESTE Usuario Dono',   'zzteste-dono-35@exemplo.invalido',   '00000000-0000-4000-8000-000000035901'),
+  (-35902, 'ZZTESTE Usuario Intruso','zzteste-intruso-35@exemplo.invalido','00000000-0000-4000-8000-000000035902');
+
+update public.professores set usuario_id = -35901 where id = -35001;
+insert into public.professores (id, nome, usuario_id) values (-35002, 'ZZTESTE Professor Intruso', -35902);
+
+do $$
+declare v_vinc bigint;
+begin
+  select id into v_vinc from lead_experimental_aulas where lead_experimental_id=-35001;
+
+  -- Dono da aula: passa
+  begin
+    set local role authenticated;
+    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000035901"}', true);
+    perform public.app_registrar_experimental(v_vinc, 'dono escreveu','b','c','d');
+    reset role;
+    insert into _res values ('professor dono da aula consegue registrar', 'ok', 'ok');
+  exception when others then
+    reset role;
+    insert into _res values ('professor dono da aula consegue registrar', 'ok', 'BARROU: '||sqlerrm);
+  end;
+
+  -- Outro professor: BARRADO
+  begin
+    set local role authenticated;
+    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000035902"}', true);
+    perform public.app_registrar_experimental(v_vinc, 'INTRUSO ESCREVEU','b','c','d');
+    reset role;
+    insert into _res values ('professor de OUTRA aula e barrado', 'barrado', 'ESCREVEU — qualquer logado registra qualquer aula');
+  exception when others then
+    reset role;
+    insert into _res values ('professor de OUTRA aula e barrado', 'barrado', 'barrado');
+  end;
+end $$;
+
+insert into _res
+select 'texto do intruso NAO entrou', 'dono escreveu',
+       (select r.anotacao_pedagogica from lead_experimental_registros r
+          join lead_experimental_aulas v on v.id=r.vinculo_id
+         where v.lead_experimental_id=-35001 and r.status <> 'descartado');
 
 -- ── Escrita direta na tabela e negada por PERMISSAO ────────────────────────
 do $$
@@ -650,15 +759,33 @@ assert m3 != src; open('supabase/migrations/035-m3.sql','w',encoding='utf-8').wr
 m4 = src.replace("grant select on table public.lead_experimental_registros to service_role;",
                  "grant select, insert, update on table public.lead_experimental_registros to service_role, authenticated;", 1)
 assert m4 != src; open('supabase/migrations/035-m4.sql','w',encoding='utf-8').write(m4)
-print('4 mutantes gerados')
+
+# M5 — guarda de posse removida: qualquer autenticado registra qualquer aula
+m5 = src.replace("""  if v_prof_aula is distinct from v_prof then
+    raise exception 'aula_de_outro_professor';
+  end if;""", "", 1)
+assert m5 != src; open('supabase/migrations/035-m5.sql','w',encoding='utf-8').write(m5)
+
+# M6 — a app_ volta a aceitar chamada sem usuario resolvido
+m6 = src.replace("""  if v_prof is null then
+    raise exception 'sem_professor_vinculado';
+  end if;""", "", 1)
+assert m6 != src; open('supabase/migrations/035-m6.sql','w',encoding='utf-8').write(m6)
+print('6 mutantes gerados')
 PY
 
-for m in m1 m2 m3 m4; do
+for m in m1 m2 m3 m4 m5 m6; do
   echo "--- $m ---"
   node scripts/rodar-teste-sql.mjs supabase/migrations/035-$m.sql supabase/migrations/035-lead-experimental-registros.test.sql | head -4
 done
 rm -f supabase/migrations/035-m?.sql
 ```
+
+M5 e M6 são os que importam mais: sem eles, o teste de autorização poderia estar
+verde por acidente (por exemplo, se o `set_config` do claim não estivesse pegando e
+**todas** as chamadas falhassem — o que faria "intruso barrado" passar sem provar
+nada). M5 exige que o **dono** consiga escrever e o intruso não; um teste que barra
+os dois morre em M5.
 
 **Falta de propósito um mutante aqui:** não há como mutar "unidade derivada" trocando por parâmetro, porque a RPC não tem esse parâmetro — a derivação é garantida pela *ausência da porta*, não por checagem. O teste ainda assere o valor derivado, para pegar erro de join.
 
@@ -682,7 +809,7 @@ git log --oneline origin/main..HEAD | wc -l   # tem que dar 0
 
 **Interfaces:**
 - Consumes: `public.fabio_notificacoes` (018), `public.lead_experimental_registros` (Task 2).
-- Produces: tabela `public.unidade_contato_comercial`; colunas `destinatario_tipo` e `destinatario_whatsapp` em `fabio_notificacoes`; função `public.fabio_enfileirar_aviso_comercial(p_registro_id uuid) returns uuid` (devolve o id da notificação, ou `null` se pulada).
+- Produces: tabela `public.unidade_contato_comercial`; colunas `destinatario_tipo` e `destinatario_whatsapp` em `fabio_notificacoes`; `public.fabio_claim_aviso_comercial(p_registro_id uuid, p_lease_minutos integer default 10) returns jsonb` — devolve `{ok, claimed, notificacao_id, lease_token}` ou `{ok, claimed:false, motivo}`, no mesmo formato de `fabio_claim_notificacao_por_referencia` (018). **Só `service_role`.**
 
 - [ ] **Passo 1: Escrever a migration**
 
@@ -717,8 +844,16 @@ alter table public.fabio_notificacoes
     check (destinatario_tipo in ('professor','comercial')),
   add column destinatario_whatsapp text;
 
+-- ATENCAO ao ramo do meio: sem ele, o CHECK se contradiz com o proprio rastro
+-- de "sem destinatario" — que grava, por definicao, destinatario_whatsapp nulo.
+-- A primeira versao deste plano tinha essa contradicao e quebraria em runtime
+-- exatamente no caminho de excecao (achado do Alfredo). O rastro de ausencia
+-- precisa de excecao EXPLICITA, senao a unica forma de registrar a falta de
+-- destinatario seria... nao registrar.
 alter table public.fabio_notificacoes
   add constraint chk_notificacao_destinatario check (
+    status = 'pulada_sem_destinatario'
+    or
     (destinatario_tipo = 'professor' and professor_id is not null)
     or
     (destinatario_tipo = 'comercial' and destinatario_whatsapp is not null)
@@ -738,8 +873,21 @@ alter table public.fabio_notificacoes drop constraint if exists fabio_notificaco
 alter table public.fabio_notificacoes add constraint fabio_notificacoes_status_check
   check (status in ('processando','enviada','falhou','pulada_preferencia','pulada_sem_destinatario'));
 
-create or replace function public.fabio_enfileirar_aviso_comercial(p_registro_id uuid)
-returns uuid
+-- CLAIM canonico, no mesmo formato de fabio_claim_notificacao_por_referencia
+-- (018): lease com token, tentativas, backoff e retorno {claimed, lease_token}.
+-- A primeira versao deste plano dava INSERT cru com status='processando' — o
+-- que esvaziava o argumento que ganhou a decisao contra o n8n ("a fila do
+-- Fabio tem lease, retry e recibo"). Achado do Alfredo.
+--
+-- A idempotencia NAO e reimplementada aqui: ela e estrutural, do indice
+-- uq_fabio_notif_por_referencia (referencia_tipo, referencia_id, canal). Este
+-- ON CONFLICT so decide QUANDO vale retomar: falhou com backoff vencido, ou o
+-- dono anterior sumiu (lease expirado). Enviada nao e retomada.
+create or replace function public.fabio_claim_aviso_comercial(
+  p_registro_id   uuid,
+  p_lease_minutos integer default 10
+)
+returns jsonb
 language plpgsql
 security definer
 set search_path to 'public'
@@ -749,6 +897,7 @@ declare
   v_contato  record;
   v_corpo    text;
   v_id       uuid;
+  v_token    uuid := gen_random_uuid();
 begin
   select r.*, le.nome_aluno, ae.data_hora_inicio, v.presenca_status
     into v_reg
@@ -781,7 +930,8 @@ begin
     coalesce(v_reg.leitura_de_conversao, '(nao preenchido)'));
 
   if v_contato.unidade_id is null then
-    -- Sem destinatario: fica VISIVEL na fila, nao some.
+    -- Sem destinatario: fica VISIVEL na fila, nao some. E idempotente pelo
+    -- mesmo indice de referencia — repetir nao empilha rastro.
     insert into fabio_notificacoes
       (professor_id, destinatario_tipo, tipo, categoria, corpo, canal, status,
        motivo_pulada, referencia_tipo, referencia_id, destinatario_whatsapp)
@@ -789,24 +939,55 @@ begin
       (null, 'comercial', 'experimental_registrada', 'informativa', v_corpo, 'whatsapp',
        'pulada_sem_destinatario', 'sem_contato_comercial_na_unidade',
        'lead_experimental_registro', p_registro_id::text, null)
-    on conflict do nothing;
-    return null;
+    on conflict (referencia_tipo, referencia_id, canal)
+      where referencia_tipo is not null and referencia_id is not null
+    do nothing;
+    return jsonb_build_object('ok', true, 'claimed', false, 'motivo', 'sem_destinatario');
   end if;
 
   insert into fabio_notificacoes
     (professor_id, destinatario_tipo, destinatario_whatsapp, tipo, categoria, corpo,
-     canal, status, referencia_tipo, referencia_id)
+     canal, status, tentativas, lease_token, lease_expira_em,
+     referencia_tipo, referencia_id)
   values
     (null, 'comercial', v_contato.whatsapp, 'experimental_registrada', 'informativa', v_corpo,
-     'whatsapp', 'processando', 'lead_experimental_registro', p_registro_id::text)
+     'whatsapp', 'processando', 1, v_token, now() + make_interval(mins => p_lease_minutos),
+     'lead_experimental_registro', p_registro_id::text)
+  on conflict (referencia_tipo, referencia_id, canal)
+    where referencia_tipo is not null and referencia_id is not null
+  do update set
+    status                = 'processando',
+    tentativas            = fabio_notificacoes.tentativas + 1,
+    corpo                 = excluded.corpo,   -- reprocessa com conteudo fresco
+    destinatario_whatsapp = excluded.destinatario_whatsapp,
+    lease_token           = excluded.lease_token,
+    lease_expira_em       = excluded.lease_expira_em,
+    last_error            = null
+  where
+    -- falhou: pode tentar de novo, respeitando o backoff
+    (fabio_notificacoes.status = 'falhou'
+      and (fabio_notificacoes.proxima_tentativa_em is null
+           or fabio_notificacoes.proxima_tentativa_em <= now()))
+    -- ou: o dono anterior sumiu. A janela mede o LEASE, nao a criacao.
+    or (fabio_notificacoes.status = 'processando'
+      and fabio_notificacoes.lease_expira_em is not null
+      and fabio_notificacoes.lease_expira_em < now())
+    -- ou: era rastro de falta de destinatario e agora HA destinatario
+    or (fabio_notificacoes.status = 'pulada_sem_destinatario')
   returning id into v_id;
 
-  return v_id;
+  if v_id is null then
+    -- ja enviada, ou outro worker esta com o lease VIVO agora
+    return jsonb_build_object('ok', true, 'claimed', false, 'motivo', 'lease_vivo_ou_enviada');
+  end if;
+
+  return jsonb_build_object('ok', true, 'claimed', true,
+                            'notificacao_id', v_id, 'lease_token', v_token);
 end
 $function$;
 
-revoke all on function public.fabio_enfileirar_aviso_comercial(uuid) from public, anon, authenticated;
-grant execute on function public.fabio_enfileirar_aviso_comercial(uuid) to service_role;
+revoke all on function public.fabio_claim_aviso_comercial(uuid,integer) from public, anon, authenticated;
+grant execute on function public.fabio_claim_aviso_comercial(uuid,integer) to service_role;
 
 -- Contatos vigentes, conferidos com o n8n em 05/08/2026 (os tres batem).
 -- Vitoria tem DDD 31 porque e de Minas — esta correto.
@@ -865,9 +1046,9 @@ do $$
 declare v_vinc bigint; v_reg uuid; v_not uuid;
 begin
   select id into v_vinc from lead_experimental_aulas where lead_experimental_id=-36001;
-  select public.app_registrar_experimental(v_vinc, 'aula boa', 'foi muito bem',
+  select public.fn_registrar_experimental_interno(v_vinc, 'aula boa', 'foi muito bem',
            'seguir no violao', 'SEGREDO COMERCIAL') into v_reg;
-  select public.fabio_enfileirar_aviso_comercial(v_reg) into v_not;
+  select (public.fabio_claim_aviso_comercial(v_reg)->>'notificacao_id')::uuid into v_not;
 
   insert into _res select 'destinatario resolvido pela unidade', '5521900000036',
     coalesce(destinatario_whatsapp,'(nulo)') from fabio_notificacoes where id=v_not;
@@ -887,8 +1068,8 @@ do $$
 declare v_vinc bigint; v_reg uuid; v_not uuid;
 begin
   select id into v_vinc from lead_experimental_aulas where lead_experimental_id=-36002;
-  select public.app_registrar_experimental(v_vinc, 'a','b','c','d') into v_reg;
-  select public.fabio_enfileirar_aviso_comercial(v_reg) into v_not;
+  select public.fn_registrar_experimental_interno(v_vinc, 'a','b','c','d') into v_reg;
+  select (public.fabio_claim_aviso_comercial(v_reg)->>'notificacao_id')::uuid into v_not;
 
   insert into _res values ('sem contato devolve null', 'null',
     coalesce(v_not::text, 'null'));
@@ -896,6 +1077,54 @@ begin
     coalesce((select status from fabio_notificacoes
                where referencia_tipo='lead_experimental_registro'
                  and referencia_id=v_reg::text), '(nenhum)');
+end $$;
+
+-- ── O claim e claim de verdade: lease, token e tentativas ─────────────────
+insert into _res
+select 'aviso nasce com lease vivo', 'sim',
+       coalesce((select case when lease_token is not null and lease_expira_em > now()
+                             then 'sim' else 'nao' end
+                   from fabio_notificacoes
+                  where referencia_tipo='lead_experimental_registro'
+                    and destinatario_tipo='comercial'
+                    and status='processando'
+                  order by criado_em desc limit 1), '(nenhum)');
+insert into _res
+select 'aviso nasce com tentativas=1', '1',
+       coalesce((select tentativas::text from fabio_notificacoes
+                  where referencia_tipo='lead_experimental_registro'
+                    and destinatario_tipo='comercial'
+                    and status='processando'
+                  order by criado_em desc limit 1), '(nenhum)');
+
+-- ── Lease VIVO nao e roubado por uma segunda chamada ───────────────────────
+do $$
+declare v_reg uuid; v_out jsonb;
+begin
+  select r.id into v_reg from lead_experimental_registros r
+    join lead_experimental_aulas v on v.id=r.vinculo_id
+   where v.lead_experimental_id=-36001;
+  select public.fabio_claim_aviso_comercial(v_reg) into v_out;
+  insert into _res values ('lease vivo nao e reclamado de novo', 'false',
+    (v_out->>'claimed'));
+end $$;
+
+-- ── Rastro de "sem destinatario" e RETOMADO quando o contato aparece ───────
+insert into public.unidade_contato_comercial (unidade_id, nome, whatsapp)
+values ('00000000-0000-4000-8000-000000000361', 'ZZTESTE Comercial Tardio', '5521900000361');
+
+do $$
+declare v_reg uuid; v_out jsonb;
+begin
+  select r.id into v_reg from lead_experimental_registros r
+    join lead_experimental_aulas v on v.id=r.vinculo_id
+   where v.lead_experimental_id=-36002;
+  select public.fabio_claim_aviso_comercial(v_reg) into v_out;
+  insert into _res values ('pulada_sem_destinatario e retomada apos cadastro', 'true',
+    coalesce(v_out->>'claimed','(nulo)'));
+  insert into _res select 'retomada pega o numero recem-cadastrado', '5521900000361',
+    coalesce(destinatario_whatsapp,'(nulo)') from fabio_notificacoes
+    where referencia_tipo='lead_experimental_registro' and referencia_id=v_reg::text;
 end $$;
 
 -- ── CHECK impede aviso sem destinatario nenhum ─────────────────────────────
@@ -950,10 +1179,24 @@ assert m2 != src; open('supabase/migrations/036-m2.sql','w',encoding='utf-8').wr
 # M3 — destinatario deixa de vir da unidade (volta o hardcode do n8n)
 m3 = src.replace("v_contato.whatsapp,", "'5521999999999',", 1)
 assert m3 != src; open('supabase/migrations/036-m3.sql','w',encoding='utf-8').write(m3)
-print('3 mutantes gerados')
+
+# M4 — CHECK volta a se contradizer com o rastro de "sem destinatario"
+m4 = src.replace("    status = 'pulada_sem_destinatario'\n    or\n", "", 1)
+assert m4 != src; open('supabase/migrations/036-m4.sql','w',encoding='utf-8').write(m4)
+
+# M5 — claim sem lease: volta o insert cru que esvaziava o argumento do Fabio
+m5 = src.replace("'whatsapp', 'processando', 1, v_token, now() + make_interval(mins => p_lease_minutos),",
+                 "'whatsapp', 'processando', 0, null, null,", 1)
+assert m5 != src; open('supabase/migrations/036-m5.sql','w',encoding='utf-8').write(m5)
+
+# M6 — quem ficou 'pulada_sem_destinatario' nunca e retomado depois que o
+# contato passa a existir: o aviso fica preso pra sempre, em silencio
+m6 = src.replace("    or (fabio_notificacoes.status = 'pulada_sem_destinatario')", "", 1)
+assert m6 != src; open('supabase/migrations/036-m6.sql','w',encoding='utf-8').write(m6)
+print('6 mutantes gerados')
 PY
 
-for m in m1 m2 m3; do
+for m in m1 m2 m3 m4 m5 m6; do
   echo "--- $m ---"
   node scripts/rodar-teste-sql.mjs supabase/migrations/036-$m.sql supabase/migrations/036-aviso-comercial-experimental.test.sql | head -4
 done
@@ -1035,10 +1278,18 @@ select r.id                     as registro_id,
   left join public.aulas_emusys ae on ae.id = v.aula_local_id
  where r.status <> 'descartado';
 
+-- As DUAS views ficam so em service_role. "family-safe" descreve o CONTEUDO
+-- (nao carrega leitura de conversao), nao autorizacao: a linha ainda tem nome
+-- de lead, unidade e horario, e uma view sem filtro por professor entregaria
+-- a base inteira de leads a qualquer usuario logado. A primeira versao deste
+-- plano dava select a authenticated aqui (achado do Alfredo).
+--
+-- Quando houver tela de professor lendo isto, o caminho e uma RPC que filtra
+-- por fn_professor_do_usuario() — nunca select direto na view.
 revoke all on public.vw_experimental_registro_comercial from public, anon, authenticated;
 grant select on public.vw_experimental_registro_comercial to service_role;
-revoke all on public.vw_experimental_registro_family_safe from public, anon;
-grant select on public.vw_experimental_registro_family_safe to service_role, authenticated;
+revoke all on public.vw_experimental_registro_family_safe from public, anon, authenticated;
+grant select on public.vw_experimental_registro_family_safe to service_role;
 ```
 
 - [ ] **Passo 2: Escrever o teste**
@@ -1136,8 +1387,8 @@ git log --oneline origin/main..HEAD | wc -l   # tem que dar 0
 - Create: `supabase/migrations/038-confirmar-registro-experimental.test.sql`
 
 **Interfaces:**
-- Consumes: `app_registrar_experimental` (Task 2), `fn_registrar_presenca_experimental` (Task 1), `fabio_enfileirar_aviso_comercial` (Task 3).
-- Produces: `public.app_confirmar_registro_experimental(p_registro_id uuid, p_confirmado_por integer) returns jsonb` — devolve `{registro_id, presenca_gravada, notificacao_id, aviso_pulado}`.
+- Consumes: `fn_registrar_experimental_interno` / `app_registrar_experimental` (Task 2), `fn_registrar_presenca_experimental` (Task 1), `fabio_claim_aviso_comercial` (Task 3), `fn_professor_do_usuario` (001).
+- Produces: `public.app_confirmar_registro_experimental(p_registro_id uuid, p_confirmado_por integer) returns jsonb` — devolve `{registro_id, presenca_gravada, notificacao_id, aviso_claimed, aviso_motivo}`. Resolve `auth.uid()` e exige que a aula seja do professor logado, igual à `app_registrar_experimental`.
 
 Sem esta task, as três peças anteriores existem soltas: o registro nasce
 `aguardando_confirmacao` e nada o move dali, a presença depende de alguém chamar a função
@@ -1167,17 +1418,31 @@ declare
   v_vinculo_id  bigint;
   v_status      text;
   v_origem      text;
+  v_prof        integer := public.fn_professor_do_usuario();
+  v_prof_aula   integer;
   v_presenca_ok boolean;
+  v_aviso       jsonb;
   v_not_id      uuid;
 begin
-  select vinculo_id, status, origem
-    into v_vinculo_id, v_status, v_origem
-    from lead_experimental_registros
-   where id = p_registro_id
-     for update;
+  if v_prof is null then
+    raise exception 'sem_professor_vinculado';
+  end if;
+
+  select r.vinculo_id, r.status, r.origem, ae.professor_id
+    into v_vinculo_id, v_status, v_origem, v_prof_aula
+    from lead_experimental_registros r
+    join lead_experimental_aulas v on v.id = r.vinculo_id
+    join aulas_emusys ae on ae.id = v.aula_local_id
+   where r.id = p_registro_id
+     for update of r;
 
   if not found then
     raise exception 'registro_inexistente: %', p_registro_id;
+  end if;
+
+  -- Mesma guarda da app_registrar_experimental: confirmar tambem e escrita.
+  if v_prof_aula is distinct from v_prof then
+    raise exception 'aula_de_outro_professor';
   end if;
 
   if v_status = 'confirmado' then
@@ -1194,6 +1459,8 @@ begin
          atualizado_em = now()
    where id = p_registro_id;
 
+  -- (segue: presenca + aviso, na mesma transacao)
+
   -- Presenca com a fonte certa: registro pelo app e professor_la_teacher;
   -- por audio e fabio_audio. Ambos passam em fn_presenca_e_forte — e NENHUM
   -- deles e 'professor_app', que nao existe.
@@ -1202,13 +1469,15 @@ begin
            case when v_origem = 'whatsapp' then 'fabio_audio' else 'professor_la_teacher' end)
     into v_presenca_ok;
 
-  select public.fabio_enfileirar_aviso_comercial(p_registro_id) into v_not_id;
+  select public.fabio_claim_aviso_comercial(p_registro_id) into v_aviso;
+  v_not_id := (v_aviso->>'notificacao_id')::uuid;
 
   return jsonb_build_object(
-    'registro_id',    p_registro_id,
+    'registro_id',      p_registro_id,
     'presenca_gravada', v_presenca_ok,
-    'notificacao_id',  v_not_id,
-    'aviso_pulado',    (v_not_id is null)
+    'notificacao_id',   v_not_id,
+    'aviso_claimed',    (v_aviso->>'claimed')::boolean,
+    'aviso_motivo',     v_aviso->>'motivo'
   );
 end
 $function$;
@@ -1231,7 +1500,13 @@ insert into public.unidade_contato_comercial (unidade_id, nome, whatsapp)
 values ('00000000-0000-4000-8000-000000000380', 'ZZTESTE Comercial 038', '5521900000038')
 on conflict (unidade_id) do nothing;
 
-insert into public.professores (id, nome) values (-38001, 'ZZTESTE Professor 038');
+-- Usuario ZZTESTE ligado ao professor: a app_confirmar resolve auth.uid(), e
+-- o teste roda como service_role (auth.uid() nulo) — sem isto a RPC barra
+-- corretamente com 'sem_professor_vinculado' e o teste nao exercita nada.
+insert into public.usuarios (id, nome, email, auth_user_id) values
+  (-38901, 'ZZTESTE Usuario 038', 'zzteste-038@exemplo.invalido',
+   '00000000-0000-4000-8000-000000038901');
+insert into public.professores (id, nome, usuario_id) values (-38001, 'ZZTESTE Professor 038', -38901);
 insert into public.leads (id, unidade_id, whatsapp, status) values
   (-38001, '00000000-0000-4000-8000-000000000380', '5521999380001', 'novo');
 insert into public.lead_experimentais
@@ -1252,17 +1527,26 @@ do $$
 declare v_vinc bigint; v_reg uuid; v_out jsonb;
 begin
   select id into v_vinc from lead_experimental_aulas where lead_experimental_id=-38001;
-  select public.app_registrar_experimental(v_vinc, 'trabalhou ritmo', 'foi bem',
+  select public.fn_registrar_experimental_interno(v_vinc, 'trabalhou ritmo', 'foi bem',
            'seguir', 'quente') into v_reg;
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000038901"}', true);
   select public.app_confirmar_registro_experimental(v_reg, null) into v_out;
+  reset role;
   insert into _conf values (v_out);
 end $$;
 
 -- Le o retorno DA CHAMADA QUE CONFIRMOU, nao de uma nova
 insert into _res select 'confirmacao gravou presenca', 'true',
   (select resultado->>'presenca_gravada' from _conf);
-insert into _res select 'confirmacao enfileirou aviso', 'false',
-  (select resultado->>'aviso_pulado' from _conf);
+insert into _res select 'confirmacao reclamou o aviso (com lease)', 'true',
+  (select resultado->>'aviso_claimed' from _conf);
+insert into _res select 'aviso da confirmacao nasceu com lease vivo', 'sim',
+  coalesce((select case when n.lease_token is not null and n.lease_expira_em > now()
+                        then 'sim' else 'nao' end
+              from fabio_notificacoes n
+             where n.referencia_tipo='lead_experimental_registro'
+               and n.referencia_id = (select (resultado->>'registro_id') from _conf)), '(nenhum)');
 
 insert into _res
 select 'registro ficou confirmado', 'confirmado',
@@ -1284,7 +1568,10 @@ begin
   select r.id into v_reg from lead_experimental_registros r
     join lead_experimental_aulas v on v.id=r.vinculo_id
    where v.lead_experimental_id=-38001;
+  set local role authenticated;
+  perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000038901"}', true);
   perform public.app_confirmar_registro_experimental(v_reg, null);
+  reset role;
 end $$;
 
 insert into _res
@@ -1312,8 +1599,8 @@ python3 - <<'PY'
 src = open('supabase/migrations/038-confirmar-registro-experimental.sql', encoding='utf-8').read()
 
 # M1 — confirma sem avisar o comercial (a meia confirmacao que a task existe pra impedir)
-m1 = src.replace("  select public.fabio_enfileirar_aviso_comercial(p_registro_id) into v_not_id;",
-                 "  v_not_id := null;", 1)
+m1 = src.replace("  select public.fabio_claim_aviso_comercial(p_registro_id) into v_aviso;\n  v_not_id := (v_aviso->>'notificacao_id')::uuid;",
+                 "  v_aviso := jsonb_build_object('claimed', false, 'motivo', 'M1');\n  v_not_id := null;", 1)
 assert m1 != src; open('supabase/migrations/038-m1.sql','w',encoding='utf-8').write(m1)
 
 # M2 — confirma sem gravar presenca
