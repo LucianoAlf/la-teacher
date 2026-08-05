@@ -785,6 +785,12 @@ def pedagogical_prefetch(professor_id: int, current_text: str, hist: list[Dict[s
         # Vai nas DUAS intenções: linha do tempo vazia sem dizer que a pessoa
         # chegou ontem é a resposta verdadeira e inútil que o Fábio deu.
         "cadastro": prontuario.get("cadastro") or {},
+        # E o `experimental` pelo mesmo motivo — de novo. Este dict escolhe
+        # chaves a dedo, então TODO bloco novo do prontuário precisa ser
+        # adicionado aqui à mão, senão ele é silenciosamente descartado. Foi o
+        # que aconteceu com `cadastro` de manhã e com `experimental` à noite,
+        # no mesmo dia e na mesma função.
+        "experimental": prontuario.get("experimental") or {},
         "ultima_aula_cronologica": latest_class,
         "ultimo_registro_com_conteudo": latest_content,
     }
@@ -1398,6 +1404,11 @@ Regras obrigatórias para esta conversa 1:1:
 - Se perguntarem QUEM É um aluno (“quem é a Fernanda?”, “não faço ideia de quem seja”), responda pelo bloco `cadastro` do CONTEXTO PEDAGÓGICO: quem é, curso, dia e horário, e há quanto tempo está na escola. Nunca responda só pelo histórico de aula.
 - Se cadastro.e_aluno_novo for true, diga isso de saída e em linguagem de gente (“entrou ontem”, “está há 5 dias na escola”), usando dias_desde_matricula. Aluno novo muda como o professor conduz a aula — é a informação mais útil que você tem ali.
 - Nunca conclua “é aluno novo” a partir de histórico vazio, e nunca diga que não sabe se é novo quando cadastro.data_matricula existir. aulas_registradas=0 significa que ninguém registrou aula dele ainda, o que é diferente de ser aluno recém-chegado.
+- Se vier o bloco `experimental`, ele conta como esse aluno CHEGOU — o que a família disse antes da primeira aula. Use antes de sugerir qualquer coisa, e nunca pergunte ao professor o que já está ali.
+- `experimental.quem_e_esse_aluno.nivel_declarado` = "ja_tocava" significa que a família declarou experiência anterior. Nesse caso é ERRADO dizer “se já tiver experiência” ou “descubra se já tocou”: já se sabe. Diga o que se sabe e sugira o passo seguinte.
+- `experimental.ganchos_de_conexao` são coisas concretas que a família contou para o professor puxar na aula. Cite-os pelo conteúdo, não como lista genérica.
+- `experimental.alertas` do tipo agenda ou saude_agenda avisam que a aula pode não acontecer como está marcada. Diga isso cedo, é o que muda o dia dele.
+- O bloco não traz dinheiro nem negociação de propósito. Se `para_a_devolutiva.atencao_conversao` for "alta", significa que essa família precisa sentir valor na devolutiva — fale de como mostrar resultado, sem citar preço nem supor a situação financeira de ninguém.
 - Se o contexto_json vier ok=false ou incompleto, explique a limitação de forma curta e peça só a informação mínima.
 
 Contexto da conversa recente:
