@@ -216,6 +216,12 @@ Contatos vigentes (conferidos com o n8n em 05/08/2026, os três batem):
 | Barra | Kailane | `5521984690143` |
 | Recreio | Daiana | `5521968060404` |
 
+Confirmado pelo Alf em 05/08/2026: **Daiana é a comercial vigente do Recreio** — o Cleiton
+era comercial e passou a gerente há cerca de um mês. É transição de equipe em andamento,
+conhecida. Isto é exatamente o motivo de D6: em um mês a pessoa mudou, e o nó do n8n
+continua chamado "Clayton". Contato em tabela se corrige com um `update`; contato dentro
+de fluxo exige alguém lembrar que ele existe.
+
 **Generalização da fila (#58):** `fabio_notificacoes.professor_id` passa a ser nullable,
 com `destinatario_tipo` (`professor` \| `comercial`) e `destinatario_whatsapp`. Uma CHECK
 garante que todo aviso tenha exatamente um destinatário resolvido. O worker existente,
@@ -330,8 +336,10 @@ conferir, porque a segunda rodada acha tudo resolvido e devolve zero naturalment
 - **Não cria tabela de presença nova** — usa o vínculo da 032.
 - **Não altera `fabio_registros_aula`** nem as 12 RPCs que a leem.
 - **Não constrói tela** — LA Report consome a view; a tela é trabalho no outro repo.
-- **Não mexe no n8n** — os problemas observados lá (rótulo do nó do Recreio, Daiana
-  inativa em `staff_unidade`) ficam registrados, não corrigidos aqui.
+- **Não mexe no n8n.** Decisão do Alf em 05/08/2026: o `Aviso Diario de Visitas` continua
+  chamando como está, e o que houver para arrumar lá é do Hugo. O rótulo do nó do Recreio
+  e a Daiana inativa em `staff_unidade` ficam registrados aqui só como contexto — não são
+  trabalho deste spec nem dependência dele.
 
 ---
 
