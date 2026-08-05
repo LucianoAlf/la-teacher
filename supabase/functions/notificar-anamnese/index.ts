@@ -400,8 +400,11 @@ function montarMensagemFinal(estrutura, briefing, _token) {
   // ⚠️ Os links JA ENVIADOS continuam valendo: os tokens nao foram rotacionados
   // (rotacionar quebraria a pagina para quem usa legitimamente). Se isso
   // incomodar, a rotacao e uma decisao a parte.
-  msg += "\n\n_Informações confidenciais — uso exclusivo do time pedagógico LA Music._";
-  msg += "\n_Precisa de mais detalhe sobre esse aluno? Fale com a coordenação._";
+  // "uso exclusivo do time pedagogico" se anulava: o professor E do time
+  // pedagogico, entao a frase autorizava justamente quem estava lendo a
+  // repassar adiante. "Coordenacao" fecha — o professor recebe porque precisa,
+  // nao porque pode distribuir. Correcao do Alf em 05/08/2026.
+  msg += "\n\n_Informações confidenciais — uso exclusivo da coordenação da LA Music._";
   return msg;
 }
 Deno.serve(async (req)=>{
