@@ -620,41 +620,93 @@ def _fetch_professor_roster(professor_id: int) -> list[Dict[str, Any]]:
     return rows or []
 
 
+def _fetch_experimentais_agendadas(professor_id: int) -> list[Dict[str, Any]]:
+    # Lead NÃO é aluno: quem vai fazer a experimental não está na carteira, e era
+    # por isso que o professor ficava sem contexto justamente na aula que decide
+    # a matrícula. Esta é a porta do pré-matrícula (migration 029).
+    r = sb_post("/rest/v1/rpc/fabio_experimentais_do_professor", {
+        "p_professor_id": int(professor_id),
+        "p_dias": 7,
+    })
+    if r.status_code >= 400:
+        # Não levanta: a experimental é um bloco A MAIS. Se ela cair, o Fábio
+        # ainda tem que responder sobre aluno matriculado — mas o log fica,
+        # porque falha silenciosa com resposta bonita já custou caro aqui.
+        log("prefetch_experimentais_falhou", status=r.status_code, corpo=r.text[:200])
+        return []
+    data = r.json()
+    return data if isinstance(data, list) else []
+
+
+def _chat_haystacks(current_text: str, hist: list[Dict[str, Any]]) -> tuple[str, str]:
+    # Resolve primarily from PROFESSOR messages. Fábio's own agenda response
+    # lists many students; if we use it blindly, the resolver can pick the last
+    # listed student (ex.: Davi) instead of the one asked (ex.: Luiza).
+    professor_recent = "\n".join((h.get("content") or "") for h in hist[-8:] if h.get("role") == "professor")
+    all_recent = "\n".join((h.get("content") or "") for h in hist[-8:])
+    return (_norm_text(professor_recent + "\n" + current_text),
+            _norm_text(all_recent + "\n" + current_text))
+
+
+def _score_rows_by_name(rows: list[Dict[str, Any]], name_key: str,
+                        hay: str, base_score: int) -> dict[str, tuple[int, Dict[str, Any]]]:
+    # Um scorer só para carteira e para experimental. Duplicar isto era como o
+    # lead passaria a casar por uma regra e o aluno por outra, sem ninguém
+    # decidir isso.
+    scores: dict[str, tuple[int, Dict[str, Any]]] = {}
+    for row in rows:
+        name = row.get(name_key) or ""
+        n = _norm_text(name)
+        if not n:
+            continue
+        parts = [part for part in n.split() if len(part) >= 3]
+        first = parts[0] if parts else ""
+        score = 0
+        if n and n in hay:
+            score = base_score + 100 + hay.rfind(n)
+        elif first and re.search(rf"\b{re.escape(first)}\b", hay):
+            score = base_score + 50 + hay.rfind(first)
+        if score and (n not in scores or score > scores[n][0]):
+            scores[n] = (score, row)
+    return scores
+
+
+def _name_hits(name: Optional[str], hay: str) -> int:
+    # Quantos pedaços do nome (>=3 letras) aparecem no texto. É a medida de
+    # ESPECIFICIDADE do casamento, e existe por causa de homônimo: perguntando
+    # "quem é o Arthur Passos", o aluno "Arthur Lee Cardozo Dias" casa 1 pedaço
+    # e o lead "Arthur Passos Queiroz" casa 2. Sem isto o Fábio respondia
+    # confiante sobre a pessoa errada — que é pior do que não responder.
+    n = _norm_text(name or "")
+    parts = [p for p in n.split() if len(p) >= 3]
+    return sum(1 for p in parts if re.search(rf"\b{re.escape(p)}\b", hay))
+
+
+def _resolve_experimental_from_chat(professor_id: int, current_text: str,
+                                    hist: list[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    experimentais = _fetch_experimentais_agendadas(professor_id)
+    if not experimentais:
+        return None
+    professor_hay, all_hay = _chat_haystacks(current_text, hist)
+    scores = _score_rows_by_name(experimentais, "nome_aluno", professor_hay, 10000)
+    if not scores:
+        scores = _score_rows_by_name(experimentais, "nome_aluno", all_hay, 0)
+    if not scores:
+        return None
+    return sorted(scores.values(), key=lambda x: x[0], reverse=True)[0][1]
+
+
 def _resolve_student_course_from_chat(professor_id: int, current_text: str, hist: list[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     roster = _fetch_professor_roster(professor_id)
     if not roster:
         return None
 
-    # Resolve student primarily from PROFESSOR messages. Fábio's own agenda
-    # response lists many students; if we use it blindly, the resolver can pick
-    # the last listed student (ex.: Davi) instead of the one asked (ex.: Luiza).
-    professor_recent = "\n".join((h.get("content") or "") for h in hist[-8:] if h.get("role") == "professor")
-    all_recent = "\n".join((h.get("content") or "") for h in hist[-8:])
-    professor_hay = _norm_text(professor_recent + "\n" + current_text)
-    all_hay = _norm_text(all_recent + "\n" + current_text)
+    professor_hay, all_hay = _chat_haystacks(current_text, hist)
     current_norm = _norm_text(current_text)
 
-    def score_students(hay: str, base_score: int) -> dict[str, tuple[int, Dict[str, Any]]]:
-        scores: dict[str, tuple[int, Dict[str, Any]]] = {}
-        for row in roster:
-            name = row.get("aluno_nome") or ""
-            n = _norm_text(name)
-            if not n:
-                continue
-            parts = [part for part in n.split() if len(part) >= 3]
-            first = parts[0] if parts else ""
-            score = 0
-            if n and n in hay:
-                score = base_score + 100 + hay.rfind(n)
-            elif first and re.search(rf"\b{re.escape(first)}\b", hay):
-                score = base_score + 50 + hay.rfind(first)
-            if score and (n not in scores or score > scores[n][0]):
-                scores[n] = (score, row)
-        return scores
-
-    student_scores = score_students(professor_hay, 10000)
+    student_scores = _score_rows_by_name(roster, "aluno_nome", professor_hay, 10000)
     if not student_scores:
-        student_scores = score_students(all_hay, 0)
+        student_scores = _score_rows_by_name(roster, "aluno_nome", all_hay, 0)
     if not student_scores:
         return None
 
@@ -767,7 +819,44 @@ def pedagogical_prefetch(professor_id: int, current_text: str, hist: list[Dict[s
     # saber quem é, mas não o contrário.
     intent = "historico_pedagogico" if quer_historico else "identidade_aluno"
     resolved = _resolve_student_course_from_chat(professor_id, current_text, hist)
+
+    # A carteira só tem MATRICULADO. Quem faz a experimental amanhã ainda é
+    # lead, então some dela — e some justamente na aula que decide se vira
+    # aluno. Medido em 05/08/2026: 15 das 16 experimentais da semana não tinham
+    # aluno_id. Esta é a outra porta (migration 029).
+    #
+    # Buscar SEMPRE, e não só quando a carteira falha. A primeira versão tratava
+    # o lead como plano B, e aí "quem é o Arthur Passos?" respondia sobre o
+    # Arthur Lee Cardozo Dias, aluno de 3 anos que estava na carteira: o
+    # primeiro nome bateu e a segunda tentativa nunca rodou. Homônimo não é
+    # exceção rara, é o caso comum — os dois candidatos têm que ser comparados.
+    exp = _resolve_experimental_from_chat(professor_id, current_text, hist)
+    if exp and resolved:
+        professor_hay, _ = _chat_haystacks(current_text, hist)
+        if _name_hits(exp.get("nome_aluno"), professor_hay) > _name_hits(resolved.get("aluno_nome"), professor_hay):
+            # Empate mantém a carteira: quem já é aluno tem mais dado, e trocar
+            # no empate seria mexer no que já funcionava.
+            log("prefetch_lead_venceu_homonimo",
+                lead=exp.get("nome_aluno"), aluno_carteira=resolved.get("aluno_nome"))
+            resolved = None
+
     if not resolved:
+        if exp:
+            return {
+                "intent": intent,
+                "resolved": {
+                    "aluno_id": None,
+                    "aluno_nome": exp.get("nome_aluno"),
+                    "curso_nome": exp.get("curso"),
+                    "professor_id": professor_id,
+                    "ainda_nao_e_aluno": True,
+                },
+                # Nome diferente de `experimental` de propósito: aquele é o bloco
+                # de quem JÁ matriculou e veio de uma experimental passada. Este
+                # é uma aula que ainda VAI acontecer. Confundir os dois faria o
+                # Fábio falar no passado de uma aula que não houve.
+                "experimental_agendada": exp,
+            }
         return {"intent": intent, "resolved": None, "erro": "aluno/curso não resolvido pelo contexto recente"}
     aluno_id = int(resolved["aluno_id"])
     course = resolved.get("curso_nome") or ""
@@ -1409,6 +1498,9 @@ Regras obrigatórias para esta conversa 1:1:
 - `experimental.ganchos_de_conexao` são coisas concretas que a família contou para o professor puxar na aula. Cite-os pelo conteúdo, não como lista genérica.
 - `experimental.alertas` do tipo agenda ou saude_agenda avisam que a aula pode não acontecer como está marcada. Diga isso cedo, é o que muda o dia dele.
 - O bloco não traz dinheiro nem negociação de propósito. Se `para_a_devolutiva.atencao_conversao` for "alta", significa que essa família precisa sentir valor na devolutiva — fale de como mostrar resultado, sem citar preço nem supor a situação financeira de ninguém.
+- `experimental_agendada` é OUTRA COISA e não pode ser confundida com `experimental`: é uma aula que ainda VAI acontecer, com alguém que ainda NÃO é aluno da escola. Nunca fale dela no passado nem procure histórico de aula: não existe histórico, e isso não é falha de registro.
+- Quando vier `experimental_agendada`, diga primeiro que é experimental, com dia e horário, e que a pessoa ainda não é aluno. Depois use `contexto` para preparar a aula: nível declarado, o que a família espera, ganchos concretos para puxar. É a aula que decide a matrícula — o professor precisa chegar sabendo.
+- Se `resolved.ainda_nao_e_aluno` for true, nunca diga “não achei esse aluno” nem peça o nome de novo. Você achou: é um lead com experimental marcada.
 - Se o contexto_json vier ok=false ou incompleto, explique a limitação de forma curta e peça só a informação mínima.
 
 Contexto da conversa recente:
