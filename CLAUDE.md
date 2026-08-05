@@ -55,6 +55,41 @@ systemctl --user restart fabio-chat-bridge.service
 | `~/la-teacher/` | Cópia do repo na VPS |
 | `~/backups/`, `~/.hermes/backups/` | Backups — o `.env` e o `config.yaml` têm histórico de `.bak` |
 
+## Os outros repositórios: SEMPRE `git pull` antes de mexer
+
+Combinado com o Alf em **05/08/2026**: *"toda vez que você for mexer em algum
+outro repositório, você vê se tem commit que andou"*. Ele **não** vai me avisar —
+é obrigação minha checar, não dele lembrar.
+
+```bash
+git -C D:/la-performance-report fetch -q && git -C D:/la-performance-report status -sb | head -1
+```
+
+Se estiver atrás, `git pull` **antes** de editar qualquer linha. Editar em cima de
+uma cópia velha e dar push é como o trabalho de outra pessoa é apagado sem que
+ninguém veja.
+
+| Caminho local | Repo | Ritmo |
+|---|---|---|
+| `D:/la-performance-report` | `LucianoAlf/LAperformanceReport` | **anda muito** — o Alf mexe direto |
+| `D:/anamnese-la-music` | `LucianoAlf/anamnese-la-music` | esporádico |
+| `D:/la-journey` | `LucianoAlf/la-journey` | em construção |
+
+⚠️ **Clone, nunca cópia.** Cópia de arquivo envelhece em silêncio; clone se
+atualiza com `pull` e acusa divergência. O `.env` de cada um fica no próprio
+clone, fora deste repo.
+
+## A mesma função pode morar em mais de um repo
+
+Em 05/08/2026 a `notificar-anamnese` existia em **três**: aqui, no
+`anamnese-la-music` e no `LAperformanceReport` — e as duas cópias eram versões
+antigas. Um `supabase functions deploy` a partir delas desfaria o conserto em
+silêncio.
+
+A fonte é **este repo**. Nos outros ficou um `LEIA-ANTES-DE-DEPLOYAR.md` sem
+`index.ts` — assim o deploy falha em vez de sobrescrever. Antes de mexer numa
+edge function, vale um `git grep` pelo nome dela nos outros clones.
+
 ## O banco é compartilhado
 
 LA Teacher, Fábio, Sol e LA Report vivem no **mesmo projeto Supabase**: `ouqwbbermlzqqvtqwlul` (LA Performance Report). A edge function `fabio-registro-aula` é publicada de lá, e o motor de relatório (`gerar-relatorio-pedagogico`) também. Juntar dados entre esses sistemas é SQL, não integração.
