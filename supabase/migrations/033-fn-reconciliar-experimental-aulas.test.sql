@@ -166,7 +166,15 @@ insert into public.aulas_emusys
 values
   (-33005, -933005, '00000000-0000-4000-8000-000000000330', current_date+2,
    (current_date+2 + time '09:00') at time zone 'America/Sao_Paulo', 'experimental', -33001, false);
-select public.fn_reconciliar_experimental_aulas(30, 500);
+
+-- GUARDA o retorno DESTA rodada — e ela que interessa. Conferir erros=0
+-- chamando o reconciliador de novo depois esconderia o defeito: a segunda
+-- rodada acha tudo ja resolvido e devolve zero naturalmente, mesmo que a
+-- promocao tenha estourado excecao na primeira. (Achado do Alfredo na
+-- auditoria do f42203e — a regressao provava o estado final, mas nao
+-- provava que o caminho ate ele foi limpo.)
+create temp table _rodada_promocao on commit drop as
+select public.fn_reconciliar_experimental_aulas(30, 500) as resumo;
 
 insert into _res
 select 'pendente casado depois: 1 unica linha vigente (nao duplicou)', '1',
@@ -186,9 +194,15 @@ select 'pendente casado depois: motivo_pendencia limpo', 'ausente',
        case when (select motivo_pendencia from lead_experimental_aulas
                     where lead_experimental_id=-33005 and substituido_em is null) is null
             then 'ausente' else 'presente' end;
+-- As duas asercoes abaixo leem a rodada QUE PROMOVEU (temp table acima),
+-- nao uma rodada nova.
 insert into _res
-select 'pendente casado depois: erros=0 na rodada', '0',
-       (select (public.fn_reconciliar_experimental_aulas(30, 500)->>'erros'));
+select 'pendente casado depois: erros=0 NA RODADA QUE PROMOVEU', '0',
+       (select resumo->>'erros' from _rodada_promocao);
+insert into _res
+select 'pendente casado depois: a rodada contou o vinculo (>=1)', 'sim',
+       case when (select (resumo->>'vinculados')::int from _rodada_promocao) >= 1
+            then 'sim' else 'nao — promoveu sem contabilizar' end;
 
 -- ── Ponto de decisao explicito: 'faltou' + matricula NAO e capitulo pedagogico ─
 -- Comercialmente a matricula aconteceu (aluno_id preenchido), entao o recibo
