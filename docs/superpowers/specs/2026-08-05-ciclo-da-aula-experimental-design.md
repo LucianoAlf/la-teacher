@@ -1,6 +1,7 @@
 # Ciclo da aula experimental — design
 
-**Data:** 05/08/2026 · **v2.1** (v2 = achado da aula existente; v2.1 = 3 correções do Contrato 1)
+**Data:** 05/08/2026 · **v2.2** (v2 = achado da aula existente; v2.1 = 3 correções do Contrato 1; v2.2 = ocupação pós-realizada + nome de coluna)
+**Status:** carimbado pelo Alfredo, condicionado ao fechamento deste ponto — v2.2 resolve.
 **Decisão do Alf:** *"isso daqui é ouro"* (registro) e *"cabe junto, trata tudo
 da questão de experimental"* (agenda). Um assunto só.
 
@@ -92,15 +93,25 @@ A tabela `lead_experimental_aulas` é **histórico**, não estado atual:
 create table public.lead_experimental_aulas (
   id                   bigserial primary key,
   lead_experimental_id integer not null references lead_experimentais(id),
-  aula_emusys_id       integer references aulas_emusys(id),  -- NULL enquanto pendente
+
+  -- ⚠️ NOME DE PROPOSITO DIFERENTE DE `lead_experimentais.emusys_aula_id`.
+  -- Aquele e o campo LEGADO, externo, que nao casa (id de evento do Emusys —
+  -- ver achado #2). Este e a NOSSA chave, e aponta pro id LOCAL (serial) de
+  -- `aulas_emusys`, nao pro `aulas_emusys.emusys_id` (que tambem e externo).
+  -- `emusys_aula_id` vs `aula_local_id` quase se escrevem igual de proposito
+  -- invertido — e por isso o nome segue a convencao que ja existe em
+  -- `vw_fabio_aulas_contexto.aula_local_id`, e nao inventa um terceiro jeito
+  -- de nomear a mesma coisa. Quem for fazer o JOIN: e sempre `aulas_emusys.id`.
+  aula_local_id        integer references aulas_emusys(id),  -- NULL enquanto pendente
 
   -- ESTADO EXPLICITO: e ele que decide o que a rotina pode tocar
   estado               text not null default 'pendente',
     -- pendente  → sem par ainda; a rotina REAVALIA a cada rodada
     -- vinculado → casado pela chave natural; a rotina pode revincular se reagendar
     -- manual    → decisao humana; a rotina NUNCA sobrescreve
-    -- realizado → a aula aconteceu; congelado
-    -- cancelado → anotado; congelado
+    -- realizado → a aula aconteceu; PERMANECE realizado pra sempre, mesmo se
+    --             cancelado_em for preenchido depois (ver regra abaixo)
+    -- cancelado → so alcancado ANTES de realizar; anotado, congelado
   motivo_pendencia     text,     -- sem_par | ambiguo   (so quando estado='pendente')
   casado_por           text,     -- chave_natural | manual
 
@@ -117,17 +128,33 @@ create table public.lead_experimental_aulas (
   aluno_origem         text
 );
 
--- UNICIDADE PARCIAL: varias linhas por lead (o historico), UMA vigente.
--- `UNIQUE(lead_experimental_id)` cru — como estava na v2 — tornaria impossivel
--- guardar o vinculo antigo depois de reagendar, que a propria spec exige.
+-- UNICIDADE PARCIAL DE VIGENCIA: varias linhas por lead (o historico), UMA
+-- vigente. So `substituido_em` retira uma linha de vigencia — de proposito
+-- SEM `cancelado_em` aqui (correcao v2.2, ver abaixo do porque). Uma
+-- experimental cancelada sem reagendamento CONTINUA sendo o registro vigente
+-- daquele lead: so passa a existir uma segunda linha vigente quando HOUVE
+-- reagendamento de verdade.
 create unique index uq_lead_exp_aula_vigente
     on public.lead_experimental_aulas (lead_experimental_id)
- where substituido_em is null and cancelado_em is null;
+ where substituido_em is null;
 
--- Uma aula do Emusys nao pode servir a dois leads ao mesmo tempo.
+-- OCUPACAO da aula e uma pergunta DIFERENTE de vigencia, e foi aqui que a v2.1
+-- tinha um acidente que o Alfredo pegou: usava `cancelado_em is null` cru, e
+-- uma aula que JA ACONTECEU (estado='realizado') saia do indice assim que
+-- alguem cancelasse a matricula depois — liberando aquele horario pra OUTRO
+-- lead ocupar uma aula que teve gente de verdade dentro dela.
+--
+-- A REGRA E EXPLICITA, nao um acidente de timestamp: cancelar ANTES de
+-- realizar libera o horario (a experimental nao aconteceu, esta genuinamente
+-- livre); cancelar DEPOIS de realizar NAO libera. E por isso a tabela de
+-- transicoes (Contrato 2) mantem `estado='realizado'` para sempre mesmo
+-- quando `cancelado_em` e preenchido a posteriori — o indice usa `estado`,
+-- que so vira 'cancelado' quando o cancelamento aconteceu ANTES da aula:
 create unique index uq_lead_exp_aula_ocupada
-    on public.lead_experimental_aulas (aula_emusys_id)
- where aula_emusys_id is not null and substituido_em is null and cancelado_em is null;
+    on public.lead_experimental_aulas (aula_local_id)
+ where aula_local_id is not null
+   and substituido_em is null
+   and estado <> 'cancelado';
 ```
 
 **Por que tabela e não coluna em `aulas_emusys`:** aquilo é espelho do Emusys.
@@ -225,7 +252,7 @@ Note a linha **realizada → cancelada**: marca `cancelado_em` mas o `estado`
 continua `realizado`. Cancelamento posterior é anotação administrativa; a aula
 aconteceu e o registro dela é fato.
 
-Duas regras que o Alfredo nomeou, escritas como invariantes testáveis:
+Três regras que o Alfredo nomeou, escritas como invariantes testáveis:
 
 - **Reagendar não deixa aula fantasma.** Depois de reagendar, o lead tem
   exatamente um vínculo vigente. O antigo fica com `substituido_em` preenchido —
@@ -233,6 +260,16 @@ Duas regras que o Alfredo nomeou, escritas como invariantes testáveis:
 - **Cancelar não apaga histórico de aula realizada.** Se existe registro de aula
   confirmado, o cancelamento é anotação, nunca remoção. Aula que aconteceu
   aconteceu.
+- **A ocupação do horário depende de QUANDO se cancela, e isso é regra
+  explícita, não acidente de índice** (v2.2). Cancelar **antes** da aula
+  acontecer libera o horário — a experimental não ocorreu, outro lead pode
+  legitimamente usar aquele mesmo horário se o Emusys reaproveitar. Cancelar
+  **depois** de `estado='realizado'` nunca libera: a aula aconteceu, o registro
+  é fato, e permitir que outro lead "herde" aquele horário apagaria de fato a
+  ocupação de quem esteve lá. É por isso que só a transição *agendada →
+  cancelada* muda o `estado` para `'cancelado'` — a transição *realizada →
+  cancelada* deixa o `estado` intocado em `'realizado'`, e é essa diferença de
+  `estado` (não de `cancelado_em`) que o índice `uq_lead_exp_aula_ocupada` lê.
 
 ### Contrato 3 — Matrícula com recibo
 
@@ -336,6 +373,8 @@ O que precisa falhar quando a defesa é removida (mutante entre parênteses):
 | `manual` sobrevive a 20 rodadas | rotina reavaliar estados finais |
 | cancelar aula realizada preserva registro | deletar em vez de marcar |
 | a mesma aula não serve a dois leads | remover `uq_lead_exp_aula_ocupada` |
+| **aula realizada continua ocupada mesmo com `cancelado_em` preenchido depois** | trocar `estado <> 'cancelado'` por `cancelado_em is null` no índice de ocupação (era o defeito da v2.1, pego pelo Alfredo) |
+| **aula cancelada ANTES de realizar libera o horário pra outro lead** | impedir a liberação — provaria que a regra virou mais restritiva que o decidido |
 | devolutiva da família não contém leitura de conversão | a RPC ler o campo |
 
 Todos com lead/professor/unidade `ZZTESTE` criados e descartados na transação —
