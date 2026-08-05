@@ -297,6 +297,27 @@ Achado do Alfredo na revisão do `4f00e94`.
 Duas views, não um parâmetro booleano: um flag errado vira vazamento; uma view que não
 tem a coluna não pode vazá-la.
 
+### 4.5 Escrita só por RPC canônica
+
+**A tabela não é escrita direto.** Duas razões, ambas apontadas pelo Alfredo na revisão do
+`3aed455`:
+
+1. **O índice único rejeita, não reconcilia.** Ele garante que não existam dois registros
+   vigentes, mas quem decide "isto é edição do que já existe" tem de ser código. Sem a
+   RPC, a segunda gravação do professor vira `unique_violation` na cara dele em vez de
+   edição.
+2. **`unidade_id` e `professor_id` são derivados do vínculo, nunca digitados.** Se vierem
+   do cliente, nasce registro incoerente — aula de uma unidade com registro carimbado em
+   outra. A RPC lê os dois seguindo `lead_experimental_aulas` → `aulas_emusys` e **ignora**
+   o que o chamador mandar nesses campos.
+
+A RPC concentra também as travas de §6 (estado `pendente`/`faltou`/`cancelado`) e a
+gravação de presença com a fonte correta (§4.2). `GRANT` apenas para os papéis que
+precisam; escrita direta na tabela fica sem permissão — a garantia é de **permissão**, não
+de convenção.
+
+Mutantes correspondentes em §7.
+
 ---
 
 ## 5. Fluxo
@@ -344,7 +365,7 @@ causa dano**. O que se separa é a *leitura comercial*, não a verdade pedagógi
 | Vínculo `cancelado` | Registro bloqueado. |
 | Unidade sem contato comercial cadastrado | Registro grava normalmente; aviso fica `pulada` com `motivo_pulada='sem_destinatario'` — visível, não silencioso. |
 | Emusys marca presença depois do professor | Ignorado para `presenca_status`; preservado em `presenca_bruta_emusys`. |
-| Professor registra duas vezes | Índice único por vínculo rejeita; o segundo vira edição do vigente. |
+| Professor registra duas vezes | O índice único **rejeita** (`unique_violation`) — ele não converte a segunda tentativa em edição. Quem transforma "já existe" em edição do vigente é a RPC canônica (§4.5); escrita direta na tabela não é caminho suportado. |
 | Áudio inaudível / transcrição vazia | Registro fica `aguardando_confirmacao` com campos vazios e cutucada explícita — nunca texto inventado. |
 
 ---
@@ -368,6 +389,9 @@ e **cada defesa tem um mutante que a mata** — verde não-falsificado é decora
 | Status comercial não regride presença forte | Remover a exclusão no ramo de sync da 033 |
 | Declarar falta grava fonte forte e promove `estado` | Fazer a declaração gravar sem fonte (viraria fantasma) |
 | Fonte inventada é rejeitada na escrita | Afrouxar o CHECK de `presenca_respondido_por` — o teste tenta gravar `professor_app` e exige rejeição |
+| Segunda chamada da RPC **edita** o vigente, não estoura | Fazer a RPC sempre `insert` — o teste chama duas vezes e exige 1 linha vigente + conteúdo da 2ª |
+| `unidade_id`/`professor_id` vêm do vínculo, não do chamador | Fazer a RPC aceitar os valores do parâmetro — o teste manda unidade errada e exige que o gravado seja o do vínculo |
+| Escrita direta na tabela é negada por permissão | Conceder `insert`/`update` ao papel do app — o teste tenta escrever direto e exige erro de permissão |
 | Toda fonte aceita pelo CHECK que representa professor passa em `fn_presenca_e_forte` | Trocar o valor gravado pelo app por um fora da lista forte |
 | Falta gera aviso **sem** blocos pedagógicos | Fazer o aviso da falta montar o corpo completo |
 
