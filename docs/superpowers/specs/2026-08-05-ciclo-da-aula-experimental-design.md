@@ -1,7 +1,43 @@
 # Ciclo da aula experimental — design
 
-**Data:** 05/08/2026 · **v2.2** (v2 = achado da aula existente; v2.1 = 3 correções do Contrato 1; v2.2 = ocupação pós-realizada + nome de coluna)
-**Status:** carimbado pelo Alfredo, condicionado ao fechamento deste ponto — v2.2 resolve.
+**Data:** 05/08/2026 · **v2.3** (v2 = achado da aula existente; v2.1 = 3 correções do Contrato 1; v2.2 = ocupação pós-realizada; v2.3 = status reais)
+**Status:** v2.2 carimbada pelo Alfredo. v2.3 achada **ao começar a escrever a
+migration** — não é revisão, é o mesmo tipo de medição que já reescreveu esta
+spec três vezes hoje. Não muda os Contratos 1 e 2 na essência; corrige o
+vocabulário de `status` para o que existe de verdade, e simplifica o Contrato 3.
+
+> **v2.3 — o que a medição mostrou ao tentar escrever o CHECK constraint:**
+>
+> Os valores reais de `lead_experimentais.status` são
+> `experimental_agendada`, `experimental_realizada`, **`experimental_faltou`
+> (212 linhas — um estágio de funil inteiro que a v2.2 não cobria)**,
+> `cancelada`, `convertido`. **`experimental_reagendada` tem ZERO linhas** —
+> nunca existiu. Pior: as migrations 027c, 027d e 029 (escritas hoje de manhã)
+> têm um filtro `status in (..., 'experimental_reagendada')` que nunca casa com
+> nada. Não perde linha (reagendamento é rastreado na **aula**, não no status —
+> ver abaixo), mas é dívida morta, registrada como tarefa à parte.
+>
+> **Reagendamento, medido:** `aulas_emusys.reagendada` + `data_hora_inicio_original`
+> vivem na MESMA linha da aula — o Emusys atualiza o horário no lugar, não cria
+> aula nova. E o `lead_experimentais.data_experimental/horario_experimental`
+> acompanha em **89%** dos casos (33 de 37 amostrados). Isso significa que a
+> maioria dos reagendamentos **não precisa de `substituido_em` nenhum**: o
+> `aula_local_id` do vínculo continua válido porque a aula e o lead se movem
+> juntos. O mecanismo de revínculo do Contrato 1 continua existindo como rede
+> de segurança para os ~11% que divergem — só deixou de ser o caminho comum.
+>
+> **`lead_experimentais.aluno_id` já existe** — coluna própria, não
+> `leads.aluno_id` como a v2.2 assumia. Medido: fica preenchida em três status
+> diferentes (`convertido`: 10, `experimental_realizada`: 70, e até 1 caso de
+> `experimental_faltou`). Não existe um único status "matriculada" limpo — o
+> gatilho certo do Contrato 3 é a **própria coluna passando de nulo pra
+> preenchida**, não um status.
+>
+> **Já existe um sistema de conciliação humana** (`lead_experimentais_decisoes_humanas`
+> + `ComercialConciliacaoExperimentais.tsx`), mas ele resolve **atribuição de
+> KPI/funil** (decisões como `duplicidade_reagendamento_ignorar`), um problema
+> vizinho e diferente do vínculo pedagógico com a aula física. Não precisa
+> integração — só registrado para não duplicar.
 **Decisão do Alf:** *"isso daqui é ouro"* (registro) e *"cabe junto, trata tudo
 da questão de experimental"* (agenda). Um assunto só.
 
@@ -111,7 +147,13 @@ create table public.lead_experimental_aulas (
     -- manual    → decisao humana; a rotina NUNCA sobrescreve
     -- realizado → a aula aconteceu; PERMANECE realizado pra sempre, mesmo se
     --             cancelado_em for preenchido depois (ver regra abaixo)
-    -- cancelado → so alcancado ANTES de realizar; anotado, congelado
+    -- faltou    → aula existiu, professor esteve la, familia nao veio. Ocupa o
+    --             horario como 'realizado' (nao e 'cancelado'), mas NAO habilita
+    --             registro/presenca/devolutiva -- nao ha aula pedagogica pra
+    --             registrar. 212 leads em producao estao neste status (medido
+    --             em 05/08/2026) — nao e caso raro, e' um estagio de funil.
+    -- cancelado → so alcancado ANTES de realizar; anotado, congelado, LIBERA
+    --             o horario (ver uq_lead_exp_aula_ocupada)
   motivo_pendencia     text,     -- sem_par | ambiguo   (so quando estado='pendente')
   casado_por           text,     -- chave_natural | manual
 
@@ -232,16 +274,21 @@ Silenciar isso seria repetir o cron que rodou onze vezes sem fazer nada.
 
 ### Contrato 2 — Máquina de estados
 
-Transições de `lead_experimentais.status` e o efeito em cada peça:
+O `estado` do vínculo (tabela `lead_experimental_aulas`) **não é um espelho 1:1**
+de `lead_experimentais.status` — é derivado dele pela rotina. Valores reais de
+`status`, medidos: `experimental_agendada`, `experimental_realizada`,
+`experimental_faltou`, `cancelada`, `convertido`.
 
-| de → para | vínculo (`estado`) | registro | presença | devolutiva |
+| `lead_experimentais.status` | vínculo (`estado`) | registro | presença | devolutiva |
 |---|---|---|---|---|
-| — → **agendada** | cria: `vinculado`, ou `pendente` se não achou par | — | — | — |
-| agendada → **reagendada** | linha atual ganha `substituido_em`; **linha nova** procura no horário novo | intocado | intocado | — |
-| agendada → **cancelada** | `cancelado_em` + `estado='cancelado'`; **não apaga** | intocado | intocado | bloqueada |
-| agendada → **realizada** | `estado='realizado'` — a rotina para de reavaliar | **habilita** | habilita | habilita após registro |
-| realizada → **cancelada** | `cancelado_em`, mas `estado` continua `realizado` | preservado | preservado | preservada |
-| realizada → **matriculada** | mantém; preenche as 4 colunas de recibo | preservado | preservado | — |
+| `experimental_agendada` (sem vínculo ainda) | busca par: `vinculado` ou `pendente` | — | — | — |
+| `experimental_agendada` (vínculo já `vinculado`) | reavalia: mesmo par → nada; par mudou → `substituido_em` + linha nova | intocado | intocado | — |
+| → **`cancelada`** | se vínculo ainda não era `realizado`: `estado='cancelado'` + `cancelado_em` (**libera o horário**, ver Contrato 1); se já era `realizado`: só `cancelado_em`, `estado` continua `realizado` (**não libera**) | intocado | intocado | bloqueada |
+| → **`experimental_realizada`** ou **`convertido`** | `estado='realizado'` — a rotina para de reavaliar o vínculo | **habilita** | habilita | habilita após registro |
+| → **`experimental_faltou`** | `estado='faltou'` — terminal, mas **não** é `'cancelado'`: o índice de ocupação (`estado <> 'cancelado'`) mantém o horário ocupado, porque o professor esteve lá | **desabilitado** (nada pedagógico ocorreu) | desabilitado | bloqueada |
+
+`aluno_id` (Contrato 3) é observado **à parte**, na própria coluna
+`lead_experimentais.aluno_id` — não depende de qual desses status está ativo.
 
 O `estado` é o que a rotina consulta antes de tocar em qualquer coisa:
 `pendente` e `vinculado` são reavaliáveis; `manual`, `realizado` e `cancelado`
@@ -282,13 +329,21 @@ Preencher `aluno_id` não basta. A conversão é um **evento com prova**:
 | `vinculado_aluno_por` | quem/o quê (`emusys_sync`, `coordenacao:<usuario_id>`, `fabio`) |
 | `vinculado_aluno_origem` | como a experimental foi encontrada |
 
-**Quem dispara:** a matrícula nasce no Emusys. A rotina que descobre
-`leads.aluno_id` preenchido é a mesma que fecha o ciclo aqui — não há passo
-manual obrigatório, mas há registro manual possível.
+**Quem dispara:** `lead_experimentais` já tem sua **própria** coluna
+`aluno_id` (não `leads.aluno_id` — são colunas diferentes, e a v2.2 confundiu
+as duas). Medido: ela é preenchida com o lead em três status diferentes
+(`convertido`, `experimental_realizada`, e até `experimental_faltou`), então
+não existe um único status "matriculada" para vigiar — o gatilho é a própria
+coluna passando de nula para preenchida. A mesma rotina que reconcilia o
+vínculo observa essa transição a cada rodada.
 
-**Como encontra a experimental certa:** pelo `lead_id`, a experimental
-`realizada` mais recente. Se houver mais de uma, é `ambiguo` e vai para a fila,
-não para o chute.
+**Como encontra a experimental certa:** ela já sabe — é a própria linha de
+`lead_experimentais` cujo `aluno_id` acabou de ser preenchido. Não precisa
+buscar "a experimental mais recente do lead": o Emusys já decidiu qual
+experimental específica converteu ao preencher aquela coluna naquela linha. Se
+o mesmo `lead_id` tiver mais de uma `lead_experimentais` com `aluno_id`
+preenchido (múltiplas tentativas convertendo — não visto em produção, mas não
+impossível), fica `ambiguo` na fila, não no chute.
 
 Sem essas quatro colunas, "primeiro capítulo do histórico" é promessa. Com elas,
 dá para responder *"quantos alunos deste professor vieram de experimental que
@@ -341,6 +396,9 @@ descartados na mesma transação — como já é feito nas migrations 027d e 029
   `audio_id` e `origem`, então o molde nasce pronto para receber
 - **Consertar o `emusys_aula_id` na origem** — reconciliamos por chave natural;
   investigar por que o campo guarda id de evento é trabalho do lado do Emusys
+- **Limpar o filtro morto `'experimental_reagendada'`** nas migrations 027c,
+  027d e 029 — nunca casa (status não existe), não perde linha hoje, mas é
+  vocabulário errado documentado como se fosse real
 - **Relatórios do Fábio** (#47–49), que o Alf quer retomar depois desta
 
 ## Riscos
@@ -375,6 +433,9 @@ O que precisa falhar quando a defesa é removida (mutante entre parênteses):
 | a mesma aula não serve a dois leads | remover `uq_lead_exp_aula_ocupada` |
 | **aula realizada continua ocupada mesmo com `cancelado_em` preenchido depois** | trocar `estado <> 'cancelado'` por `cancelado_em is null` no índice de ocupação (era o defeito da v2.1, pego pelo Alfredo) |
 | **aula cancelada ANTES de realizar libera o horário pra outro lead** | impedir a liberação — provaria que a regra virou mais restritiva que o decidido |
+| **`experimental_faltou` mantém o horário ocupado** (não é tratado como cancelado) | usar `estado='cancelado'` em vez de `'faltou'` na transição |
+| **`experimental_faltou` não habilita registro nem devolutiva** | tratar `'faltou'` como `'realizado'` para fins de registro |
+| **matrícula usa `lead_experimentais.aluno_id`, não `leads.aluno_id`** | ler a coluna errada — voltaria ao erro da v2.2 |
 | devolutiva da família não contém leitura de conversão | a RPC ler o campo |
 
 Todos com lead/professor/unidade `ZZTESTE` criados e descartados na transação —
