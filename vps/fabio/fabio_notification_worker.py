@@ -15,6 +15,8 @@ import json
 import os
 import re
 import sys
+
+import requests
 from dataclasses import dataclass
 from datetime import datetime, time as dtime
 from typing import Any, Dict, Iterable, Optional
@@ -25,6 +27,13 @@ import fabio_chat_bridge as bridge
 BRT = ZoneInfo("America/Sao_Paulo")
 DEFAULT_BRIEFING_TIME = os.getenv("FABIO_NOTIFY_BRIEFING_TIME", "08:00")
 DEFAULT_PENDENCIA_TIME = os.getenv("FABIO_NOTIFY_PENDENCIA_TIME", "18:30")
+# Depois de 3 dias o Fabio PARA de cutucar o professor por aquelas aulas e a
+# bola passa pra coordenacao. Desenho do Alfredo em
+# docs/2026-07-18-fabio-governanca-presenca-professor-alfredo.md.
+ESCALONAMENTO_DIAS = int(os.getenv("FABIO_ESCALONAMENTO_DIAS", "3"))
+# COORDENACAO PEDAGOGICA (Marcos Quintela, Juliane, Fabio). Puxado da UAZAPI.
+GRUPO_COORDENACAO_JID = os.getenv("FABIO_GRUPO_COORDENACAO_JID", "120363304349910605@g.us")
+DEFAULT_ESCALONAMENTO_TIME = os.getenv("FABIO_NOTIFY_ESCALONAMENTO_TIME", "09:00")
 DEFAULT_WINDOW_MINUTES = int(os.getenv("FABIO_NOTIFY_WINDOW_MINUTES", "15"))
 DEFAULT_CHANNEL = os.getenv("FABIO_NOTIFY_CHANNEL", "whatsapp")
 SEND_EMPTY_BRIEFING = os.getenv("FABIO_NOTIFY_EMPTY_BRIEFING", "false").lower() in {"1", "true", "yes", "sim"}
@@ -41,6 +50,7 @@ class EventSpec:
 EVENTS = {
     "briefing": EventSpec("briefing_matinal", "informativa", DEFAULT_BRIEFING_TIME),
     "pendencia": EventSpec("pendencia_registro", "governanca", DEFAULT_PENDENCIA_TIME),
+    "escalonamento": EventSpec("pendencia_escalonada", "governanca", DEFAULT_ESCALONAMENTO_TIME),
 }
 
 
@@ -316,38 +326,135 @@ def format_briefing(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[str]
     return "\n".join(lines)
 
 
+DIAS_PT = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
+
+
+def _dia_label(iso: str) -> str:
+    """2026-08-04 -> 'terça, 04/08'. Se vier fora do padrão, devolve como veio."""
+    try:
+        d = datetime.strptime(iso[:10], "%Y-%m-%d").date()
+    except Exception:
+        return iso
+    return f"{DIAS_PT[d.weekday()]}, {d.strftime('%d/%m')}"
+
+
 def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[str]:
+    """Cobrança do professor.
+
+    Diagramação decidida com o Alf em 05/08/2026: a HORA é a âncora (o professor
+    percorre o próprio dia na ordem em que aconteceu), data em pt-BR (ninguém lê
+    ISO no zap) e o fecho diz COMO resolver, não que a cobrança vai parar.
+
+    O fecho manda abrir o APP de propósito: o registro por áudio no WhatsApp
+    ainda não está ligado, e mandar áudio pro Fabio aqui não registra nada.
+    """
     total = int(data.get("total_aulas") or 0)
     if total <= 0:
         return None
     nome = first_name(prof)
-    total_alunos = int(data.get("total_alunos") or 0)
     pior = int(data.get("pior_atraso_dias") or 0)
     aulas = data.get("aulas") or []
-    plural = "aula pendente" if total == 1 else "aulas pendentes"
-    head = f"{nome}, passando pra te ajudar a fechar os registros. Você tem {total} {plural}"
-    if total_alunos:
-        head += f" envolvendo {total_alunos} aluno(s)"
-    if pior:
-        head += f" — a mais antiga está há {pior} dia(s)."
-    else:
-        head += "."
-    lines = [head, "", "Pendências:"]
-    for aula in aulas[:8]:
-        data_aula = aula.get("data") or aula.get("data_aula") or "data não informada"
-        hora = aula.get("hora") or aula.get("horario") or ""
-        curso = aula.get("curso") or "Aula"
-        atraso = aula.get("dias_atraso") or aula.get("atraso_dias")
-        alunos = aula.get("alunos") or []
-        when = f"{data_aula} {hora}".strip()
-        line = f"• {when} — {curso}: {student_names(alunos)}"
-        if atraso:
-            line += f" ({atraso}d)"
-        lines.append(line)
-    if len(aulas) > 8:
-        lines.append(f"• +{len(aulas) - 8} aula(s) pendente(s).")
-    lines.append("\nQuando registrar, eu paro de te cobrar essa pendência.")
+
+    plural = "aula" if total == 1 else "aulas"
+    quando = "de ontem" if pior <= 1 else f"dos últimos {pior} dias"
+    lines = [f"*{nome}, ficaram {total} {plural} {quando} sem registro.*"]
+
+    # O que passou de ESCALONAMENTO_DIAS nao e mais cobranca do professor: subiu
+    # pra coordenacao. Continuar cobrando aqui seria cobrar duas vezes a mesma
+    # coisa, em dois lugares, sem ninguem assumir.
+    aulas = [a for a in aulas
+             if int(a.get("dias_atraso") or a.get("atraso_dias") or 0) <= ESCALONAMENTO_DIAS]
+    if not aulas:
+        return None
+    total = len(aulas)
+    plural = "aula" if total == 1 else "aulas"
+
+    por_dia: Dict[str, list] = {}
+    for aula in aulas:
+        dia = (aula.get("data") or aula.get("data_aula") or "")[:10]
+        por_dia.setdefault(dia, []).append(aula)
+
+    mostradas = 0
+    for dia in sorted(por_dia.keys()):
+        if mostradas >= 8:
+            break
+        lines.append("")
+        lines.append(_dia_label(dia))
+        for aula in sorted(por_dia[dia], key=lambda a: (a.get("hora") or a.get("horario") or "")):
+            if mostradas >= 8:
+                break
+            hora = (aula.get("hora") or aula.get("horario") or "")[:5]
+            curso = aula.get("curso") or "Aula"
+            alunos = student_names(aula.get("alunos") or [])
+            lines.append(f"*{hora}*  {curso} · {alunos}" if hora else f"{curso} · {alunos}")
+            mostradas += 1
+
+    if len(aulas) > mostradas:
+        lines.append("")
+        lines.append(f"e mais {len(aulas) - mostradas}.")
+
+    lines.append("")
+    lines.append("É só abrir o app do LA Teacher e mandar o áudio de cada aula "
+                 "— eu escrevo o resto. Se preferir, dá pra fechar tudo por lá mesmo.")
     return "\n".join(lines)
+
+
+def pendencias_escalonadas() -> list:
+    """Quem passou do prazo, agregado no banco.
+
+    Chama fn_pendencias_escalonadas (039) em vez de fazer SELECT na view: a
+    vw_presenca_pendencia leva ~21s pra agregar e estoura o statement_timeout
+    do PostgREST (57014). A view continua sendo a fonte canonica — a funcao so
+    agrega dentro do banco, com timeout proprio.
+    """
+    data = rpc("fn_pendencias_escalonadas", {"p_dias": ESCALONAMENTO_DIAS})
+    if not data:
+        return []
+    return data.get("linhas") or []
+
+
+def format_escalonamento(rows: list) -> Optional[str]:
+    """Mensagem do grupo da coordenacao.
+
+    Fala de PESSOAS e PRAZO, nao de aula a aula: quem le decide o que fazer com
+    o professor, nao vai registrar aula nenhuma.
+    """
+    if not rows:
+        return None
+    quantos = len(rows)
+    cabeca = ("*1 professor passou de " if quantos == 1
+              else f"*{quantos} professores passaram de ")
+    lines = [cabeca + f"{ESCALONAMENTO_DIAS} dias sem registrar.*", ""]
+    for r in rows[:15]:
+        n_al = int(r.get("alunos") or 0)
+        alunos_txt = f"{n_al} aluno" if n_al == 1 else f"{n_al} alunos"
+        unidade = r.get("unidade_nome") or ""
+        unidade = f" ({unidade})" if unidade else ""
+        nome = r.get("professor_nome") or f"professor {r.get('professor_id')}"
+        lines.append(f"*{nome}*{unidade} · {alunos_txt} · há {r.get('pior_atraso')} dias")
+    if quantos > 15:
+        lines.append(f"e mais {quantos - 15}.")
+    lines.append("")
+    lines.append("Parei de cobrar no particular — daqui pra frente é de vocês.")
+    return "\n".join(lines)
+
+
+def enviar_grupo(texto: str) -> Dict[str, Any]:
+    """Envia pro grupo da coordenacao pela UAZAPI.
+
+    O caminho normal do worker resolve telefone de PROFESSOR; grupo e um JID e
+    nao passa por canonical_phone. Por isso posta direto, com o mesmo token.
+    """
+    r = requests.post(
+        f"{bridge.UAZAPI_URL}/send/text",
+        headers={"Content-Type": "application/json", "token": bridge.UAZAPI_TOKEN},
+        json={"number": GRUPO_COORDENACAO_JID, "text": texto},
+        timeout=30,
+    )
+    if r.status_code >= 400:
+        raise RuntimeError(f"uazapi grupo {r.status_code}: {r.text[:300]}")
+    log("escalonamento_enviado", grupo=GRUPO_COORDENACAO_JID[:18] + "...")
+    return {"ok": True}
 
 
 def build_content(event: str, prof: Dict[str, Any], target_date: Optional[str] = None) -> tuple[Optional[str], Dict[str, Any]]:
@@ -635,7 +742,7 @@ def run_devolutivas(channel: str, dry_run: bool, professor_id: Optional[int] = N
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "all"], default="all")
+    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "escalonamento", "all"], default="all")
     parser.add_argument("--professor-id", type=int)
     parser.add_argument("--channel", choices=["whatsapp", "app"], default=DEFAULT_CHANNEL)
     parser.add_argument("--dry-run", action="store_true")
@@ -671,6 +778,29 @@ def main() -> int:
         payload = {"ok": True, "status": "nothing_due", "now_brt": now.isoformat(), "events_checked": selected}
         print(json.dumps(payload, ensure_ascii=False) if args.json else payload)
         return 0
+
+    # O escalonamento NAO e por professor: e uma mensagem so, pro grupo da
+    # coordenacao, agregando todo mundo que passou do prazo. Por isso sai do
+    # laco de professores — se ficasse dentro, o grupo levaria uma mensagem
+    # por professor.
+    if "escalonamento" in due_events:
+        due_events = [e for e in due_events if e != "escalonamento"]
+        try:
+            linhas = pendencias_escalonadas()
+            corpo = format_escalonamento(linhas)
+            if not corpo:
+                results.append({"event": "escalonamento", "status": "sem_pendencia_escalonada"})
+            elif args.dry_run:
+                results.append({"event": "escalonamento", "status": "dry_run_ready",
+                                "professores": len({r.get("professor_id") for r in linhas}),
+                                "content_preview": corpo})
+            else:
+                enviar_grupo(corpo)
+                results.append({"event": "escalonamento", "status": "sent",
+                                "professores": len({r.get("professor_id") for r in linhas})})
+        except Exception as exc:
+            results.append({"event": "escalonamento", "status": "error", "error": str(exc)[:500]})
+        log("event_result", **results[-1])
 
     rows = active_professors(args.professor_id) if due_events else []
     for prof in rows:
