@@ -103,6 +103,10 @@ const SCHEMA_SAIDA = {
       },
     },
     ganchos_de_conexao: { type: "array", items: { type: "string" } },
+    // A dica que o professor lê minutos antes de entrar na sala. Nullable de
+    // propósito: conversa que só falou de preço e horário não vira conduta, e
+    // vazio honesto continua sendo resposta.
+    como_conduzir: { type: "string", nullable: true },
     para_a_devolutiva: {
       type: "object",
       properties: {
@@ -180,6 +184,17 @@ O QUE PROCURAR
   partiu a vontade (do aluno, dos pais, de terceiro).
 - ganchos_de_conexao: 1 a 3 coisas CONCRETAS para o professor puxar na aula —
   o que a criança gosta de ouvir ou cantar, o que já tentou, o que a encanta.
+- como_conduzir: UMA sugestão de condução, no máximo 2 frases, escrita para o
+  professor ler minutos antes de entrar na sala. Parta do que a conversa
+  REVELOU sobre esse aluno e diga o que FAZER com isso. Não repita o gancho —
+  use ele.
+  Errado: "Ela gosta de pop internacional." (isso é gancho, tem campo próprio)
+  Certo: "Comece deixando ela escolher a música: a mãe contou que ela trava
+  quando tem gente olhando."
+  NUNCA cite preço, mensalidade, matrícula, decisão de compra nem o interesse
+  comercial da família. Este campo vai para quem vai DAR a aula, e a aula dele
+  não é venda. Se a conversa só tratou de valor e horário, devolva null — uma
+  dica inventada é pior que nenhuma, porque o professor confia nela.
 - para_a_devolutiva: o que a família espera ouvir no fim.
 - alertas: mudanças de agenda, cancelamentos, restrição de horário.
 
