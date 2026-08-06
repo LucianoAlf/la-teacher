@@ -399,7 +399,7 @@ def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[st
     return "\n".join(lines)
 
 
-def pendencias_escalonadas() -> list:
+def pendencias_escalonadas(professor_id: Optional[int] = None) -> list:
     """Quem passou do prazo, agregado no banco.
 
     Chama fn_pendencias_escalonadas (039) em vez de fazer SELECT na view: a
@@ -410,7 +410,11 @@ def pendencias_escalonadas() -> list:
     data = rpc("fn_pendencias_escalonadas", {"p_dias": ESCALONAMENTO_DIAS})
     if not data:
         return []
-    return data.get("linhas") or []
+    linhas = data.get("linhas") or []
+    if professor_id is not None:
+        linhas = [l for l in linhas
+                  if int(l.get("professor_id") or 0) == int(professor_id)]
+    return linhas
 
 
 def format_escalonamento(rows: list) -> Optional[str]:
@@ -786,7 +790,7 @@ def main() -> int:
     if "escalonamento" in due_events:
         due_events = [e for e in due_events if e != "escalonamento"]
         try:
-            linhas = pendencias_escalonadas()
+            linhas = pendencias_escalonadas(args.professor_id)
             corpo = format_escalonamento(linhas)
             if not corpo:
                 results.append({"event": "escalonamento", "status": "sem_pendencia_escalonada"})

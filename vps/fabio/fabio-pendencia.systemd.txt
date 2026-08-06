@@ -95,7 +95,7 @@ WantedBy=timers.target
 #   igual ao briefing do piloto.
 
 # ============================================================================
-# ~/.config/systemd/user/fabio-escalonamento.service   (INSTALADO, NAO HABILITADO)
+# ~/.config/systemd/user/fabio-escalonamento.service   (ATIVO, so professor 25)
 # ============================================================================
 [Unit]
 Description=Fábio — escala pra coordenacao quem passou de 3 dias sem registrar
@@ -105,10 +105,10 @@ Documentation=https://github.com/LucianoAlf/la-teacher
 Type=oneshot
 WorkingDirectory=/home/fabio/fabio-chat-bridge
 EnvironmentFile=/home/fabio/.hermes/.env
-ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event escalonamento --channel whatsapp --force
+ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event escalonamento --professor-id 25 --channel whatsapp --force
 
 # ============================================================================
-# ~/.config/systemd/user/fabio-escalonamento.timer    (INSTALADO, NAO HABILITADO)
+# ~/.config/systemd/user/fabio-escalonamento.timer    (ATIVO, so professor 25)
 # ============================================================================
 [Unit]
 Description=Timer do escalonamento pra coordenacao as 09:00 BRT (12:00 UTC)
@@ -123,16 +123,16 @@ Unit=fabio-escalonamento.timer
 WantedBy=timers.target
 
 # ============================================================================
-# POR QUE O ESCALONAMENTO ESTA INSTALADO MAS DESLIGADO
+# ESCALONAMENTO: ATIVO, MAS RESTRITO AO PILOTO (professor 25)
 #
-# Testado em dry-run em 05/08/2026 e funciona. Mas o primeiro disparo levaria
+# Decisao do Alf em 05/08/2026: por enquanto so o Matheus sobe pro grupo.
+#
+# O motivo de nao ser geral: sem o --professor-id, o primeiro disparo levaria
 # pro grupo da coordenacao 75 professores-unidade com 4 a 37 DIAS de atraso
-# (CG 32, Recreio 24, Barra 19) — passivo historico, nao a governanca do dia.
-# O Fabio entrando no grupo com essa lista nao e cobranca, e escombro.
+# (CG 32, Recreio 24, Barra 19). Isso e passivo historico, nao a governanca do
+# dia — o Fabio estreando no grupo com essa lista queima o mecanismo no
+# primeiro uso. Antes de abrir pra todos, decidir o que fazer com o acumulado:
+# zerar/justificar e ligar limpo, ou escalonar so uma janela (ex.: 4 a 15 dias).
 #
-# Ligar depende de uma decisao que nao e minha: o que fazer com o acumulado.
-# Duas saidas razoaveis: (a) zerar/justificar o passivo e ligar limpo;
-# (b) escalonar so uma janela (ex.: 4 a 15 dias) e tratar o resto por fora.
-#
-# Quando decidir:  systemctl --user enable --now fabio-escalonamento.timer
+# Primeiro envio real ao grupo: 05/08/2026, so o Matheus (19 alunos, 37 dias).
 # ============================================================================
