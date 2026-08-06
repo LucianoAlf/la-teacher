@@ -317,13 +317,25 @@ def format_briefing(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[str]
     ]
     for aula in aulas:
         hora = aula.get("hora") or "--:--"
-        curso = aula.get("curso") or "Aula"
+        curso = _curso_limpo(aula.get("curso"))
         lines.append("")
         lines.append(f"{_relogio(hora)} *{hora} — {curso}*")
         lines.extend(_summary_lines_for_class(aula.get("alunos") or []))
     lines.append("")
     lines.append("Se quiser preparar alguma aula específica, me manda o nome do aluno.")
     return "\n".join(lines)
+
+
+def _curso_limpo(nome: Optional[str]) -> str:
+    """Tira o sufixo de turma do Emusys ("Canto T" -> "Canto").
+
+    O "T" nao significa nada pra quem le no zap e repete em toda linha.
+    """
+    txt = (nome or "Aula").strip()
+    for suf in (" T", " I", " -"):
+        if txt.endswith(suf):
+            txt = txt[: -len(suf)].strip()
+    return txt or "Aula"
 
 
 DIAS_PT = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
@@ -407,7 +419,11 @@ def pendencias_escalonadas(professor_id: Optional[int] = None) -> list:
     do PostgREST (57014). A view continua sendo a fonte canonica — a funcao so
     agrega dentro do banco, com timeout proprio.
     """
-    data = rpc("fn_pendencias_escalonadas", {"p_dias": ESCALONAMENTO_DIAS})
+    data = rpc("fn_pendencias_escalonadas", {
+        "p_dias": ESCALONAMENTO_DIAS,
+        "p_professor_id": professor_id,
+        "p_max_aulas": int(os.getenv("FABIO_ESCALONAMENTO_MAX_AULAS", "12")),
+    })
     if not data:
         return []
     linhas = data.get("linhas") or []
@@ -418,29 +434,61 @@ def pendencias_escalonadas(professor_id: Optional[int] = None) -> list:
 
 
 def format_escalonamento(rows: list) -> Optional[str]:
-    """Mensagem do grupo da coordenacao.
+    """Mensagem do grupo da coordenacao, no formato A (escolhido pelo Alf).
 
-    Fala de PESSOAS e PRAZO, nao de aula a aula: quem le decide o que fazer com
-    o professor, nao vai registrar aula nenhuma.
+    Tem que ser ENCAMINHAVEL: a coordenacao copia daqui e manda pro professor.
+    Por isso vai a relacao completa (dia, hora, curso, nome COMPLETO do aluno)
+    e nao um resumo — resumo nao diz a ninguem o que fazer.
+
+    Hierarquia com o que o WhatsApp respeita: *negrito* na hora (a ancora),
+    _italico_ no aluno (apoio, um nivel abaixo), regua fechando o bloco de
+    cada professor — que e onde a coordenacao vai cortar pra copiar. A linha
+    em branco entre aulas impede que os horarios grudem quando a lista de
+    alunos quebra em duas linhas no celular.
     """
     if not rows:
         return None
+
+    REGUA = "━━━━━━━━━━━━━━"
     quantos = len(rows)
-    cabeca = ("*1 professor passou de " if quantos == 1
-              else f"*{quantos} professores passaram de ")
-    lines = [cabeca + f"{ESCALONAMENTO_DIAS} dias sem registrar.*", ""]
-    for r in rows[:15]:
-        n_al = int(r.get("alunos") or 0)
-        alunos_txt = f"{n_al} aluno" if n_al == 1 else f"{n_al} alunos"
-        unidade = r.get("unidade_nome") or ""
-        unidade = f" ({unidade})" if unidade else ""
+    out: list = ["*Registro atrasado*"]
+    out.append("_1 professor_" if quantos == 1 else f"_{quantos} professores_")
+
+    for r in rows:
         nome = r.get("professor_nome") or f"professor {r.get('professor_id')}"
-        lines.append(f"*{nome}*{unidade} · {alunos_txt} · há {r.get('pior_atraso')} dias")
-    if quantos > 15:
-        lines.append(f"e mais {quantos - 15}.")
-    lines.append("")
-    lines.append("Parei de cobrar no particular — daqui pra frente é de vocês.")
-    return "\n".join(lines)
+        unidades = r.get("unidades") or []
+        aulas = r.get("aulas") or []
+        total = int(r.get("total_aulas") or len(aulas))
+        uma_unidade = len(unidades) == 1
+
+        out.append(REGUA)
+        out.append(f"*{nome}*" + (f" · {unidades[0]}" if uma_unidade else ""))
+
+        por_dia: Dict[str, list] = {}
+        for a in aulas:
+            por_dia.setdefault((a.get("data_aula") or "")[:10], []).append(a)
+
+        for dia in sorted(por_dia.keys(), reverse=True):
+            out.append("")
+            out.append(f"*{_dia_label(dia)}*")
+            for a in sorted(por_dia[dia], key=lambda x: (x.get("hora") or "")):
+                hora = (a.get("hora") or "")[:5]
+                curso = _curso_limpo(a.get("curso"))
+                if not uma_unidade and a.get("unidade"):
+                    curso += f" · {a['unidade']}"
+                alunos = ", ".join(a.get("alunos") or []) or "sem aluno na lista"
+                out.append("")
+                out.append(f"*{hora}* · {curso}" if hora else f"· {curso}")
+                out.append(f"_{alunos}_")
+
+        if total > len(aulas):
+            out.append("")
+            out.append(f"_+{total - len(aulas)} aulas atrasadas deste professor_")
+
+    out.append(REGUA)
+    out.append("Passei do prazo de cobrar no particular. Segue pra encaminhar — "
+               "assim que registrar, some daqui.")
+    return "\n".join(out)
 
 
 def enviar_grupo(texto: str) -> Dict[str, Any]:
