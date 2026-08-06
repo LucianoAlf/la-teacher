@@ -1,0 +1,72 @@
+# Aviso comercial da experimental — unit systemd do usuario `fabio`
+#
+# POR QUE ISTO EXISTE
+# O worker (fabio_aviso_comercial_worker.py) tira da fila e entrega. Sem um
+# TIMER ele so roda quando alguem chama na mao — e "codigo pronto" nao e
+# "funcionalidade no ar". Foi exatamente assim que a cobranca de registro
+# ficou invisivel por meses: o worker sabia cobrar, e nada o disparava.
+#
+# CADENCIA: a cada 3 minutos.
+# A devolutiva tem que chegar no consultor logo depois da aula, enquanto a
+# familia ainda esta na escola ou acabou de sair — e a janela em que o
+# comercial consegue falar com ela. Uma varredura por hora transformaria um
+# aviso quente em relatorio frio.
+#
+# CUSTO DE VARRER TAO RAPIDO: quase nada. fabio_avisos_comerciais_pendentes e
+# um SELECT com filtro em indice, e o worker NAO tem LLM — fila vazia sai em
+# um round-trip. Nao ha lote grande possivel: a escola nao faz 10 experimentais
+# em 3 minutos.
+#
+# NAO DUPLICA: a idempotencia e estrutural, do indice
+# uq_fabio_notif_por_referencia (referencia_tipo, referencia_id, canal). Duas
+# varreduras concorrentes nao empilham mensagem, e quem esta com o lease vivo
+# nao e roubado (migration 043, passo "um segundo worker NAO rouba o
+# trabalho").
+#
+# HORARIO DA VPS: UTC. Aqui nao importa — OnCalendar e por intervalo.
+#
+# Instalar em ~/.config/systemd/user/ e:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now fabio-aviso-comercial.timer
+
+# ============================================================================
+# ~/.config/systemd/user/fabio-aviso-comercial.service
+# ============================================================================
+[Unit]
+Description=Fábio — entrega ao comercial a devolutiva da aula experimental
+Documentation=https://github.com/LucianoAlf/la-teacher
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+EnvironmentFile=/home/fabio/.hermes/.env
+ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_aviso_comercial_worker.py --json
+
+# ============================================================================
+# ~/.config/systemd/user/fabio-aviso-comercial.timer
+# ============================================================================
+[Unit]
+Description=Timer do aviso comercial da experimental (a cada 3 min)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=3min
+AccuracySec=30s
+Persistent=true
+Unit=fabio-aviso-comercial.service
+
+[Install]
+WantedBy=timers.target
+
+# ============================================================================
+# ESCOPO: TODAS as unidades, desde o primeiro dia — de proposito.
+#
+# Diferente da cobranca (que ficou restrita ao professor 25 porque escalar o
+# passivo historico pro grupo da coordenacao queimaria o mecanismo), aqui nao
+# ha passivo: a fila so tem o que foi confirmado DEPOIS que o ciclo existiu.
+# Zero linha antiga, zero risco de enxurrada.
+#
+# Unidade sem comercial cadastrado nao trava nada: vira
+# `pulada_sem_destinatario`, fica visivel na fila e e retomada sozinha quando
+# alguem cadastrar o contato.
+# ============================================================================
