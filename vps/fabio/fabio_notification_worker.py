@@ -412,12 +412,14 @@ def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[st
 
 
 def pendencias_escalonadas(professor_id: Optional[int] = None) -> list:
-    """Quem passou do prazo, agregado no banco.
+    """Quem passou do prazo de lancar CONTEUDO, agregado no banco.
 
-    Chama fn_pendencias_escalonadas (039) em vez de fazer SELECT na view: a
-    vw_presenca_pendencia leva ~21s pra agregar e estoura o statement_timeout
-    do PostgREST (57014). A view continua sendo a fonte canonica — a funcao so
-    agrega dentro do banco, com timeout proprio.
+    Le vw_registro_pendencia (cobravel) pela fn_pendencias_escalonadas (041) —
+    a MESMA fonte da cobranca do professor. Presenca nao entra: ela nasce do
+    lancamento do conteudo ou da secretaria marcando no Emusys, entao cobrar
+    por ela acusava o professor de 18 aulas que ele tinha dado e que estavam
+    marcadas. Enquanto as duas mensagens tinham fontes diferentes, elas podiam
+    discordar — e discordaram na primeira que foi pro grupo.
     """
     data = rpc("fn_pendencias_escalonadas", {
         "p_dias": ESCALONAMENTO_DIAS,
