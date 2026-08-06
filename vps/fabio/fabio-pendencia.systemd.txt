@@ -117,7 +117,7 @@ Description=Timer do escalonamento pra coordenacao as 09:00 BRT (12:00 UTC)
 OnCalendar=*-*-* 12:00:00
 AccuracySec=1m
 Persistent=true
-Unit=fabio-escalonamento.timer
+Unit=fabio-escalonamento.service
 
 [Install]
 WantedBy=timers.target
