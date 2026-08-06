@@ -58,9 +58,15 @@ insert into _res select 'confirmacao gravou presenca', 'true',
   (select resultado->>'presenca_gravada' from _conf);
 insert into _res select 'confirmacao reclamou o aviso (com lease)', 'true',
   (select resultado->>'aviso_claimed' from _conf);
-insert into _res select 'aviso da confirmacao nasceu com lease vivo', 'sim',
-  coalesce((select case when n.lease_token is not null and n.lease_expira_em > now()
-                        then 'sim' else 'nao' end
+-- ATENCAO: aqui havia um passo exigindo que o aviso nascesse com LEASE VIVO.
+-- Era o defeito escrito como se fosse contrato — a confirmacao segurava o
+-- lease de 10 min e o worker nao conseguia entregar. A 042 conserta, e o
+-- carrasco do comportamento certo mora la
+-- (042-confirmacao-enfileira-nao-segura.test.sql, passo "o worker CONSEGUE
+-- reivindicar o aviso"). Este arquivo continua rodando contra o corpo da 038,
+-- entao ele so nao pode afirmar o contrario do que vale hoje.
+insert into _res select 'aviso da confirmacao entrou na fila', 'sim',
+  coalesce((select case when n.lease_token is not null then 'sim' else 'nao' end
               from fabio_notificacoes n
              where n.referencia_tipo='lead_experimental_registro'
                and n.referencia_id = (select (resultado->>'registro_id') from _conf)), '(nenhum)');

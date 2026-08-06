@@ -80,10 +80,19 @@ const MUTANTES = [
   },
   {
     // Acrescentado: revoke sem carrasco e convencao, nao regra.
+    //
+    // O mutante CONCEDE de proposito, em vez de so deixar de revogar.
+    // `create or replace function` PRESERVA os privilegios existentes: depois
+    // que a migration foi aplicada de verdade, "esquecer o revoke" nao devolve
+    // nada a ninguem e o mutante vira no-op — ele sobreviveria sem que
+    // houvesse defeito nenhum. Um mutante que so funciona antes do deploy
+    // deixa de vigiar exatamente quando passa a importar.
     nome: 'N8 — anon passa a confirmar registro',
     pega: 'passo "anon nao confirma registro"',
-    de: 'revoke all on function public.app_confirmar_registro_experimental(uuid,integer) from public, anon;',
-    para: 'revoke all on function public.app_confirmar_registro_experimental(uuid,integer) from public;',
+    de: 'grant execute on function public.app_confirmar_registro_experimental(uuid,integer) to service_role, authenticated;',
+    para:
+      'grant execute on function public.app_confirmar_registro_experimental(uuid,integer) to service_role, authenticated;\n' +
+      'grant execute on function public.app_confirmar_registro_experimental(uuid,integer) to anon;',
   },
 ]
 
