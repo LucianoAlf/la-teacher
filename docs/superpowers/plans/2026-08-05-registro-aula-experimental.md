@@ -18,6 +18,7 @@
 - **Nenhum prontuário real de aluno vira bancada de teste.** Toda fixture usa prefixo `ZZTESTE`, criada e descartada na mesma transação.
 - **Todo teste tem mutante que o mata.** Verde não-falsificado é decoração. O mutante certo é o que as checagens antigas deixam passar.
 - **Mutante que não aplica é mutante morto antes de nascer.** Os scripts citam o SQL verbatim, então envelhecem em silêncio quando a migration muda. Todo `src.replace(...)` vem seguido de `assert m != src, 'Mx stale'`, e **um `assert` que dispara é falha da rodada, não aviso** — é obrigatório atualizar o texto do mutante antes de seguir. Ao editar qualquer migration, reexecutar o bloco de mutantes dela antes de dar a task por pronta. (Este plano já perdeu dois mutantes assim entre `f722171` e a revisão seguinte.)
+- **A conferência de mutantes vale contra o ARQUIVO GERADO, não contra este plano.** O plano contém fragmentos (a Task 1 manda copiar o corpo da 033 e trocar só um `if`), então um mutante pode citar texto que existe aqui e não existir lá — ou o contrário. Depois de escrever cada `.sql` real e **antes de aplicar**, rodar o bloco de mutantes daquela migration: o `assert` é o detector. Nenhuma migration é aplicada com mutante que não gerou.
 - **Asserções medem a rodada sob teste.** Guardar o retorno da chamada em temp table e assertar nele; nunca chamar de novo para conferir (a segunda rodada acha tudo resolvido e devolve zero).
 - **`\gset` é meta-comando do psql e NÃO funciona** no runner deste projeto. Usar `create temp table ... as select ...`.
 - **`leitura_de_conversao` nunca aparece em view family-safe.**
@@ -309,6 +310,12 @@ Esperado no primeiro rascunho: divergências (ou erro de sintaxe). Corrigir até
 
 - [ ] **Passo 5: Matar os mutantes**
 
+**Checkpoint obrigatório antes deste passo:** a 034 contém o corpo **completo** da 033
+(copiado no Passo 2), que aqui no plano aparece só como fragmento. Portanto o M4 abaixo
+cita texto que só existe no arquivo real. Se algum `assert` disparar com `Mx stale`, o
+texto do mutante está desalinhado do arquivo gerado — **corrigir o mutante e não aplicar
+a migration até os cinco gerarem**.
+
 ```bash
 python3 - <<'PY'
 src = open('supabase/migrations/034-presenca-no-vinculo-experimental.sql', encoding='utf-8').read()
@@ -317,31 +324,31 @@ src = open('supabase/migrations/034-presenca-no-vinculo-experimental.sql', encod
 m1 = src.replace(
   "and public.fn_presenca_e_forte(v_atual_por)\n     and not public.fn_presenca_e_forte(p_respondido_por) then",
   "and not public.fn_presenca_e_forte(v_atual_por)\n     and public.fn_presenca_e_forte(p_respondido_por) then", 1)
-assert m1 != src; open('supabase/migrations/034-m1.sql','w',encoding='utf-8').write(m1)
+assert m1 != src, 'M1 stale'; open('supabase/migrations/034-m1.sql','w',encoding='utf-8').write(m1)
 
 # M2 — CHECK de fonte afrouxado: professor_app passaria
 m2 = src.replace(
   "check (presenca_respondido_por is null or presenca_respondido_por in\n      ('professor_whatsapp','professor_la_teacher','manual','sistema','emusys','fabio_audio')),",
   "check (presenca_respondido_por is null or length(presenca_respondido_por) > 0),", 1)
-assert m2 != src; open('supabase/migrations/034-m2.sql','w',encoding='utf-8').write(m2)
+assert m2 != src, 'M2 stale'; open('supabase/migrations/034-m2.sql','w',encoding='utf-8').write(m2)
 
 # M3 — bruto do Emusys deixa de ser preservado
 m3 = src.replace(
   "  if p_bruta_emusys is not null then\n    update lead_experimental_aulas\n       set presenca_bruta_emusys = p_bruta_emusys\n     where id = p_vinculo_id;\n  end if;",
   "  -- M3: bruto descartado", 1)
-assert m3 != src; open('supabase/migrations/034-m3.sql','w',encoding='utf-8').write(m3)
+assert m3 != src, 'M3 stale'; open('supabase/migrations/034-m3.sql','w',encoding='utf-8').write(m3)
 
 # M4 — guarda de fonte forte sai do primeiro if do reconciliador
 m4 = src.replace(
   "or public.fn_presenca_e_forte(v_vinculo.presenca_respondido_por)) then",
   "or false) then", 1)
-assert m4 != src; open('supabase/migrations/034-m4.sql','w',encoding='utf-8').write(m4)
+assert m4 != src, 'M4 stale'; open('supabase/migrations/034-m4.sql','w',encoding='utf-8').write(m4)
 
 # M5 — fonte fraca passa a promover estado (fantasma pela porta dos fundos)
 m5 = src.replace(
   "  if public.fn_presenca_e_forte(p_respondido_por) then\n    update lead_experimental_aulas\n       set estado = case",
   "  if true then\n    update lead_experimental_aulas\n       set estado = case", 1)
-assert m5 != src; open('supabase/migrations/034-m5.sql','w',encoding='utf-8').write(m5)
+assert m5 != src, 'M5 stale'; open('supabase/migrations/034-m5.sql','w',encoding='utf-8').write(m5)
 print('5 mutantes gerados')
 PY
 
@@ -746,32 +753,32 @@ src = open('supabase/migrations/035-lead-experimental-registros.sql', encoding='
 
 # M1 — RPC sempre insere: a 2a chamada volta a estourar unique_violation
 m1 = src.replace("  if found then\n    update lead_experimental_registros", "  if false then\n    update lead_experimental_registros", 1)
-assert m1 != src; open('supabase/migrations/035-m1.sql','w',encoding='utf-8').write(m1)
+assert m1 != src, 'M1 stale'; open('supabase/migrations/035-m1.sql','w',encoding='utf-8').write(m1)
 
 # M2 — trava de 'faltou' removida
 m2 = src.replace("  elsif v_estado = 'faltou' then\n    raise exception 'experimental_faltou_nao_tem_registro';", "", 1)
-assert m2 != src; open('supabase/migrations/035-m2.sql','w',encoding='utf-8').write(m2)
+assert m2 != src, 'M2 stale'; open('supabase/migrations/035-m2.sql','w',encoding='utf-8').write(m2)
 
 # M3 — trava de 'pendente' removida
 m3 = src.replace("  if v_estado = 'pendente' then\n    raise exception 'experimental_sem_aula_vinculada';\n  elsif", "  if false then\n    null;\n  elsif", 1)
-assert m3 != src; open('supabase/migrations/035-m3.sql','w',encoding='utf-8').write(m3)
+assert m3 != src, 'M3 stale'; open('supabase/migrations/035-m3.sql','w',encoding='utf-8').write(m3)
 
 # M4 — escrita direta liberada: a fronteira volta a ser convencao
 m4 = src.replace("grant select on table public.lead_experimental_registros to service_role;",
                  "grant select, insert, update on table public.lead_experimental_registros to service_role, authenticated;", 1)
-assert m4 != src; open('supabase/migrations/035-m4.sql','w',encoding='utf-8').write(m4)
+assert m4 != src, 'M4 stale'; open('supabase/migrations/035-m4.sql','w',encoding='utf-8').write(m4)
 
 # M5 — guarda de posse removida: qualquer autenticado registra qualquer aula
 m5 = src.replace("""  if v_prof_aula is distinct from v_prof then
     raise exception 'aula_de_outro_professor';
   end if;""", "", 1)
-assert m5 != src; open('supabase/migrations/035-m5.sql','w',encoding='utf-8').write(m5)
+assert m5 != src, 'M5 stale'; open('supabase/migrations/035-m5.sql','w',encoding='utf-8').write(m5)
 
 # M6 — a app_ volta a aceitar chamada sem usuario resolvido
 m6 = src.replace("""  if v_prof is null then
     raise exception 'sem_professor_vinculado';
   end if;""", "", 1)
-assert m6 != src; open('supabase/migrations/035-m6.sql','w',encoding='utf-8').write(m6)
+assert m6 != src, 'M6 stale'; open('supabase/migrations/035-m6.sql','w',encoding='utf-8').write(m6)
 print('6 mutantes gerados')
 PY
 
@@ -1149,6 +1156,39 @@ begin
   end;
 end $$;
 
+-- ── O ramo de excecao NAO e porta: so vale pro formato exato (mata M7) ─────
+-- Linha com o status de excecao mas em OUTRO formato (tipo professor, sem
+-- professor_id) tem que ser rejeitada. Sem este passo, estreitar o CHECK nao
+-- teria carrasco e o mutante M7 sobreviveria.
+do $$
+begin
+  begin
+    insert into fabio_notificacoes
+      (professor_id, destinatario_tipo, tipo, categoria, corpo, canal, status)
+    values (null, 'professor', 'outro', 'informativa', 'x', 'whatsapp',
+            'pulada_sem_destinatario');
+    insert into _res values ('excecao nao vira porta p/ outro formato', 'rejeitado', 'ACEITOU');
+  exception when check_violation then
+    insert into _res values ('excecao nao vira porta p/ outro formato', 'rejeitado', 'rejeitado');
+  end;
+end $$;
+
+-- E o rastro legitimo (comercial, sem professor, sem telefone) CONTINUA aceito
+-- — senao "estreitar" viraria "proibir", e a ausencia voltaria a ser invisivel.
+do $$
+begin
+  begin
+    insert into fabio_notificacoes
+      (professor_id, destinatario_tipo, tipo, categoria, corpo, canal, status,
+       referencia_tipo, referencia_id)
+    values (null, 'comercial', 'outro', 'informativa', 'x', 'whatsapp',
+            'pulada_sem_destinatario', 'zzteste_036', 'formato-legitimo');
+    insert into _res values ('rastro legitimo de ausencia continua aceito', 'aceito', 'aceito');
+  exception when check_violation then
+    insert into _res values ('rastro legitimo de ausencia continua aceito', 'aceito', 'REJEITOU');
+  end;
+end $$;
+
 select json_build_object(
   'falhas',  (select count(*) from _res where esperado is distinct from obtido),
   'detalhe', (select coalesce(json_agg(json_build_object(
@@ -1195,7 +1235,7 @@ assert m2 != src, 'M2 stale'; open('supabase/migrations/036-m2.sql','w',encoding
 
 # M3 — destinatario deixa de vir da unidade (volta o hardcode do n8n)
 m3 = src.replace("v_contato.whatsapp,", "'5521999999999',", 1)
-assert m3 != src; open('supabase/migrations/036-m3.sql','w',encoding='utf-8').write(m3)
+assert m3 != src, 'M3 stale'; open('supabase/migrations/036-m3.sql','w',encoding='utf-8').write(m3)
 
 # M4 — CHECK volta a se contradizer com o rastro de "sem destinatario"
 m4 = src.replace("""    (status = 'pulada_sem_destinatario'
@@ -1233,24 +1273,10 @@ done
 rm -f supabase/migrations/036-m?.sql
 ```
 
-M7 precisa de um teste que o mate — o caso é "linha com o status de exceção, mas
-que não é o formato de exceção". Acrescentar ao teste:
-
-```sql
--- ── O ramo de excecao NAO e porta: so vale pro formato exato ───────────────
-do $$
-begin
-  begin
-    insert into fabio_notificacoes
-      (professor_id, destinatario_tipo, tipo, categoria, corpo, canal, status)
-    values (null, 'professor', 'outro', 'informativa', 'x', 'whatsapp',
-            'pulada_sem_destinatario');   -- tipo professor, sem professor_id
-    insert into _res values ('excecao nao vira porta p/ outro formato', 'rejeitado', 'ACEITOU');
-  exception when check_violation then
-    insert into _res values ('excecao nao vira porta p/ outro formato', 'rejeitado', 'rejeitado');
-  end;
-end $$;
-```
+M7 é morto pelos dois passos "exceção não vira porta" e "rastro legítimo continua
+aceito", que **já estão dentro** do `.test.sql` do Passo 2 — não são lembrete à parte.
+O par importa: sozinho, o primeiro passaria com um CHECK que proibisse o rastro
+inteiro, e a ausência voltaria a ser invisível.
 
 - [ ] **Passo 4: Aplicar e commitar**
 
@@ -1402,11 +1428,11 @@ src = open('supabase/migrations/037-views-registro-experimental.sql', encoding='
 # M1 — a coluna interna entra na view family-safe (o vazamento que a spec proibe)
 m1 = src.replace("       r.status,\n       r.criado_em\n       -- leitura_de_conversao NAO entra aqui. Nunca.",
                  "       r.status,\n       r.criado_em,\n       r.leitura_de_conversao", 1)
-assert m1 != src; open('supabase/migrations/037-m1.sql','w',encoding='utf-8').write(m1)
+assert m1 != src, 'M1 stale'; open('supabase/migrations/037-m1.sql','w',encoding='utf-8').write(m1)
 # M2 — anon ganha leitura da view comercial
 m2 = src.replace("revoke all on public.vw_experimental_registro_comercial from public, anon, authenticated;",
                  "grant select on public.vw_experimental_registro_comercial to anon;", 1)
-assert m2 != src; open('supabase/migrations/037-m2.sql','w',encoding='utf-8').write(m2)
+assert m2 != src, 'M2 stale'; open('supabase/migrations/037-m2.sql','w',encoding='utf-8').write(m2)
 print('2 mutantes gerados')
 PY
 
@@ -1610,6 +1636,88 @@ insert into _res
 select 'presenca forte promoveu o estado', 'realizado',
        (select estado from lead_experimental_aulas where lead_experimental_id=-38001);
 
+-- ── AUTORIZACAO: intruso NAO confirma registro alheio ──────────────────────
+-- Confirmar nao e leitura: grava presenca de fonte FORTE, promove o estado do
+-- vinculo e dispara aviso ao comercial. Precisa da mesma prova da 035 — provar
+-- so que o dono consegue deixaria a porta aberta sem ninguem ver.
+insert into public.usuarios (id, nome, email, auth_user_id) values
+  (-38902, 'ZZTESTE Usuario Intruso 038', 'zzteste-intruso-038@exemplo.invalido',
+   '00000000-0000-4000-8000-000000038902');
+insert into public.professores (id, nome, usuario_id)
+values (-38002, 'ZZTESTE Professor Intruso 038', -38902);
+
+insert into public.leads (id, unidade_id, whatsapp, status) values
+  (-38002, '00000000-0000-4000-8000-000000000380', '5521999380002', 'novo');
+insert into public.lead_experimentais
+  (id, lead_id, nome_aluno, unidade_id, data_experimental, horario_experimental,
+   status, professor_experimental_id)
+values (-38002, -38002, 'ZZTESTE Alvo do Intruso', '00000000-0000-4000-8000-000000000380',
+        current_date+1, '15:00', 'experimental_agendada', -38001);
+insert into public.aulas_emusys
+  (id, emusys_id, unidade_id, data_aula, data_hora_inicio, categoria, professor_id, cancelada)
+values (-38002, -938002, '00000000-0000-4000-8000-000000000380', current_date+1,
+   (current_date+1 + time '15:00') at time zone 'America/Sao_Paulo', 'experimental', -38001, false);
+insert into public.lead_experimental_aulas (lead_experimental_id, aula_local_id, estado, casado_por)
+values (-38002, -38002, 'vinculado', 'chave_natural');
+
+do $$
+declare v_vinc bigint; v_reg uuid;
+begin
+  select id into v_vinc from lead_experimental_aulas where lead_experimental_id=-38002;
+  select public.fn_registrar_experimental_interno(v_vinc, 'aula do -38001','b','c','d')
+    into v_reg;
+
+  begin
+    set local role authenticated;
+    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000038902"}', true);
+    perform public.app_confirmar_registro_experimental(v_reg, null);
+    reset role;
+    insert into _res values ('intruso NAO confirma registro alheio', 'barrado',
+      'CONFIRMOU — gravou presenca e disparou aviso de aula que nao e dele');
+  exception when others then
+    reset role;
+    insert into _res values ('intruso NAO confirma registro alheio', 'barrado', 'barrado');
+  end;
+end $$;
+
+insert into _res
+select 'registro alheio segue nao confirmado', 'aguardando_confirmacao',
+       (select r.status from lead_experimental_registros r
+          join lead_experimental_aulas v on v.id=r.vinculo_id
+         where v.lead_experimental_id=-38002);
+insert into _res
+select 'intruso nao gravou presenca no vinculo alheio', 'ausente',
+       case when (select presenca_respondido_por from lead_experimental_aulas
+                    where lead_experimental_id=-38002) is null
+            then 'ausente' else 'GRAVOU' end;
+insert into _res
+select 'intruso nao disparou aviso ao comercial', '0',
+       (select count(*)::text from fabio_notificacoes
+         where referencia_tipo='lead_experimental_registro'
+           and referencia_id=(select r.id::text from lead_experimental_registros r
+                                join lead_experimental_aulas v on v.id=r.vinculo_id
+                               where v.lead_experimental_id=-38002));
+
+-- E o DONO confirma normalmente o mesmo registro (senao "barrar todo mundo"
+-- passaria como se fosse autorizacao funcionando)
+do $$
+declare v_reg uuid;
+begin
+  select r.id into v_reg from lead_experimental_registros r
+    join lead_experimental_aulas v on v.id=r.vinculo_id
+   where v.lead_experimental_id=-38002;
+  begin
+    set local role authenticated;
+    perform set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000038901"}', true);
+    perform public.app_confirmar_registro_experimental(v_reg, null);
+    reset role;
+    insert into _res values ('dono confirma o mesmo registro', 'ok', 'ok');
+  exception when others then
+    reset role;
+    insert into _res values ('dono confirma o mesmo registro', 'ok', 'BARROU: '||sqlerrm);
+  end;
+end $$;
+
 -- ── Idempotencia: confirmar 2x nao duplica aviso ───────────────────────────
 do $$
 declare v_reg uuid;
@@ -1650,29 +1758,42 @@ src = open('supabase/migrations/038-confirmar-registro-experimental.sql', encodi
 # M1 — confirma sem avisar o comercial (a meia confirmacao que a task existe pra impedir)
 m1 = src.replace("  select public.fabio_claim_aviso_comercial(p_registro_id) into v_aviso;\n  v_not_id := (v_aviso->>'notificacao_id')::uuid;",
                  "  v_aviso := jsonb_build_object('claimed', false, 'motivo', 'M1');\n  v_not_id := null;", 1)
-assert m1 != src; open('supabase/migrations/038-m1.sql','w',encoding='utf-8').write(m1)
+assert m1 != src, 'M1 stale'; open('supabase/migrations/038-m1.sql','w',encoding='utf-8').write(m1)
 
 # M2 — confirma sem gravar presenca
 m2 = src.replace("""  select public.fn_registrar_presenca_experimental(
            v_vinculo_id, 'presente',
            case when v_origem = 'whatsapp' then 'fabio_audio' else 'professor_la_teacher' end)
     into v_presenca_ok;""", "  v_presenca_ok := false;", 1)
-assert m2 != src; open('supabase/migrations/038-m2.sql','w',encoding='utf-8').write(m2)
+assert m2 != src, 'M2 stale'; open('supabase/migrations/038-m2.sql','w',encoding='utf-8').write(m2)
 
 # M3 — fonte fraca na confirmacao: presenca nasceria fantasma
 m3 = src.replace("else 'professor_la_teacher' end)", "else 'emusys' end)", 1)
-assert m3 != src; open('supabase/migrations/038-m3.sql','w',encoding='utf-8').write(m3)
+assert m3 != src, 'M3 stale'; open('supabase/migrations/038-m3.sql','w',encoding='utf-8').write(m3)
 
 # M4 — idempotencia quebrada: confirmar 2x duplica o aviso
 m4 = src.replace("""  if v_status = 'confirmado' then
     -- Idempotente: confirmar duas vezes nao duplica aviso nem regrava presenca.
     return jsonb_build_object('registro_id', p_registro_id, 'ja_confirmado', true);
   end if;""", "", 1)
-assert m4 != src; open('supabase/migrations/038-m4.sql','w',encoding='utf-8').write(m4)
-print('4 mutantes gerados')
+assert m4 != src, 'M4 stale'; open('supabase/migrations/038-m4.sql','w',encoding='utf-8').write(m4)
+
+# M5 — guarda de posse removida: intruso confirma registro alheio, gravando
+# presenca forte e disparando aviso de aula que nao e dele
+m5 = src.replace("""  if v_prof_aula is distinct from v_prof then
+    raise exception 'aula_de_outro_professor';
+  end if;""", "", 1)
+assert m5 != src, 'M5 stale'; open('supabase/migrations/038-m5.sql','w',encoding='utf-8').write(m5)
+
+# M6 — confirmar deixa de exigir usuario resolvido
+m6 = src.replace("""  if v_prof is null then
+    raise exception 'sem_professor_vinculado';
+  end if;""", "", 1)
+assert m6 != src, 'M6 stale'; open('supabase/migrations/038-m6.sql','w',encoding='utf-8').write(m6)
+print('6 mutantes gerados')
 PY
 
-for m in m1 m2 m3 m4; do
+for m in m1 m2 m3 m4 m5 m6; do
   echo "--- $m ---"
   node scripts/rodar-teste-sql.mjs supabase/migrations/038-$m.sql supabase/migrations/038-confirmar-registro-experimental.test.sql | head -4
 done
