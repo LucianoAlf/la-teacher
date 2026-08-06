@@ -17,6 +17,7 @@
 - **Toda comparação de horário converte para `'America/Sao_Paulo'` explicitamente.**
 - **Nenhum prontuário real de aluno vira bancada de teste.** Toda fixture usa prefixo `ZZTESTE`, criada e descartada na mesma transação.
 - **Todo teste tem mutante que o mata.** Verde não-falsificado é decoração. O mutante certo é o que as checagens antigas deixam passar.
+- **Mutante que não aplica é mutante morto antes de nascer.** Os scripts citam o SQL verbatim, então envelhecem em silêncio quando a migration muda. Todo `src.replace(...)` vem seguido de `assert m != src, 'Mx stale'`, e **um `assert` que dispara é falha da rodada, não aviso** — é obrigatório atualizar o texto do mutante antes de seguir. Ao editar qualquer migration, reexecutar o bloco de mutantes dela antes de dar a task por pronta. (Este plano já perdeu dois mutantes assim entre `f722171` e a revisão seguinte.)
 - **Asserções medem a rodada sob teste.** Guardar o retorno da chamada em temp table e assertar nele; nunca chamar de novo para conferir (a segunda rodada acha tudo resolvido e devolve zero).
 - **`\gset` é meta-comando do psql e NÃO funciona** no runner deste projeto. Usar `create temp table ... as select ...`.
 - **`leitura_de_conversao` nunca aparece em view family-safe.**
@@ -38,7 +39,7 @@
 | `supabase/migrations/034-presenca-no-vinculo-experimental.test.sql` | CHECK de fonte, precedência nos dois sentidos, preservação do bruto, regressão comercial |
 | `supabase/migrations/035-lead-experimental-registros.sql` | tabela do registro + índice único parcial + RPC `app_registrar_experimental` + grants |
 | `supabase/migrations/035-lead-experimental-registros.test.sql` | travas de estado, 2ª chamada edita, derivação de unidade/professor, negação de escrita direta |
-| `supabase/migrations/036-aviso-comercial-experimental.sql` | `unidade_contato_comercial` + generalização de `fabio_notificacoes` + `fabio_claim_notificacao_comercial` |
+| `supabase/migrations/036-aviso-comercial-experimental.sql` | `unidade_contato_comercial` + generalização de `fabio_notificacoes` + `fabio_claim_aviso_comercial` |
 | `supabase/migrations/036-aviso-comercial-experimental.test.sql` | destinatário resolvido por unidade, ausência vira pulada visível, idempotência por referência |
 | `supabase/migrations/037-views-registro-experimental.sql` | `vw_experimental_registro_comercial` + `vw_experimental_registro_family_safe` |
 | `supabase/migrations/037-views-registro-experimental.test.sql` | a view family-safe não expõe `leitura_de_conversao` |
@@ -850,9 +851,17 @@ alter table public.fabio_notificacoes
 -- exatamente no caminho de excecao (achado do Alfredo). O rastro de ausencia
 -- precisa de excecao EXPLICITA, senao a unica forma de registrar a falta de
 -- destinatario seria... nao registrar.
+-- O ramo de excecao e ESTREITO de proposito: nao basta "tem esse status".
+-- `status = 'pulada_sem_destinatario' or ...` liberaria qualquer linha com esse
+-- status, inclusive aviso de professor mal formado — a excecao viraria porta.
+-- Aqui ela descreve exatamente UM formato: rastro comercial, sem professor e
+-- sem telefone. (Achado do Alfredo na revisao do f722171.)
 alter table public.fabio_notificacoes
   add constraint chk_notificacao_destinatario check (
-    status = 'pulada_sem_destinatario'
+    (status = 'pulada_sem_destinatario'
+      and destinatario_tipo = 'comercial'
+      and professor_id is null
+      and destinatario_whatsapp is null)
     or
     (destinatario_tipo = 'professor' and professor_id is not null)
     or
@@ -1164,43 +1173,83 @@ m1 = src.replace("""    insert into fabio_notificacoes
       (null, 'comercial', 'experimental_registrada', 'informativa', v_corpo, 'whatsapp',
        'pulada_sem_destinatario', 'sem_contato_comercial_na_unidade',
        'lead_experimental_registro', p_registro_id::text, null)
-    on conflict do nothing;
-    return null;""", "    return null;", 1)
-assert m1 != src; open('supabase/migrations/036-m1.sql','w',encoding='utf-8').write(m1)
+    on conflict (referencia_tipo, referencia_id, canal)
+      where referencia_tipo is not null and referencia_id is not null
+    do nothing;
+    return jsonb_build_object('ok', true, 'claimed', false, 'motivo', 'sem_destinatario');""",
+"    return jsonb_build_object('ok', true, 'claimed', false, 'motivo', 'sem_destinatario');", 1)
+assert m1 != src, 'M1 stale'; open('supabase/migrations/036-m1.sql','w',encoding='utf-8').write(m1)
 
-# M2 — CHECK de destinatario removido: aviso sem ninguem passa a ser aceito
+# M2 — CHECK de destinatario vira permissivo: aviso sem ninguem passa a ser aceito
 m2 = src.replace("""  add constraint chk_notificacao_destinatario check (
+    (status = 'pulada_sem_destinatario'
+      and destinatario_tipo = 'comercial'
+      and professor_id is null
+      and destinatario_whatsapp is null)
+    or
     (destinatario_tipo = 'professor' and professor_id is not null)
     or
     (destinatario_tipo = 'comercial' and destinatario_whatsapp is not null)
   );""", "  add constraint chk_notificacao_destinatario check (true);", 1)
-assert m2 != src; open('supabase/migrations/036-m2.sql','w',encoding='utf-8').write(m2)
+assert m2 != src, 'M2 stale'; open('supabase/migrations/036-m2.sql','w',encoding='utf-8').write(m2)
 
 # M3 — destinatario deixa de vir da unidade (volta o hardcode do n8n)
 m3 = src.replace("v_contato.whatsapp,", "'5521999999999',", 1)
 assert m3 != src; open('supabase/migrations/036-m3.sql','w',encoding='utf-8').write(m3)
 
 # M4 — CHECK volta a se contradizer com o rastro de "sem destinatario"
-m4 = src.replace("    status = 'pulada_sem_destinatario'\n    or\n", "", 1)
-assert m4 != src; open('supabase/migrations/036-m4.sql','w',encoding='utf-8').write(m4)
+m4 = src.replace("""    (status = 'pulada_sem_destinatario'
+      and destinatario_tipo = 'comercial'
+      and professor_id is null
+      and destinatario_whatsapp is null)
+    or
+""", "", 1)
+assert m4 != src, 'M4 stale'; open('supabase/migrations/036-m4.sql','w',encoding='utf-8').write(m4)
 
 # M5 — claim sem lease: volta o insert cru que esvaziava o argumento do Fabio
 m5 = src.replace("'whatsapp', 'processando', 1, v_token, now() + make_interval(mins => p_lease_minutos),",
                  "'whatsapp', 'processando', 0, null, null,", 1)
-assert m5 != src; open('supabase/migrations/036-m5.sql','w',encoding='utf-8').write(m5)
+assert m5 != src, 'M5 stale'; open('supabase/migrations/036-m5.sql','w',encoding='utf-8').write(m5)
 
 # M6 — quem ficou 'pulada_sem_destinatario' nunca e retomado depois que o
 # contato passa a existir: o aviso fica preso pra sempre, em silencio
 m6 = src.replace("    or (fabio_notificacoes.status = 'pulada_sem_destinatario')", "", 1)
-assert m6 != src; open('supabase/migrations/036-m6.sql','w',encoding='utf-8').write(m6)
-print('6 mutantes gerados')
+assert m6 != src, 'M6 stale'; open('supabase/migrations/036-m6.sql','w',encoding='utf-8').write(m6)
+
+# M7 — o ramo de excecao vira PORTA: qualquer linha com esse status passa,
+# inclusive aviso de professor mal formado
+m7 = src.replace("""    (status = 'pulada_sem_destinatario'
+      and destinatario_tipo = 'comercial'
+      and professor_id is null
+      and destinatario_whatsapp is null)""", "    status = 'pulada_sem_destinatario'", 1)
+assert m7 != src, 'M7 stale'; open('supabase/migrations/036-m7.sql','w',encoding='utf-8').write(m7)
+print('7 mutantes gerados')
 PY
 
-for m in m1 m2 m3 m4 m5 m6; do
+for m in m1 m2 m3 m4 m5 m6 m7; do
   echo "--- $m ---"
   node scripts/rodar-teste-sql.mjs supabase/migrations/036-$m.sql supabase/migrations/036-aviso-comercial-experimental.test.sql | head -4
 done
 rm -f supabase/migrations/036-m?.sql
+```
+
+M7 precisa de um teste que o mate — o caso é "linha com o status de exceção, mas
+que não é o formato de exceção". Acrescentar ao teste:
+
+```sql
+-- ── O ramo de excecao NAO e porta: so vale pro formato exato ───────────────
+do $$
+begin
+  begin
+    insert into fabio_notificacoes
+      (professor_id, destinatario_tipo, tipo, categoria, corpo, canal, status)
+    values (null, 'professor', 'outro', 'informativa', 'x', 'whatsapp',
+            'pulada_sem_destinatario');   -- tipo professor, sem professor_id
+    insert into _res values ('excecao nao vira porta p/ outro formato', 'rejeitado', 'ACEITOU');
+  exception when check_violation then
+    insert into _res values ('excecao nao vira porta p/ outro formato', 'rejeitado', 'rejeitado');
+  end;
+end $$;
 ```
 
 - [ ] **Passo 4: Aplicar e commitar**
