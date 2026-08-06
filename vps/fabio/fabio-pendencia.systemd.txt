@@ -1,0 +1,95 @@
+# Cobranca de registro de aula (governanca) — units systemd do usuario `fabio`
+#
+# POR QUE ISTO EXISTE
+# O worker (fabio_notification_worker.py) sempre soube cobrar: o evento
+# `pendencia` esta implementado, com formatador de mensagem, dias de atraso e
+# claim com lease. O que nunca existiu foi um TIMER que o disparasse — so o
+# briefing tinha. Resultado: ZERO notificacoes 'pendencia_registro' em toda a
+# base, e o professor do piloto ficou sem ser cobrado por dias sem que nada
+# acusasse. Codigo pronto nao e funcionalidade no ar.
+#
+# QUANDO DISPARA (decisao do Alf em 05/08/2026)
+#   20:50 BRT (23:50 UTC) — logo depois de as aulas acabarem, cobra o dia
+#   08:30 BRT (11:30 UTC) — no dia seguinte, lembra de novo
+#
+# POR QUE --force
+# O timer e a UNICA fonte de horario. O worker tem janela propria
+# (FABIO_NOTIFY_PENDENCIA_TIME, default 18:30) e, sem --force, OnCalendar e
+# essa janela teriam que concordar; qualquer divergencia faz o worker rodar e
+# pular em silencio ("nothing_due"). Foi assim que a cobranca ficou invisivel.
+#
+# HORARIO DA VPS: UTC. O Brasil nao tem mais horario de verao, entao BRT = UTC-3
+# fixo e o OnCalendar em UTC nao precisa de ajuste sazonal.
+#
+# Instalar em ~/.config/systemd/user/ e:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now fabio-pendencia-noite.timer fabio-pendencia-manha.timer
+
+# ============================================================================
+# ~/.config/systemd/user/fabio-pendencia-noite.service
+# ============================================================================
+[Unit]
+Description=Fábio — cobranca de registro no FIM DO DIA (piloto Matheus, professor 25)
+Documentation=https://github.com/LucianoAlf/la-teacher
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+EnvironmentFile=/home/fabio/.hermes/.env
+ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event pendencia --professor-id 25 --channel whatsapp --force
+
+# ============================================================================
+# ~/.config/systemd/user/fabio-pendencia-noite.timer
+# ============================================================================
+[Unit]
+Description=Timer da cobranca de registro do Fabio as 20:50 BRT (23:50 UTC) — fim das aulas
+
+[Timer]
+OnCalendar=*-*-* 23:50:00
+AccuracySec=30s
+Persistent=true
+Unit=fabio-pendencia-noite.service
+
+[Install]
+WantedBy=timers.target
+
+# ============================================================================
+# ~/.config/systemd/user/fabio-pendencia-manha.service
+# ============================================================================
+[Unit]
+Description=Fábio — cobranca de registro na MANHA seguinte (piloto Matheus, professor 25)
+Documentation=https://github.com/LucianoAlf/la-teacher
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+EnvironmentFile=/home/fabio/.hermes/.env
+ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event pendencia --professor-id 25 --channel whatsapp --force
+
+# ============================================================================
+# ~/.config/systemd/user/fabio-pendencia-manha.timer
+# ============================================================================
+[Unit]
+Description=Timer da cobranca de registro do Fabio as 08:30 BRT (11:30 UTC) — lembra de novo
+
+[Timer]
+OnCalendar=*-*-* 11:30:00
+AccuracySec=30s
+Persistent=true
+Unit=fabio-pendencia-manha.service
+
+[Install]
+WantedBy=timers.target
+
+# ============================================================================
+# NAO DUPLICA: o indice uq_fabio_notif_recorrente_diario e por
+# (professor_id, tipo, dia_referencia, canal) para tipo in
+# ('briefing_matinal','pendencia_registro'). Os dois disparos caem em
+# dia_referencia diferente (noite = dia corrente, manha = dia seguinte), entao
+# ambos passam; dois disparos no MESMO dia nao empilham mensagem.
+#
+# AINDA FALTA (nao esta neste arquivo):
+# - escalonamento para coordenacao e grupo depois de N dias sem registro. O
+#   worker hoje so fala com o professor. Ver task #80.
+# - generalizar para todos os professores: hoje e --professor-id 25 fixo,
+#   igual ao briefing do piloto.
