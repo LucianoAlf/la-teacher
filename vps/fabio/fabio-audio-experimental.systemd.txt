@@ -1,0 +1,63 @@
+# Áudio da aula experimental — unit systemd do usuario `fabio`
+#
+# POR QUE ISTO EXISTE
+# O worker (fabio_audio_experimental_worker.py) transforma o audio nos quatro
+# campos do registro. Sem TIMER ele so roda quando alguem chama na mao, e
+# "codigo pronto" nao e "funcionalidade no ar" — foi assim que a cobranca de
+# registro ficou invisivel por meses: o worker sabia cobrar e nada o disparava.
+#
+# PYTHON: O DA VENV DO HERMES, NAO O DO SISTEMA
+# Os outros workers rodam com /usr/bin/python3. Este NAO PODE: `faster_whisper`
+# so existe na venv do agente. Com o python do sistema o servico sobe, pega da
+# fila, e quebra no import — deixando a linha presa em 'transcrevendo' ate a
+# retomada de 15 minutos. Falha barulhenta a cada ciclo, e o professor esperando.
+#
+# CADENCIA: 20s DEPOIS QUE A RODADA ANTERIOR TERMINA.
+# Aqui tem alguem olhando pra tela. O professor grava e fica esperando os campos
+# se preencherem — 3 minutos (a cadencia do aviso comercial) seria uma eternidade
+# de spinner. Com 20s o pior caso e ~45s: a espera da fila mais os ~25s de
+# transcricao + modelo.
+#
+# `OnUnitInactiveSec` e nao `OnUnitActiveSec` de proposito: conta a partir do
+# FIM da rodada. Com OnUnitActiveSec (que conta do inicio) um lote lento faria a
+# proxima disparar em cima da anterior.
+#
+# CUSTO DE VARRER TAO RAPIDO: fila vazia sai em um round-trip. O modelo whisper
+# so e carregado dentro de `transcrever()`, ou seja, so quando ha audio de
+# verdade — rodada vazia nao toca em CPU.
+#
+# NAO DUPLICA: o claim usa `for update skip locked` e marca 'transcrevendo' na
+# mesma transacao (051). Duas rodadas concorrentes nao pegam a mesma linha.
+#
+# Instalar em ~/.config/systemd/user/ e:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now fabio-audio-experimental.timer
+
+# ============================================================================
+# ~/.config/systemd/user/fabio-audio-experimental.service
+# ============================================================================
+[Unit]
+Description=Fábio — transforma o áudio da experimental nos quatro campos do registro
+Documentation=https://github.com/LucianoAlf/la-teacher
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+EnvironmentFile=/home/fabio/.hermes/.env
+ExecStart=/home/fabio/.hermes/hermes-agent/venv/bin/python /home/fabio/fabio-chat-bridge/fabio_audio_experimental_worker.py --json
+
+# ============================================================================
+# ~/.config/systemd/user/fabio-audio-experimental.timer
+# ============================================================================
+[Unit]
+Description=Timer do áudio da experimental (20s após cada rodada)
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=20s
+AccuracySec=5s
+Persistent=true
+Unit=fabio-audio-experimental.service
+
+[Install]
+WantedBy=timers.target
