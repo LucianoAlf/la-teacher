@@ -604,6 +604,29 @@ _STUDENT_IDENTITY_PATTERNS = [
 ]
 
 
+# O professor pergunta pela experimental SEM saber o nome — "tenho experimental
+# amanha?", "como conduzo essa aula?". Nenhum dos dois gatilhos acima casa com
+# isso: nao e historico (a aula nao aconteceu) e nao e identidade (ele nao cita
+# ninguem). Medido em 07/08/2026: fabio_experimentais_do_professor devolvia a
+# Helena inteira, com dica de conducao, e o Fabio respondia "ainda nao tenho a
+# confirmacao" e inventava uma conducao generica.
+#
+# Funcao pronta que ninguem chama e o mesmo defeito da governanca, de novo.
+_EXPERIMENTAL_AGENDA_PATTERNS = [
+    r"\bexperimenta(l|is)\b",
+    r"\bprimeira aula\b",
+    r"\baula de (teste|demonstracao)\b",
+    r"\bcondu(zo|zir|za)\b[^?.!]{0,40}\baula\b",
+    r"\bcomo (eu )?(dou|dar|encaminho|comeco|começo) (essa|esta|a) aula\b",
+    r"\bdica (de|pra|para) (conducao|conduzir|aula)\b",
+]
+
+
+def _has_experimental_agenda_intent(current_text: str, hist: list[Dict[str, Any]]) -> bool:
+    hay = _norm_text(current_text)
+    return any(re.search(p, hay) for p in _EXPERIMENTAL_AGENDA_PATTERNS)
+
+
 def _has_student_identity_intent(current_text: str, hist: list[Dict[str, Any]]) -> bool:
     recent = "\n".join((h.get("content") or "") for h in hist[-6:] if h.get("role") == "professor")
     hay = _norm_text(current_text + "\n" + recent)
@@ -813,8 +836,26 @@ def _latest_registered_content(prontuario: Dict[str, Any], course_name: str) -> 
 def pedagogical_prefetch(professor_id: int, current_text: str, hist: list[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     quer_historico = _has_pedagogical_history_intent(current_text, hist)
     quer_identidade = _has_student_identity_intent(current_text, hist)
-    if not (quer_historico or quer_identidade):
+    quer_experimental = _has_experimental_agenda_intent(current_text, hist)
+    if not (quer_historico or quer_identidade or quer_experimental):
         return None
+
+    # Perguntou pela experimental sem citar nome: a resposta certa e a AGENDA
+    # dele, nao uma resolucao por nome que nao tem como acontecer. Vai antes do
+    # resto porque, sem nome no texto, o caminho de baixo devolve "nao
+    # resolvido" e o Fabio inventa.
+    if quer_experimental:
+        agendadas = _fetch_experimentais_agendadas(professor_id)
+        if agendadas:
+            por_nome = _resolve_experimental_from_chat(professor_id, current_text, hist)
+            return {
+                "intent": "experimentais_agendadas",
+                "resolved": None,
+                # A que ele citou pelo nome, quando citou — pra o Fabio falar
+                # dela em vez de listar tudo.
+                "experimental_agendada": por_nome,
+                "experimentais_agendadas": agendadas,
+            }
     # "quem é" é a pergunta mais fraca das duas: quem pede histórico também quer
     # saber quem é, mas não o contrário.
     intent = "historico_pedagogico" if quer_historico else "identidade_aluno"
