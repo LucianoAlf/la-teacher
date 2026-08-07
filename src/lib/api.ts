@@ -1042,9 +1042,11 @@ export async function confirmarRegistroExperimental(
 ): Promise<ResultadoConfirmacao> {
   if (SOMENTE_LEITURA) throw new Error('app em modo somente leitura')
   // rpcSolta: RPC nasceu na migration 038, depois da última geração do db.ts.
+  // Um parâmetro só: `p_confirmado_por` saiu na 054. Ele vinha do cliente —
+  // que mandava null, então "quem confirmou" nunca era gravado, e um cliente
+  // menos inocente podia carimbar o id de outra pessoa.
   const { data: res, error } = await rpcSolta('app_confirmar_registro_experimental', {
     p_registro_id: registroId,
-    p_confirmado_por: null,
   })
   if (error) throw error
   return res as unknown as ResultadoConfirmacao
