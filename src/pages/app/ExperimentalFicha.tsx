@@ -154,6 +154,19 @@ function Conteudo({ dados }: { dados: ExperimentalDoProfessor }) {
             Registrada e enviada ao comercial
           </p>
         )}
+        {/* A saída pra quando não houve aula. Discreta e embaixo: é o caminho
+            menos frequente, e um botão de falta com o mesmo peso do de
+            registrar convida ao toque errado. Some depois de confirmada —
+            aula já relatada não vira falta (053). */}
+        {!jaConfirmado && (
+          <button
+            type="button"
+            onClick={() => navigate(`/app/experimental/${dados.vinculo_id}/falta`)}
+            className="w-full py-2 text-center text-[12.5px] text-text-secondary underline decoration-border-strong underline-offset-4"
+          >
+            O aluno não veio
+          </button>
+        )}
       </div>
     </>
   )

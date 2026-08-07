@@ -990,6 +990,33 @@ export async function enfileirarAudioExperimental(
   return res as unknown as { audio_id: string; status: string; vinculo_id: number }
 }
 
+/** O que o toque da falta FEZ. Mesma disciplina da confirmação: a tela conta o
+ *  que aconteceu de verdade, não um "ok" genérico. */
+export interface ResultadoFalta {
+  vinculo_id: number
+  presenca_gravada: boolean
+  aviso_claimed: string | null
+  /** 'sem_destinatario' = unidade sem comercial. O aviso NÃO some: fica na fila
+   *  e sai sozinho quando alguém cadastrar o contato (053). */
+  aviso_motivo: string | null
+  notificacao_id: string | null
+}
+
+/**
+ * Um toque: grava a falta com fonte forte e enfileira o aviso curto pro
+ * comercial, na mesma transação (053). Sem campos pedagógicos — aula que não
+ * aconteceu não tem capítulo, e um formulário aqui convidaria a inventar.
+ */
+export async function declararFaltaExperimental(vinculoId: number): Promise<ResultadoFalta> {
+  if (SOMENTE_LEITURA) throw new Error('app em modo somente leitura')
+  // rpcSolta: RPC nasceu na migration 053, depois da última geração do db.ts.
+  const { data: res, error } = await rpcSolta('app_declarar_falta_experimental', {
+    p_vinculo_id: vinculoId,
+  })
+  if (error) throw error
+  return res as unknown as ResultadoFalta
+}
+
 /** O que a confirmação FEZ. A tela mostra isso, não um "ok" genérico. */
 export interface ResultadoConfirmacao {
   registro_id: string

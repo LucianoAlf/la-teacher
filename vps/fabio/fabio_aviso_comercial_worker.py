@@ -10,10 +10,18 @@ só tira da fila, entrega e fecha.
 
 O CICLO
     1. fabio_avisos_comerciais_pendentes   o que há pra fazer (não reivindica)
-    2. fabio_claim_aviso_comercial         pega o lease de verdade
+    2. o claim do TIPO da linha             pega o lease de verdade
     3. fabio_aviso_comercial_para_envio    corpo + destinatário, só com o token
     4. UAZAPI /send/text
     5. fabio_marcar_notificacao_enviada    fecha com o mesmo token
+
+DOIS TIPOS, UMA ESTEIRA
+A devolutiva da experimental (`experimental_registrada`) e a falta
+(`experimental_falta`, migration 053) andam na mesma fila e saem pelo mesmo
+cano: mesma tabela, mesmo lease, mesmo envio, mesmo fechamento. O que muda é o
+claim — cada tipo tem o seu, porque um é chaveado por registro e o outro por
+vínculo. Do passo 3 em diante os dois são a mesma coisa: `para_envio` lê
+`corpo` e não pergunta de onde veio.
 
 QUEM PEGA O LEASE É QUEM TRABALHA
 A confirmação (038) enfileira com lease ZERO — ela não trabalha, só deixa na
@@ -78,12 +86,26 @@ def enviar(destinatario: str, corpo: str) -> None:
         raise RuntimeError(f"uazapi send/text {r.status_code}: {r.text[:300]}")
 
 
-def processar(item: Dict[str, Any]) -> Dict[str, Any]:
-    registro_id = item.get("registro_id")
-    resultado: Dict[str, Any] = {"registro_id": registro_id, "status": "?"}
+def reivindicar(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Dois tipos entram na mesma fila; cada um tem a sua porta.
 
-    claim = rpc("fabio_claim_aviso_comercial",
-                {"p_registro_id": registro_id, "p_lease_minutos": LEASE_MIN}) or {}
+    A escolha é pelo `tipo` que a fila devolve, e nunca por "qual id não veio
+    nulo" — a fila é que sabe o que a linha é. Adivinhar pela forma do dado é
+    como um aviso de falta acabaria batendo na porta da devolutiva, que
+    levantaria `registro_inexistente` e devolveria a linha pra fila pra sempre.
+    """
+    if item.get("tipo") == "experimental_falta":
+        return rpc("fabio_claim_aviso_falta_experimental",
+                   {"p_vinculo_id": int(item["vinculo_id"]), "p_lease_minutos": LEASE_MIN}) or {}
+    return rpc("fabio_claim_aviso_comercial",
+               {"p_registro_id": item.get("registro_id"), "p_lease_minutos": LEASE_MIN}) or {}
+
+
+def processar(item: Dict[str, Any]) -> Dict[str, Any]:
+    registro_id = item.get("registro_id") or item.get("vinculo_id")
+    resultado: Dict[str, Any] = {"registro_id": registro_id, "tipo": item.get("tipo"), "status": "?"}
+
+    claim = reivindicar(item)
     if not claim.get("claimed"):
         motivo = claim.get("motivo") or "desconhecido"
         # `sem_destinatario` NÃO é erro: é a unidade sem comercial cadastrado.
@@ -155,6 +177,8 @@ def rodar(lote: int, dry_run: bool) -> Dict[str, Any]:
         # corpo lido. O que ele mostra é exatamente o que a fila mostra.
         return {"ok": True, "dry_run": True, "na_fila": len(fila),
                 "resultados": [{"registro_id": i.get("registro_id"),
+                                "vinculo_id": i.get("vinculo_id"),
+                                "tipo": i.get("tipo"),
                                 "status_na_fila": i.get("status"),
                                 "tentativas": i.get("tentativas")} for i in fila]}
 

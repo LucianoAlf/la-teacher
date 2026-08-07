@@ -3,6 +3,7 @@ import DesignSystemPage from './pages/dev/DesignSystem'
 import ExperimentalFichaPage from './pages/app/ExperimentalFicha'
 import ExperimentalRegistrarPage from './pages/app/ExperimentalRegistrar'
 import ExperimentalConfirmarPage from './pages/app/ExperimentalConfirmar'
+import ExperimentalFaltaPage from './pages/app/ExperimentalFalta'
 import LoginPage from './pages/app/Login'
 import NovaSenhaPage from './pages/app/NovaSenha'
 import IntroPage from './pages/app/Intro'
@@ -97,6 +98,9 @@ export const router = createBrowserRouter(
           { path: '/app/experimental/:vinculoId', element: <ExperimentalFichaPage /> },
           { path: '/app/experimental/:vinculoId/registrar', element: <ExperimentalRegistrarPage /> },
           { path: '/app/experimental/:vinculoId/confirmar', element: <ExperimentalConfirmarPage /> },
+          // Falta tem rota própria porque é caminho próprio: sem campos, e com
+          // o que vai acontecer escrito antes do toque que manda WhatsApp.
+          { path: '/app/experimental/:vinculoId/falta', element: <ExperimentalFaltaPage /> },
           ],
         },
         // Vitrine do design system — SÓ em desenvolvimento. Em produção a rota
