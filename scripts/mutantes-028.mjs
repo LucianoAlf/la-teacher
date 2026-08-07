@@ -84,7 +84,9 @@ const MUTANTES = [
     nome: 'a view fica exposta ao anon e ao authenticated',
     pega: 'passos 23 e 24',
     de: 'revoke all on table public.vw_fabio_contexto_experimental from public, anon, authenticated;',
-    para: 'revoke all on table public.vw_fabio_contexto_experimental from public;',
+    // GRANT ativo pelo mesmo motivo da 027: `create or replace view` preserva
+    // privilegio, e omitir o revoke nao muda nada depois de aplicada.
+    para: 'grant select on table public.vw_fabio_contexto_experimental to anon, authenticated;',
   },
   {
     nome: 'contexto de aluno alheio entra no prontuario',

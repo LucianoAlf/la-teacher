@@ -95,8 +95,13 @@ const MUTANTES = [
   {
     nome: 'a gravacao fica exposta ao anon',
     pega: 'passo 36',
+    // GRANT ativo, nao a mera ausencia do revoke: `create or replace function`
+    // PRESERVA privilegio, entao depois desta migration aplicada um mutante que
+    // so apagasse o revoke viraria no-op — e sobreviveria por engano, deixando
+    // o passo de permissao sem carrasco possivel. Descoberto rodando as suites
+    // antigas em 07/08 (as tres unicas sobreviventes eram todas desta classe).
     de: 'revoke all on function public.fabio_gravar_contexto_experimental(integer, jsonb) from public, anon, authenticated;',
-    para: '',
+    para: 'grant execute on function public.fabio_gravar_contexto_experimental(integer, jsonb) to anon;',
   },
   {
     // O Supabase concede EXECUTE explicitamente a anon, authenticated e
@@ -105,7 +110,7 @@ const MUTANTES = [
     nome: 'a gravacao fica exposta ao authenticated',
     pega: 'passo 38',
     de: 'revoke all on function public.fabio_gravar_contexto_experimental(integer, jsonb) from public, anon, authenticated;',
-    para: 'revoke all on function public.fabio_gravar_contexto_experimental(integer, jsonb) from public, anon;',
+    para: 'grant execute on function public.fabio_gravar_contexto_experimental(integer, jsonb) to authenticated;',
   },
   {
     // O campo `observacoes` e do Emusys, que o reescreve a cada webhook.
