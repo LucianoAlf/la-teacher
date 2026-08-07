@@ -965,6 +965,31 @@ export async function registrarExperimental(campos: {
   return res as unknown as string
 }
 
+/**
+ * Enfileira o áudio da experimental (050). NÃO é a mesma fila lógica do áudio
+ * de aula comum: a linha nasce com `vinculo_id`, e é essa coluna que faz o
+ * gatilho NÃO chamar a edge do Hermes — que monta registro pelo roster de
+ * alunos, e a experimental tem lead, não aluno.
+ *
+ * Os erros conhecidos são os mesmos da gravação de aula, porque as travas são
+ * as mesmas (janela, posse, aula cancelada), mais os estados do vínculo.
+ */
+export async function enfileirarAudioExperimental(
+  vinculoId: number,
+  storagePath: string,
+  duracaoSegundos: number,
+): Promise<{ audio_id: string; status: string; vinculo_id: number }> {
+  if (SOMENTE_LEITURA) throw new Error('app em modo somente leitura')
+  // rpcSolta: RPC nasceu na migration 050, depois da última geração do db.ts.
+  const { data: res, error } = await rpcSolta('app_enfileirar_audio_experimental', {
+    p_vinculo_id: vinculoId,
+    p_storage_path: storagePath,
+    p_duracao_segundos: duracaoSegundos,
+  })
+  if (error) throw error
+  return res as unknown as { audio_id: string; status: string; vinculo_id: number }
+}
+
 /** O que a confirmação FEZ. A tela mostra isso, não um "ok" genérico. */
 export interface ResultadoConfirmacao {
   registro_id: string

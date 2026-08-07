@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AppFrame } from './AppFrame'
 import { Button, Card, EmptyState, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
 import { BlocoInterno } from '../../features/experimental/BlocoInterno'
+import { GravadorExperimental } from '../../features/experimental/GravadorExperimental'
 import { useExperimental } from '../../features/experimental/useExperimental'
-import { registrarExperimental } from '../../lib/api'
+import { registrarExperimental, type RegistroExperimental } from '../../lib/api'
 
 /**
  * Registrar a experimental.
@@ -20,7 +21,7 @@ import { registrarExperimental } from '../../lib/api'
 export default function ExperimentalRegistrarPage() {
   const { vinculoId } = useParams<{ vinculoId: string }>()
   const navigate = useNavigate()
-  const { estado } = useExperimental(vinculoId ? Number(vinculoId) : null)
+  const { estado, recarregar } = useExperimental(vinculoId ? Number(vinculoId) : null)
   const { message, visible, show } = useToast()
 
   const [pedagogica, setPedagogica] = useState('')
@@ -28,17 +29,34 @@ export default function ExperimentalRegistrarPage() {
   const [proximos, setProximos] = useState('')
   const [conversao, setConversao] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const [veioDoAudio, setVeioDoAudio] = useState(false)
+
+  // Copiar do banco pra tela é destrutivo: sobrescreve o que a pessoa está
+  // digitando. Então só acontece em dois momentos declarados — ao abrir, e
+  // quando o Fábio termina de ouvir. `assinatura` é o que já foi aplicado; sem
+  // ela, qualquer recarregar futuro apagaria a edição em curso.
+  const aplicadoRef = useRef<string | null>(null)
+  function aplicar(r: RegistroExperimental | null, doAudio: boolean) {
+    aplicadoRef.current = r?.id ?? 'vazio'
+    setPedagogica(r?.anotacao_pedagogica ?? '')
+    setFamilia(r?.devolutiva_familia ?? '')
+    setProximos(r?.proximos_passos ?? '')
+    setConversao(r?.leitura_de_conversao ?? '')
+    if (doAudio) setVeioDoAudio(true)
+  }
 
   // Reabre o que ele já tinha escrito — perder texto digitado depois de uma
   // aula é o jeito mais rápido de ninguém mais registrar nada.
+  const esperandoAudioRef = useRef(false)
   useEffect(() => {
     if (estado.fase !== 'pronto') return
-    const r = estado.dados.registro
-    if (!r) return
-    setPedagogica(r.anotacao_pedagogica ?? '')
-    setFamilia(r.devolutiva_familia ?? '')
-    setProximos(r.proximos_passos ?? '')
-    setConversao(r.leitura_de_conversao ?? '')
+    if (esperandoAudioRef.current) {
+      esperandoAudioRef.current = false
+      aplicar(estado.dados.registro, true)
+      return
+    }
+    if (aplicadoRef.current !== null) return // já carregou uma vez; não atropela
+    aplicar(estado.dados.registro, false)
   }, [estado])
 
   if (estado.fase === 'carregando') {
@@ -104,6 +122,24 @@ export default function ExperimentalRegistrarPage() {
       />
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-[calc(24px_+_env(safe-area-inset-bottom))]">
+        <GravadorExperimental
+          vinculoId={dados.vinculo_id}
+          onPronto={() => {
+            esperandoAudioRef.current = true
+            recarregar()
+          }}
+        />
+
+        {veioDoAudio && (
+          <div className="flex items-start gap-2 rounded-md border border-[color:var(--brand-border)] bg-brand-soft px-3 py-[10px] text-[12.5px] leading-relaxed text-brand-text">
+            <i className="fa-solid fa-wand-magic-sparkles mt-[2px]" aria-hidden="true" />
+            <span>
+              Preenchi pelo que você falou. <b>Confere e ajusta</b> — o que sai daqui vai pro
+              prontuário e pro comercial com o seu nome.
+            </span>
+          </div>
+        )}
+
         {jaConfirmado && (
           <Card title="Já confirmada" icon="fa-solid fa-check">
             <p className="text-[13.5px] leading-relaxed text-text-secondary">
