@@ -20,8 +20,28 @@ export default function AgendaPage() {
 
   const { estado, recarregar } = useSessoes(data)
   const { dias, contagem } = useSemana(data)
-  const abrirChamada = (sessao: SessaoAula) =>
+  /**
+   * Tocar numa linha abre o que aquela aula PEDE.
+   *
+   * Experimental não tem chamada: o roster é um lead, não um aluno conciliado,
+   * e a presença nasce da confirmação do registro (038) — não de marcar
+   * presente numa lista. Levar o professor pra chamada aqui seria oferecer uma
+   * porta que o banco recusa.
+   *
+   * Sem vínculo, nem a ficha abre: o reconciliador ainda não casou o lead com
+   * esta aula. Dizer isso é melhor que uma tela de erro.
+   */
+  const abrirSessao = (sessao: SessaoAula) => {
+    if (sessao.experimental) {
+      if (sessao.vinculo_id == null) {
+        show('Essa experimental ainda está sendo casada com a agenda. Tenta em alguns minutos.')
+        return
+      }
+      navigate(`/app/experimental/${sessao.vinculo_id}`)
+      return
+    }
     navigate(`/app/chamada/${sessao.aula_id_ancora}`, { state: { sessao } })
+  }
   const gravarAula = (sessao: SessaoAula) =>
     navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
 
@@ -41,7 +61,7 @@ export default function AgendaPage() {
             data={data}
             estado={estado}
             onRetry={recarregar}
-            onAbrir={abrirChamada}
+            onAbrir={abrirSessao}
             onGravar={gravarAula}
           />
         </div>

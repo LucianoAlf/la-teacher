@@ -1,5 +1,8 @@
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom'
 import DesignSystemPage from './pages/dev/DesignSystem'
+import ExperimentalFichaPage from './pages/app/ExperimentalFicha'
+import ExperimentalRegistrarPage from './pages/app/ExperimentalRegistrar'
+import ExperimentalConfirmarPage from './pages/app/ExperimentalConfirmar'
 import LoginPage from './pages/app/Login'
 import NovaSenhaPage from './pages/app/NovaSenha'
 import IntroPage from './pages/app/Intro'
@@ -88,6 +91,12 @@ export const router = createBrowserRouter(
             { path: '/app/gravar/:aulaId', element: <GravarAulaPage /> },
             { path: '/app/processando/:audioId', element: <ProcessandoPage /> },
             { path: '/app/confirmar/:registroId', element: <ConfirmarPage /> },
+          // Ciclo da aula experimental (migrations 034-047). A chave da rota é
+          // o VÍNCULO lead↔aula, não a aula: é ele que amarra registro,
+          // presença e aviso ao comercial.
+          { path: '/app/experimental/:vinculoId', element: <ExperimentalFichaPage /> },
+          { path: '/app/experimental/:vinculoId/registrar', element: <ExperimentalRegistrarPage /> },
+          { path: '/app/experimental/:vinculoId/confirmar', element: <ExperimentalConfirmarPage /> },
           ],
         },
         // Vitrine do design system — SÓ em desenvolvimento. Em produção a rota

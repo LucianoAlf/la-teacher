@@ -73,6 +73,17 @@ export interface SessaoAula {
    * avulsa): sem porta de chamada pelo app. Enriquecido por agruparSessoes.
    */
   aula_id_chamada?: number | null
+  /** true = aula experimental (deriva de aulas_emusys.categoria — migration 047). */
+  experimental?: boolean
+  /**
+   * Vínculo lead↔aula: a chave de TODO o ciclo da experimental.
+   * null com `experimental: true` NÃO é o mesmo que "não é experimental" —
+   * significa que o reconciliador ainda não casou o lead com esta aula, e por
+   * isso ainda não dá pra registrar. A tela precisa distinguir os dois.
+   */
+  vinculo_id?: number | null
+  /** Nome de quem vem. Na experimental o que importa é a pessoa, não a turma. */
+  experimental_nome?: string | null
 }
 
 /**
@@ -863,4 +874,126 @@ export async function definirDestinatarioDevolutiva(
     p_destinatario: destinatario,
   })
   if (error) throw error
+}
+
+// ---------------------------------------------------------------------------
+// Aula experimental — o ciclo (migrations 034-047)
+// ---------------------------------------------------------------------------
+
+/**
+ * O que o professor pode saber sobre quem vem. Chega pela lista branca da 028
+ * (fn_experimental_contexto_seguro); o sinal comercial `atencao_conversao` é
+ * removido na 045 de propósito — ele conduz melhor sabendo que a menina canta
+ * no chuveiro, não sabendo que a mãe já perguntou o preço.
+ */
+export interface ContextoExperimental {
+  idade?: number
+  recepcao?: { responsavel?: string; aluno?: string; junto_com?: string }
+  quem_e_esse_aluno?: { nivel_declarado?: string; historia?: string; de_quem_partiu?: string }
+  ganchos_de_conexao?: string[]
+  para_a_devolutiva?: { o_que_a_familia_espera?: string }
+  apoio_declarado?: string
+  alertas?: { tipo: string; texto: string }[]
+  extraido_em?: string
+}
+
+/** Registro em andamento — a tela reabre em vez de começar do zero. */
+export interface RegistroExperimental {
+  id: string
+  status: 'rascunho' | 'aguardando_confirmacao' | 'confirmado' | 'descartado'
+  anotacao_pedagogica: string | null
+  devolutiva_familia: string | null
+  proximos_passos: string | null
+  leitura_de_conversao: string | null
+  confirmado_em: string | null
+}
+
+export interface ExperimentalDoProfessor {
+  vinculo_id: number
+  lead_experimental_id: number
+  nome_aluno: string
+  curso: string | null
+  unidade_nome: string | null
+  data_hora_inicio: string
+  hora: string
+  estado: string
+  presenca_status: string | null
+  presenca_e_forte: boolean
+  contexto: ContextoExperimental | null
+  /**
+   * A dica de condução do Fábio. null = a conversa não deu material pra uma —
+   * e dica inventada é pior que nenhuma, porque o professor confia nela. A
+   * tela esconde o bloco em vez de mostrar vazio.
+   */
+  como_conduzir: string | null
+  registro: RegistroExperimental | null
+}
+
+/** A experimental como o professor DONO dela vê. Aula de outro professor não
+ *  devolve linha: a posse está no JOIN da RPC, que levanta exceção. */
+export async function experimentalDoProfessor(vinculoId: number): Promise<ExperimentalDoProfessor> {
+  // rpcSolta: RPC nasceu na migration 045, depois da última geração do db.ts.
+  const { data: res, error } = await rpcSolta('app_experimental_do_professor', {
+    p_vinculo_id: vinculoId,
+  })
+  if (error) throw error
+  return res as unknown as ExperimentalDoProfessor
+}
+
+/**
+ * Grava o registro. NÃO confirma: ele nasce 'aguardando_confirmacao', e é a
+ * confirmação que dispara presença e aviso. Separado de propósito — o
+ * professor escreve, revisa, e só então dispara o que sai da escola.
+ */
+export async function registrarExperimental(campos: {
+  vinculoId: number
+  anotacaoPedagogica: string
+  devolutivaFamilia: string
+  proximosPassos: string
+  leituraDeConversao: string
+}): Promise<string> {
+  if (SOMENTE_LEITURA) throw new Error('app em modo somente leitura')
+  // rpcSolta: RPC nasceu na migration 035, depois da última geração do db.ts.
+  const { data: res, error } = await rpcSolta('app_registrar_experimental', {
+    p_vinculo_id: campos.vinculoId,
+    p_anotacao_pedagogica: campos.anotacaoPedagogica,
+    p_devolutiva_familia: campos.devolutivaFamilia,
+    p_proximos_passos: campos.proximosPassos,
+    p_leitura_de_conversao: campos.leituraDeConversao,
+  })
+  if (error) throw error
+  return res as unknown as string
+}
+
+/** O que a confirmação FEZ. A tela mostra isso, não um "ok" genérico. */
+export interface ResultadoConfirmacao {
+  registro_id: string
+  ja_confirmado?: boolean
+  presenca_gravada?: boolean
+  notificacao_id?: string | null
+  aviso_claimed?: boolean
+  /**
+   * 'sem_destinatario' = unidade sem comercial cadastrado. O aviso NÃO some:
+   * fica visível na fila e é retomado sozinho quando alguém cadastrar o
+   * contato (036/043). A tela precisa dizer isso, não fingir que enviou.
+   */
+  aviso_motivo?: string | null
+}
+
+/**
+ * Confirma: marca o registro, grava presença de fonte forte e enfileira o
+ * aviso ao comercial — as três na MESMA transação (038). Meia confirmação
+ * (presença sim, aviso não) é impossível por construção.
+ */
+export async function confirmarRegistroExperimental(
+  registroId: string,
+): Promise<ResultadoConfirmacao> {
+  if (SOMENTE_LEITURA) throw new Error('app em modo somente leitura')
+  // rpcSolta: RPC nasceu na migration 038, depois da última geração do db.ts.
+  const { data: res, error } = await rpcSolta('app_confirmar_registro_experimental', {
+    p_registro_id: registroId,
+    p_confirmado_por: null,
+  })
+  if (error) throw error
+  return res as unknown as ResultadoConfirmacao
 }

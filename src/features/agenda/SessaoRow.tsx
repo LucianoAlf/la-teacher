@@ -21,6 +21,10 @@ interface Props {
  */
 export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props) {
   const status = statusSessao(sessao, now)
+  // A experimental não é uma aula como as outras: é alguém que nunca pisou
+  // aqui, cuja família está decidindo se fica. Ela se anuncia antes de
+  // qualquer estado operacional (047).
+  const ehExperimental = sessao.experimental === true
   const parcial = sessao.n_registradas > 0 && sessao.n_registradas < sessao.n_alunos
   const mostrarGravar = onGravar != null && podeGravar(sessao, now)
   const registrada = aulaRegistrada(sessao)
@@ -71,11 +75,22 @@ export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props
   return (
     <AulaRow
       hora={horaSessao(sessao)}
-      titulo={tituloSessao(sessao)}
-      detalhe={subtituloSessao(sessao)}
+      titulo={ehExperimental && sessao.experimental_nome ? sessao.experimental_nome : tituloSessao(sessao)}
+      detalhe={
+        ehExperimental
+          ? [sessao.curso, sessao.vinculo_id == null ? 'aguardando vínculo' : 'primeira vez aqui']
+              .filter(Boolean)
+              .join(' · ')
+          : subtituloSessao(sessao)
+      }
       badge={
-        chamadaBadge || registroBadge ? (
+        ehExperimental || chamadaBadge || registroBadge ? (
           <span className="flex flex-none flex-col items-end gap-1">
+            {ehExperimental && (
+              <Badge variant="info" icon="fa-solid fa-star">
+                Experimental
+              </Badge>
+            )}
             {chamadaBadge}
             {registroBadge}
           </span>
