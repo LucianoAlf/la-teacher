@@ -6,6 +6,7 @@ import ExperimentalConfirmarPage from './pages/app/ExperimentalConfirmar'
 import ExperimentalFaltaPage from './pages/app/ExperimentalFalta'
 import EquipePage from './pages/app/Equipe'
 import CoordenacaoPage from './pages/app/Coordenacao'
+import PerfilCoordenacaoPage from './pages/app/PerfilCoordenacao'
 import { RequireAdmin } from './pages/app/RequireAdmin'
 import LoginPage from './pages/app/Login'
 import NovaSenhaPage from './pages/app/NovaSenha'
@@ -114,6 +115,11 @@ export const router = createBrowserRouter(
           element: <RequireAdmin />,
           children: [
             { path: '/app/coordenacao', element: <CoordenacaoPage /> },
+            // Perfil PRÓPRIO da coordenação: o /app/perfil mora dentro do
+            // RequireProfessor e lê a RPC do professor, que devolve vazio pra
+            // quem não tem vínculo — era a dona do painel batendo na tela de
+            // quem não tem acesso.
+            { path: '/app/coordenacao/perfil', element: <PerfilCoordenacaoPage /> },
             { path: '/app/equipe', element: <EquipePage /> },
           ],
         },

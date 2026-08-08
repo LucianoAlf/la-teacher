@@ -1177,3 +1177,27 @@ export async function coordenacaoRecado(
   if (error && !data) return { ok: false, erro: 'rede' }
   return (data ?? { ok: false, erro: 'indisponivel' }) as ResultadoRecado
 }
+
+export interface MeuPerfilCoordenacao {
+  usuario_id: number
+  nome: string
+  apelido: string | null
+  email: string | null
+  cargo: string | null
+  telefone: string | null
+  avatar_url: string | null
+  alcance: string
+}
+
+/**
+ * Perfil de quem é da coordenação (migration 069).
+ *
+ * NÃO é a `app_meu_perfil`: aquela lê de `professores` filtrando por
+ * `fn_professor_do_usuario()` e devolve VAZIO pra coordenação, que não tem
+ * vínculo de professor. São duas identidades no mesmo app.
+ */
+export async function meuPerfilCoordenacao(): Promise<MeuPerfilCoordenacao> {
+  const { data, error } = await rpcSolta('app_meu_perfil_coordenacao', {})
+  if (error) throw error
+  return data as unknown as MeuPerfilCoordenacao
+}

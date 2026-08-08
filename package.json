@@ -63,6 +63,8 @@
     "teste:066": "node scripts/rodar-teste-sql.mjs supabase/migrations/066-a-coordenacao-manda-recado.sql supabase/migrations/066-a-coordenacao-manda-recado.test.sql",
     "teste:067": "node scripts/rodar-teste-sql.mjs supabase/migrations/067-a-fila-para-de-repetir-professor.sql supabase/migrations/067-a-fila-para-de-repetir-professor.test.sql",
     "mutantes:067": "node scripts/mutantes-067.mjs",
+    "teste:069": "node scripts/rodar-teste-sql.mjs supabase/migrations/069-a-coordenacao-tem-perfil.sql supabase/migrations/069-a-coordenacao-tem-perfil.test.sql",
+    "mutantes:069": "node scripts/mutantes-069.mjs",
     "teste:068": "node scripts/rodar-teste-sql.mjs supabase/migrations/068-o-default-que-o-check-recusa.sql supabase/migrations/068-o-default-que-o-check-recusa.test.sql",
     "mutantes:036": "node scripts/mutantes-036.mjs",
     "mutantes:037": "node scripts/mutantes-037.mjs",
