@@ -211,7 +211,7 @@ kpis_v3 → kpis_v2`). Trazer **o contrato de saída**, nunca a pilha.
 | Coordenação do LA Teacher | **4** (Alf, Hugo, Juliana, Quintela) |
 | Experimentais na semana | **24 aulas, 22 com ficha** |
 | Cron do reconciliador | **ativo**, `12,27,42,57 * * * *` |
-| Suíte de migrations | **42 passam, 0 falham** (`npm run teste:tudo`) |
+| Suíte de migrations | **43 passam, 0 falham** (`npm run teste:tudo`) |
 
 **A corrente do primeiro acesso está PROVADA com gente de verdade.** Não é
 teste: o Alf clicou "Liberar" no painel e
@@ -358,6 +358,19 @@ sabe a linha do tempo é o `selectComposition` (`scripts/conferir-video.mjs`).
 
 **`git pull` antes de mexer em outro repo.** O Alf não avisa; checar é
 obrigação minha. `D:/la-performance-report` anda muito.
+
+**A suíte dá falso vermelho quando a API do Supabase engasga.** Em 08/08 a
+`teste:tudo` acusou `030-anamnese-ficha-exige-login`, e rodando ela sozinha
+passou — a Management API estava devolvendo **502 (Cloudflare)** naquela janela,
+e o runner reprova quando não consegue tirar a impressão digital inicial. Antes
+de acreditar num vermelho da suíte (e principalmente antes de culpar o commit de
+outra pessoa), **rodar o `teste:NNN` isolado**. Falha de infra e defeito de
+verdade têm a mesma cor na saída.
+
+**Número de migration livre no `git log` pode estar ocupado no disco.** Outra
+sessão pode ter escrito `NNN-*.sql` no worktree principal e ainda não ter
+commitado — o log não enxerga. Antes de numerar:
+`git -C D:/la-teacher status -s | grep migrations`. Aconteceu com a 067/068.
 
 ---
 
