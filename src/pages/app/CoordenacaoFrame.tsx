@@ -23,6 +23,13 @@ import { meuPerfilCoordenacao, type MeuPerfilCoordenacao } from '../../lib/api'
 
 const COLAPSADA_KEY = 'la-coord-sidebar-colapsada'
 
+/** A data mora na moldura: é a mesma em toda tela da coordenação. */
+const HOJE = new Intl.DateTimeFormat('pt-BR', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'long',
+}).format(new Date())
+
 const ITENS = [
   { para: '/app/coordenacao', rotulo: 'Painel', icone: 'fa-solid fa-table-columns' },
   { para: '/app/equipe', rotulo: 'Equipe', icone: 'fa-solid fa-users' },
@@ -64,24 +71,42 @@ export function CoordenacaoFrame({
     <div className="flex h-svh overflow-hidden bg-bg-app">
       {/* ── Sidebar: só md+ ─────────────────────────────────────────────── */}
       <aside
-        className={`hidden shrink-0 flex-col border-r border-border-subtle bg-bg-surface transition-[width] duration-150 md:flex ${
+        className={`relative hidden shrink-0 flex-col border-r border-border-subtle bg-bg-surface transition-[width] duration-150 md:flex ${
           colapsada ? 'w-[64px]' : 'w-[210px]'
         }`}
       >
-        {/* O Fábio é a cara do app — ele abre a sidebar, não um texto. */}
-        <div
-          className={`flex items-center gap-2.5 border-b border-border-subtle p-3 ${
-            colapsada ? 'justify-center' : ''
+        {/* O chevron mora na QUINA, não numa barra própria: é controle da
+            moldura, não item de menu. Colado no topo pra não competir com a
+            navegação. */}
+        <button
+          onClick={() => setColapsada((v) => !v)}
+          aria-label={colapsada ? 'Expandir menu' : 'Recolher menu'}
+          className={`absolute top-2 z-10 flex h-6 w-6 items-center justify-center rounded-sm text-text-muted hover:bg-bg-hover hover:text-text-secondary ${
+            colapsada ? 'right-1/2 translate-x-1/2' : 'right-2'
           }`}
         >
-          <FabioAvatar className="h-8 w-8 shrink-0" alt="Fábio" />
+          <i
+            className={`fa-solid ${colapsada ? 'fa-chevron-right' : 'fa-chevron-left'} text-[11px]`}
+            aria-hidden
+          />
+        </button>
+
+        {/* O Fábio é a cara do app: o nome dele em cima, o produto embaixo.
+            Mesmo desenho do TOM no LA Organizer. Respiro maior aqui porque é a
+            assinatura da tela — apertado ele vira ícone de barra de tarefas. */}
+        <div
+          className={`flex items-center gap-2.5 px-3 pb-4 ${
+            colapsada ? 'justify-center pt-11' : 'pt-10'
+          }`}
+        >
+          <FabioAvatar className="h-9 w-9 shrink-0" alt="Fábio" />
           {!colapsada && (
             <div className="min-w-0">
-              <div className="truncate font-brand text-[16px] font-black leading-none tracking-tight text-text-primary">
-                <span className="text-la-pink">LA</span> teacher
+              <div className="truncate text-[15px] font-bold leading-tight text-text-primary">
+                Fábio
               </div>
-              <div className="mt-1 text-[9.5px] uppercase tracking-wider text-text-muted">
-                Coordenação
+              <div className="truncate text-[11.5px] leading-tight text-text-muted">
+                <span className="text-la-pink">LA</span> Teacher
               </div>
             </div>
           )}
@@ -109,55 +134,35 @@ export function CoordenacaoFrame({
           ))}
         </nav>
 
-        {/* Perfil de VERDADE: foto, nome e cargo, vindos da 069. Antes daqui
-            havia um link "Meu perfil" que apontava pra rota do professor — e a
-            coordenação não tem vínculo de professor, então o guard expulsava a
-            dona do painel pra tela de quem não tem acesso. */}
-        <NavLink
-          to="/app/coordenacao/perfil"
-          title={colapsada ? (perfil?.nome ?? 'Meu perfil') : undefined}
-          className={({ isActive }) =>
-            `flex items-center gap-2.5 border-t border-border-subtle p-3 ${
-              colapsada ? 'justify-center' : ''
-            } ${isActive ? 'bg-brand-soft' : 'hover:bg-bg-hover'}`
-          }
-        >
-          <AvatarDoUsuario perfil={perfil} />
-          {!colapsada && (
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[12px] text-text-primary">
-                {perfil?.apelido || perfil?.nome || 'Meu perfil'}
-              </div>
-              <div className="truncate text-[10px] text-text-muted">
-                {perfil?.cargo || 'Coordenação'}
-              </div>
-            </div>
-          )}
-        </NavLink>
-
-        <button
-          onClick={() => setColapsada((v) => !v)}
-          aria-label={colapsada ? 'Expandir menu' : 'Recolher menu'}
-          className="flex items-center justify-center border-t border-border-subtle py-2 text-text-muted hover:bg-bg-hover hover:text-text-secondary"
-        >
-          <i
-            className={`fa-solid ${colapsada ? 'fa-chevron-right' : 'fa-chevron-left'} text-[11px]`}
-            aria-hidden
-          />
-        </button>
       </aside>
 
       {/* ── Coluna principal ─────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-[46px] shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-surface px-4">
+        {/* Sem barra de cabeçalho, de propósito (pedido do Alf, 08/08). Título,
+            data e quem está logado FLUTUAM sobre o conteúdo: mesma linha, sem
+            fundo e sem borda. Uma barra de chrome rouba altura de um painel que
+            é feito pra caber a lista inteira — e num app de uma tela só ela não
+            informa nada que a sidebar já não diga. */}
+        <div className="flex shrink-0 items-center justify-between gap-3 px-4 pb-1 pt-3">
           <div className="min-w-0">
-            <span className="text-[14.5px] font-bold text-text-primary">{titulo}</span>
+            <span className="text-[15px] font-bold text-text-primary">{titulo}</span>
             {subtitulo ? (
               <span className="ml-2 text-[11.5px] text-text-secondary">{subtitulo}</span>
             ) : null}
           </div>
-          {acaoTopo ? <div className="flex shrink-0 items-center gap-2">{acaoTopo}</div> : null}
-        </header>
+
+          <div className="flex shrink-0 items-center gap-3">
+            {acaoTopo}
+            <span className="hidden text-[11.5px] text-text-muted sm:inline">{HOJE}</span>
+            <NavLink
+              to="/app/coordenacao/perfil"
+              title={perfil?.nome ?? 'Meu perfil'}
+              className="hidden rounded-full ring-offset-2 hover:opacity-80 md:block"
+            >
+              <AvatarDoUsuario perfil={perfil} />
+            </NavLink>
+          </div>
+        </div>
 
         {/* Só o miolo rola — a moldura não cresce com o conteúdo. */}
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>

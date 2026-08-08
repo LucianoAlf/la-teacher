@@ -5,12 +5,6 @@ import { PainelNumero } from '../../features/coordenacao/components/PainelNumero
 import { FilaEmAberto } from '../../features/coordenacao/components/FilaEmAberto'
 import { coordenacaoEmAberto, type CoordenacaoEmAberto } from '../../lib/api'
 
-const HOJE = new Intl.DateTimeFormat('pt-BR', {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'long',
-}).format(new Date())
-
 /**
  * Painel da coordenação — bloco 1: quem está com lançamento em aberto.
  *
@@ -43,10 +37,7 @@ export default function CoordenacaoPage() {
   const fila = dados?.professores ?? []
 
   return (
-    <CoordenacaoFrame
-      titulo="Coordenação"
-      acaoTopo={<span className="text-[11.5px] text-text-muted">{HOJE}</span>}
-    >
+    <CoordenacaoFrame titulo="Coordenação">
       <div className="p-4">
         {erro ? (
           <EmptyState
