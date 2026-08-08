@@ -61,6 +61,7 @@
     "teste:064": "node scripts/rodar-teste-sql.mjs supabase/migrations/064-a-pendencia-de-presenca-para-de-levar-27s.sql supabase/migrations/064-a-pendencia-de-presenca-para-de-levar-27s.test.sql",
     "teste:065": "node scripts/rodar-teste-sql.mjs supabase/migrations/065-o-painel-da-coordenacao-tem-fonte.sql supabase/migrations/065-o-painel-da-coordenacao-tem-fonte.test.sql",
     "teste:066": "node scripts/rodar-teste-sql.mjs supabase/migrations/066-a-coordenacao-manda-recado.sql supabase/migrations/066-a-coordenacao-manda-recado.test.sql",
+    "teste:067": "node scripts/rodar-teste-sql.mjs supabase/migrations/067-o-default-que-o-check-recusa.sql supabase/migrations/067-o-default-que-o-check-recusa.test.sql",
     "mutantes:036": "node scripts/mutantes-036.mjs",
     "mutantes:037": "node scripts/mutantes-037.mjs",
     "mutantes:038": "node scripts/mutantes-038.mjs",
