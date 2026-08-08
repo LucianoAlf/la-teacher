@@ -1,3 +1,11 @@
+-- SUPERADA POR: 061-a-experimental-remarcada-ressuscita.sql (via 034)
+--
+-- Esta versao da funcao nao roda mais em producao. O teste dela continua util
+-- — ele instala esta versao dentro do rollback e a exercita —, mas contra os
+-- dados de hoje ele ACUSA, e com razao: aqui ainda existe o `v_vinculo := null`
+-- que deixa o record nao atribuido, e o UPDATE que promove um 'pendente' nao
+-- tem handler pra aula ja ocupada. Os dois viraram "+1 erro" mudo por rodadas
+-- seguidas ate a 061. Ver vermelho aqui e o teste funcionando.
 -- 033 — reconciliador do vinculo lead_experimentais <-> aulas_emusys
 --
 -- Roda por cron (a cada N minutos, sem pressa: e leitura/escrita local, sem

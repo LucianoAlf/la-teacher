@@ -27,7 +27,18 @@ begin
   perform pg_temp.checar('2. e o Fabio sabe de quando','2026-08-03',
     (select data_matricula::text from public.vw_fabio_carteira_professor
       where aluno_id = 1897 limit 1));
-  perform pg_temp.checar('3. sem aula registrada dela ainda','0',
+  -- Este passo dizia '0' fixo: "a Fernanda ainda não tem aula registrada".
+  -- Era verdade em 03/08/2026 e deixou de ser quando ela teve aula — o teste
+  -- ficou vermelho sem que nada tivesse quebrado. Fixture que é uma PESSOA DE
+  -- VERDADE envelhece junto com a vida dela.
+  --
+  -- O que interessa aqui não é o número, é a coerência: a carteira conta
+  -- exatamente os registros confirmados dela, nem um a mais. Isso continua
+  -- valendo na semana que vem e pega o defeito real (contagem inflada por
+  -- rascunho, ou zerada por join errado).
+  perform pg_temp.checar('3. a contagem de aulas bate com os registros confirmados',
+    (select count(*)::text from public.fabio_registros_aula r
+      where r.aluno_id = 1897 and r.status in ('confirmado','gravado_emusys')),
     (select aulas_registradas::text from public.vw_fabio_carteira_professor
       where aluno_id = 1897 limit 1));
 

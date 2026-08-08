@@ -18,14 +18,19 @@ const fonte = readFileSync(ORIGINAL, 'utf8')
 
 const MUTANTES = [
   {
-    nome: 'V1 — o job simplesmente nao e criado (o estado de 06/08 a 08/08)',
+    // O job NÃO EXISTIR é o defeito original, mas depois que a migration foi
+    // aplicada de verdade a linha mora em `cron.job` — produção, não este
+    // arquivo. Um mutante que apenas deixa de criar o job encontra o que já
+    // está lá e sobrevive sem significar nada. Por isso ele DESAGENDA: é a
+    // mesma semântica ("não roda") de um jeito que o teste consegue ver.
+    nome: 'V1 — o job e desagendado (a semantica do "nao roda")',
     pega: 'passo "o job existe"',
     de: `select cron.schedule(
   'reconciliar-experimental-aulas',
   '12,27,42,57 * * * *',
   $cron$select public.fn_reconciliar_experimental_aulas(7, 200)$cron$
 );`,
-    para: 'select 1;',
+    para: `select cron.unschedule('reconciliar-experimental-aulas');`,
   },
   {
     // O pior de todos: aparece na lista de crons, tem nome bonito, e nunca
