@@ -78,7 +78,7 @@ export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props
       titulo={ehExperimental && sessao.experimental_nome ? sessao.experimental_nome : tituloSessao(sessao)}
       detalhe={
         ehExperimental
-          ? [sessao.curso, sessao.vinculo_id == null ? 'aguardando vínculo' : 'primeira vez aqui']
+          ? [sessao.curso, sessao.vinculo_id == null ? 'registro ainda não abre' : 'primeira vez aqui']
               .filter(Boolean)
               .join(' · ')
           : subtituloSessao(sessao)

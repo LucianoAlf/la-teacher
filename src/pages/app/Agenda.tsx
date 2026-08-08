@@ -29,12 +29,19 @@ export default function AgendaPage() {
    * porta que o banco recusa.
    *
    * Sem vínculo, nem a ficha abre: o reconciliador ainda não casou o lead com
-   * esta aula. Dizer isso é melhor que uma tela de erro.
+   * esta aula. Dizer isso é melhor que uma tela de erro — mas sem prometer
+   * prazo. Medido em 08/08/2026: das 23 experimentais da semana, 12 estavam
+   * sem vínculo, e algumas a 2 dias da aula. "Tenta em alguns minutos" manda o
+   * professor voltar num lugar que pode não abrir hoje. O que ele precisa
+   * saber é o que AINDA dá pra fazer.
    */
   const abrirSessao = (sessao: SessaoAula) => {
     if (sessao.experimental) {
       if (sessao.vinculo_id == null) {
-        show('Essa experimental ainda está sendo casada com a agenda. Tenta em alguns minutos.')
+        // Sem promessa de prazo NEM de aviso: hoje nada notifica quando o
+        // vínculo aparece. Diz o que é, o que segue funcionando, e a quem
+        // recorrer se o dia da aula chegar assim.
+        show('Essa experimental ainda não casou com a agenda, então o registro dela não abre. A aula acontece normal — se chegar o dia assim, fala com a coordenação.')
         return
       }
       navigate(`/app/experimental/${sessao.vinculo_id}`)
