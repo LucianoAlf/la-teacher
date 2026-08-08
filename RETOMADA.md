@@ -116,10 +116,26 @@ só" e estava errado: já são duas (`/app/equipe` + `/app/coordenacao`). Copiar
   domingo** — só férias (`pausa_ate`) barra. Não existe estado "fora de horário".
 - ⬜ Tasks 3 a 6: rota + shell com sidebar, tabela, plantão, verificação.
 
-**Achado dormindo, anotado como tarefa própria:** `fabio_notificacoes.status` tem
-`DEFAULT 'pendente'`, valor que o próprio CHECK da tabela recusa — qualquer
-INSERT que omita o status quebra com erro confuso. Não quebra hoje porque todo
-caminho informa explicitamente.
+- ✅ **O achado dormindo foi resolvido — migration 067 NO AR.**
+  `fabio_notificacoes.status` tinha `DEFAULT 'pendente'`, valor que o próprio
+  CHECK da tabela recusa: todo INSERT que omitisse o status morria com uma
+  mensagem que mandava investigar a constraint, nunca o default. **Escolhido
+  `drop default`, não trocar para 'processando'** — um default válido faria o
+  INSERT incompleto PASSAR, fabricando em silêncio uma linha "em voo" sem lease
+  e sem ninguém pra concluir; o defeito reapareceria horas depois como mensagem
+  que não chega. Agora falha na hora com `null value in column "status"`. O
+  **NOT NULL fica**: é ele que transforma a falta do default em erro.
+  Auditoria antes de mexer (nenhum caminho dependia do default): **7 INSERTs em
+  5 funções**, todos nomeando `status`; zero triggers, zero rules, zero views;
+  **56 crons, nenhum cita a tabela**; na VPS o `~/.hermes` não menciona a tabela
+  e o worker só fala por RPC; RLS deixa só service_role escrever; e nos dados,
+  19 linhas, nenhuma jamais 'pendente'. 9 passos verdes, **6/6 mutantes
+  mortos**, conferida em produção e com o worker do Fábio rodando limpo depois
+  (`fabio-devolutiva-oferta`, 20:55:04 UTC, exit 0).
+  ⚠️ O comentário dentro da **066** ("o DEFAULT da coluna é 'pendente'… omitir
+  quebraria") ficou obsoleto na razão, não no conselho: status continua indo
+  explícito, só que agora quebra por NOT NULL. Não reescrevi a 066 — migration
+  aplicada é registro histórico; a correção mora no cabeçalho da 067.
 
 **Antes de escrever tela, invocar `superpowers:brainstorming`.** É a regra da
 casa e ela existe porque telas chutadas viram retrabalho.
@@ -164,7 +180,7 @@ kpis_v3 → kpis_v2`). Trazer **o contrato de saída**, nunca a pilha.
 | Coordenação do LA Teacher | **4** (Alf, Hugo, Juliana, Quintela) |
 | Experimentais na semana | **24 aulas, 22 com ficha** |
 | Cron do reconciliador | **ativo**, `12,27,42,57 * * * *` |
-| Suíte de migrations | **39 passam, 0 falham** (`npm run teste:tudo`) |
+| Suíte de migrations | **42 passam, 0 falham** (`npm run teste:tudo`) |
 
 **A corrente do primeiro acesso está PROVADA com gente de verdade.** Não é
 teste: o Alf clicou "Liberar" no painel e
