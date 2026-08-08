@@ -20,7 +20,11 @@
     "teste:028": "node scripts/rodar-teste-sql.mjs supabase/migrations/028-fabio-le-contexto-experimental.sql supabase/migrations/028-fabio-le-contexto-experimental.test.sql",
     "mutantes:028": "node scripts/mutantes-028.mjs",
     "teste:059": "node scripts/rodar-teste-sql.mjs supabase/migrations/059-quem-ja-entrou-de-verdade.sql supabase/migrations/059-quem-ja-entrou-de-verdade.test.sql",
-    "mutantes:059": "node scripts/mutantes-059.mjs"
+    "mutantes:059": "node scripts/mutantes-059.mjs",
+    "teste:060": "node scripts/rodar-teste-sql.mjs supabase/migrations/060-o-reconciliador-passa-a-rodar.sql supabase/migrations/060-o-reconciliador-passa-a-rodar.test.sql",
+    "mutantes:060": "node scripts/mutantes-060.mjs",
+    "teste:061": "node scripts/rodar-teste-sql.mjs supabase/migrations/061-a-experimental-remarcada-ressuscita.sql supabase/migrations/061-a-experimental-remarcada-ressuscita.test.sql",
+    "mutantes:061": "node scripts/mutantes-061.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
