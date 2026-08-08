@@ -409,10 +409,14 @@ const CenaExpAgenda: React.FC = () => {
 /** A ficha: o contexto do lead antes de a criança entrar na sala. */
 const CenaExpFicha: React.FC = () => {
   const frame = useCurrentFrame()
+  // Sem clique de abertura: a transição da agenda pra ficha acontece ENTRE as
+  // cenas, então um clique aqui não tem alvo — na folha de contato o dedo
+  // aparecia no meio da tela apontando pro nada, que lê como toque errado
+  // (gotcha 9b). O único toque é no fim, no botão que motiva a cena seguinte.
   const kfs: CursorKeyframe[] = [
-    { frame: 8, x: 250, y: 617, click: true }, // abre pela linha da agenda
-    { frame: 24, x: 330, y: 760 },
-    { frame: 300, x: 330, y: 640 },
+    { frame: 20, x: 330, y: 760 },
+    { frame: 405, x: 205, y: 727, click: true }, // Registrar a experimental
+    { frame: 419, x: 330, y: 800 },
   ]
   return (
     <Palco dedo={kfs}>
@@ -433,9 +437,9 @@ const CenaExpRegistrar: React.FC = () => {
   const frame = useCurrentFrame()
   const kfs: CursorKeyframe[] = [
     { frame: 10, x: 330, y: 760 },
-    { frame: 85, x: 215, y: 560, click: true }, // toca o microfone em "toca e fala"
-    { frame: 101, x: 330, y: 800 },
-    { frame: 200, x: 320, y: 700 },
+    { frame: 85, x: 205, y: 402, click: true }, // toca o microfone em "toca e fala"
+    { frame: 101, x: 330, y: 700 },
+    { frame: 200, x: 320, y: 640 },
   ]
   // Os campos aparecem quando a voz NOMEIA os dois destinos ("o que fica pra
   // escola de um lado, e do outro o que a mãe vai receber", ~5,5s): o

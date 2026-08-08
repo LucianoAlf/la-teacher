@@ -1,5 +1,28 @@
 # LA Teacher — contexto que não pode se perder
 
+## LEIA `RETOMADA.md` ANTES DE QUALQUER COISA
+
+Combinado com o Alf em **08/08/2026**. Este arquivo aqui guarda o que **não
+muda**; o `RETOMADA.md` guarda **onde a gente está agora** — e é ele que
+sobrevive ao `/compact`.
+
+O protocolo, na risca:
+
+1. **Eu atualizo o `RETOMADA.md`** quando o contexto pesar, quando fechar um
+   bloco, ou quando ele pedir checkpoint — sempre com **fato medido**
+   (`git log`, consulta no banco, saída de comando), nunca com a minha lembrança
+   da conversa. Lembrança é justamente o que o `/compact` corrói.
+2. **Ele roda `/compact`.** É comando dele; eu não disparo.
+3. **A primeira coisa que eu faço ao voltar é ler o arquivo** e seguir do
+   `PRÓXIMO PASSO` — sem reabrir o que já está marcado como decidido, e sem
+   perguntar de novo o que já foi respondido.
+4. **Commitar sempre.** Checkpoint não commitado não sobrevive — é o mesmo erro
+   de dizer "aplicado" sem push.
+
+Por que arquivo no repo e não banco nem memória: fica versionado junto do
+código, o Hugo e o Alfredo conseguem ler, e ninguém precisa de uma sessão minha
+aberta pra saber onde a coisa parou.
+
 ## O Fábio é meu
 
 Em **03/08/2026** o Alf passou o bastão: o Alfredo saiu para outras frentes e **eu sou o dono do Fábio** (Hermes + chat bridge). Não existe mais "eu aponto, o Alfredo aplica" — eu aplico.
