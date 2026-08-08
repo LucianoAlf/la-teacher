@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { FabioAvatar } from '../../components/ui'
+import { BotaoTema, FabioAvatar } from '../../components/ui'
 import { InstallPrompt } from '../../features/pwa/InstallPrompt'
-import { useTheme } from '../../lib/theme'
+import { dataLonga } from '../../lib/datas'
 import { meuPerfilCoordenacao, type MeuPerfilCoordenacao } from '../../lib/api'
 
 /**
@@ -28,12 +28,6 @@ import { meuPerfilCoordenacao, type MeuPerfilCoordenacao } from '../../lib/api'
 
 const COLAPSADA_KEY = 'la-coord-sidebar-colapsada'
 
-/** A data mora na moldura: é a mesma em toda tela da coordenação. */
-const HOJE = new Intl.DateTimeFormat('pt-BR', {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'long',
-}).format(new Date())
 
 const ITENS = [
   { para: '/app/coordenacao', rotulo: 'Painel', icone: 'fa-solid fa-table-columns' },
@@ -55,8 +49,6 @@ export function CoordenacaoFrame({
   acaoTopo?: ReactNode
   children: ReactNode
 }) {
-  const { theme, toggle } = useTheme()
-
   // Colapso persiste: quem trabalha o dia todo no painel não quer reajustar a
   // largura a cada navegação. Mesmo comportamento do Organizer.
   const [colapsada, setColapsada] = useState(
@@ -108,7 +100,7 @@ export function CoordenacaoFrame({
           <FabioAvatar className="h-11 w-11 shrink-0" alt="Fábio" />
           {!colapsada && (
             <div className="min-w-0">
-              <div className="truncate text-[17px] font-bold leading-tight text-text-primary">
+              <div className="truncate text-[17px] font-extrabold leading-tight tracking-[-.3px] text-text-primary">
                 Fábio
               </div>
               <div className="truncate text-[12.5px] leading-tight text-text-secondary">
@@ -150,7 +142,11 @@ export function CoordenacaoFrame({
             {icone ? (
               <i className={`${icone} text-[15px] text-text-secondary`} aria-hidden />
             ) : null}
-            <span className="truncate text-[17px] font-bold text-text-primary">{titulo}</span>
+            {/* Mesma tipografia do título do AppHeader: extrabold com tracking
+                negativo. É o que o app do professor já usa. */}
+            <span className="truncate text-[17px] font-extrabold tracking-[-.3px] text-text-primary">
+              {titulo}
+            </span>
             {subtitulo ? (
               <span className="truncate text-[12px] text-text-secondary">{subtitulo}</span>
             ) : null}
@@ -158,19 +154,9 @@ export function CoordenacaoFrame({
 
           <div className="flex shrink-0 items-center gap-3">
             {acaoTopo}
-            <span className="hidden text-[13px] text-text-secondary sm:inline">{HOJE}</span>
+            <span className="hidden text-[13px] text-text-secondary sm:inline">{dataLonga()}</span>
 
-            <button
-              onClick={toggle}
-              aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
-              title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:bg-bg-hover hover:text-text-primary"
-            >
-              <i
-                className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'} text-[14px]`}
-                aria-hidden
-              />
-            </button>
+            <BotaoTema />
 
             <NavLink
               to="/app/coordenacao/perfil"
@@ -240,9 +226,12 @@ export function AvatarDoUsuario({
       />
     )
   }
+  // `--avatar-grad` / `--avatar-fg` são os tokens que a foto do professor já
+  // usa no AppHeader e no Meu perfil. Eu tinha inventado `bg-brand-soft` aqui —
+  // e aí a mesma pessoa teria duas caras conforme a tela.
   return (
     <div
-      className={`${classe} flex shrink-0 items-center justify-center rounded-full bg-brand-soft font-bold text-brand-text`}
+      className={`${classe} flex shrink-0 items-center justify-center rounded-full bg-[var(--avatar-grad)] font-extrabold text-[color:var(--avatar-fg)]`}
       aria-hidden
     >
       {iniciais(perfil?.nome)}

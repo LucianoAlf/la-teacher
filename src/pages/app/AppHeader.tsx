@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Moon, Sun } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
-import { useTheme } from '../../lib/theme'
 import { supabase } from '../../lib/supabase'
 import { meuPerfil } from '../../lib/api'
-import { Toast, useToast } from '../../components/ui'
+import { BotaoTema, Toast, useToast } from '../../components/ui'
+import { dataLonga } from '../../lib/datas'
 
 function primeiroNome(email?: string, nome?: string): string {
   if (nome) return nome.split(' ')[0]
@@ -14,19 +13,12 @@ function primeiroNome(email?: string, nome?: string): string {
   return local.charAt(0).toUpperCase() + local.slice(1)
 }
 
-/** "Sábado, 11 de julho" com a primeira letra maiúscula. */
-function dataLonga(): string {
-  const d = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
-  return d.charAt(0).toUpperCase() + d.slice(1)
-}
-
 /**
  * Header das telas internas — padrão da família LA (espelha o LA Organizer):
  * avatar do Fábio · saudação + data · toggle de tema (sol/lua) · foto + menu.
  */
 export function AppHeader() {
   const { session, signOut } = useAuth()
-  const { theme, toggle } = useTheme()
   const navigate = useNavigate()
   const { message, visible, show } = useToast()
 
@@ -77,15 +69,7 @@ export function AppHeader() {
         <span className="block truncate text-[12.5px] text-text-secondary">{dataLonga()}</span>
       </div>
 
-      {/* Toggle de tema — sol no escuro (clarear), lua no claro (escurecer) */}
-      <button
-        type="button"
-        aria-label={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-        className="flex h-8 w-8 flex-none items-center justify-center rounded-full border border-border-subtle bg-bg-surface text-text-secondary transition-colors hover:bg-bg-hover"
-        onClick={toggle}
-      >
-        {theme === 'dark' ? <Sun size={14} aria-hidden="true" /> : <Moon size={14} aria-hidden="true" />}
-      </button>
+      <BotaoTema />
 
       {/* Foto do professor + menu */}
       <div ref={menuRef} className="relative flex-none">
