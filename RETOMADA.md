@@ -41,9 +41,43 @@ O que **já está decidido** (não reabrir):
   ideal é elas terem o painel delas aqui, com o que realmente importa lá do LA
   Report"*. O painel daqui é **curadoria, não espelho**.
 
-O que **falta pra começar**: o layout — quais blocos, em que ordem, e o que o
-mobile mostra no lugar do painel. Isso se resolve **mostrando mockup**, não
-descrevendo (o próprio Alf disse que descrever fica raso).
+### Os blocos do painel (decididos com mockup na mão, 08/08)
+
+**1º bloco — "quem está em aberto".** Aprovado. Professor é a linha, ordenado
+**por urgência** (não alfabético — esse erro já aconteceu no painel de equipe),
+com duas ações na própria linha: recado pelo Fábio e seta pro detalhe. Faixa de
+4 números em cima. **Nota/health/ranking ficam de fora de propósito** — existem e
+são bons no LA Report; repetir aqui cria o segundo número.
+
+**2º bloco — "o que os professores registraram"** (escolha do Alf). É o bloco que
+dá motivo pra abrir o painel. Hoje ele é o mais magro: **63 registros, de 1
+professor só** (o Matheus), 32 nos últimos 7 dias — e `lead_experimental_registros`
+está **zerada**. Ele enche na medida em que os 15 voluntários entrarem.
+
+⚠️ **Armadilha de escala:** com 44 professores registrando o volume vai pra
+**850+ por semana**. Feed cronológico vira mural que ninguém lê. Esse bloco é
+**curadoria do Fábio**, nunca "todos os registros".
+
+⚠️ **O selo desse bloco não pode ser `gravado_emusys`** — esse status mente (o
+texto não chega ao campo `anotacoes` do Emusys, documentado na spec da
+devolutiva §78). O selo honesto é "o professor confirmou e havia conteúdo".
+
+**O que faz um registro subir** (Alf, 08/08). Medido campo a campo:
+
+| Critério | Dá pra medir hoje? |
+|---|---|
+| Aluno em risco | ✅ sim |
+| Aluno se destacou | ✅ sim |
+| Silêncio do professor (registrava e parou) | ✅ sim |
+| **Estagnação por `eixos`** | ✅ **sim** — `eixos` é array estruturado e já vem preenchido (`["TecnicaVocal","Repertorio"]`). É o critério do Alf na versão computável |
+| Muito tempo no mesmo **repertório** | ⚠️ campo mais preenchido (57/63) mas **texto livre** — `group by` não serve (na 1ª consulta o `null` agrupou e fabricou 4 falsos positivos). Quem compara é o Fábio, ou o campo vira canônico |
+| Desalinhamento com a **Jornada Pedagógica** | ❌ **não existe o lado do "deveria"**. `marco_ref` é null em 29/29, e `vw_jornada_marcos` é jornada **contratual** (aulas do contrato), não pedagógica. Isso é o RAG (#61) / LA Journey |
+
+**Recomendação:** o painel nasce com os 4 ✅. Repertório e Jornada entram quando o
+Fábio tiver a régua — bloco próprio, não remendo.
+
+O que **ainda falta**: o 3º bloco, o **mobile** (desenho próprio, não o painel
+espremido) e a spec. Layout se resolve **mostrando mockup**, não descrevendo.
 
 **Antes de escrever tela, invocar `superpowers:brainstorming`.** É a regra da
 casa e ela existe porque telas chutadas viram retrabalho.
