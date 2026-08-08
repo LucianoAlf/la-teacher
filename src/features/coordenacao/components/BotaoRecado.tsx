@@ -108,12 +108,20 @@ function Selo({
  * O texto que chega no WhatsApp. Traz o NÚMERO e o pior atraso porque cobrança
  * sem tamanho vira aviso genérico — o professor precisa saber se são duas aulas
  * ou cinquenta antes de decidir quando sentar.
+ *
+ * E o número precisa ser o do TRABALHO DELE. Até a 070 isso dizia "50
+ * lançamentos em aberto" pra quem tinha 21 aulas pra lançar: a fonte contava
+ * pares aluno-aula, não aulas. Cobrança com tamanho inflado é pior do que
+ * cobrança sem tamanho — é ela que decide quando o professor senta, e um número
+ * que ele sabe que está errado ensina a ignorar o Fábio.
  */
 function textoDaCobranca(p: CoordenacaoLinha) {
+  const quantas = p.aulas === 1 ? '*1 aula sem lançamento*' : `*${p.aulas} aulas sem lançamento*`
+  const desde =
+    p.pior_atraso === 1 ? 'a mais antiga é de ontem' : `a mais antiga tem ${p.pior_atraso} dias`
   return (
     `Oi! Aqui é o Fábio 🎧\n\n` +
-    `Ficaram *${p.em_aberto} lançamentos em aberto* na sua agenda ` +
-    `(o mais antigo tem ${p.pior_atraso} dias). Consegue dar uma olhada hoje?\n\n` +
+    `Ficaram ${quantas} na sua agenda (${desde}). Consegue dar uma olhada hoje?\n\n` +
     `É rapidinho pelo app: https://la-teacher.vercel.app`
   )
 }

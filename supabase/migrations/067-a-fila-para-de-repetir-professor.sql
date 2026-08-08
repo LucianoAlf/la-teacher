@@ -3,6 +3,13 @@
 -- SUPERA A 065 (só a função `app_coordenacao_em_aberto`; o resto da 065 continua
 -- valendo).
 --
+-- SUPERADA POR: 070 — esta versão conta `count(*)` na `vw_presenca_pendencia`,
+-- que tem uma linha por PAR aluno-aula. Com 1,36 aluno por aula, "em aberto" e
+-- "alunos" saíam quase iguais em toda a fila, e a ORDEM saía errada: o Ramon
+-- (50 pares, 21 aulas) vinha em 1º e a Leticia (43 pares, 35 aulas) em 2º — a
+-- coordenação era mandada cobrar quem tinha menos trabalho. O teste desta
+-- migration continua verde porque a suíte roda o SQL DELA antes de testar.
+--
 -- O DEFEITO, achado com o painel já rodando: a 065 agrupava por
 -- (professor, unidade). Como 27 dos 44 professores da casa dão aula em mais de
 -- uma unidade, 38 professores viravam **60 linhas** — e a própria tela

@@ -50,8 +50,12 @@ export default function CoordenacaoPage() {
         ) : (
           <>
             <div className="mb-3.5 grid grid-cols-2 gap-2.5 md:grid-cols-4">
+              {/* "Aulas" no rótulo porque a unidade mudou na 070: antes isso
+                  contava pares aluno-aula e dava 847 onde o trabalho real da
+                  equipe eram 624 aulas. Número grande sem unidade é o que
+                  deixou a fila com "50 em aberto / 49 alunos" sem sentido. */}
               <PainelNumero
-                rotulo="Sem lançamento · 7 dias"
+                rotulo="Aulas sem lançamento · 7 dias"
                 valor={r?.sem_lancamento}
                 tom="perigo"
                 carregando={!dados}
@@ -63,7 +67,7 @@ export default function CoordenacaoPage() {
                 carregando={!dados}
               />
               <PainelNumero
-                rotulo="Só de ontem"
+                rotulo="Aulas só de ontem"
                 valor={r?.ontem}
                 tom="atencao"
                 carregando={!dados}

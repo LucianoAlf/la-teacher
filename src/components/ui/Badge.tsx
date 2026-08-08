@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react'
 import { cx } from '../../lib/cx'
 
-export type BadgeVariant = 'ok' | 'warn' | 'danger' | 'brand' | 'info'
+// 'neutro' entrou com o painel da coordenação: lá cada métrica da linha é um
+// selo ("21 aulas", "49 alunos", "5 dias") e nem toda métrica é um estado. Sem
+// um tom sem cor, ou o número de alunos virava alerta que não é, ou eu montava
+// um chip próprio ao lado do Badge — o começo de um segundo design system.
+export type BadgeVariant = 'ok' | 'warn' | 'danger' | 'brand' | 'info' | 'neutro'
 
 // Regra visual do app: PREENCHIDO = estado gravado no banco; CONTORNO (outline)
 // = ainda depende do professor (pré-marcado, não enviado). Não trocar um pelo outro.
@@ -11,6 +15,7 @@ const FILL_CLASS: Record<BadgeVariant, string> = {
   danger: 'bg-danger-soft text-danger-text',
   brand: 'bg-brand-soft text-brand-text',
   info: 'bg-info-soft text-info-text',
+  neutro: 'bg-bg-inset text-text-secondary',
 }
 const OUTLINE_CLASS: Record<BadgeVariant, string> = {
   ok: 'border border-current text-success-text',
@@ -18,6 +23,7 @@ const OUTLINE_CLASS: Record<BadgeVariant, string> = {
   danger: 'border border-current text-danger-text',
   brand: 'border border-current text-brand-text',
   info: 'border border-current text-info-text',
+  neutro: 'border border-border-strong text-text-secondary',
 }
 
 export interface BadgeProps {

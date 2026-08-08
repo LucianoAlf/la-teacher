@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { BotaoTema, BotaoVoltar, FabioAvatar, TabBar } from '../../components/ui'
+import { Avatar, BotaoTema, BotaoVoltar, FabioAvatar, TabBar } from '../../components/ui'
 import { InstallPrompt } from '../../features/pwa/InstallPrompt'
 import { dataLonga } from '../../lib/datas'
 import { meuPerfilCoordenacao, type MeuPerfilCoordenacao } from '../../lib/api'
@@ -227,11 +227,13 @@ export function CoordenacaoFrame({
 }
 
 /**
- * Foto quando existe; iniciais quando não. Nunca um boneco genérico.
+ * A foto de quem está logado — só o `Avatar` do DS com os tamanhos do app do
+ * professor: 40px no topo (AppHeader) e 92px no perfil (Meu perfil).
  *
- * Tamanhos colados nos do professor: 40px no topo (AppHeader) e 92px no perfil
- * (Meu perfil). Estavam em 36px e 92px/2xl — a mesma pessoa aparecia menor no
- * painel da coordenação do que no app dela.
+ * Já teve corpo próprio aqui, com `bg-brand-soft` inventado no lugar dos tokens
+ * `--avatar-grad`/`--avatar-fg` — a mesma pessoa com duas caras conforme a
+ * tela. Virou casca fina quando a fila do painel virou o TERCEIRO lugar a
+ * precisar de foto-com-fallback.
  */
 export function AvatarDoUsuario({
   perfil,
@@ -240,33 +242,11 @@ export function AvatarDoUsuario({
   perfil: MeuPerfilCoordenacao | null
   tamanho?: 'sm' | 'lg'
 }) {
-  const classe = tamanho === 'lg' ? 'h-[92px] w-[92px] text-3xl' : 'h-10 w-10 text-[15px]'
-
-  if (perfil?.avatar_url) {
-    return (
-      <img
-        src={perfil.avatar_url}
-        alt={perfil.nome}
-        draggable={false}
-        className={`${classe} shrink-0 rounded-full object-cover`}
-      />
-    )
-  }
-  // `--avatar-grad` / `--avatar-fg` são os tokens que a foto do professor já
-  // usa no AppHeader e no Meu perfil. Eu tinha inventado `bg-brand-soft` aqui —
-  // e aí a mesma pessoa teria duas caras conforme a tela.
   return (
-    <div
-      className={`${classe} flex shrink-0 items-center justify-center rounded-full bg-[var(--avatar-grad)] font-extrabold text-[color:var(--avatar-fg)]`}
-      aria-hidden
-    >
-      {iniciais(perfil?.nome)}
-    </div>
+    <Avatar
+      fotoUrl={perfil?.avatar_url}
+      nome={perfil?.nome}
+      tamanho={tamanho === 'lg' ? 'h-[92px] w-[92px] text-3xl' : 'h-10 w-10 text-[15px]'}
+    />
   )
-}
-
-function iniciais(nome?: string | null) {
-  if (!nome) return '·'
-  const partes = nome.trim().split(/\s+/)
-  return ((partes[0]?.[0] ?? '') + (partes[1]?.[0] ?? '')).toUpperCase()
 }

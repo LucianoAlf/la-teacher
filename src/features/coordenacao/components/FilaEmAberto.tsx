@@ -1,28 +1,28 @@
-import { Card, EmptyState, Skeleton } from '../../../components/ui'
-import { BotaoRecado } from './BotaoRecado'
+import { EmptyState, Skeleton } from '../../../components/ui'
+import { LinhaProfessor, ATRASO_URGENTE } from './LinhaProfessor'
 import type { CoordenacaoLinha } from '../../../lib/api'
 
-/** Atraso a partir do qual o caso vira "não pode esperar" (plantão do celular). */
-export const ATRASO_URGENTE = 3
 /** Teto do plantão. Lista de plantão que rola deixa de ser plantão. */
 export const TETO_PLANTAO = 8
+
+export { ATRASO_URGENTE }
 
 /**
  * A fila de quem está com lançamento em aberto.
  *
- * A ordem vem PRONTA da RPC (067) e não se reordena aqui. Isso não é detalhe: o
+ * A ordem vem PRONTA da RPC (070) e não se reordena aqui. Isso não é detalhe: o
  * painel de equipe já foi ao ar com a tela escrevendo "por urgência" em cima de
  * uma lista alfabética, e ninguém percebeu — lista ordenada errado parece lista
  * ordenada.
  *
  * Desktop e celular mostram COISAS DIFERENTES do mesmo dado, de propósito. No
  * computador a coordenação varre a lista inteira; no celular ela está andando
- * pela escola e só quer o que não pode esperar.
+ * pela escola e só quer o que não pode esperar. A LINHA, porém, é a mesma nos
+ * dois — o card se reorganiza sozinho por `flex-wrap`.
  *
- * Superfície, título e vazio são os do DS (`Card`, `EmptyState`). A primeira
- * versão desenhava os três à mão — e o título da tabela saía 13px sem caixa
- * alta em `text-primary`, quando todo cabeçalho de card do app é 13px caixa
- * alta com tracking em `text-secondary`.
+ * O cabeçalho da seção usa a tipografia de título de card do DS (13px, caixa
+ * alta, tracking .5px) SEM envelopar tudo num `Card`: as linhas já são cards, e
+ * card dentro de card vira moldura dentro de moldura.
  */
 export function FilaEmAberto({
   linhas,
@@ -35,75 +35,39 @@ export function FilaEmAberto({
 }) {
   const plantao = linhas.filter((p) => p.pior_atraso >= ATRASO_URGENTE).slice(0, TETO_PLANTAO)
 
+  if (carregando) {
+    return (
+      <>
+        <Cabecalho />
+        <div className="space-y-2">
+          <Skeleton className="h-[70px] w-full rounded-lg" />
+          <Skeleton className="h-[70px] w-full rounded-lg" />
+          <Skeleton className="h-[70px] w-full rounded-lg" />
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       {/* ── Desktop: a lista inteira ─────────────────────────────────────── */}
       <div className="hidden md:block">
-        <Card
-          title="Quem está em aberto"
-          icon="fa-solid fa-list-check"
-          right={linhas.length > 0 ? 'ordenado por urgência' : undefined}
-        >
-          {carregando ? (
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          ) : linhas.length === 0 ? (
-            <EmptyState
-              icon="fa-solid fa-circle-check"
-              title="Ninguém com lançamento em aberto"
-              description="Nos últimos 7 dias a equipe lançou tudo. Volta amanhã ou aumenta a janela."
-            />
-          ) : (
-            /* Linhas com `px-1`, como as do Card "Semana" no Meu ponto: o
-               respiro das laterais é o padding do próprio Card. */
-            <table className="w-full table-fixed border-collapse text-[12.5px]">
-              <thead>
-                <tr className="text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
-                  <th className="w-[36%] px-1 py-2 text-left font-bold">Professor</th>
-                  <th className="w-[13%] px-1 py-2 text-right font-bold">Em aberto</th>
-                  <th className="w-[11%] px-1 py-2 text-right font-bold">Alunos</th>
-                  <th className="w-[11%] px-1 py-2 text-right font-bold">Atraso</th>
-                  <th className="w-[29%] px-1 py-2 text-right font-bold">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {linhas.map((p) => (
-                  <tr key={p.professor_id} className="border-t border-border-subtle hover:bg-bg-hover">
-                    <td className="px-1 py-2.5">
-                      <span className="block truncate text-text-primary">{p.professor_nome}</span>
-                      <span className="block truncate text-[11px] text-text-muted">{p.unidades}</span>
-                    </td>
-                    <td className="px-1 py-2.5 text-right font-bold text-danger-text">{p.em_aberto}</td>
-                    <td className="px-1 py-2.5 text-right text-text-secondary">{p.alunos}</td>
-                    <td className={`px-1 py-2.5 text-right ${corDoAtraso(p.pior_atraso)}`}>
-                      {p.pior_atraso}d
-                    </td>
-                    <td className="px-1 py-2.5 text-right">
-                      <BotaoRecado professor={p} aviso={aviso} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Card>
+        <Cabecalho direita={linhas.length > 0 ? 'ordenado por urgência' : undefined} />
+        {linhas.length === 0 ? (
+          <EmptyState
+            icon="fa-solid fa-circle-check"
+            title="Ninguém com lançamento em aberto"
+            description="Nos últimos 7 dias a equipe lançou tudo. Volta amanhã ou aumenta a janela."
+          />
+        ) : (
+          linhas.map((p) => <LinhaProfessor key={p.professor_id} p={p} aviso={aviso} />)
+        )}
       </div>
 
       {/* ── Celular: só o que pede decisão agora ──────────────────────────── */}
       <div className="md:hidden">
-        <p className="mb-2 text-[13px] font-bold uppercase tracking-[.5px] text-text-secondary">
-          Precisa de decisão agora
-        </p>
-
-        {carregando ? (
-          <div className="space-y-2">
-            <Skeleton className="h-20 w-full rounded-lg" />
-            <Skeleton className="h-20 w-full rounded-lg" />
-          </div>
-        ) : plantao.length === 0 ? (
+        <Cabecalho titulo="Precisa de decisão agora" icone="fa-solid fa-bolt" />
+        {plantao.length === 0 ? (
           <EmptyState
             icon="fa-solid fa-mug-hot"
             title={`Nada parado há ${ATRASO_URGENTE} dias ou mais`}
@@ -112,16 +76,7 @@ export function FilaEmAberto({
         ) : (
           <>
             {plantao.map((p) => (
-              <Card key={p.professor_id} className="mb-2">
-                <p className="text-sm font-semibold text-text-primary">{p.professor_nome}</p>
-                <p className="mt-0.5 text-[12.5px] text-text-secondary">
-                  <span className={corDoAtraso(p.pior_atraso)}>{p.em_aberto} em aberto</span> ·{' '}
-                  {p.pior_atraso} dias · {p.unidades}
-                </p>
-                <div className="mt-2.5">
-                  <BotaoRecado professor={p} aviso={aviso} />
-                </div>
-              </Card>
+              <LinhaProfessor key={p.professor_id} p={p} aviso={aviso} />
             ))}
             {/* Diz o que ficou de fora em vez de fingir que a lista é essa. */}
             {linhas.length > plantao.length ? (
@@ -137,6 +92,22 @@ export function FilaEmAberto({
   )
 }
 
-function corDoAtraso(dias: number) {
-  return dias >= ATRASO_URGENTE ? 'font-bold text-danger-text' : 'text-text-secondary'
+function Cabecalho({
+  titulo = 'Quem está em aberto',
+  icone = 'fa-solid fa-list-check',
+  direita,
+}: {
+  titulo?: string
+  icone?: string
+  direita?: string
+}) {
+  return (
+    <div className="mb-2 flex items-baseline justify-between gap-3">
+      <span className="flex items-center gap-2 text-[13px] font-bold uppercase tracking-[.5px] text-text-secondary">
+        <i className={`${icone} text-xs text-brand-text`} aria-hidden />
+        {titulo}
+      </span>
+      {direita ? <span className="text-[11.5px] text-text-muted">{direita}</span> : null}
+    </div>
+  )
 }

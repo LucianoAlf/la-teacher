@@ -1110,19 +1110,32 @@ export async function liberarAcessoProfessor(professorId: number): Promise<Resul
 export interface CoordenacaoLinha {
   professor_id: number
   professor_nome: string
+  /** 43 dos 44 ativos têm foto; as iniciais são fallback, não o caso comum. */
+  foto_url: string | null
   /**
    * Plural porque é lista: 27 dos 44 professores dão aula em mais de uma
    * unidade, e a fila é UMA linha por pessoa (067). "Campo Grande, Recreio".
    */
   unidades: string
-  /** Aluno-aulas sem presença forte na janela. É a unidade da vw_presenca_pendencia. */
-  em_aberto: number
+  /** Também lista: "Teclado, Piano, Contrabaixo". Dá cara pro professor na fila. */
+  cursos: string | null
+  /**
+   * AULAS sem lançamento — a unidade de trabalho do professor (070).
+   *
+   * Era `em_aberto` e contava PARES aluno-aula, que é a linha da
+   * `vw_presenca_pendencia`. Com 1,36 aluno por aula na média, esse número saía
+   * quase igual ao de alunos em toda a fila e os dois juntos não informavam
+   * nada. O campo mudou de nome junto com o significado, de propósito.
+   */
+  aulas: number
+  /** Quantos alunos são afetados. Só diverge de `aulas` quando há turma. */
   alunos: number
   pior_atraso: number
 }
 
 export interface CoordenacaoEmAberto {
   resumo: {
+    /** Em AULAS, a mesma unidade da fila — senão a coluna não soma o topo. */
     sem_lancamento: number
     professores: number
     ontem: number
@@ -1130,6 +1143,52 @@ export interface CoordenacaoEmAberto {
   }
   /** Já vem ordenado por urgência pela RPC — NUNCA reordenar por nome no cliente. */
   professores: CoordenacaoLinha[]
+}
+
+/** Uma aula sem lançamento, dentro de um dia do detalhe. */
+export interface CoordenacaoAula {
+  aula_id: string
+  hora: string | null
+  curso_nome: string | null
+  turma_nome: string | null
+  unidade_nome: string | null
+  alunos: number
+  /** "Beatriz, Arthur, Caio" — primeiros nomes, pra caber na linha. */
+  alunos_nomes: string | null
+}
+
+export interface CoordenacaoDiaAberto {
+  data_aula: string
+  dias_em_atraso: number
+  aulas: number
+  itens: CoordenacaoAula[]
+}
+
+export interface CoordenacaoDetalhe {
+  professor_id: number
+  professor_nome: string
+  aulas: number
+  /** Dia MAIS ANTIGO primeiro — a mesma régua de urgência da fila. */
+  dias: CoordenacaoDiaAberto[]
+}
+
+/**
+ * O detalhe da linha: QUAIS aulas estão sem lançamento (070).
+ *
+ * Existe porque a coordenação cobrava às cegas — a fila só dizia quantas. E vem
+ * agrupado por dia porque é assim que o professor resolve: ele senta e lança o
+ * dia inteiro.
+ */
+export async function coordenacaoProfessorDetalhe(
+  professorId: number,
+  dias = 7,
+): Promise<CoordenacaoDetalhe> {
+  const { data, error } = await rpcSolta('app_coordenacao_professor_detalhe', {
+    p_professor_id: professorId,
+    p_dias: dias,
+  })
+  if (error) throw error
+  return data as unknown as CoordenacaoDetalhe
 }
 
 /**
