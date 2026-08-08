@@ -3,6 +3,10 @@
 -- SUPERA A 067 (só a função `app_coordenacao_em_aberto`; o resto da 067 e da
 -- 065 continua valendo). Adiciona também a função de detalhe por professor.
 --
+-- SUPERADA POR: 071 — as duas funções ganharam filtro de unidade e de curso, e
+-- a assinatura mudou (a 071 dá `drop` nestas). A conta em AULAS, que é o motivo
+-- desta migration existir, continua valendo lá.
+--
 -- ── O DEFEITO ───────────────────────────────────────────────────────────────
 --
 -- A `vw_presenca_pendencia` tem uma linha por PAR aluno-aula. A 067 fazia

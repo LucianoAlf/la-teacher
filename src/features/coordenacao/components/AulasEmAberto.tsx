@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Skeleton } from '../../../components/ui'
 import { formatDiaCurto, formatHoraBRT } from '../../../lib/date'
 import { coordenacaoProfessorDetalhe, type CoordenacaoDetalhe } from '../../../lib/api'
+import type { FiltroPainel } from './FiltrosPainel'
 
 /**
  * O que exatamente está em aberto de um professor (070).
@@ -16,19 +17,27 @@ import { coordenacaoProfessorDetalhe, type CoordenacaoDetalhe } from '../../../l
  *
  * Carrega SÓ ao abrir: são 38 professores na fila e ninguém abre os 38.
  */
-export function AulasEmAberto({ professorId }: { professorId: number }) {
+export function AulasEmAberto({
+  professorId,
+  filtro,
+}: {
+  professorId: number
+  filtro: FiltroPainel
+}) {
   const [detalhe, setDetalhe] = useState<CoordenacaoDetalhe | null>(null)
   const [erro, setErro] = useState(false)
 
   useEffect(() => {
     let vivo = true
-    coordenacaoProfessorDetalhe(professorId)
+    // Os mesmos filtros da fila: o selo da linha e esta lista contam a mesma
+    // coisa, então têm que ver o mesmo recorte.
+    coordenacaoProfessorDetalhe(professorId, 7, filtro.unidadeId, filtro.curso)
       .then((d) => vivo && setDetalhe(d))
       .catch(() => vivo && setErro(true))
     return () => {
       vivo = false
     }
-  }, [professorId])
+  }, [professorId, filtro.unidadeId, filtro.curso])
 
   if (erro) {
     return (

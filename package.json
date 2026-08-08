@@ -90,7 +90,9 @@
     "mutantes:064": "node scripts/mutantes-064.mjs",
     "teste:tudo": "node scripts/rodar-todos-os-testes.mjs",
     "teste:070": "node scripts/rodar-teste-sql.mjs supabase/migrations/070-o-painel-conta-aula-nao-par-aluno-aula.sql supabase/migrations/070-o-painel-conta-aula-nao-par-aluno-aula.test.sql",
-    "mutantes:070": "node scripts/mutantes-070.mjs"
+    "mutantes:070": "node scripts/mutantes-070.mjs",
+    "teste:071": "node scripts/rodar-teste-sql.mjs supabase/migrations/071-o-painel-filtra-por-unidade-e-curso.sql supabase/migrations/071-o-painel-filtra-por-unidade-e-curso.test.sql",
+    "mutantes:071": "node scripts/mutantes-071.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",

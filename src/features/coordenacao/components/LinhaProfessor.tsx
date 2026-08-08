@@ -2,10 +2,28 @@ import { useState } from 'react'
 import { Avatar, Badge } from '../../../components/ui'
 import { BotaoRecado } from './BotaoRecado'
 import { AulasEmAberto } from './AulasEmAberto'
+import type { FiltroPainel } from './FiltrosPainel'
 import type { CoordenacaoLinha } from '../../../lib/api'
 
 /** Atraso a partir do qual o caso vira "não pode esperar". */
 export const ATRASO_URGENTE = 3
+
+/** Quantos cursos cabem antes de a legenda virar parede. */
+const CURSOS_VISIVEIS = 3
+
+/**
+ * "Canto, Canto IND, Musicalização Infantil +5".
+ *
+ * A Leticia dá oito cursos: a lista inteira estourava a linha e o navegador
+ * cortava com reticências, o que esconde a CONTAGEM. Dizer "+5" informa que
+ * tem mais; "…" só informa que não coube.
+ */
+function resumirCursos(cursos: string | null): string | null {
+  if (!cursos) return null
+  const lista = cursos.split(', ').filter(Boolean)
+  if (lista.length <= CURSOS_VISIVEIS) return cursos
+  return `${lista.slice(0, CURSOS_VISIVEIS).join(', ')} +${lista.length - CURSOS_VISIVEIS}`
+}
 
 /**
  * Uma linha da fila — e ela é um CARD, não uma célula de tabela.
@@ -24,29 +42,17 @@ export const ATRASO_URGENTE = 3
  * O tom é UM por linha, não um por selo: ou a pessoa está urgente (vermelho) ou
  * está pendente (amarelo). Dois selos brigando de cor na mesma linha fazem a
  * coordenação escolher por susto, não por prioridade.
- */
-/** Quantos cursos cabem antes de a legenda virar parede. */
-const CURSOS_VISIVEIS = 3
-
-/**
- * "Canto, Canto IND, Musicalização Infantil +5".
  *
- * A Leticia dá oito cursos: a lista inteira estourava a linha e o navegador
- * cortava com reticências, o que esconde a CONTAGEM. Dizer "+5" informa que
- * tem mais; "…" só informa que não coube.
+ * `filtro` desce até aqui só pra chegar no `AulasEmAberto`: o expandir precisa
+ * ver o MESMO recorte que gerou o selo da linha.
  */
-function resumirCursos(cursos: string | null): string | null {
-  if (!cursos) return null
-  const lista = cursos.split(', ').filter(Boolean)
-  if (lista.length <= CURSOS_VISIVEIS) return cursos
-  return `${lista.slice(0, CURSOS_VISIVEIS).join(', ')} +${lista.length - CURSOS_VISIVEIS}`
-}
-
 export function LinhaProfessor({
   p,
+  filtro,
   aviso,
 }: {
   p: CoordenacaoLinha
+  filtro: FiltroPainel
   aviso: (m: string) => void
 }) {
   const [aberto, setAberto] = useState(false)
@@ -104,7 +110,7 @@ export function LinhaProfessor({
 
       {aberto && (
         <div className="border-t border-border-subtle">
-          <AulasEmAberto professorId={p.professor_id} />
+          <AulasEmAberto professorId={p.professor_id} filtro={filtro} />
         </div>
       )}
     </div>

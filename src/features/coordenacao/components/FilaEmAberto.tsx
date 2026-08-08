@@ -1,6 +1,7 @@
 import { EmptyState, Skeleton } from '../../../components/ui'
 import { LinhaProfessor, ATRASO_URGENTE } from './LinhaProfessor'
 import type { CoordenacaoLinha } from '../../../lib/api'
+import type { FiltroPainel } from './FiltrosPainel'
 
 /** Teto do plantão. Lista de plantão que rola deixa de ser plantão. */
 export const TETO_PLANTAO = 8
@@ -26,10 +27,12 @@ export { ATRASO_URGENTE }
  */
 export function FilaEmAberto({
   linhas,
+  filtro,
   carregando,
   aviso,
 }: {
   linhas: CoordenacaoLinha[]
+  filtro: FiltroPainel
   carregando: boolean
   aviso: (m: string) => void
 }) {
@@ -60,7 +63,9 @@ export function FilaEmAberto({
             description="Nos últimos 7 dias a equipe lançou tudo. Volta amanhã ou aumenta a janela."
           />
         ) : (
-          linhas.map((p) => <LinhaProfessor key={p.professor_id} p={p} aviso={aviso} />)
+          linhas.map((p) => (
+            <LinhaProfessor key={p.professor_id} p={p} filtro={filtro} aviso={aviso} />
+          ))
         )}
       </div>
 
@@ -76,7 +81,7 @@ export function FilaEmAberto({
         ) : (
           <>
             {plantao.map((p) => (
-              <LinhaProfessor key={p.professor_id} p={p} aviso={aviso} />
+              <LinhaProfessor key={p.professor_id} p={p} filtro={filtro} aviso={aviso} />
             ))}
             {/* Diz o que ficou de fora em vez de fingir que a lista é essa. */}
             {linhas.length > plantao.length ? (

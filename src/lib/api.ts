@@ -1133,6 +1133,19 @@ export interface CoordenacaoLinha {
   pior_atraso: number
 }
 
+/** Uma opção de filtro, com quantas aulas ela representa. */
+export interface OpcaoFiltro {
+  nome: string
+  aulas: number
+}
+export interface OpcaoUnidade extends OpcaoFiltro {
+  unidade_id: string
+}
+export interface OpcaoCurso extends OpcaoFiltro {
+  /** Chave AGRUPADA ("bateria"), não o nome cru — ver `fn_curso_chave` (071). */
+  chave: string
+}
+
 export interface CoordenacaoEmAberto {
   resumo: {
     /** Em AULAS, a mesma unidade da fila — senão a coluna não soma o topo. */
@@ -1140,6 +1153,15 @@ export interface CoordenacaoEmAberto {
     professores: number
     ontem: number
     professores_ativos: number
+  }
+  /**
+   * Facetas (071). Cada lista ignora o PRÓPRIO filtro e respeita o outro: é o
+   * que impede escolher uma unidade, a lista de cursos encolher, e não haver
+   * caminho de volta sem recarregar a página.
+   */
+  filtros: {
+    unidades: OpcaoUnidade[]
+    cursos: OpcaoCurso[]
   }
   /** Já vem ordenado por urgência pela RPC — NUNCA reordenar por nome no cliente. */
   professores: CoordenacaoLinha[]
@@ -1182,28 +1204,40 @@ export interface CoordenacaoDetalhe {
 export async function coordenacaoProfessorDetalhe(
   professorId: number,
   dias = 7,
+  unidadeId: string | null = null,
+  curso: string | null = null,
 ): Promise<CoordenacaoDetalhe> {
   const { data, error } = await rpcSolta('app_coordenacao_professor_detalhe', {
     p_professor_id: professorId,
     p_dias: dias,
+    // Os MESMOS filtros da fila. Sem isso o selo da linha diz "12 aulas" e o
+    // expandir lista 35 — dois números da mesma coisa na mesma tela.
+    p_unidade_id: unidadeId,
+    p_curso: curso,
   })
   if (error) throw error
   return data as unknown as CoordenacaoDetalhe
 }
 
 /**
- * Bloco 1 do painel: quem está com lançamento em aberto (migration 065).
+ * Bloco 1 do painel: quem está com lançamento em aberto (071).
  *
  * A janela é FECHADA em hoje: aula do dia ainda não está atrasada. Levanta
  * `apenas_admin` pra quem não é da coordenação.
+ *
+ * `curso` é a CHAVE agrupada ("bateria"), nunca o nome cru: "Bateria",
+ * "Bateria T" e "Bateria IND" são modalidades do mesmo curso, e filtrar pelo
+ * nome mostraria 46 das 129 aulas sem avisar.
  */
 export async function coordenacaoEmAberto(
   dias = 7,
   unidadeId: string | null = null,
+  curso: string | null = null,
 ): Promise<CoordenacaoEmAberto> {
   const { data, error } = await rpcSolta('app_coordenacao_em_aberto', {
     p_dias: dias,
     p_unidade_id: unidadeId,
+    p_curso: curso,
   })
   if (error) throw error
   return data as unknown as CoordenacaoEmAberto
