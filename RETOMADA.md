@@ -83,10 +83,29 @@ com o botão de resolver ali, chegando por push. Não é o painel espremido.
 silêncio e estagnação. Retenção e experimentais viram **filtro dentro do bloco
 2**. Um terceiro bloco nasce de falta sentida, não de espaço vazio na tela.
 
-📄 **A spec está escrita e commitada:**
-`docs/superpowers/specs/2026-08-08-painel-coordenacao-design.md`.
-Falta o **plano de implementação** (`superpowers:writing-plans`) — e antes dele,
-o review do Alf na spec.
+📄 **Spec e plano escritos e commitados.** Spec:
+`docs/superpowers/specs/2026-08-08-painel-coordenacao-design.md`. Plano (parte 1,
+6 tarefas): `docs/superpowers/plans/2026-08-08-painel-coordenacao.md`.
+**Sidebar ENTRA** (decisão do Alf) — eu tinha proposto adiar por ser "uma página
+só" e estava errado: já são duas (`/app/equipe` + `/app/coordenacao`). Copiar de
+`web/src/components/DesktopShell.tsx` do repo `LucianoAlf/LA-Organizer` —
+**clonar**, nunca usar `D:/la-organizer`, que não é clone.
+
+### Execução da parte 1 — onde parou
+
+- ✅ **Task 1 — migration 065 NO AR** (`c1ebd82`). `app_coordenacao_em_aberto`:
+  10 passos verdes, **5/5 mutantes mortos**, conferida em produção (`anon` não
+  executa, `authenticated` executa, `stable`, `security definer`). O teste troca
+  de identidade com `set_config('request.jwt.claim.sub', …)` — primeiro ramo do
+  coalesce de `auth.uid()`; sem isso o guard ficaria sem teste.
+- ⏭️ **Task 2 — REPLANEJADA na execução.** Ver o bloco ⚠️ no plano. Resumo: **a
+  fila do Fábio não tem estado de entrada** (`status` só aceita `processando`,
+  `enviada`, `falhou`, `pulada_*` — não existe `pendente`), e
+  `fabio_claim_notificacao_por_referencia` é a função do **worker**, não do
+  produtor. O painel não tem onde depositar recado. Vira **edge function
+  síncrona**, no molde do `professor-liberar-acesso`. E cobrança é categoria
+  `governanca`, que por projeto **ignora silêncio e domingo** — só férias barra.
+- ⬜ Tasks 3 a 6: rota + shell com sidebar, tabela, plantão, verificação.
 
 **Antes de escrever tela, invocar `superpowers:brainstorming`.** É a regra da
 casa e ela existe porque telas chutadas viram retrabalho.

@@ -38,15 +38,22 @@ TypeScript + Vite, Tailwind, react-router v6 (flags v7), `@supabase/supabase-js`
   sem exclamação, sentence case.
 - Push direto na `main` é liberado neste repo.
 
-## Desvio consciente da spec (precisa de OK do Alf)
+## Decisões do Alf sobre os desvios (08/08)
 
-A spec §4 previa **shell de sidebar no desktop, copiado do LA Organizer**. Este
-plano entrega **uma página responsiva dentro do `AppFrame` atual**, sem sidebar.
+**Sidebar: ENTRA nesta parte 1.** Eu tinha proposto adiar por ser "uma página
+só" — e estava errado: a coordenação já tem **duas** telas (`/app/equipe`, que
+existe, e `/app/coordenacao`, que nasce aqui). Sidebar com dois itens não é
+moldura vazia. Vira parte da Task 3.
 
-Motivo: a coordenação tem **uma** página nesta entrega. Sidebar com um item só é
-moldura vazia, e o LA Organizer continua ali para ser copiado quando existir a
-segunda página. Se o Alf preferir a sidebar já, é uma tarefa a mais e nada do que
-está abaixo muda.
+**O que copiar do LA Organizer** (`web/src/components/DesktopShell.tsx`, commit
+`47f169c`) — clonar o repo `LucianoAlf/LA-Organizer`, **nunca** usar a pasta
+`D:/la-organizer`, que não é clone e envelhece em silêncio:
+
+- Shell `fixed inset-0 overflow-hidden`: a janela **não cresce com o conteúdo**,
+  só o `<main>` rola. É o que faz um app de desktop não ter faixa vazia embaixo.
+- Sidebar fixa à esquerda: **240px expandida, 64px colapsada**, com o estado
+  colapsado em `localStorage`.
+- `<main>` `absolute right-0 bottom-0 top-14` com `left: sidebarWidth` inline.
 
 **E dois ajustes na §10 da spec, achados no self-review:**
 
@@ -401,7 +408,56 @@ git push origin main
   returns jsonb` → `{"enfileirado": true, "notificacao_id": "…"}` ou
   `{"enfileirado": false, "motivo": "janela_de_silencio"}`.
 
-- [ ] **Step 1: Ler o canal antes de escrever em cima dele**
+> ⚠️ **REPLANEJADA EM 08/08, durante a execução.** O Step 1 abaixo mandava ler o
+> canal antes de escrever em cima dele. Eu li — e o que ele diz muda a tarefa.
+> **Os Steps 1 e 2 originais estão superados**; a forma correta está no bloco
+> "Como ficou" logo abaixo. Os Steps 3 a 6 seguem valendo com os ajustes ali.
+>
+> **O que a leitura mostrou:**
+>
+> 1. `fn_fabio_pode_notificar` só aceita categoria `'governanca'` ou
+>    `'informativa'` — `'coordenacao'` levanta `categoria_invalida`. Cobrança de
+>    lançamento é **governança**.
+> 2. Para `governanca`, **silêncio e domingo nunca bloqueiam** — só férias
+>    (`pausa_ate`). Está escrito na função: *"bypass estrutural, não decisão de
+>    prompt do Fábio"*. Logo **não existe "janela de silêncio" na cobrança**, e o
+>    estado `silencio` que o Step 2 da Task 4 previa vira `pausa` (professor de
+>    férias).
+> 3. `fabio_claim_notificacao_por_referencia` é **a função do WORKER**, não do
+>    produtor: ela insere já com `status='processando'`, `tentativas=1` e um
+>    lease de N minutos. Usá-la a partir do painel criaria uma notificação
+>    "já sendo enviada por ninguém", que só sairia quando o lease vencesse — por
+>    acidente, não por projeto.
+> 4. **A fila não tem estado de entrada.** O `status` aceita apenas
+>    `processando`, `enviada`, `falhou`, `pulada_preferencia`,
+>    `pulada_sem_destinatario`. Não há `pendente`: a linha nasce no claim. Então
+>    **o painel não tem onde depositar um recado** para o worker levar depois.
+>
+> **Como ficou:** o recado segue o padrão que o convite já usa — **edge function
+> com envio síncrono**. Faz sentido além da restrição técnica: a coordenação
+> clicou e está olhando a tela, então ela merece saber se chegou, não "foi
+> enfileirado". A função:
+>
+> 1. valida `fn_e_coordenacao_la_teacher()` pelo JWT de quem chamou;
+> 2. checa `fn_fabio_pode_notificar(professor_id, 'governanca', now())` — a única
+>    coisa que barra é férias;
+> 3. envia pelo mesmo caminho de WhatsApp do `professor-liberar-acesso`;
+> 4. grava em `fabio_notificacoes` com `tipo='pendencia_registro'`,
+>    `categoria='governanca'`, `canal='whatsapp'`,
+>    `destinatario_tipo='professor'`, `status='enviada'` e `envio_recibo`.
+>
+> **A dedupe muda de mecanismo junto.** O índice
+> `uq_fabio_notif_recorrente_diario` já cobre
+> `(professor_id, tipo, dia_referencia, canal)` justamente para
+> `pendencia_registro` — então basta preencher `dia_referencia = current_date` e
+> o segundo clique do dia colide sozinho. **Índice único e `on conflict` são um
+> contrato só**: quem escreve tem que tratar a colisão, não descobrir na
+> exceção.
+>
+> Isso torna a Task 2 uma **edge function + migration pequena** (só o helper de
+> gravação), não a RPC única que estava planejada.
+
+- [ ] **Step 1 (SUPERADO — feito, resultado no bloco acima): Ler o canal antes de escrever em cima dele**
 
 Antes de qualquer linha, leia a fonte das duas funções — não confie na assinatura.
 Rode esta consulta (pelo MCP do Supabase ou pelo `scripts/aplicar-sql.mjs` com um
