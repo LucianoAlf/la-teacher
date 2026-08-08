@@ -24,7 +24,9 @@
     "teste:060": "node scripts/rodar-teste-sql.mjs supabase/migrations/060-o-reconciliador-passa-a-rodar.sql supabase/migrations/060-o-reconciliador-passa-a-rodar.test.sql",
     "mutantes:060": "node scripts/mutantes-060.mjs",
     "teste:061": "node scripts/rodar-teste-sql.mjs supabase/migrations/061-a-experimental-remarcada-ressuscita.sql supabase/migrations/061-a-experimental-remarcada-ressuscita.test.sql",
-    "mutantes:061": "node scripts/mutantes-061.mjs"
+    "mutantes:061": "node scripts/mutantes-061.mjs",
+    "teste:062": "node scripts/rodar-teste-sql.mjs supabase/migrations/062-coordenacao-do-la-teacher-tem-lista.sql supabase/migrations/062-coordenacao-do-la-teacher-tem-lista.test.sql",
+    "mutantes:062": "node scripts/mutantes-062.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",

@@ -59,21 +59,33 @@ Deno.serve(async (req) => {
     const WA_TOKEN = Deno.env.get('FABIO_UAZAPI_TOKEN') || '';
     const H = { Authorization: `Bearer ${SB_KEY}`, apikey: SB_KEY, 'Content-Type': 'application/json' };
 
-    // 1. Quem está chamando? Identidade pelo JWT, perfil pelo banco.
+    // 1. Quem está chamando? Identidade pelo JWT, permissão pelo banco.
+    //
+    // A lista da coordenação (migration 062), NÃO `perfil = 'admin'`. Esse
+    // perfil é do LA Report e vale pra 11 pessoas, incluindo Marketing e
+    // Comercial — gente que não tem por que liberar professor nem disparar
+    // WhatsApp em nome do Fábio. Listar e liberar têm que perguntar a MESMA
+    // coisa: senão o painel some pra quem não pode e o botão continua valendo.
     const meRes = await fetch(`${SB_URL}/auth/v1/user`, {
       headers: { Authorization: auth, apikey: ANON },
     });
     if (!meRes.ok) return json({ ok: false, erro: 'nao_autenticado' }, 401);
     const me = await meRes.json();
 
-    const perfRes = await fetch(
-      `${SB_URL}/rest/v1/usuarios?auth_user_id=eq.${me.id}&select=perfil,ativo&limit=1`,
+    const usuRes = await fetch(
+      `${SB_URL}/rest/v1/usuarios?auth_user_id=eq.${me.id}&select=id,ativo&limit=1`,
       { headers: H },
     );
-    const perfis = perfRes.ok ? await perfRes.json() : [];
-    if (!perfis[0]?.ativo || perfis[0]?.perfil !== 'admin') {
-      return json({ ok: false, erro: 'apenas_admin' }, 403);
-    }
+    const usuarios = usuRes.ok ? await usuRes.json() : [];
+    const usuario = usuarios[0];
+    if (!usuario?.ativo) return json({ ok: false, erro: 'apenas_admin' }, 403);
+
+    const coordRes = await fetch(
+      `${SB_URL}/rest/v1/la_teacher_coordenacao?usuario_id=eq.${usuario.id}&select=usuario_id&limit=1`,
+      { headers: H },
+    );
+    const coord = coordRes.ok ? await coordRes.json() : [];
+    if (!coord.length) return json({ ok: false, erro: 'apenas_admin' }, 403);
 
     let body: Record<string, unknown>;
     try { body = await req.json(); } catch { return json({ ok: false, erro: 'json_invalido' }, 400); }
