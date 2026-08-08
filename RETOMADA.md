@@ -18,20 +18,24 @@ painel no ar e o de Professores do LA Report lado a lado: *"esse formato
 tabelona, assim um negócio meio tabela, meio Excel... essa parte dos professores
 aí, pensa que eles são os nossos ouros"*.
 
-O que ele apontou, na ordem em que falou:
+O que ele apontou — **os cinco foram feitos** (`1ae83f4`):
 
-1. **Hierarquia invertida** — o nome do professor está em 12,5px regular, o
-   mesmo peso dos números ao lado. *"O nome do professor tá muito pequeno. Não é
-   igual aluno, é o professor."*
-2. **Foto do professor na linha.** Medido: **43 dos 44 ativos têm `foto_url`**, e
-   **os 38 da fila têm foto — 847/847 linhas**. Não vai ter fallback na prática.
-3. **Expandir/colapsar a linha** pra ver o detalhe, como o LA Report faz na tela
-   de Professores (chevron abre uma tabela de alunos aninhada).
-4. **"Em aberto 50 / alunos 49 — o quê?"** Ele acertou em cheio, e é defeito de
-   DADO, não de layout — ver o achado abaixo.
-5. **Modal ao clicar**, respondendo *"quem são os alunos atrasados cinco dias?"*.
+1. ✅ **Hierarquia invertida** — o nome estava em 12,5px regular, o mesmo peso
+   dos números ao lado. *"O nome do professor tá muito pequeno. Não é igual
+   aluno, é o professor."* Agora: foto 40px + nome 15px bold + segunda linha
+   com unidades e cursos (3 + "+N", como o LA Report).
+2. ✅ **Foto do professor na linha.** Medido antes: **43 dos 44 ativos têm
+   `foto_url`**, e **os 38 da fila têm — 847/847**. Fallback de iniciais existe
+   mas não é o caso comum.
+3. ✅ **Expandir/colapsar** — decisão dele entre expandir e modal: **expandir na
+   linha**. Lista as aulas por DIA, mais antigo primeiro, com hora, curso, turma
+   e quem está esperando. Carrega só ao abrir (são 38 na fila).
+4. ✅ **"Em aberto 50 / alunos 49 — o quê?"** Era defeito de DADO. Ver abaixo.
+5. ✅ **A tabelona** virou card por professor. Cada métrica é um selo com a
+   unidade dentro ("21 aulas"), então a linha 12 se lê sem o cabeçalho — que era
+   de onde vinha a sensação de Excel.
 
-### ⚠️ ACHADO: o painel conta a unidade errada
+### ⚠️ ACHADO (RESOLVIDO na 070): o painel contava a unidade errada
 
 Medido em 08/08 na `vw_presenca_pendencia`, janela de 7 dias:
 
@@ -50,10 +54,27 @@ Exemplo do Ramon Pina Morais, que o painel mostra como "50 em aberto / 49
 alunos": são **21 aulas em 3 dias** (6 no dia 03, 9 no dia 04, 6 no dia 05).
 Vinte e uma aulas é o trabalho real; cinquenta é um artefato do formato da view.
 
-**Consequência:** o número que vai no WhatsApp da cobrança
-(`textoDaCobranca` em `BotaoRecado.tsx`) também está inflado — o Matheus recebeu
-"lançamentos em aberto" contando pares. Corrigir isso é parte da UI v2, não
-depois dela.
+**A consequência mais séria era a ORDEM.** A fila mandava cobrar quem tinha
+menos trabalho:
+
+| Professor | Pares (antes) | Aulas (real) | Posição |
+|---|---|---|---|
+| Ramon Pina Morais | 50 | 21 | 1º → **11º** |
+| Rodrigo Pinheiro Gomes | 37 | 18 | 4º → **20º** |
+| Valdo Delfino | 27 | 25 | 13º → **4º** |
+| Larissa Bheattriz | 33 | 27 | 7º → **3º** |
+
+E vazava pro WhatsApp: `textoDaCobranca` dizia "50 lançamentos em aberto" pra
+quem tinha 21 aulas pra lançar. **Corrigido junto na 070.**
+
+`em_aberto` virou `aulas` — campo que muda de significado muda de nome, mesma
+disciplina do `unidade_nome` → `unidades` da 067.
+
+**Por que passou por 065 e 067 inteiras** (10 + 12 passos, 5 + 7 mutantes): todo
+passo comparava o número da RPC com o mesmo `count(*)` da view. Teste que confere
+a conta contra ela mesma nunca discorda dela. Quem discordou foi o Alf, olhando
+a tela. O par de passos "conta AULAS" + "NAO e mais o total de linhas" da 070
+existe pra que da próxima vez seja o teste.
 
 ### O que já está decidido (não reabrir):
 

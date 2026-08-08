@@ -25,6 +25,23 @@ export const ATRASO_URGENTE = 3
  * está pendente (amarelo). Dois selos brigando de cor na mesma linha fazem a
  * coordenação escolher por susto, não por prioridade.
  */
+/** Quantos cursos cabem antes de a legenda virar parede. */
+const CURSOS_VISIVEIS = 3
+
+/**
+ * "Canto, Canto IND, Musicalização Infantil +5".
+ *
+ * A Leticia dá oito cursos: a lista inteira estourava a linha e o navegador
+ * cortava com reticências, o que esconde a CONTAGEM. Dizer "+5" informa que
+ * tem mais; "…" só informa que não coube.
+ */
+function resumirCursos(cursos: string | null): string | null {
+  if (!cursos) return null
+  const lista = cursos.split(', ').filter(Boolean)
+  if (lista.length <= CURSOS_VISIVEIS) return cursos
+  return `${lista.slice(0, CURSOS_VISIVEIS).join(', ')} +${lista.length - CURSOS_VISIVEIS}`
+}
+
 export function LinhaProfessor({
   p,
   aviso,
@@ -36,7 +53,7 @@ export function LinhaProfessor({
   const urgente = p.pior_atraso >= ATRASO_URGENTE
   const tom = urgente ? 'danger' : 'warn'
 
-  const legenda = [p.unidades, p.cursos].filter(Boolean).join(' · ')
+  const legenda = [p.unidades, resumirCursos(p.cursos)].filter(Boolean).join(' · ')
 
   return (
     <div className="mb-2 overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card last:mb-0">
