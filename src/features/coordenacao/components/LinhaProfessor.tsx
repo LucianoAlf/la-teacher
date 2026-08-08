@@ -89,19 +89,33 @@ export function LinhaProfessor({
           </span>
         </button>
 
+        {/* Todo selo desta linha mede o MESMO recorte: a pendência da janela.
+            O de alunos diz "afetados" por escrito porque foi lido como
+            carteira — o Alf viu "22 alunos" no Gabriel Antony (36 na carteira)
+            e achou o número errado. Número certo com rótulo ambíguo É defeito. */}
         <div className="flex flex-none items-center gap-1.5">
-          <Badge variant={tom} icon="fa-solid fa-clipboard-list">
-            {p.aulas} {p.aulas === 1 ? 'aula' : 'aulas'}
+          <Badge
+            variant={tom}
+            icon="fa-solid fa-clipboard-list"
+            title="Aulas dos últimos 7 dias ainda sem lançamento"
+          >
+            {p.aulas} {p.aulas === 1 ? 'aula em aberto' : 'aulas em aberto'}
           </Badge>
-          {/* Alunos é CONTEXTO, não estado — por isso sem cor. Antes da 070
-              este número saía quase igual ao de aulas em toda linha (a view tem
-              uma linha por par aluno-aula); agora ele só se destaca quando há
-              turma de verdade, que é quando informa alguma coisa. */}
-          <Badge variant="neutro" icon="fa-solid fa-user-group">
-            {p.alunos} {p.alunos === 1 ? 'aluno' : 'alunos'}
+          {/* Alunos é CONTEXTO, não estado — por isso sem cor. Só se destaca
+              de "aulas" quando há turma, que é quando informa alguma coisa. */}
+          <Badge
+            variant="neutro"
+            icon="fa-solid fa-user-group"
+            title="Alunos com aula sem lançamento na janela — não é a carteira do professor"
+          >
+            {p.alunos} {p.alunos === 1 ? 'aluno afetado' : 'alunos afetados'}
           </Badge>
-          <Badge variant={tom} icon="fa-regular fa-clock">
-            {p.pior_atraso} {p.pior_atraso === 1 ? 'dia' : 'dias'}
+          <Badge
+            variant={tom}
+            icon="fa-regular fa-clock"
+            title="Há quantos dias a aula mais antiga espera lançamento"
+          >
+            {p.pior_atraso} {p.pior_atraso === 1 ? 'dia parado' : 'dias parado'}
           </Badge>
         </div>
 

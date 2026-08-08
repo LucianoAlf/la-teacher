@@ -55,7 +55,9 @@ export function FilaEmAberto({
     <>
       {/* ── Desktop: a lista inteira ─────────────────────────────────────── */}
       <div className="hidden md:block">
-        <Cabecalho direita={linhas.length > 0 ? 'ordenado por urgência' : undefined} />
+        {/* A janela no cabeçalho: os selos das linhas dizem "em aberto" e
+            "afetados", e é AQUI que se aprende em aberto DESDE QUANDO. */}
+        <Cabecalho direita={linhas.length > 0 ? 'últimos 7 dias · por urgência' : undefined} />
         {linhas.length === 0 ? (
           <EmptyState
             icon="fa-solid fa-circle-check"

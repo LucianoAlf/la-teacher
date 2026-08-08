@@ -32,15 +32,18 @@ export interface BadgeProps {
   outline?: boolean
   /** Classe de ícone opcional (ex.: "fa-solid fa-check"). */
   icon?: string
+  /** Tooltip nativo — a frase inteira que o selo abrevia. */
+  title?: string
   className?: string
   onClick?: () => void
   children: ReactNode
 }
 
 /** Selo de status (protótipo .badge — ok/warn/danger/brand/info). */
-export function Badge({ variant = 'brand', outline = false, icon, className, onClick, children }: BadgeProps) {
+export function Badge({ variant = 'brand', outline = false, icon, title, className, onClick, children }: BadgeProps) {
   return (
     <span
+      title={title}
       className={cx(
         'inline-flex items-center gap-[5px] rounded-full px-[9px] py-[3px] text-[11px] font-bold',
         outline ? OUTLINE_CLASS[variant] : FILL_CLASS[variant],

@@ -52,7 +52,6 @@ export function CoordenacaoFrame({
   titulo,
   icone,
   subtitulo,
-  acaoTopo,
   aoVoltar,
   children,
 }: {
@@ -60,8 +59,6 @@ export function CoordenacaoFrame({
   titulo: string
   icone?: string
   subtitulo?: string
-  /** Extras do topo direito: filtro de unidade, de curso, o que a tela precisar. */
-  acaoTopo?: ReactNode
   /**
    * Saída, pras telas que não estão na navegação (o perfil). É o mesmo botão
    * redondo do `ScreenHeader` do professor — não um link de texto.
@@ -184,8 +181,10 @@ export function CoordenacaoFrame({
             ) : null}
           </div>
 
+          {/* Só CHROME aqui: data, tema, quem está logado. Filtro é ferramenta
+              da tela e mora nela — já esteve aqui em cima e o Alf devolveu:
+              "lá é específico pro perfil, tema e nome da página". */}
           <div className="flex shrink-0 items-center gap-3">
-            {acaoTopo}
             <span className="hidden text-[13px] text-text-secondary sm:inline">{dataLonga()}</span>
 
             <BotaoTema />

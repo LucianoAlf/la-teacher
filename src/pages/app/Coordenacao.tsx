@@ -46,13 +46,7 @@ export default function CoordenacaoPage() {
   const carregando = !dados
 
   return (
-    <CoordenacaoFrame
-      titulo="Painel"
-      icone="fa-solid fa-table-columns"
-      acaoTopo={
-        <FiltrosPainel opcoes={dados?.filtros ?? null} filtro={filtro} aoMudar={setFiltro} />
-      }
-    >
+    <CoordenacaoFrame titulo="Painel" icone="fa-solid fa-table-columns">
       {/* Respiro entre a faixa flutuante e os números: sem ele os KPIs colam no
           nome da página e a tela parece começar no meio. */}
       <div className="px-5 pb-5 pt-3">
@@ -93,6 +87,10 @@ export default function CoordenacaoPage() {
                 carregando={carregando}
               />
             </div>
+
+            {/* Os filtros valem pra TELA inteira (KPIs inclusive), mas moram
+                abaixo dos números: resumo primeiro, ferramenta depois. */}
+            <FiltrosPainel opcoes={dados?.filtros ?? null} filtro={filtro} aoMudar={setFiltro} />
 
             <FilaEmAberto linhas={fila} filtro={filtro} carregando={carregando} aviso={show} />
           </>
