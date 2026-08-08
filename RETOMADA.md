@@ -13,10 +13,49 @@
 
 ## ▶ PRÓXIMO PASSO
 
-**Desenhar o módulo da coordenação** (Alf, 08/08: *"depois de concluir tudo, a
-gente entra no desenho dessa versão da coordenação"*).
+**UI v2 do painel da coordenação** — pedido do Alf em 08/08, à noite, olhando o
+painel no ar e o de Professores do LA Report lado a lado: *"esse formato
+tabelona, assim um negócio meio tabela, meio Excel... essa parte dos professores
+aí, pensa que eles são os nossos ouros"*.
 
-O que **já está decidido** (não reabrir):
+O que ele apontou, na ordem em que falou:
+
+1. **Hierarquia invertida** — o nome do professor está em 12,5px regular, o
+   mesmo peso dos números ao lado. *"O nome do professor tá muito pequeno. Não é
+   igual aluno, é o professor."*
+2. **Foto do professor na linha.** Medido: **43 dos 44 ativos têm `foto_url`**, e
+   **os 38 da fila têm foto — 847/847 linhas**. Não vai ter fallback na prática.
+3. **Expandir/colapsar a linha** pra ver o detalhe, como o LA Report faz na tela
+   de Professores (chevron abre uma tabela de alunos aninhada).
+4. **"Em aberto 50 / alunos 49 — o quê?"** Ele acertou em cheio, e é defeito de
+   DADO, não de layout — ver o achado abaixo.
+5. **Modal ao clicar**, respondendo *"quem são os alunos atrasados cinco dias?"*.
+
+### ⚠️ ACHADO: o painel conta a unidade errada
+
+Medido em 08/08 na `vw_presenca_pendencia`, janela de 7 dias:
+
+| | |
+|---|---|
+| Linhas aluno-aula (o que o painel mostra) | **847** |
+| **Aulas** de verdade (o que o professor lança) | **624** |
+| Alunos distintos | 809 |
+| Média de alunos por aula | **1,36** |
+
+O `count(*)` da 067 conta **pares aluno-aula**, não aulas. Como a maioria das
+turmas tem 1 aluno, "em aberto" e "alunos" saem quase iguais em toda linha — foi
+exatamente isso que o Alf estranhou. Os dois números juntos não informam nada.
+
+Exemplo do Ramon Pina Morais, que o painel mostra como "50 em aberto / 49
+alunos": são **21 aulas em 3 dias** (6 no dia 03, 9 no dia 04, 6 no dia 05).
+Vinte e uma aulas é o trabalho real; cinquenta é um artefato do formato da view.
+
+**Consequência:** o número que vai no WhatsApp da cobrança
+(`textoDaCobranca` em `BotaoRecado.tsx`) também está inflado — o Matheus recebeu
+"lançamentos em aberto" contando pares. Corrigir isso é parte da UI v2, não
+depois dela.
+
+### O que já está decidido (não reabrir):
 
 - **Um app só**, não um segundo. O Organizer é a prova: papel por rota
   (`requireRoles`) e shell trocado por breakpoint (`AppShell` no celular,
@@ -138,6 +177,25 @@ só" e estava errado: já são duas (`/app/equipe` + `/app/coordenacao`). Copiar
 - ⬜ **Task 6 — falta a verificação AO VIVO** em `la-teacher.vercel.app` com a
   conta do Alf (o que rodou até aqui foi localhost + suíte + build). E o deploy
   do front pela Vercel.
+
+- ✅ **Varredura do Design System** (`fa019ba` + `df8d1b5`), depois do Alf
+  flagrar duas vezes: *"a gente já tem um Design System pronto que você está
+  criando um outro paralelo"*.
+  Os **tokens de cor sempre passaram** nos dois greps do `frontend-tokens.md` —
+  o desvio estava no que o checklist **não mede**: raio, sombra, tamanho de
+  rótulo e componente recriado à mão. Consertado: KPIs viraram `Card`
+  (`rounded-md` sem borda e sem `shadow-card` some no tema escuro e achata no
+  claro), rótulo virou a receita do DS (11px bold caixa alta `.5px`), vazio
+  virou `EmptyState`, e o rodapé do celular virou a `TabBar` do DS — o meu
+  `<nav>` não tinha `env(safe-area-inset-bottom)` e no iPhone jogava os rótulos
+  embaixo da barra de gestos.
+  **Extraído, não copiado** (senão a duplicação só muda de lugar): `BotaoTema`,
+  `dataLonga`, `BotaoVoltar`, `LinhaInfo`/`TituloSecao`, `SeloVersao` — e as
+  telas do professor passaram a consumir os mesmos.
+  De quebra: o token `--scrim` existia desde o P0 **sem utilitário no Tailwind**,
+  e o app tinha três véus de modal diferentes (`bg-black/50`, `bg-black/60` e um
+  `style` com var). Virou `bg-scrim`.
+  **Lição registrada:** checklist que mede só cor dá verde em DS paralelo.
 
 - ✅ **O achado dormindo foi resolvido — migration 068 NO AR.**
   `fabio_notificacoes.status` tinha `DEFAULT 'pendente'`, valor que o próprio
