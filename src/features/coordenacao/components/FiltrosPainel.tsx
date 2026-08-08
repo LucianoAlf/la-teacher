@@ -1,4 +1,4 @@
-import { Select } from '../../../components/ui'
+import { Select, type OpcaoSelect } from '../../../components/ui'
 import type { CoordenacaoEmAberto } from '../../../lib/api'
 
 /** O recorte que a coordenação está olhando. `null` = tudo. */
@@ -38,35 +38,33 @@ export function FiltrosPainel({
   // vazio piscando no topo é pior que um espaço vazio.
   if (!opcoes) return null
 
+  const unidades: OpcaoSelect[] = [
+    { valor: '', rotulo: 'Todas as unidades' },
+    ...opcoes.unidades.map((u) => ({ valor: u.unidade_id, rotulo: u.nome, sufixo: u.aulas })),
+  ]
+  const cursos: OpcaoSelect[] = [
+    { valor: '', rotulo: 'Todos os cursos' },
+    ...opcoes.cursos.map((c) => ({ valor: c.chave, rotulo: c.nome, sufixo: c.aulas })),
+  ]
+
   return (
     <div className="flex items-center gap-2">
       <Select
         size="sm"
-        aria-label="Filtrar por unidade"
-        value={filtro.unidadeId ?? ''}
-        onChange={(e) => aoMudar({ ...filtro, unidadeId: e.target.value || null })}
-      >
-        <option value="">Todas as unidades</option>
-        {opcoes.unidades.map((u) => (
-          <option key={u.unidade_id} value={u.unidade_id}>
-            {u.nome} · {u.aulas}
-          </option>
-        ))}
-      </Select>
-
+        className="w-[168px]"
+        rotuloAcessivel="Filtrar por unidade"
+        opcoes={unidades}
+        valor={filtro.unidadeId ?? ''}
+        aoEscolher={(v) => aoMudar({ ...filtro, unidadeId: v || null })}
+      />
       <Select
         size="sm"
-        aria-label="Filtrar por curso"
-        value={filtro.curso ?? ''}
-        onChange={(e) => aoMudar({ ...filtro, curso: e.target.value || null })}
-      >
-        <option value="">Todos os cursos</option>
-        {opcoes.cursos.map((c) => (
-          <option key={c.chave} value={c.chave}>
-            {c.nome} · {c.aulas}
-          </option>
-        ))}
-      </Select>
+        className="w-[168px]"
+        rotuloAcessivel="Filtrar por curso"
+        opcoes={cursos}
+        valor={filtro.curso ?? ''}
+        aoEscolher={(v) => aoMudar({ ...filtro, curso: v || null })}
+      />
     </div>
   )
 }
