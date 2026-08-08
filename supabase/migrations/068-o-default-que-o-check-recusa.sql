@@ -1,4 +1,4 @@
--- 067 — o default que o próprio CHECK recusa
+-- 068 — o default que o próprio CHECK recusa
 --
 -- `fabio_notificacoes.status` tinha `DEFAULT 'pendente'` e um CHECK que aceita
 -- só ('processando','enviada','falhou','pulada_preferencia',

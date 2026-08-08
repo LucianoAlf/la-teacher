@@ -1,4 +1,4 @@
--- 067 (teste) — o default que o próprio CHECK recusa
+-- 068 (teste) — o default que o próprio CHECK recusa
 --
 -- Este teste é sobre o SCHEMA, não sobre a agenda de ninguém: ele não depende
 -- de quem já foi cobrado hoje, de preferência de professor nem de férias. O
@@ -112,7 +112,7 @@ declare v_j jsonb;
 begin
   v_j := public.fabio_claim_notificacao(
            (select prof from _ctx), 'outro', 'informativa', 'app',
-           'regressao 067: o produtor real ainda reserva', 'Teste 067', true);
+           'regressao 068: o produtor real ainda reserva', 'Teste 068', true);
   insert into _claim values (v_j);
   insert into _res values ('o produtor real ainda reserva', 'true', coalesce(v_j->>'claimed', 'null'));
 end $$;

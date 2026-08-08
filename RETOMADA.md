@@ -116,7 +116,7 @@ só" e estava errado: já são duas (`/app/equipe` + `/app/coordenacao`). Copiar
   domingo** — só férias (`pausa_ate`) barra. Não existe estado "fora de horário".
 - ⬜ Tasks 3 a 6: rota + shell com sidebar, tabela, plantão, verificação.
 
-- ✅ **O achado dormindo foi resolvido — migration 067 NO AR.**
+- ✅ **O achado dormindo foi resolvido — migration 068 NO AR.**
   `fabio_notificacoes.status` tinha `DEFAULT 'pendente'`, valor que o próprio
   CHECK da tabela recusa: todo INSERT que omitisse o status morria com uma
   mensagem que mandava investigar a constraint, nunca o default. **Escolhido
@@ -135,7 +135,15 @@ só" e estava errado: já são duas (`/app/equipe` + `/app/coordenacao`). Copiar
   ⚠️ O comentário dentro da **066** ("o DEFAULT da coluna é 'pendente'… omitir
   quebraria") ficou obsoleto na razão, não no conselho: status continua indo
   explícito, só que agora quebra por NOT NULL. Não reescrevi a 066 — migration
-  aplicada é registro histórico; a correção mora no cabeçalho da 067.
+  aplicada é registro histórico; a correção mora no cabeçalho da 068.
+  ⚠️ **Por que 068 e não 067:** o número 067 já estava tomado por
+  `067-a-fila-para-de-repetir-professor` (+ `.test.sql` + `mutantes-067.mjs`),
+  escrita às 17h51 no worktree principal e **ainda não commitada** — invisível
+  pro `git log`, e por isso eu subi como 067 antes de ver. Renumerei o **meu**,
+  que é um `ALTER` solto, e não o dela, que está amarrada em `Coordenacao.tsx`,
+  `routes.tsx` e `api.ts` no meio da Task 3. Fica a lição: **número de migration
+  livre no `git log` pode estar ocupado no disco de outra sessão** — antes de
+  numerar, olhar também o `git status` do worktree principal.
 
 **Antes de escrever tela, invocar `superpowers:brainstorming`.** É a regra da
 casa e ela existe porque telas chutadas viram retrabalho.

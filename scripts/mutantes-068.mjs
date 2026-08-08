@@ -1,4 +1,4 @@
-// Mutantes da 067 — o default que o próprio CHECK recusa.
+// Mutantes da 068 — o default que o próprio CHECK recusa.
 //
 // A migration é uma linha só, e é exatamente por isso que ela precisa de
 // mutante: um teste que só olhasse "o INSERT sem status falha" ficaria VERDE
@@ -13,10 +13,24 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
 
-const ORIGINAL = 'supabase/migrations/067-o-default-que-o-check-recusa.sql'
-const TESTE = 'supabase/migrations/067-o-default-que-o-check-recusa.test.sql'
-const TEMP = 'supabase/migrations/_mutante-067.sql'
+const ORIGINAL = 'supabase/migrations/068-o-default-que-o-check-recusa.sql'
+const TESTE = 'supabase/migrations/068-o-default-que-o-check-recusa.test.sql'
+const TEMP = 'supabase/migrations/_mutante-068.sql'
 const fonte = readFileSync(ORIGINAL, 'utf8')
+
+// Cada mutante RECRIA o defeito antes de rodar a migration mutada.
+//
+// Sem isto o harness morreria no dia do apply: com produção já consertada, um
+// mutante que simplesmente NÃO conserta (M1, M5) encontraria o banco correto e
+// passaria — e o arquivo continuaria imprimindo um 6/6 que não mede mais nada.
+// É a mesma doença do teste da 060, que media o buraco da produção e ficou
+// verde quando o buraco fechou sozinho. Recriando o defeito aqui dentro, o
+// veredito vale amanhã igual valeu na hora de escrever.
+//
+// Roda dentro do BEGIN/ROLLBACK do runner, como todo o resto.
+const RECRIA_O_DEFEITO = `alter table public.fabio_notificacoes
+  alter column status set default 'pendente';
+`
 
 const ALVO = `alter table public.fabio_notificacoes
   alter column status drop default;`
@@ -88,6 +102,20 @@ alter table public.fabio_notificacoes
 let mortos = 0
 let stale = 0
 
+// CONTROLE — com o defeito recriado, a migration DE VERDADE tem que consertar.
+// Sem este passo, um 6/6 poderia significar só "todo mundo morre porque o
+// recria-defeito sozinho já derruba o teste", que é vermelho por motivo errado.
+writeFileSync(TEMP, RECRIA_O_DEFEITO + fonte)
+let controleOk = true
+try {
+  execFileSync('node', ['scripts/rodar-teste-sql.mjs', TEMP, TESTE], { stdio: 'pipe' })
+} catch {
+  controleOk = false
+}
+console.log(controleOk
+  ? 'OK     controle: com o defeito recriado, a migration real conserta'
+  : 'FALHA  CONTROLE VERMELHO: a migration real nao conserta o defeito recriado')
+
 for (const m of MUTANTES) {
   const n = fonte.split(m.de).length - 1
   if (n !== 1) {
@@ -95,7 +123,7 @@ for (const m of MUTANTES) {
     stale++
     continue
   }
-  writeFileSync(TEMP, fonte.replace(m.de, m.para))
+  writeFileSync(TEMP, RECRIA_O_DEFEITO + fonte.replace(m.de, m.para))
   let passou = true
   try {
     execFileSync('node', ['scripts/rodar-teste-sql.mjs', TEMP, TESTE], { stdio: 'pipe' })
@@ -111,5 +139,7 @@ for (const m of MUTANTES) {
 }
 
 try { unlinkSync(TEMP) } catch {}
-console.log(`\n${mortos}/${MUTANTES.length} mutantes mortos` + (stale ? `  —  ${stale} ANCORA(S) PODRE(S)` : ''))
-process.exitCode = mortos === MUTANTES.length ? 0 : 1
+console.log(`\n${mortos}/${MUTANTES.length} mutantes mortos`
+  + (stale ? `  —  ${stale} ANCORA(S) PODRE(S)` : '')
+  + (controleOk ? '' : '  —  CONTROLE VERMELHO'))
+process.exitCode = mortos === MUTANTES.length && controleOk && !stale ? 0 : 1
