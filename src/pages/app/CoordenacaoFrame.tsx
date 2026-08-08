@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { FabioAvatar } from '../../components/ui'
 import { InstallPrompt } from '../../features/pwa/InstallPrompt'
+import { useTheme } from '../../lib/theme'
 import { meuPerfilCoordenacao, type MeuPerfilCoordenacao } from '../../lib/api'
 
 /**
@@ -13,12 +14,16 @@ import { meuPerfilCoordenacao, type MeuPerfilCoordenacao } from '../../lib/api'
  *
  * Layout por breakpoint, não por JS:
  *  - celular: sem sidebar, largura cheia, navegação no rodapé
- *  - md+ : sidebar fixa (colapsável), topbar, conteúdo em largura cheia
+ *  - md+ : sidebar fixa (colapsável), conteúdo em largura cheia
  *
  * Padrão do shell copiado do LA Organizer (`web/src/components/DesktopShell.tsx`):
  * a moldura ocupa a janela e NÃO cresce com o conteúdo — só o `<main>` rola. O
  * que NÃO foi copiado, de propósito: a coluna de leitura de 720px. As telas dele
  * são de ler e responder; esta é de varrer uma lista e agir.
+ *
+ * NÃO TEM BARRA DE CABEÇALHO (pedido do Alf, 08/08). Nome da página, data e
+ * quem está logado flutuam sobre o conteúdo, sem fundo e sem borda: barra de
+ * chrome rouba altura de um painel feito pra caber a lista inteira.
  */
 
 const COLAPSADA_KEY = 'la-coord-sidebar-colapsada'
@@ -37,16 +42,21 @@ const ITENS = [
 
 export function CoordenacaoFrame({
   titulo,
+  icone,
   subtitulo,
   acaoTopo,
   children,
 }: {
+  /** Nome da PÁGINA — o mesmo do item da sidebar ("Painel", "Equipe"). */
   titulo: string
+  icone?: string
   subtitulo?: string
-  /** Canto direito da topbar: filtro de unidade, data, o que a tela precisar. */
+  /** Extras do topo direito: filtro de unidade, de curso, o que a tela precisar. */
   acaoTopo?: ReactNode
   children: ReactNode
 }) {
+  const { theme, toggle } = useTheme()
+
   // Colapso persiste: quem trabalha o dia todo no painel não quer reajustar a
   // largura a cada navegação. Mesmo comportamento do Organizer.
   const [colapsada, setColapsada] = useState(
@@ -72,54 +82,50 @@ export function CoordenacaoFrame({
       {/* ── Sidebar: só md+ ─────────────────────────────────────────────── */}
       <aside
         className={`relative hidden shrink-0 flex-col border-r border-border-subtle bg-bg-surface transition-[width] duration-150 md:flex ${
-          colapsada ? 'w-[64px]' : 'w-[210px]'
+          colapsada ? 'w-[72px]' : 'w-[228px]'
         }`}
       >
-        {/* O chevron mora na QUINA, não numa barra própria: é controle da
-            moldura, não item de menu. Colado no topo pra não competir com a
-            navegação. */}
+        {/* Na PONTA, sobreposto: o chevron é controle da moldura, não item de
+            menu, e não pode gastar uma linha da sidebar. */}
         <button
           onClick={() => setColapsada((v) => !v)}
           aria-label={colapsada ? 'Expandir menu' : 'Recolher menu'}
-          className={`absolute top-2 z-10 flex h-6 w-6 items-center justify-center rounded-sm text-text-muted hover:bg-bg-hover hover:text-text-secondary ${
-            colapsada ? 'right-1/2 translate-x-1/2' : 'right-2'
+          className={`absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-sm text-text-muted hover:bg-bg-hover hover:text-text-secondary ${
+            colapsada ? 'right-1/2 translate-x-1/2' : ''
           }`}
         >
           <i
-            className={`fa-solid ${colapsada ? 'fa-chevron-right' : 'fa-chevron-left'} text-[11px]`}
+            className={`fa-solid ${colapsada ? 'fa-chevron-right' : 'fa-chevron-left'} text-[10px]`}
             aria-hidden
           />
         </button>
 
         {/* O Fábio é a cara do app: o nome dele em cima, o produto embaixo.
-            Mesmo desenho do TOM no LA Organizer. Respiro maior aqui porque é a
-            assinatura da tela — apertado ele vira ícone de barra de tarefas. */}
+            Mesmo desenho do TOM no LA Organizer. */}
         <div
-          className={`flex items-center gap-2.5 px-3 pb-4 ${
-            colapsada ? 'justify-center pt-11' : 'pt-10'
-          }`}
+          className={`flex items-center gap-3 px-3.5 pb-5 pt-8 ${colapsada ? 'justify-center' : ''}`}
         >
-          <FabioAvatar className="h-9 w-9 shrink-0" alt="Fábio" />
+          <FabioAvatar className="h-11 w-11 shrink-0" alt="Fábio" />
           {!colapsada && (
             <div className="min-w-0">
-              <div className="truncate text-[15px] font-bold leading-tight text-text-primary">
+              <div className="truncate text-[17px] font-bold leading-tight text-text-primary">
                 Fábio
               </div>
-              <div className="truncate text-[11.5px] leading-tight text-text-muted">
-                <span className="text-la-pink">LA</span> Teacher
+              <div className="truncate text-[12.5px] leading-tight text-text-secondary">
+                LA Teacher
               </div>
             </div>
           )}
         </div>
 
-        <nav className="flex-1 p-2">
+        <nav className="flex-1 px-2">
           {ITENS.map((item) => (
             <NavLink
               key={item.para}
               to={item.para}
               title={colapsada ? item.rotulo : undefined}
               className={({ isActive }) =>
-                `mb-1 flex items-center gap-2.5 rounded-sm px-3 py-2.5 text-[13px] ${
+                `mb-1 flex items-center gap-3 rounded-sm px-3 py-2.5 text-[13.5px] ${
                   colapsada ? 'justify-center' : ''
                 } ${
                   isActive
@@ -133,31 +139,43 @@ export function CoordenacaoFrame({
             </NavLink>
           ))}
         </nav>
-
       </aside>
 
       {/* ── Coluna principal ─────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Sem barra de cabeçalho, de propósito (pedido do Alf, 08/08). Título,
-            data e quem está logado FLUTUAM sobre o conteúdo: mesma linha, sem
-            fundo e sem borda. Uma barra de chrome rouba altura de um painel que
-            é feito pra caber a lista inteira — e num app de uma tela só ela não
-            informa nada que a sidebar já não diga. */}
-        <div className="flex shrink-0 items-center justify-between gap-3 px-4 pb-1 pt-3">
-          <div className="min-w-0">
-            <span className="text-[15px] font-bold text-text-primary">{titulo}</span>
+        {/* Faixa flutuante: nome da PÁGINA à esquerda (o mesmo rótulo do item
+            ativo na sidebar), data e perfil à direita. Sem fundo, sem borda. */}
+        <div className="flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-6">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {icone ? (
+              <i className={`${icone} text-[15px] text-text-secondary`} aria-hidden />
+            ) : null}
+            <span className="truncate text-[17px] font-bold text-text-primary">{titulo}</span>
             {subtitulo ? (
-              <span className="ml-2 text-[11.5px] text-text-secondary">{subtitulo}</span>
+              <span className="truncate text-[12px] text-text-secondary">{subtitulo}</span>
             ) : null}
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
             {acaoTopo}
-            <span className="hidden text-[11.5px] text-text-muted sm:inline">{HOJE}</span>
+            <span className="hidden text-[13px] text-text-secondary sm:inline">{HOJE}</span>
+
+            <button
+              onClick={toggle}
+              aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+              title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+            >
+              <i
+                className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'} text-[14px]`}
+                aria-hidden
+              />
+            </button>
+
             <NavLink
               to="/app/coordenacao/perfil"
               title={perfil?.nome ?? 'Meu perfil'}
-              className="hidden rounded-full ring-offset-2 hover:opacity-80 md:block"
+              className="hidden hover:opacity-80 md:block"
             >
               <AvatarDoUsuario perfil={perfil} />
             </NavLink>
@@ -210,7 +228,7 @@ export function AvatarDoUsuario({
   perfil: MeuPerfilCoordenacao | null
   tamanho?: 'sm' | 'lg'
 }) {
-  const classe = tamanho === 'lg' ? 'h-[84px] w-[84px] text-2xl' : 'h-8 w-8 text-[11px]'
+  const classe = tamanho === 'lg' ? 'h-[92px] w-[92px] text-2xl' : 'h-9 w-9 text-[12px]'
 
   if (perfil?.avatar_url) {
     return (

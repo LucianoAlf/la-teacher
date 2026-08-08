@@ -68,6 +68,7 @@ export default function EquipePage() {
   return (
     <CoordenacaoFrame
       titulo="Equipe"
+      icone="fa-solid fa-users"
       subtitulo={lista ? `· ${comAcesso.length} com acesso · ${semAcesso.length} sem` : undefined}
     >
       {/* Sem seta de voltar: a navegação da coordenação é a sidebar (desktop) ou
@@ -77,7 +78,7 @@ export default function EquipePage() {
           430px no meio de 1300px, e seis professores ocupavam a tela inteira
           rolando. Pra liberar 15 voluntários, ver a fila toda de uma vez é a
           diferença entre trabalho e paciência. */}
-      <div className="space-y-3 px-4 py-4 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3 [&>p]:md:col-span-full">
+      <div className="space-y-3 px-5 pb-5 pt-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3 [&>p]:md:col-span-full">
         {!lista && !erro && (
           <>
             <Skeleton className="h-16 w-full rounded-lg" />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { NavLink } from 'react-router-dom'
 import { CoordenacaoFrame, AvatarDoUsuario } from './CoordenacaoFrame'
 import { EmptyState, Skeleton } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
@@ -33,8 +34,19 @@ export default function PerfilCoordenacaoPage() {
   }, [])
 
   return (
-    <CoordenacaoFrame titulo="Meu perfil">
-      <div className="mx-auto max-w-[560px] p-4">
+    <CoordenacaoFrame titulo="Meu perfil" icone="fa-solid fa-user">
+      <div className="mx-auto max-w-[560px] px-5 pb-5 pt-3">
+        {/* Saída explícita: a sidebar leva pras outras telas, mas quem entra no
+            perfil pelo avatar espera um caminho de volta — igual à seta do
+            ScreenHeader na tela do professor. */}
+        <NavLink
+          to="/app/coordenacao"
+          className="mb-4 inline-flex items-center gap-2 text-[13px] text-text-secondary hover:text-text-primary"
+        >
+          <i className="fa-solid fa-arrow-left text-[12px]" aria-hidden />
+          Voltar pro painel
+        </NavLink>
+
         {erro ? (
           <EmptyState
             icon="fa-solid fa-triangle-exclamation"
@@ -73,15 +85,36 @@ export default function PerfilCoordenacaoPage() {
 
             <button
               onClick={() => void signOut()}
-              className="mt-6 text-[13px] text-danger-text hover:underline"
+              className="mt-6 inline-flex items-center gap-2 text-[13px] text-danger-text hover:underline"
             >
+              <i className="fa-solid fa-right-from-bracket text-[12px]" aria-hidden />
               Sair da conta
             </button>
+
+            {/* Mesmo selo da tela do professor: dá pra bater o olho e saber em
+                que versão a pessoa está antes de investigar um "sumiu". */}
+            <p className="mt-6 text-[11px] text-text-muted">{versaoDoBuild()}</p>
           </>
         )}
       </div>
     </CoordenacaoFrame>
   )
+}
+
+function versaoDoBuild() {
+  try {
+    const d = new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'America/Sao_Paulo',
+    }).format(new Date(__BUILD_TIME__))
+    return `versão de ${d}`
+  } catch {
+    return 'versão desconhecida'
+  }
 }
 
 /** Campo vazio aparece como "não informado" — não some. Sumir esconde o buraco. */

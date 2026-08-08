@@ -37,8 +37,10 @@ export default function CoordenacaoPage() {
   const fila = dados?.professores ?? []
 
   return (
-    <CoordenacaoFrame titulo="Coordenação">
-      <div className="p-4">
+    <CoordenacaoFrame titulo="Painel" icone="fa-solid fa-table-columns">
+      {/* Respiro entre a faixa flutuante e os números: sem ele os KPIs colam no
+          nome da página e a tela parece começar no meio. */}
+      <div className="px-5 pb-5 pt-3">
         {erro ? (
           <EmptyState
             icon="fa-solid fa-triangle-exclamation"
