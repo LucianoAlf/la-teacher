@@ -55,7 +55,7 @@ export function FiltrosPainel({
     // tema, perfil); o que mexe no CONTEÚDO mora junto do conteúdo. E a linha
     // é uma barra com nome ("Filtrar"), não dois selects soltos: é aqui que os
     // próximos controles da tela vão morar.
-    <div className="mb-3.5 flex flex-wrap items-center gap-2">
+    <div className="mb-6 flex flex-wrap items-center gap-2">
       <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
         <i className="fa-solid fa-filter text-[10px] text-brand-text" aria-hidden="true" />
         Filtrar

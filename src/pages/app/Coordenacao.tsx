@@ -58,7 +58,10 @@ export default function CoordenacaoPage() {
           />
         ) : (
           <>
-            <div className="mb-3.5 grid grid-cols-2 gap-2.5 md:grid-cols-4">
+            {/* Respiro entre os três andares (KPIs → filtro → fila): 24px, o
+                `--s-6` da escala. Com 14px os blocos liam como um bloco só —
+                apontado pelo Alf com a tela na mão. */}
+            <div className="mb-6 grid grid-cols-2 gap-2.5 md:grid-cols-4">
               {/* "Aulas" no rótulo porque a unidade mudou na 070: antes isso
                   contava pares aluno-aula e dava 847 onde o trabalho real da
                   equipe eram 624 aulas. Número grande sem unidade é o que

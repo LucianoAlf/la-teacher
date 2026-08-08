@@ -109,7 +109,7 @@ function Cabecalho({
   direita?: string
 }) {
   return (
-    <div className="mb-2 flex items-baseline justify-between gap-3">
+    <div className="mb-3 flex items-baseline justify-between gap-3">
       <span className="flex items-center gap-2 text-[13px] font-bold uppercase tracking-[.5px] text-text-secondary">
         <i className={`${icone} text-xs text-brand-text`} aria-hidden />
         {titulo}
