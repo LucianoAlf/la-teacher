@@ -98,14 +98,28 @@ só" e estava errado: já são duas (`/app/equipe` + `/app/coordenacao`). Copiar
   executa, `authenticated` executa, `stable`, `security definer`). O teste troca
   de identidade com `set_config('request.jwt.claim.sub', …)` — primeiro ramo do
   coalesce de `auth.uid()`; sem isso o guard ficaria sem teste.
-- ⏭️ **Task 2 — REPLANEJADA na execução.** Ver o bloco ⚠️ no plano. Resumo: **a
-  fila do Fábio não tem estado de entrada** (`status` só aceita `processando`,
-  `enviada`, `falhou`, `pulada_*` — não existe `pendente`), e
+- ✅ **Task 2 — migration 066 + edge function NO AR e PROVADA COM WHATSAPP REAL**
+  (`a389d16`). 15 passos verdes, **7/7 mutantes mortos**. Foi replanejada durante
+  a execução — ver o bloco ⚠️ no plano. Resumo do porquê: **a fila do Fábio não
+  tem estado de entrada** (`status` só aceita `processando`, `enviada`, `falhou`,
+  `pulada_*`; não existe `pendente`) e
   `fabio_claim_notificacao_por_referencia` é a função do **worker**, não do
-  produtor. O painel não tem onde depositar recado. Vira **edge function
-  síncrona**, no molde do `professor-liberar-acesso`. E cobrança é categoria
-  `governanca`, que por projeto **ignora silêncio e domingo** — só férias barra.
+  produtor — o painel não tem onde depositar recado. Virou **edge function
+  síncrona** (`coordenacao-recado`, v1), no molde do `professor-liberar-acesso`.
+  Sequência **reserva → envia → conclui**, com `lease_token` provando que quem
+  fecha é quem abriu.
+  **Prova ao vivo (08/08, 17:27:56):** recado real chegou no WhatsApp do Matheus,
+  linha em `enviada` com recibo, lease devolvido, `solicitado_por` resolvendo
+  para **"Luciano Alf"** — e o segundo clique do dia recusado com
+  `ja_cobrado_hoje`.
+  Cobrança é categoria `governanca`, que por projeto **ignora silêncio e
+  domingo** — só férias (`pausa_ate`) barra. Não existe estado "fora de horário".
 - ⬜ Tasks 3 a 6: rota + shell com sidebar, tabela, plantão, verificação.
+
+**Achado dormindo, anotado como tarefa própria:** `fabio_notificacoes.status` tem
+`DEFAULT 'pendente'`, valor que o próprio CHECK da tabela recusa — qualquer
+INSERT que omita o status quebra com erro confuso. Não quebra hoje porque todo
+caminho informa explicitamente.
 
 **Antes de escrever tela, invocar `superpowers:brainstorming`.** É a regra da
 casa e ela existe porque telas chutadas viram retrabalho.
