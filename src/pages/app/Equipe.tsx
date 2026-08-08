@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { AppFrame } from './AppFrame'
 import { Badge, Button, EmptyState, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
 import {
@@ -21,7 +20,6 @@ import {
  * "perdi a mensagem" é o pedido mais comum depois do primeiro dia.
  */
 export default function EquipePage() {
-  const navigate = useNavigate()
   const { message, visible, show } = useToast()
   const [lista, setLista] = useState<ProfessorParaLiberar[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -69,10 +67,12 @@ export default function EquipePage() {
 
   return (
     <AppFrame>
+      {/* Sem seta de voltar: pra coordenação esta É a home. O /app manda de
+          volta pra cá (a agenda de lá é do professor), então uma seta faria o
+          caminho voltar pra própria tela — que parece travamento. */}
       <ScreenHeader
         title="Equipe"
         subtitle={lista ? `${comAcesso.length} com acesso · ${semAcesso.length} sem` : undefined}
-        onBack={() => navigate('/app')}
       />
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-[calc(24px_+_env(safe-area-inset-bottom))]">

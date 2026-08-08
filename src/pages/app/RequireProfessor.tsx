@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { Button, FabioAvatar } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
-import { isSemVinculo, minhaAgendaSessao } from '../../lib/api'
+import { isSemVinculo, minhaAgendaSessao, professoresParaLiberar } from '../../lib/api'
 import { introVisto } from '../../features/onboarding/introState'
 import { OnboardingGate } from '../../features/onboarding/OnboardingGate'
 import { iniciarSincronizacaoFila } from '../../features/registro/uploadAudio'
 import { AppFrame } from './AppFrame'
 import VinculoPendentePage from './VinculoPendente'
 
-type Estado = 'checando' | 'ok' | 'sem_vinculo' | 'erro'
+type Estado = 'checando' | 'ok' | 'sem_vinculo' | 'e_coordenacao' | 'erro'
 
 /** Tela de carregamento (nunca branca) enquanto o guard decide. */
 function Carregando() {
@@ -45,9 +45,23 @@ export function RequireProfessor() {
     let vivo = true
     setEstado('checando')
     minhaAgendaSessao()
-      .then((res) => {
+      .then(async (res) => {
         if (!vivo) return
-        setEstado(isSemVinculo(res) ? 'sem_vinculo' : 'ok')
+        if (!isSemVinculo(res)) {
+          setEstado('ok')
+          return
+        }
+        // Sem professor não quer dizer sem acesso: a coordenação também entra
+        // aqui, e o app dela não é a agenda do professor. Antes de mostrar
+        // "falta ativar" — que pra ela seria mentira — pergunta se é do time da
+        // coordenação. A pergunta só acontece neste ramo raro; quem é professor
+        // nunca paga esse round-trip.
+        try {
+          await professoresParaLiberar()
+          if (vivo) setEstado('e_coordenacao')
+        } catch {
+          if (vivo) setEstado('sem_vinculo')
+        }
       })
       .catch(() => vivo && setEstado('erro'))
     return () => {
@@ -65,6 +79,10 @@ export function RequireProfessor() {
   // Sem sessão: primeira vez no dispositivo vê o intro; quem já viu vai pro login.
   if (!session) return <Navigate to={introVisto() ? '/app/login' : '/app/intro'} replace />
   if (estado === 'checando') return <Carregando />
+  // Coordenação não tem agenda de professor — tem equipe. Mandar pro painel em
+  // vez de mostrar "falta ativar seu acesso", que no caso dela é falso e manda
+  // procurar a coordenação... que é ela mesma.
+  if (estado === 'e_coordenacao') return <Navigate to="/app/equipe" replace />
   if (estado === 'sem_vinculo') return <VinculoPendentePage />
 
   if (estado === 'erro') {
