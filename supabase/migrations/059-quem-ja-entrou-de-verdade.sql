@@ -1,5 +1,12 @@
 -- 059 — o painel para de mentir sobre quem já entrou
 --
+-- ⚠️ SUPERADA PELA 062 no que diz respeito à GUARDA. Esta versão libera o
+-- painel pra `usuarios.perfil = 'admin'` — 11 pessoas, incluindo Marketing e
+-- Comercial. A 062 trocou isso pela lista `la_teacher_coordenacao`.
+-- Reaplicar este arquivo sozinho REABRE o painel pras 11. Se precisar dele,
+-- rode a 062 logo depois. (O teste desta migration continua válido: ele roda
+-- contra a versão daqui, de propósito.)
+--
 -- O DADO NÃO EXISTIA. A 057 leu `usuarios.ultimo_acesso` pra dizer se o professor
 -- já tinha usado o app. Medido em produção hoje: **0 de 29** usuários têm essa
 -- coluna preenchida, e a única função no banco inteiro que a menciona é a minha —
