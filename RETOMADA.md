@@ -76,6 +76,49 @@ a conta contra ela mesma nunca discorda dela. Quem discordou foi o Alf, olhando
 a tela. O par de passos "conta AULAS" + "NAO e mais o total de linhas" da 070
 existe pra que da próxima vez seja o teste.
 
+### ⚠️ BLOCO 2 ("o que os professores registraram") — MEDIDO EM 08/08, À NOITE
+
+Antes de desenhar, fui olhar se há o que mostrar. **Não há — ainda.**
+
+`fabio_registros_aula`, o banco inteiro:
+
+| | |
+|---|---|
+| Registros no total | **65** |
+| Professores que registraram | **2** |
+| Alunos cobertos | 21 |
+| Registro mais antigo | 13/07 (26 dias) |
+| Registros em **agosto** | **0** |
+
+E a `vw_aderencia_registro_professor` confirma pelo outro lado: em agosto, **todo
+professor da casa está com `pct_cobertura` = 0**, Fábio e Emusys.
+
+Isso **não é defeito de pipeline** — é o piloto começando. Os professores estão
+sendo liberados esta semana (o Rafael nem entrou ainda). O dado vai aparecer.
+
+**A boa notícia é que o schema aguenta.** As chaves que já existem em
+`campos jsonb`: `repertorio` (59×), `eixos` (30×), `marco_ref` (30×),
+`progresso`, `proximo_passo`, `objetivo`, `atividades`, `dever_casa`,
+`materiais`. Não vai precisar de tabela nova pra estagnação.
+
+Os cinco critérios do Alf, um a um:
+
+| Critério | Fonte | Hoje |
+|---|---|---|
+| Aluno em risco | `vw_risco_evasao_atual`, `risco_evasao` | ✅ **dá pra fazer agora** — independe de registro |
+| Silêncio do professor | `vw_aderencia_registro_professor` | ⚠️ computável, mas **degenerado**: todo mundo em 0%, e é o que o bloco 1 já mostra |
+| Estagnação (>2 meses no mesmo repertório/eixo) | `campos->repertorio`/`eixos` | ⏳ schema pronto, **falta HISTÓRICO** — precisa de 2 meses e o mais antigo tem 26 dias |
+| Aluno se destacou | `campos->progresso`/`observacao` + leitura do Fábio | ⏳ precisa de registro pra ler |
+| Desalinhamento com a Jornada Pedagógica | ❓ | ❌ **a "jornada" do banco é de CONTRATO** (aulas contratadas/passadas/percentual, `vw_jornada_aluno_atual` e `vw_jornada_marcos`). Não achei conteúdo/repertório de referência em lugar nenhum — a jornada PEDAGÓGICA parece não existir como dado |
+
+**Decisão pendente do Alf** (é o que trava o desenho): em 08/08 ele disse *"não
+vai ter aluno na visão da coordenação"*, mas quatro dos cinco critérios são
+sinais SOBRE alunos. Não é contradição necessariamente — pode ser "não tem
+LISTA de alunos, tem sinal curado". Precisa dele pra saber qual dos dois.
+
+**Risco de construir agora:** um painel com 4 de 5 sinais permanentemente
+vazios. É a armadilha do "cron verde × trabalho feito" que esta casa já tomou.
+
 ### O que já está decidido (não reabrir):
 
 - **Um app só**, não um segundo. O Organizer é a prova: papel por rota
@@ -195,9 +238,31 @@ só" e estava errado: já são duas (`/app/equipe` + `/app/coordenacao`). Copiar
   - Conferido no navegador em 1280 e 375: sidebar 196px, `main` 1084px, Equipe
     em 3 colunas de 342px, zero rolagem lateral, 38 linhas / 38 nomes.
   - De quebra: "2 experimenta**lis**" virou "experimenta**is**".
-- ⬜ **Task 6 — falta a verificação AO VIVO** em `la-teacher.vercel.app` com a
-  conta do Alf (o que rodou até aqui foi localhost + suíte + build). E o deploy
-  do front pela Vercel.
+- ✅ **Task 6 — produção conferida** (08/08, à noite), com o que dá pra provar
+  sem a conta dele:
+  - o deploy da Vercel **está com o código novo** — o bundle servido contém
+    "Aulas sem lançamento", "Todos os cursos" e "Precisa de decisão agora", e
+    **não** contém mais o texto velho de cobrança ("lançamentos em aberto");
+  - `/app/coordenacao` sem sessão **redireciona pro login** (o guard de rota
+    funciona em produção);
+  - a RPC chamada com a chave `anon` responde **401 `permission denied for
+    function app_coordenacao_em_aberto`**, zero dado no corpo. E o fato de ela
+    ter sido RESOLVIDA (permissão negada, não "função não existe" nem "could
+    not choose the best candidate") prova que a assinatura de 3 argumentos
+    entrou certa e que não sobrou sobrecarga ambígua.
+  - ⬜ **O que eu NÃO consigo:** abrir o painel autenticado. Exige o código do
+    WhatsApp dele ou a senha — credencial não é coisa que eu digite. Fica pro
+    Alf: abrir, conferir que o topo diz **624** (não 847) e que os filtros
+    aparecem ao lado da data.
+
+- ✅ **Filtros de unidade e curso NO AR** (migration 071, `1e75770`). O filtro de
+  curso agrupa as modalidades: 34 nomes viram 20 cursos, e escolher "Bateria"
+  traz as **129** aulas (não as 46 de "Bateria" cru, sem "Bateria T"). As
+  facetas ignoram o próprio filtro e respeitam a outra — escolher a Barra mantém
+  as 3 unidades e reduz os cursos de 20 pra 10, com as contagens da Barra.
+  31 passos, 22/22 mutantes. **Dois achados do próprio harness** estão no corpo
+  do commit: um teste meu que nunca podia falhar, e a 071 saindo da suíte em
+  silêncio por não ser reaplicável.
 
 - ✅ **Varredura do Design System** (`fa019ba` + `df8d1b5`), depois do Alf
   flagrar duas vezes: *"a gente já tem um Design System pronto que você está
