@@ -5,7 +5,8 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 08/08/2026, 15h (BRT).** Commit `cde0466`, tudo no remoto.
+> **Última atualização: 08/08/2026, noite (BRT).** Tudo no remoto — confira com
+> `git log --oneline -5`.
 > Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 ---
@@ -22,17 +23,48 @@ O que **já está decidido** (não reabrir):
   `DesktopShell` com sidebar no desktop). O argumento que fecha: a coordenação
   precisa ver **o que o professor registrou**, e isso é a maior parte do app que
   já existe. Dois apps = duplicar isso, que é a cicatriz que esta casa já tem.
-- **Desktop E mobile** — pedido explícito do Alf.
+- **Desktop E mobile** — pedido explícito do Alf. E são **dois desenhos**: o
+  mobile não é o painel espremido.
 - **Não vai ter aluno** na visão da coordenação (palavras dele).
 - O painel `/app/equipe` já existe e já é da coordenação (migration 062).
+- **O desktop é um painel executivo de governança onde o professor é a LINHA**,
+  não o número solto — cada professor com seus alunos pendurados (quem faltou, o
+  que não foi lançado, o que ficou em aberto). É **ponto de partida, não
+  destino**: clicou, sai dali pro detalhe ou pra ação.
+- **Mede o REGISTRO, não o julgamento.** Correção do Alf, 08/08: não é "o
+  professor deu presença ou não", é **"ele fez o lançamento ou não"**.
+- **Divisão com o LA Report (Alf, 08/08):** aqui é **diário + ação** (estado de
+  hoje, botão pra cobrar, mandar recado, lançar ocorrência). Ranking, premiação
+  e mês fechado ficam no LA Report — **por enquanto**.
+- **Destino final: um painel só, aqui.** Palavras dele: *"no futuro a gente vai
+  trazer isso pra cá... senão a coordenação vai ficar acessando dois sistemas. O
+  ideal é elas terem o painel delas aqui, com o que realmente importa lá do LA
+  Report"*. O painel daqui é **curadoria, não espelho**.
 
-O que **falta pra começar**, e é conversa, não código: *o que a Juliana e o
-Quintela abrem primeiro quando chegam de manhã?* Sem isso eu chuto telas. As
-funções que o Alf citou: mensagem individual pro professor, tarefas pro
-professor, comunicado geral, governança.
+O que **falta pra começar**: o layout — quais blocos, em que ordem, e o que o
+mobile mostra no lugar do painel. Isso se resolve **mostrando mockup**, não
+descrevendo (o próprio Alf disse que descrever fica raso).
 
 **Antes de escrever tela, invocar `superpowers:brainstorming`.** É a regra da
 casa e ela existe porque telas chutadas viram retrabalho.
+
+### O que o LA Report já entrega (auditado em 08/08, com `git pull` antes)
+
+O banco é **o mesmo projeto** (`ouqwbbermlzqqvtqwlul`): chamar a RPC de lá não é
+integração, é consulta. **UI aqui, regra de negócio onde ela já está** — o LA
+Teacher **não pode RECALCULAR** o que o LA Report calcula, é assim que nascem
+dois números pra mesma pergunta.
+
+| O que já existe | Onde |
+|---|---|
+| **50 colunas por professor/período** (carteira, ticket, MRR, presença, faltas, experimentais, conversão, renovação, evasão, retenção atribuível) | `get_kpis_professor_periodo_canonico_v3` |
+| **Health Score V3**: 5 pilares de nota + 1 diagnóstico, já honesto (`score_exibivel`, `comparabilidade_estado`, `pilares_validos/esperados`) — se recusa a dar nota sem base | `src/lib/healthScoreProfessorV3.ts` |
+| **Relatório de coordenação** em 4 recortes (ranking, carteira, presença, retenção), com auditoria (fingerprint da regra, data de corte) | `get_relatorio_coordenacao_canonico_v3` |
+| **360° do professor**: 8 critérios (6 penalidade + 2 bônus). Peso: Preench. EMUSYS 25, Assiduidade 20, Pontualidade/Salas/Prazos 15, Dresscode 10 | `professor_360_*` |
+| Carteira, agenda do dia, jornada com metas e prazo, saídas detalhadas | `get_carteira_professores`, `get_agenda_dia`, `get_jornada_professor` |
+
+⚠️ A pilha do relatório é **5 camadas** (`v3 → payload_v3 → v2 → payload_v2 →
+kpis_v3 → kpis_v2`). Trazer **o contrato de saída**, nunca a pilha.
 
 ### Enquanto isso, duas coisas pra observar (não são tarefa, são vigília)
 
@@ -113,7 +145,27 @@ senha**, que não existe mais. Cinco cenas novas do ciclo da experimental.
 
 ## 📋 PENDENTE, em ordem
 
-1. **Desenho da coordenação** — ver PRÓXIMO PASSO.
+1. **Desenho da coordenação** — ver PRÓXIMO PASSO. A auditoria do LA Report
+   (08/08) abriu quatro costuras que fazem parte deste bloco:
+   - **a) O ritual está lá, a evidência está aqui, e ninguém ligou os dois.** O
+     critério mais pesado do 360° (`Preenchimento EMUSYS`, peso 25) é digitado à
+     mão: 18 ocorrências em jun/2026, 1 em jul, **0 em ago**. O LA Teacher mede
+     a mesma coisa sozinho — `vw_presenca_pendencia`: 847 aulas sem lançamento
+     em 7 dias, 38 dos 44 professores. É a costura mais valiosa do painel.
+   - **b) As 192 ocorrências do 360° não têm autor.** `registrado_por` é null em
+     **192/192**. Penalidade de 25 pontos e ninguém sabe quem lançou — mesma
+     classe do defeito que a migration 054 consertou aqui. Resolver **antes** de
+     a coordenação passar a lançar ocorrência pelo app.
+   - **c) A avaliação 360° nunca é fechada.** `professor_360_avaliacoes` tem
+     **0 linhas** e a tela mostra 75 avaliações, todas "Pendente": a nota é
+     calculada na hora e nunca consolidada. Mexeu no peso de um critério, **a
+     nota de março muda junto**. Pra ranking e premiação isso é bomba armada.
+   - **d) NÃO MEDIDO (não afirmar sem medir).** O LA Report tem régua própria de
+     presença honesta (`presenca_publicavel` / `presenca_confianca` /
+     `presenca_cobertura`) e o LA Teacher tem a dele (`fn_presenca_e_forte`).
+     **Não sei se as duas concordam.** Medir antes de o painel exibir qualquer
+     percentual de presença — senão a mesma escola tem dois números e os dois se
+     dizem honestos.
 2. **Os 15 voluntários.** O Alf mandou o texto no grupo pedindo voluntários. Ele
    libera; eu confiro. Dos 13 com experimental na semana, priorizar quem
    levantar a mão — são os que mais ganham no primeiro dia.
