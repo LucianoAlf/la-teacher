@@ -98,7 +98,7 @@ export default function LoginPage() {
         falha === 'expirado'
           ? 'Esse código já venceu. Pede um novo que eu te mando na hora.'
           : falha === 'codigo_errado'
-            ? 'Esse código não bateu. Confere os 6 números da mensagem.'
+            ? 'Esse código não bateu. Confere os 8 números da mensagem.'
             : 'Não consegui falar com o servidor. Confere a internet e tenta de novo.',
       )
       return
@@ -218,7 +218,10 @@ export default function LoginPage() {
                 required
                 value={codigo}
                 onChange={(e) => setCodigo(e.target.value)}
-                placeholder="000000"
+                // 8 dígitos: é o tamanho que o Supabase Auth gera (medido, não
+                // suposto). O placeholder é a forma que a pessoa espera ver —
+                // com 6 zeros ela conta os dela, dá 8, e conclui que copiou errado.
+                placeholder="00000000"
                 maxLength={8}
                 className={campoCapa}
                 style={{ ...campoCapaStyle, letterSpacing: '.35em', textAlign: 'center', fontSize: 22 }}
