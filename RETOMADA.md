@@ -114,7 +114,30 @@ só" e estava errado: já são duas (`/app/equipe` + `/app/coordenacao`). Copiar
   `ja_cobrado_hoje`.
   Cobrança é categoria `governanca`, que por projeto **ignora silêncio e
   domingo** — só férias (`pausa_ate`) barra. Não existe estado "fora de horário".
-- ⬜ Tasks 3 a 6: rota + shell com sidebar, tabela, plantão, verificação.
+- ✅ **Tasks 3, 4 e 5 — O PAINEL ESTÁ NO AR** (`/app/coordenacao`), com shell
+  próprio, fila por urgência, recado na linha e plantão no celular.
+  - **`CoordenacaoFrame` existe porque o `AppFrame` não serve:** ele é
+    `max-w-[430px]`, a moldura do celular do professor. No desktop virava coluna
+    estreita no meio de 1300px — foi o que aconteceu com o `/app/equipe`. A
+    Equipe agora usa a mesma casca e vira **grade de 3 colunas**.
+  - Copiado do `DesktopShell` do Organizer: a moldura **não cresce com o
+    conteúdo**, só o `<main>` rola. **NÃO** copiada: a coluna de leitura de
+    720px — aquelas telas são de ler e responder, esta é de varrer e agir.
+  - **⚠️ migration 067 — a fila repetia professor.** A 065 agrupava por
+    (professor, unidade) e, como **27 dos 44 dão aula em mais de uma unidade**,
+    38 pessoas viravam **60 linhas**. O defeito passou pelos 10 passos e pelos 5
+    mutantes da 065 porque **todos perguntavam sobre NÚMEROS e nenhum sobre a
+    CHAVE** — somar certo por linha errada continua somando certo. Quem
+    denunciou foi a tela ("38 afetados" sobre fila de 60) e o React (chave
+    duplicada). O V1 da 067 reintroduz exatamente esse `group by`.
+    **Efeito do conserto:** o Ramon aparecia com 37 e tem **50** (37 Recreio +
+    13 CG) — a fila mentia pra baixo sobre quem mais precisa de cobrança.
+  - Conferido no navegador em 1280 e 375: sidebar 196px, `main` 1084px, Equipe
+    em 3 colunas de 342px, zero rolagem lateral, 38 linhas / 38 nomes.
+  - De quebra: "2 experimenta**lis**" virou "experimenta**is**".
+- ⬜ **Task 6 — falta a verificação AO VIVO** em `la-teacher.vercel.app` com a
+  conta do Alf (o que rodou até aqui foi localhost + suíte + build). E o deploy
+  do front pela Vercel.
 
 - ✅ **O achado dormindo foi resolvido — migration 068 NO AR.**
   `fabio_notificacoes.status` tinha `DEFAULT 'pendente'`, valor que o próprio
