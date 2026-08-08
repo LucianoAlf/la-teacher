@@ -478,7 +478,7 @@ export default function ConfirmarPage() {
           aria-modal="true"
           aria-label="Substituir ou complementar o relatório"
         >
-          <button className="absolute inset-0 bg-black/50" aria-label="Fechar" onClick={() => setEscolhendoModo(false)} />
+          <button className="absolute inset-0 bg-scrim" aria-label="Fechar" onClick={() => setEscolhendoModo(false)} />
           <div className="relative w-full rounded-t-2xl border-t border-border-subtle bg-bg-surface p-5 pb-[calc(20px+env(safe-area-inset-bottom))]">
             <b className="block text-[15px]">Esta aula já tem relatório</b>
             <p className="mt-1 text-[12.5px] leading-relaxed text-text-secondary">

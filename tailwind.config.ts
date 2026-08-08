@@ -20,6 +20,11 @@ export default {
         warning: 'var(--warning)', 'warning-text': 'var(--warning-text)', 'warning-soft': 'var(--warning-soft)',
         info: 'var(--info)', 'info-text': 'var(--info-text)', 'info-soft': 'var(--info-soft)',
         'la-pink': 'var(--la-pink)',
+        // Fundo escurecido atrás de modal/bottom-sheet. O token existia em
+        // tokens.css desde o P0 mas não tinha utilitário — e por isso o app
+        // acumulou três véus diferentes (`bg-black/50`, `bg-black/60` e um
+        // `style` com var). No tema claro o certo é bem mais suave que preto.
+        scrim: 'var(--scrim)',
       },
       borderRadius: { sm: 'var(--r-sm)', md: 'var(--r-md)', lg: 'var(--r-lg)', xl: 'var(--r-xl)', full: 'var(--r-full)' },
       boxShadow: { card: 'var(--shadow-card)', fab: 'var(--shadow-fab)' },

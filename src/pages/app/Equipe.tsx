@@ -93,7 +93,7 @@ export default function EquipePage() {
 
         {lista && semAcesso.length > 0 && (
           <>
-            <p className="pt-1 text-[11.5px] font-bold uppercase tracking-[.5px] text-text-secondary">
+            <p className="pt-1 text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
               Ainda sem acesso
             </p>
             {semAcesso.map((p) => (
@@ -109,7 +109,7 @@ export default function EquipePage() {
 
         {lista && comAcesso.length > 0 && (
           <>
-            <p className="pt-3 text-[11.5px] font-bold uppercase tracking-[.5px] text-text-secondary">
+            <p className="pt-3 text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
               Já entram no app
             </p>
             {comAcesso.map((p) => (
@@ -126,9 +126,10 @@ export default function EquipePage() {
 
       {/* Confirmar antes: o toque manda mensagem no WhatsApp de uma pessoa. */}
       {confirmando && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4">
-          <div className="w-full max-w-[420px] rounded-lg border border-border-subtle bg-bg-surface p-4">
-            <b className="block text-[15px]">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim p-4">
+          {/* Mesma caixa do modal "Mudar senha" do professor: raio xl e p-5. */}
+          <div className="w-full max-w-[420px] rounded-xl border border-border-subtle bg-bg-surface p-5">
+            <b className="block text-[15px] font-extrabold">
               {confirmando.liberado ? 'Reenviar convite' : 'Liberar acesso'} — {confirmando.primeiro_nome}
             </b>
             <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
@@ -170,8 +171,10 @@ function quando(iso: string): string {
 function Linha({
   p, enviando, onLiberar,
 }: { p: ProfessorParaLiberar; enviando: boolean; onLiberar: () => void }) {
+  // Mesma superfície do Card do DS (raio lg + borda + shadow-card); só a
+  // densidade é menor, porque é linha de lista e não bloco de conteúdo.
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border-subtle bg-bg-surface px-3 py-[11px]">
+    <div className="flex items-center gap-3 rounded-lg border border-border-subtle bg-bg-surface px-3 py-[11px] shadow-card">
       <div className="min-w-0 flex-1">
         <b className="block truncate text-[14px]">{p.nome}</b>
         <div className="mt-[3px] flex flex-wrap items-center gap-[6px]">

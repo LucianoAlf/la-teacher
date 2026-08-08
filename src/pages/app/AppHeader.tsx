@@ -161,7 +161,7 @@ function ModalSenha({ onFechar, show }: { onFechar: (msg?: string) => void; show
   const campo = 'w-full rounded-md border border-border-strong bg-bg-inset px-[14px] py-[11px] text-sm text-text-primary placeholder:text-text-muted focus-visible:border-brand'
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center px-6" style={{ background: 'var(--scrim)' }}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-scrim px-6">
       <div className="w-full max-w-[380px] rounded-xl border border-border-subtle bg-bg-surface p-5">
         <b className="mb-3 block text-lg font-extrabold">Mudar senha</b>
         <form className="flex flex-col gap-3" onSubmit={salvar}>

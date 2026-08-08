@@ -110,7 +110,7 @@ export function InstallPrompt() {
       aria-modal="true"
       aria-label="Instalar o LA Teacher"
     >
-      <button className="absolute inset-0 bg-black/50" aria-label="Fechar" onClick={dismiss} />
+      <button className="absolute inset-0 bg-scrim" aria-label="Fechar" onClick={dismiss} />
       <div className="relative w-full rounded-t-2xl border-t border-border-subtle bg-bg-surface p-5 pb-[calc(20px+env(safe-area-inset-bottom))]">
         <button
           onClick={dismiss}

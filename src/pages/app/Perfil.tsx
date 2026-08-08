@@ -1,6 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, EmptyState, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
+import {
+  Button,
+  EmptyState,
+  LinhaInfo,
+  ScreenHeader,
+  SeloVersao,
+  Skeleton,
+  TituloSecao,
+  Toast,
+  useToast,
+} from '../../components/ui'
 import { atualizarPerfil, meuPerfil, type MeuPerfil } from '../../lib/api'
 import { PreferenciasFabio } from '../../features/fabio/PreferenciasFabio'
 import { AppFrame } from './AppFrame'
@@ -113,11 +123,7 @@ export default function PerfilPage() {
 
             {/* Informações da conta — só leitura */}
             <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface">
-              <div className="border-b border-border-subtle px-[14px] py-3">
-                <span className="text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
-                  Informações da conta
-                </span>
-              </div>
+              <TituloSecao>Informações da conta</TituloSecao>
               <LinhaInfo rotulo="Nome" valor={estado.perfil.nome} />
               <LinhaInfo rotulo="E-mail" valor={estado.perfil.email} />
               <LinhaInfo rotulo="WhatsApp" valor={estado.perfil.telefone_whatsapp} />
@@ -129,11 +135,7 @@ export default function PerfilPage() {
               onSubmit={(e) => void salvar(e)}
               className="mt-3 overflow-hidden rounded-lg border border-border-subtle bg-bg-surface"
             >
-              <div className="border-b border-border-subtle px-[14px] py-3">
-                <span className="text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
-                  Como o Fábio te conhece
-                </span>
-              </div>
+              <TituloSecao>Como o Fábio te conhece</TituloSecao>
 
               <div className="flex flex-col gap-4 px-[14px] py-4">
                 <label className="flex flex-col gap-[6px]">
@@ -186,31 +188,6 @@ export default function PerfilPage() {
   )
 }
 
-/** Selo discreto de build: dá pra bater o olho e saber em que versão o professor está. */
-function SeloVersao() {
-  const data = (() => {
-    try {
-      return new Intl.DateTimeFormat('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'America/Sao_Paulo',
-      }).format(new Date(__BUILD_TIME__))
-    } catch {
-      return null
-    }
-  })()
-
-  return (
-    <p className="mt-6 text-center text-[11px] text-text-muted">
-      LA Teacher · v{__APP_VERSION__}
-      {data ? ` · ${data}` : ''}
-    </p>
-  )
-}
-
 function Avatar({ perfil }: { perfil: MeuPerfil }) {
   if (perfil.foto_url) {
     return (
@@ -225,15 +202,6 @@ function Avatar({ perfil }: { perfil: MeuPerfil }) {
   return (
     <div className="flex h-[92px] w-[92px] items-center justify-center rounded-full bg-[var(--avatar-grad)] text-3xl font-extrabold text-[color:var(--avatar-fg)]">
       {inicial}
-    </div>
-  )
-}
-
-function LinhaInfo({ rotulo, valor }: { rotulo: string; valor: string | null }) {
-  return (
-    <div className="flex items-center gap-3 border-b border-border-subtle px-[14px] py-3 last:border-b-0">
-      <span className="w-[76px] flex-none text-[12.5px] font-bold text-text-secondary">{rotulo}</span>
-      <span className="min-w-0 flex-1 truncate text-sm text-text-primary">{valor || '—'}</span>
     </div>
   )
 }

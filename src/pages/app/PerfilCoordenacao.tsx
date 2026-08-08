@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { CoordenacaoFrame, AvatarDoUsuario } from './CoordenacaoFrame'
-import { EmptyState, Skeleton } from '../../components/ui'
+import { EmptyState, LinhaInfo, SeloVersao, Skeleton, TituloSecao } from '../../components/ui'
 import { useAuth } from '../../lib/auth'
 import { meuPerfilCoordenacao, type MeuPerfilCoordenacao } from '../../lib/api'
 
@@ -17,8 +17,14 @@ import { meuPerfilCoordenacao, type MeuPerfilCoordenacao } from '../../lib/api'
  *
  * É read-only por enquanto, e a tela DIZ isso em vez de mostrar campos que não
  * salvam. Botão que não faz nada ensina a não confiar no resto.
+ *
+ * Cartão, linhas, selo de versão e botão de voltar são os mesmos componentes do
+ * Meu perfil do professor. A primeira versão desta tela tinha uma linha de
+ * informação própria, um selo de build próprio (que omitia o número da versão)
+ * e um link de texto no lugar do botão de voltar.
  */
 export default function PerfilCoordenacaoPage() {
+  const navigate = useNavigate()
   const { signOut } = useAuth()
   const [perfil, setPerfil] = useState<MeuPerfilCoordenacao | null>(null)
   const [erro, setErro] = useState(false)
@@ -34,19 +40,12 @@ export default function PerfilCoordenacaoPage() {
   }, [])
 
   return (
-    <CoordenacaoFrame titulo="Meu perfil" icone="fa-solid fa-user">
+    <CoordenacaoFrame
+      titulo="Meu perfil"
+      icone="fa-solid fa-user"
+      aoVoltar={() => navigate('/app/coordenacao')}
+    >
       <div className="mx-auto max-w-[560px] px-5 pb-5 pt-3">
-        {/* Saída explícita: a sidebar leva pras outras telas, mas quem entra no
-            perfil pelo avatar espera um caminho de volta — igual à seta do
-            ScreenHeader na tela do professor. */}
-        <NavLink
-          to="/app/coordenacao"
-          className="mb-4 inline-flex items-center gap-2 text-[13px] text-text-secondary hover:text-text-primary"
-        >
-          <i className="fa-solid fa-arrow-left text-[12px]" aria-hidden />
-          Voltar pro painel
-        </NavLink>
-
         {erro ? (
           <EmptyState
             icon="fa-solid fa-triangle-exclamation"
@@ -55,76 +54,52 @@ export default function PerfilCoordenacaoPage() {
           />
         ) : !perfil ? (
           <div className="space-y-3">
-            <Skeleton className="h-[84px] w-[84px] rounded-full" />
+            <Skeleton className="h-[92px] w-[92px] rounded-full" />
             <Skeleton className="h-5 w-48" />
-            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full rounded-lg" />
           </div>
         ) : (
           <>
             <div className="mb-5 flex items-center gap-4">
               <AvatarDoUsuario perfil={perfil} tamanho="lg" />
               <div className="min-w-0">
-                <h2 className="truncate text-[19px] font-bold text-text-primary">{perfil.nome}</h2>
-                <p className="text-[13px] text-text-secondary">
+                <h2 className="truncate text-[17px] font-extrabold tracking-[-.3px] text-text-primary">
+                  {perfil.nome}
+                </h2>
+                <p className="text-[12.5px] text-text-secondary">
                   {perfil.cargo || 'Coordenação'} · {perfil.alcance}
                 </p>
               </div>
             </div>
 
-            <dl className="overflow-hidden rounded-md border border-border-subtle bg-bg-surface">
-              <Campo rotulo="Como te chamam" valor={perfil.apelido} />
-              <Campo rotulo="E-mail" valor={perfil.email} />
-              <Campo rotulo="Telefone" valor={perfil.telefone} />
-              <Campo rotulo="Cargo" valor={perfil.cargo} />
-            </dl>
+            <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card">
+              <TituloSecao>Informações da conta</TituloSecao>
+              <LinhaInfo rotulo="Apelido" valor={perfil.apelido} />
+              <LinhaInfo rotulo="E-mail" valor={perfil.email} />
+              <LinhaInfo rotulo="WhatsApp" valor={perfil.telefone} />
+              <LinhaInfo rotulo="Cargo" valor={perfil.cargo} />
+            </div>
 
-            <p className="mt-3 text-[12px] text-text-muted">
+            <p className="mt-3 text-[12px] leading-relaxed text-text-muted">
               Editar o perfil e trocar a foto ainda não têm porta no app. Por enquanto isso é
               alterado no LA Report.
             </p>
 
             <button
               onClick={() => void signOut()}
-              className="mt-6 inline-flex items-center gap-2 text-[13px] text-danger-text hover:underline"
+              className="mt-6 inline-flex items-center gap-3 text-sm text-danger-text"
             >
-              <i className="fa-solid fa-right-from-bracket text-[12px]" aria-hidden />
-              Sair da conta
+              <i
+                className="fa-solid fa-arrow-right-from-bracket w-[18px] text-center text-[13px]"
+                aria-hidden="true"
+              />
+              Sair
             </button>
 
-            {/* Mesmo selo da tela do professor: dá pra bater o olho e saber em
-                que versão a pessoa está antes de investigar um "sumiu". */}
-            <p className="mt-6 text-[11px] text-text-muted">{versaoDoBuild()}</p>
+            <SeloVersao />
           </>
         )}
       </div>
     </CoordenacaoFrame>
-  )
-}
-
-function versaoDoBuild() {
-  try {
-    const d = new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'America/Sao_Paulo',
-    }).format(new Date(__BUILD_TIME__))
-    return `versão de ${d}`
-  } catch {
-    return 'versão desconhecida'
-  }
-}
-
-/** Campo vazio aparece como "não informado" — não some. Sumir esconde o buraco. */
-function Campo({ rotulo, valor }: { rotulo: string; valor: string | null }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-3.5 py-3 last:border-b-0">
-      <dt className="shrink-0 text-[12.5px] text-text-secondary">{rotulo}</dt>
-      <dd className={`truncate text-[13px] ${valor ? 'text-text-primary' : 'text-text-muted'}`}>
-        {valor || 'não informado'}
-      </dd>
-    </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
-import { BotaoTema, FabioAvatar } from '../../components/ui'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { BotaoTema, BotaoVoltar, FabioAvatar, TabBar } from '../../components/ui'
 import { InstallPrompt } from '../../features/pwa/InstallPrompt'
 import { dataLonga } from '../../lib/datas'
 import { meuPerfilCoordenacao, type MeuPerfilCoordenacao } from '../../lib/api'
@@ -24,21 +24,36 @@ import { meuPerfilCoordenacao, type MeuPerfilCoordenacao } from '../../lib/api'
  * NÃO TEM BARRA DE CABEÇALHO (pedido do Alf, 08/08). Nome da página, data e
  * quem está logado flutuam sobre o conteúdo, sem fundo e sem borda: barra de
  * chrome rouba altura de um painel feito pra caber a lista inteira.
+ *
+ * O que MUDA em relação ao app do professor é só o esqueleto (sidebar × coluna
+ * de 430px). Tudo que aparece dentro — avatar, toggle de tema, data, barra do
+ * rodapé — é o mesmo componente e o mesmo tamanho, senão viram dois apps.
  */
 
 const COLAPSADA_KEY = 'la-coord-sidebar-colapsada'
 
-
 const ITENS = [
-  { para: '/app/coordenacao', rotulo: 'Painel', icone: 'fa-solid fa-table-columns' },
-  { para: '/app/equipe', rotulo: 'Equipe', icone: 'fa-solid fa-users' },
+  { id: 'painel', para: '/app/coordenacao', rotulo: 'Painel', icone: 'fa-solid fa-table-columns' },
+  { id: 'equipe', para: '/app/equipe', rotulo: 'Equipe', icone: 'fa-solid fa-users' },
 ] as const
+
+/** Rodapé do celular: as mesmas seções da sidebar + o perfil (que no desktop é a foto). */
+const ABAS = [
+  ...ITENS.map((i) => ({ id: i.id, label: i.rotulo, icon: i.icone })),
+  { id: 'perfil', label: 'Perfil', icon: 'fa-solid fa-user' },
+]
+const ROTA: Record<string, string> = {
+  painel: '/app/coordenacao',
+  equipe: '/app/equipe',
+  perfil: '/app/coordenacao/perfil',
+}
 
 export function CoordenacaoFrame({
   titulo,
   icone,
   subtitulo,
   acaoTopo,
+  aoVoltar,
   children,
 }: {
   /** Nome da PÁGINA — o mesmo do item da sidebar ("Painel", "Equipe"). */
@@ -47,8 +62,21 @@ export function CoordenacaoFrame({
   subtitulo?: string
   /** Extras do topo direito: filtro de unidade, de curso, o que a tela precisar. */
   acaoTopo?: ReactNode
+  /**
+   * Saída, pras telas que não estão na navegação (o perfil). É o mesmo botão
+   * redondo do `ScreenHeader` do professor — não um link de texto.
+   */
+  aoVoltar?: () => void
   children: ReactNode
 }) {
+  const nav = useNavigate()
+  const { pathname } = useLocation()
+  const abaAtiva = pathname.startsWith('/app/coordenacao/perfil')
+    ? 'perfil'
+    : pathname.startsWith('/app/equipe')
+      ? 'equipe'
+      : 'painel'
+
   // Colapso persiste: quem trabalha o dia todo no painel não quer reajustar a
   // largura a cada navegação. Mesmo comportamento do Organizer.
   const [colapsada, setColapsada] = useState(
@@ -93,7 +121,8 @@ export function CoordenacaoFrame({
         </button>
 
         {/* O Fábio é a cara do app: o nome dele em cima, o produto embaixo.
-            Mesmo desenho do TOM no LA Organizer. */}
+            Mesmo desenho do TOM no LA Organizer, e o mesmo avatar de 44px que o
+            AppHeader do professor usa. */}
         <div
           className={`flex items-center gap-3 px-3.5 pb-5 pt-8 ${colapsada ? 'justify-center' : ''}`}
         >
@@ -133,12 +162,15 @@ export function CoordenacaoFrame({
         </nav>
       </aside>
 
-      {/* ── Coluna principal ─────────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* ── Coluna principal ─────────────────────────────────────────────
+          `relative` porque a TabBar do DS se posiciona no rodapé do container
+          posicionado mais próximo — igual ao AppFrame do professor. */}
+      <div className="relative flex min-w-0 flex-1 flex-col">
         {/* Faixa flutuante: nome da PÁGINA à esquerda (o mesmo rótulo do item
             ativo na sidebar), data e perfil à direita. Sem fundo, sem borda. */}
         <div className="flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-6">
           <div className="flex min-w-0 items-center gap-2.5">
+            {aoVoltar ? <BotaoVoltar onClick={aoVoltar} /> : null}
             {icone ? (
               <i className={`${icone} text-[15px] text-text-secondary`} aria-hidden />
             ) : null}
@@ -148,7 +180,7 @@ export function CoordenacaoFrame({
               {titulo}
             </span>
             {subtitulo ? (
-              <span className="truncate text-[12px] text-text-secondary">{subtitulo}</span>
+              <span className="truncate text-[12.5px] text-text-secondary">{subtitulo}</span>
             ) : null}
           </div>
 
@@ -168,37 +200,25 @@ export function CoordenacaoFrame({
           </div>
         </div>
 
-        {/* Só o miolo rola — a moldura não cresce com o conteúdo. */}
-        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+        {/* Só o miolo rola — a moldura não cresce com o conteúdo. O respiro de
+            baixo no celular é a altura da TabBar (72px + safe-area). */}
+        <main className="min-h-0 flex-1 overflow-y-auto pb-[calc(80px_+_env(safe-area-inset-bottom))] md:pb-0">
+          {children}
+        </main>
 
-        {/* Navegação do celular. No desktop some: quem navega é a sidebar. */}
-        <nav className="flex shrink-0 border-t border-border-subtle bg-bg-surface md:hidden">
-          {ITENS.map((item) => (
-            <NavLink
-              key={item.para}
-              to={item.para}
-              className={({ isActive }) =>
-                `flex flex-1 flex-col items-center gap-1 py-2 text-[11px] ${
-                  isActive ? 'font-bold text-brand-text' : 'text-text-muted'
-                }`
-              }
-            >
-              <i className={`${item.icone} text-[15px]`} aria-hidden />
-              {item.rotulo}
-            </NavLink>
-          ))}
-          <NavLink
-            to="/app/coordenacao/perfil"
-            className={({ isActive }) =>
-              `flex flex-1 flex-col items-center gap-1 py-2 text-[11px] ${
-                isActive ? 'font-bold text-brand-text' : 'text-text-muted'
-              }`
-            }
-          >
-            <i className="fa-solid fa-user text-[15px]" aria-hidden />
-            Perfil
-          </NavLink>
-        </nav>
+        {/* Navegação do celular: a TabBar do DS, a mesma do app do professor —
+            72px, `env(safe-area-inset-bottom)` e 10,5px semibold. A versão
+            anterior era um <nav> meu, mais baixo e sem safe-area: no iPhone os
+            rótulos ficavam embaixo da barra de gestos. Sem vão central porque
+            aqui não existe FAB. */}
+        <div className="md:hidden">
+          <TabBar
+            items={ABAS}
+            activeId={abaAtiva}
+            fabGap={false}
+            onSelect={(id) => nav(ROTA[id])}
+          />
+        </div>
 
         <InstallPrompt />
       </div>
@@ -206,7 +226,13 @@ export function CoordenacaoFrame({
   )
 }
 
-/** Foto quando existe; iniciais quando não. Nunca um boneco genérico. */
+/**
+ * Foto quando existe; iniciais quando não. Nunca um boneco genérico.
+ *
+ * Tamanhos colados nos do professor: 40px no topo (AppHeader) e 92px no perfil
+ * (Meu perfil). Estavam em 36px e 92px/2xl — a mesma pessoa aparecia menor no
+ * painel da coordenação do que no app dela.
+ */
 export function AvatarDoUsuario({
   perfil,
   tamanho = 'sm',
@@ -214,7 +240,7 @@ export function AvatarDoUsuario({
   perfil: MeuPerfilCoordenacao | null
   tamanho?: 'sm' | 'lg'
 }) {
-  const classe = tamanho === 'lg' ? 'h-[92px] w-[92px] text-2xl' : 'h-9 w-9 text-[12px]'
+  const classe = tamanho === 'lg' ? 'h-[92px] w-[92px] text-3xl' : 'h-10 w-10 text-[15px]'
 
   if (perfil?.avatar_url) {
     return (
