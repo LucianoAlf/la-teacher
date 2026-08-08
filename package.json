@@ -59,6 +59,7 @@
     "teste:057": "node scripts/rodar-teste-sql.mjs supabase/migrations/057-liberar-acesso-do-professor.sql supabase/migrations/057-liberar-acesso-do-professor.test.sql",
     "teste:058": "node scripts/rodar-teste-sql.mjs supabase/migrations/058-a-fila-do-painel-e-por-urgencia.sql supabase/migrations/058-a-fila-do-painel-e-por-urgencia.test.sql",
     "teste:064": "node scripts/rodar-teste-sql.mjs supabase/migrations/064-a-pendencia-de-presenca-para-de-levar-27s.sql supabase/migrations/064-a-pendencia-de-presenca-para-de-levar-27s.test.sql",
+    "teste:065": "node scripts/rodar-teste-sql.mjs supabase/migrations/065-o-painel-da-coordenacao-tem-fonte.sql supabase/migrations/065-o-painel-da-coordenacao-tem-fonte.test.sql",
     "mutantes:036": "node scripts/mutantes-036.mjs",
     "mutantes:037": "node scripts/mutantes-037.mjs",
     "mutantes:038": "node scripts/mutantes-038.mjs",
