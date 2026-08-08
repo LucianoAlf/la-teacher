@@ -1104,3 +1104,76 @@ export async function liberarAcessoProfessor(professorId: number): Promise<Resul
   if (error && !data) return { ok: false, erro: 'rede' }
   return (data ?? { ok: false, erro: 'indisponivel' }) as ResultadoLiberacao
 }
+
+/* ─────────────────────── Painel da coordenação (065/066) ─────────────────── */
+
+export interface CoordenacaoLinha {
+  professor_id: number
+  professor_nome: string
+  /**
+   * Plural porque é lista: 27 dos 44 professores dão aula em mais de uma
+   * unidade, e a fila é UMA linha por pessoa (067). "Campo Grande, Recreio".
+   */
+  unidades: string
+  /** Aluno-aulas sem presença forte na janela. É a unidade da vw_presenca_pendencia. */
+  em_aberto: number
+  alunos: number
+  pior_atraso: number
+}
+
+export interface CoordenacaoEmAberto {
+  resumo: {
+    sem_lancamento: number
+    professores: number
+    ontem: number
+    professores_ativos: number
+  }
+  /** Já vem ordenado por urgência pela RPC — NUNCA reordenar por nome no cliente. */
+  professores: CoordenacaoLinha[]
+}
+
+/**
+ * Bloco 1 do painel: quem está com lançamento em aberto (migration 065).
+ *
+ * A janela é FECHADA em hoje: aula do dia ainda não está atrasada. Levanta
+ * `apenas_admin` pra quem não é da coordenação.
+ */
+export async function coordenacaoEmAberto(
+  dias = 7,
+  unidadeId: string | null = null,
+): Promise<CoordenacaoEmAberto> {
+  const { data, error } = await rpcSolta('app_coordenacao_em_aberto', {
+    p_dias: dias,
+    p_unidade_id: unidadeId,
+  })
+  if (error) throw error
+  return data as unknown as CoordenacaoEmAberto
+}
+
+export interface ResultadoRecado {
+  ok: boolean
+  /** Só é true quando o WhatsApp SAIU. Reservar não é enviar. */
+  enviado?: boolean
+  /** 'ja_cobrado_hoje' | 'professor_em_pausa' | 'sem_whatsapp' | 'falha_no_envio' */
+  motivo?: string | null
+  erro?: string
+}
+
+/**
+ * Manda o recado pelo canal do Fábio (edge function `coordenacao-recado`, 066).
+ *
+ * Reserva → envia → conclui. `ja_cobrado_hoje` NÃO é erro: é o Fábio já ter
+ * cobrado esse professor hoje, e a tela precisa dizer isso em vez de fingir que
+ * mandou.
+ */
+export async function coordenacaoRecado(
+  professorId: number,
+  corpo: string,
+): Promise<ResultadoRecado> {
+  if (SOMENTE_LEITURA) throw new Error('app em modo somente leitura')
+  const { data, error } = await supabase.functions.invoke('coordenacao-recado', {
+    body: { professor_id: professorId, corpo },
+  })
+  if (error && !data) return { ok: false, erro: 'rede' }
+  return (data ?? { ok: false, erro: 'indisponivel' }) as ResultadoRecado
+}

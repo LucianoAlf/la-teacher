@@ -1,23 +1,23 @@
--- 065 — o painel da coordenação tem fonte
+-- 067 — a fila do painel para de repetir professor
 --
--- SUPERADA POR: 067 — esta versão agrupa por (professor, unidade) e repete o
--- professor multi-unidade (38 pessoas viravam 60 linhas). O teste desta migration
--- continua rodando de propósito: ele instala a versão antiga e prova que o
--- defeito existia. Para o contrato vigente, ver a 067.
+-- SUPERA A 065 (só a função `app_coordenacao_em_aberto`; o resto da 065 continua
+-- valendo).
 --
--- A coordenação precisa ver quem está em aberto AGORA. A fonte é a
--- `vw_presenca_pendencia` (013), que já é a resposta canônica para "sem presença
--- forte". Não se recalcula nada aqui: o LA Teacher já tem uma régua de presença
--- honesta e o LA Report tem outra — somar uma terceira, dentro de casa, seria
--- garantir que o painel e a agenda discordem um dia.
+-- O DEFEITO, achado com o painel já rodando: a 065 agrupava por
+-- (professor, unidade). Como 27 dos 44 professores da casa dão aula em mais de
+-- uma unidade, 38 professores viravam **60 linhas** — e a própria tela
+-- denunciava, mostrando "Professores afetados: 38" em cima de uma fila de 60.
 --
--- Ordena por urgência (em_aberto desc, pior_atraso desc), NUNCA por nome. Isso
--- não é preferência: o painel de equipe já foi ao ar com a fila alfabética
--- enquanto a tela dizia "por urgência", e ninguém percebeu porque uma lista
--- ordenada errado parece uma lista ordenada.
+-- Não é cosmético. A coordenação cobraria o mesmo professor duas vezes, e o
+-- segundo clique bateria na dedupe diária da 066 respondendo "o Fábio já cobrou
+-- hoje" — uma explicação que não explica nada, porque quem clicou foi ela mesma,
+-- dez segundos antes.
 --
--- A janela é FECHADA em current_date: aula de hoje ainda não está atrasada. Sem
--- isso o painel cobraria o professor pela aula que ele está dando agora.
+-- A unidade não some: vira lista ("Campo Grande, Recreio"). Quem cobra precisa
+-- saber onde o professor dá aula, mas cobra a PESSOA, não a lotação.
+--
+-- Por isso o campo mudou de nome (`unidade_nome` → `unidades`): um campo que
+-- passa a guardar várias e mantém o nome no singular é a próxima armadilha.
 
 create or replace function public.app_coordenacao_em_aberto(
   p_dias       int  default 7,
@@ -44,12 +44,15 @@ begin
        and (p_unidade_id is null or unidade_id = p_unidade_id)
   ),
   por_professor as (
-    select professor_id, professor_nome, unidade_nome,
-           count(*)::int                 as em_aberto,
-           count(distinct aluno_id)::int as alunos,
-           max(dias_em_atraso)::int      as pior_atraso
-      from pend
-     group by 1, 2, 3
+    select professor_id,
+           min(professor_nome)            as professor_nome,
+           count(*)::int                  as em_aberto,
+           count(distinct aluno_id)::int  as alunos,
+           max(dias_em_atraso)::int       as pior_atraso,
+           (select string_agg(distinct u.unidade_nome, ', ' order by u.unidade_nome)
+              from pend u where u.professor_id = p.professor_id) as unidades
+      from pend p
+     group by professor_id
   )
   select jsonb_build_object(
     'resumo', jsonb_build_object(
@@ -64,7 +67,7 @@ begin
                jsonb_build_object(
                  'professor_id',   p.professor_id,
                  'professor_nome', p.professor_nome,
-                 'unidade_nome',   p.unidade_nome,
+                 'unidades',       p.unidades,
                  'em_aberto',      p.em_aberto,
                  'alunos',         p.alunos,
                  'pior_atraso',    p.pior_atraso)
@@ -77,13 +80,13 @@ begin
 end;
 $function$;
 
--- `create or replace` PRESERVA privilégios: sem o revoke explícito abaixo, um
--- grant antigo sobrevive à substituição e o mutante de permissão passa batido.
+-- `create or replace` PRESERVA privilégios: sem o revoke explícito, um grant
+-- antigo sobrevive à substituição e o mutante de permissão passa batido.
 revoke all on function public.app_coordenacao_em_aberto(int, uuid) from public;
 revoke all on function public.app_coordenacao_em_aberto(int, uuid) from anon;
 grant execute on function public.app_coordenacao_em_aberto(int, uuid) to authenticated;
 
 comment on function public.app_coordenacao_em_aberto(int, uuid) is
   'Bloco 1 do painel da coordenacao: quem esta com lancamento em aberto, '
-  'ordenado por urgencia. Fonte unica: vw_presenca_pendencia (013). '
-  'So coordenacao (fn_e_coordenacao_la_teacher, 062).';
+  'UMA linha por professor (as unidades viram lista), ordenado por urgencia. '
+  'Fonte unica: vw_presenca_pendencia (013). Supera a 065.';

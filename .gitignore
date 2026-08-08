@@ -46,3 +46,6 @@ coverage/
 
 # renders do estudio de video (binarios grandes)
 out/
+
+# Mockups do companion de brainstorm (superpowers)
+.superpowers/

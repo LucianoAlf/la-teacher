@@ -137,12 +137,16 @@ Deno.serve(async (req) => {
         reserva.notificacao_id, fimRes.status, (await fimRes.text()).slice(0, 200));
     }
 
+    // 200 mesmo quando o WhatsApp falha — igual ao `professor-liberar-acesso`.
+    // Não-2xx faz o supabase-js jogar tudo em `error` e engolir o corpo: a tela
+    // veria "problema de rede" e nunca saberia que o número está errado. O
+    // desfecho vai no CORPO, que é onde a tela consegue ler.
     return json({
       ok: true,
       enviado: envioOk,
       motivo: envioOk ? null : 'falha_no_envio',
       notificacao_id: reserva.notificacao_id,
-    }, envioOk ? 200 : 502);
+    });
 
   } catch (e) {
     console.error('[coordenacao-recado] erro nao tratado:', e);

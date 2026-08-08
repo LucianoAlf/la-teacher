@@ -5,6 +5,7 @@ import ExperimentalRegistrarPage from './pages/app/ExperimentalRegistrar'
 import ExperimentalConfirmarPage from './pages/app/ExperimentalConfirmar'
 import ExperimentalFaltaPage from './pages/app/ExperimentalFalta'
 import EquipePage from './pages/app/Equipe'
+import CoordenacaoPage from './pages/app/Coordenacao'
 import { RequireAdmin } from './pages/app/RequireAdmin'
 import LoginPage from './pages/app/Login'
 import NovaSenhaPage from './pages/app/NovaSenha'
@@ -111,7 +112,10 @@ export const router = createBrowserRouter(
           // "Vínculo pendente" — o dono do painel bateria na tela de quem não
           // tem acesso.
           element: <RequireAdmin />,
-          children: [{ path: '/app/equipe', element: <EquipePage /> }],
+          children: [
+            { path: '/app/coordenacao', element: <CoordenacaoPage /> },
+            { path: '/app/equipe', element: <EquipePage /> },
+          ],
         },
         // Vitrine do design system — SÓ em desenvolvimento. Em produção a rota
         // nem existe (cai no catch-all → /app), pra nenhum professor tropeçar.

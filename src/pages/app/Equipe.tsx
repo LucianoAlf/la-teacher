@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AppFrame } from './AppFrame'
-import { Badge, Button, EmptyState, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
+import { CoordenacaoFrame } from './CoordenacaoFrame'
+import { Badge, Button, EmptyState, Skeleton, Toast, useToast } from '../../components/ui'
 import {
   liberarAcessoProfessor,
   professoresParaLiberar,
@@ -66,16 +66,18 @@ export default function EquipePage() {
   const comAcesso = lista?.filter((p) => p.liberado) ?? []
 
   return (
-    <AppFrame>
-      {/* Sem seta de voltar: pra coordenação esta É a home. O /app manda de
-          volta pra cá (a agenda de lá é do professor), então uma seta faria o
-          caminho voltar pra própria tela — que parece travamento. */}
-      <ScreenHeader
-        title="Equipe"
-        subtitle={lista ? `${comAcesso.length} com acesso · ${semAcesso.length} sem` : undefined}
-      />
+    <CoordenacaoFrame
+      titulo="Equipe"
+      subtitulo={lista ? `· ${comAcesso.length} com acesso · ${semAcesso.length} sem` : undefined}
+    >
+      {/* Sem seta de voltar: a navegação da coordenação é a sidebar (desktop) ou
+          a barra do rodapé (celular). Seta aqui levaria pra lugar nenhum.
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-[calc(24px_+_env(safe-area-inset-bottom))]">
+          A lista vira GRADE no desktop: com o AppFrame ela ficava numa coluna de
+          430px no meio de 1300px, e seis professores ocupavam a tela inteira
+          rolando. Pra liberar 15 voluntários, ver a fila toda de uma vez é a
+          diferença entre trabalho e paciência. */}
+      <div className="space-y-3 px-4 py-4 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3 [&>p]:md:col-span-full">
         {!lista && !erro && (
           <>
             <Skeleton className="h-16 w-full rounded-lg" />
@@ -147,7 +149,7 @@ export default function EquipePage() {
       )}
 
       <Toast message={message} visible={visible} />
-    </AppFrame>
+    </CoordenacaoFrame>
   )
 }
 
@@ -174,7 +176,10 @@ function Linha({
         <div className="mt-[3px] flex flex-wrap items-center gap-[6px]">
           {p.experimentais_7d > 0 && (
             <Badge variant="info" icon="fa-solid fa-star">
-              {p.experimentais_7d} experimental{p.experimentais_7d > 1 ? 'is' : ''} essa semana
+              {/* "experimental" faz plural trocando o -l por -is: experimentais.
+                  Concatenar 'is' dava "experimentalis", que foi ao ar assim. */}
+              {p.experimentais_7d} {p.experimentais_7d > 1 ? 'experimentais' : 'experimental'} essa
+              semana
             </Badge>
           )}
           {!p.tem_whatsapp && (
