@@ -1,16 +1,25 @@
 import React from 'react'
-import { interpolate, staticFile, useCurrentFrame } from 'remotion'
+import { staticFile, useCurrentFrame } from 'remotion'
 import { C } from '../tokens'
 import { MarcaLA } from '../ui/MarcaLA'
 
 /**
  * Tela de login — réplica fiel de src/pages/app/Login.tsx.
+ *
+ * ⚠️ REFEITA EM 08/08/2026. A versão anterior mostrava e-mail + senha, e a
+ * narração mandava usar "a senha que a coordenação te passou". O login virou
+ * WhatsApp + código de 8 dígitos (migrations 056/057, edge `professor-entrar`)
+ * e não existe senha nenhuma no caminho do professor. Um vídeo de onboarding
+ * que ensina o passo errado é pior que vídeo nenhum: a pessoa tenta, não
+ * consegue, e conclui que o app não funciona no aparelho dela.
+ *
+ * São DUAS telas na mesma cena, como no app: pedir o código e digitar o
+ * código. O campo do código tem 8 zeros de placeholder de propósito — o
+ * mesmo detalhe que eu tinha errado no app (o Auth gera 8, não 6).
+ *
  * Medidas auditadas: moldura 430px, avatar 120px com glow rosa 24px, título
  * Prompt 900/32px ("LA" rosa + "Teacher" off-white), labels uppercase 11px,
  * inputs raio 12px sobre ink-800, botão teal 14.5px.
- *
- * Só a atmosfera muda: aqui os pontinhos e a marca d'água entram junto,
- * porque no vídeo a tela aparece pronta.
  */
 
 const LOGIN = {
@@ -29,8 +38,9 @@ const Campo: React.FC<{
   valor: string
   placeholder: string
   focado?: boolean
-  senha?: boolean
-}> = ({ label, valor, placeholder, focado = false, senha = false }) => (
+  /** o campo do código é grande, centralizado e espaçado */
+  codigo?: boolean
+}> = ({ label, valor, placeholder, focado = false, codigo = false }) => (
   <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
     <span
       style={{
@@ -46,8 +56,8 @@ const Campo: React.FC<{
     <div
       style={{
         borderRadius: 12,
-        padding: '12px 14px',
-        fontSize: 14,
+        padding: codigo ? '14px' : '12px 14px',
+        fontSize: codigo ? 22 : 14,
         background: LOGIN.inputBg,
         border: `1px solid ${focado ? C.brand : LOGIN.inputBorder}`,
         color: valor ? LOGIN.text : 'rgba(245,245,245,.45)',
@@ -55,30 +65,57 @@ const Campo: React.FC<{
         minHeight: 20,
         display: 'flex',
         alignItems: 'center',
+        justifyContent: codigo ? 'center' : 'flex-start',
+        letterSpacing: codigo ? '.35em' : undefined,
       }}
     >
-      {valor ? (senha ? '•'.repeat(valor.length) : valor) : placeholder}
+      {valor || placeholder}
     </div>
   </label>
 )
 
+const Botao: React.FC<{ children: React.ReactNode; pressionado?: boolean }> = ({
+  children,
+  pressionado = false,
+}) => (
+  <div
+    style={{
+      marginTop: 8,
+      borderRadius: 12,
+      padding: '13px 18px',
+      background: C.brand,
+      color: '#0A0F0E',
+      fontWeight: 700,
+      fontSize: 14.5,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      transform: pressionado ? 'scale(.97)' : 'scale(1)',
+    }}
+  >
+    {children}
+  </div>
+)
+
 export const Login: React.FC<{
-  /** quantos caracteres do e-mail já foram "digitados" */
-  emailDigitado?: number
-  senhaDigitada?: number
-  focoEmail?: boolean
-  focoSenha?: boolean
+  /** quantos caracteres do WhatsApp já foram "digitados" */
+  telefoneDigitado?: number
+  focoTelefone?: boolean
+  /** a partir daqui a tela troca pro passo do código */
+  modoCodigo?: boolean
+  codigoDigitado?: number
+  focoCodigo?: boolean
   entrando?: boolean
 }> = ({
-  emailDigitado = 0,
-  senhaDigitada = 0,
-  focoEmail = false,
-  focoSenha = false,
+  telefoneDigitado = 0,
+  focoTelefone = false,
+  modoCodigo = false,
+  codigoDigitado = 0,
+  focoCodigo = false,
   entrando = false,
 }) => {
   const frame = useCurrentFrame()
-  const EMAIL = 'matheus.felipe@lamusic.com.br'
-  const SENHA = '••••••••'
 
   return (
     <div
@@ -102,7 +139,6 @@ export const Login: React.FC<{
             backgroundSize: '14px 14px',
           }}
         />
-        {/* a LOGOMARCA de verdade (mesmo SVG do app), não texto em fonte */}
         <div
           style={{
             position: 'absolute',
@@ -153,67 +189,95 @@ export const Login: React.FC<{
 
       {/* formulário */}
       <div style={{ position: 'relative', zIndex: 10, padding: '0 28px 40px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Campo
-            label="E-mail"
-            valor={EMAIL.slice(0, emailDigitado)}
-            placeholder="voce@lamusic.com.br"
-            focado={focoEmail}
-          />
-          <Campo
-            label="Senha"
-            valor={SENHA.slice(0, senhaDigitada)}
-            placeholder="••••••••"
-            focado={focoSenha}
-          />
-          <div
-            style={{
-              marginTop: 8,
-              borderRadius: 12,
-              padding: '13px 18px',
-              background: C.brand,
-              color: '#0A0F0E',
-              fontWeight: 700,
-              fontSize: 14.5,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              transform: entrando ? 'scale(.97)' : 'scale(1)',
-            }}
-          >
-            {entrando ? (
-              <>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: 13,
-                    height: 13,
-                    border: '2px solid rgba(10,15,14,.35)',
-                    borderTopColor: '#0A0F0E',
-                    borderRadius: 999,
-                    transform: `rotate(${frame * 12}deg)`,
-                  }}
-                />
-                Entrando…
-              </>
-            ) : (
-              <>→ Entrar</>
-            )}
-          </div>
-        </div>
-        <div
-          style={{
-            marginTop: 20,
-            textAlign: 'center',
-            fontSize: 12,
-            lineHeight: 1.625,
-            color: LOGIN.muted,
-          }}
-        >
-          Sem acesso ainda? Fala com a coordenação da sua unidade pra ativar seu login.
-        </div>
+        {!modoCodigo ? (
+          <>
+            <div style={{ marginBottom: 12, fontSize: 13, lineHeight: 1.5, color: LOGIN.muted }}>
+              Coloca teu WhatsApp que eu te mando um código de acesso. Sem senha pra decorar.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Campo
+                label="WhatsApp"
+                valor={TELEFONE.slice(0, telefoneDigitado)}
+                placeholder="21 99999-9999"
+                focado={focoTelefone}
+              />
+              <Botao pressionado={entrando}>
+                {entrando ? (
+                  <>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 13,
+                        height: 13,
+                        border: '2px solid rgba(10,15,14,.35)',
+                        borderTopColor: '#0A0F0E',
+                        borderRadius: 999,
+                        transform: `rotate(${frame * 12}deg)`,
+                      }}
+                    />
+                    Mandando…
+                  </>
+                ) : (
+                  <>✆ Receber código</>
+                )}
+              </Botao>
+            </div>
+            <div
+              style={{
+                marginTop: 16,
+                textAlign: 'center',
+                fontSize: 12.5,
+                color: LOGIN.muted,
+                textDecoration: 'underline',
+                textUnderlineOffset: 3,
+              }}
+            >
+              Entrar com e-mail e senha
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ marginBottom: 12, fontSize: 13, lineHeight: 1.5, color: LOGIN.muted }}>
+              Boa, Matheus! Mandei um código no WhatsApp{' '}
+              <b style={{ color: LOGIN.text }}>5521·····47</b>. Ele vale por 1 hora.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Campo
+                label="Código"
+                valor={CODIGO.slice(0, codigoDigitado)}
+                placeholder="00000000"
+                focado={focoCodigo}
+                codigo
+              />
+              <Botao pressionado={entrando}>
+                {entrando ? (
+                  <>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 13,
+                        height: 13,
+                        border: '2px solid rgba(10,15,14,.35)',
+                        borderTopColor: '#0A0F0E',
+                        borderRadius: 999,
+                        transform: `rotate(${frame * 12}deg)`,
+                      }}
+                    />
+                    Conferindo…
+                  </>
+                ) : (
+                  <>→ Entrar</>
+                )}
+              </Botao>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
 }
+
+/** O número do Matheus, do jeito que ele digitaria — sem o 55. */
+export const TELEFONE = '21 98127-8047'
+/** 8 dígitos: é o que o Supabase Auth gera (mailer_otp_length = 8, medido). */
+export const CODIGO = '48210673'

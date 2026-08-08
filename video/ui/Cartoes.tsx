@@ -169,6 +169,21 @@ export const AULAS_0308: Aula[] = [
     badges: [{ tom: 'warn', texto: 'Sem chamada' }],
     mic: true,
   },
+  // A experimental entra na ORDEM DO DIA, entre a Amanda e a musicalização —
+  // agenda fora de ordem cronológica é a primeira coisa que um professor
+  // estranha. Ela se anuncia por duas diferenças ao mesmo tempo: o badge de
+  // estrela e o título ser o nome de uma PESSOA, não de uma turma (é o que o
+  // app faz — SessaoRow, migration 047).
+  //
+  // E não tem microfone na linha, de propósito: a experimental não se grava
+  // por aqui. Ela tem tela própria, porque o que o professor dita nela vai
+  // pra dois destinos diferentes (escola × família).
+  {
+    hora: '16:00',
+    titulo: 'Helena Duarte',
+    detalhe: 'Teclado · primeira vez aqui',
+    badges: [{ tom: 'info', texto: '★ Experimental' }],
+  },
   {
     hora: '17:00',
     titulo: 'Musicalização · turma de 2',

@@ -73,10 +73,35 @@ for (const m of fonte.matchAll(/^\s*const ([A-Za-z_][A-Za-z0-9_]*) = (-?\d+)\s*$
 }
 
 // id da cena → nome do componente, lido do registro CENAS
+//
+// ⚠️ A chave pode vir COM ASPAS: id com hífen (`'exp-agenda'`) não é
+// identificador JS válido. A primeira versão desta regex exigia `\w+` cru e
+// pulava essas cenas EM SILÊNCIO — as cinco cenas da experimental entraram no
+// vídeo e o harness continuou dizendo "31 toques conferidos", sem uma linha
+// avisando que nove tinham ficado de fora. Harness que ignora o que não
+// reconhece é pior que harness nenhum: ele assina embaixo.
 const bloco = fonte.slice(fonte.indexOf('const CENAS: Record<string, React.FC> = {'))
 const registro = bloco.slice(0, bloco.indexOf('\n}'))
 const componentePorCena = {}
-for (const m of registro.matchAll(/^\s{2}(\w+):\s*(Cena\w+),?\s*$/gm)) componentePorCena[m[1]] = m[2]
+for (const m of registro.matchAll(/^\s{2}'?([\w-]+)'?:\s*(Cena\w+),?\s*$/gm)) {
+  componentePorCena[m[1]] = m[2]
+}
+
+// A trava: toda entrada do CENAS tem que ter virado par id→componente. As que
+// não são `Cena*` (abertura e fecho são arrow functions inline) são declaradas
+// aqui uma vez, de propósito — se aparecer uma terceira, o harness para e
+// alguém decide o que fazer, em vez de a cena sumir da conferência.
+const INLINE = ['abertura', 'fecho']
+const idsNoRegistro = [...registro.matchAll(/^\s{2}'?([\w-]+)'?:/gm)].map((m) => m[1])
+const perdidas = idsNoRegistro.filter(
+  (id) => !componentePorCena[id] && !INLINE.includes(id),
+)
+if (perdidas.length) {
+  throw new Error(
+    `não li o componente de: ${perdidas.join(', ')} — o harness ia conferir ` +
+      'menos toques do que o vídeo tem, sem avisar',
+  )
+}
 
 function keyframesDe(componente) {
   const i = fonte.indexOf(`const ${componente}: React.FC = () => {`)

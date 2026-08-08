@@ -32,10 +32,19 @@ export const ROTEIRO: Cena[] = [
   },
   {
     id: 'login',
-    duracaoMinS: 7,
+    // ⚠️ REESCRITA EM 08/08/2026. Dizia "teu e-mail da LA e a senha que a
+    // coordenação te passou" — e não existe mais senha nenhuma no caminho do
+    // professor. É WhatsApp + código de 8 dígitos (056/057). Vídeo que ensina
+    // o passo errado é pior que vídeo nenhum: a pessoa tenta, não entra, e
+    // conclui que o app não funciona no aparelho dela.
+    //
+    // E o comentário fica DEPOIS do `id:`, não antes: o leitor do roteiro é
+    // uma regex que casa `{ id:` com `\s*` no meio — comentário ali dentro faz
+    // a cena inteira sumir da geração de voz, em silêncio.
+    duracaoMinS: 12,
     caption: '',
     narracao:
-      'Primeiro acesso é rapidinho: teu e-mail da LA e a senha que a coordenação te passou. Só isso.',
+      'Primeiro acesso: coloca teu WhatsApp. Eu te mando um código de oito números na hora, na nossa conversa. Digita ele aqui e pronto — sem senha pra decorar, sem e-mail pra lembrar.',
   },
   {
     id: 'home',
@@ -99,6 +108,46 @@ export const ROTEIRO: Cena[] = [
     caption: '',
     narracao:
       'E se num dia você não gravar o áudio? A chamada manual tá aqui. Todo mundo já começa presente — você só toca em quem faltou, confere e envia. Dois toques e acabou. Só presta atenção: depois de enviar, não dá pra editar pelo app.',
+  },
+  // ---- o ciclo da aula experimental (acrescentado em 08/08/2026) ----
+  // Entra aqui, DEPOIS da chamada: fecha o bloco "como registrar uma aula" e
+  // abre o de "e tem uma aula que não é como as outras". Antes dos alunos, que
+  // é a carteira de quem JÁ ficou na escola — a experimental é justamente
+  // sobre quem ainda está decidindo.
+  {
+    id: 'exp-agenda',
+    duracaoMinS: 9,
+    caption: '',
+    narracao:
+      'Repara nessa aqui de quatro horas. Ela vem com uma estrelinha e o nome de uma pessoa, não de uma turma: é aula experimental. Alguém que nunca pisou aqui.',
+  },
+  {
+    id: 'exp-ficha',
+    duracaoMinS: 14,
+    caption: '',
+    narracao:
+      'Toca e eu te conto quem vem antes de ela entrar na sala. A Helena tem sete anos, a irmã já faz teclado aqui, e a mãe avisou que ela é tímida no começo. Você entra sabendo — não descobre quando a criança chega.',
+  },
+  {
+    id: 'exp-registrar',
+    duracaoMinS: 15,
+    caption: '',
+    narracao:
+      'Acabou? Mesmo gesto de sempre: toca e fala. Só que agora eu separo de um jeito diferente — o que fica pra escola de um lado, e do outro o que a mãe vai receber. Você fala tudo junto, eu que divido.',
+  },
+  {
+    id: 'exp-confirmar',
+    duracaoMinS: 14,
+    caption: '',
+    narracao:
+      'Antes de sair, você lê o que a Camila vai receber. Nada vai pra família sem você ver. Confirmou? Aí eu lanço a presença, mando a devolutiva e aviso o comercial — as três de uma vez.',
+  },
+  {
+    id: 'exp-falta',
+    duracaoMinS: 9,
+    caption: '',
+    narracao:
+      'E se ela não aparecer, não precisa escrever nada. Um toque e o comercial já sabe, ainda hoje, pra correr atrás de remarcar antes que a família esfrie.',
   },
   {
     id: 'alunos',

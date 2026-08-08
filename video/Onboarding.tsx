@@ -20,7 +20,7 @@ import { Telefone } from './ui/Telefone'
 import { MenuProfessor } from './ui/AppShell'
 import { Abertura, Fecho } from './cenas/Marca'
 import { IntroTela } from './telas/IntroTela'
-import { Login } from './telas/Login'
+import { CODIGO, Login, TELEFONE } from './telas/Login'
 import { Home } from './telas/Home'
 import { AgendaTela } from './telas/AgendaTela'
 import { Gravar } from './telas/Gravar'
@@ -30,6 +30,12 @@ import { ConfirmarTela, OBS_TEXTO } from './telas/ConfirmarTela'
 import { Sucesso } from './telas/Sucesso'
 import { PresencaAuto } from './telas/PresencaAuto'
 import { ChamadaTela } from './telas/ChamadaTela'
+import {
+  ExperimentalConfirmar,
+  ExperimentalFalta,
+  ExperimentalFicha,
+  ExperimentalRegistrar,
+} from './telas/ExperimentalTelas'
 import { AlunosTela } from './telas/AlunosTela'
 import { FichaTela } from './telas/FichaTela'
 import { TurmaTela } from './telas/TurmaTela'
@@ -149,7 +155,9 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
 const digitado = (frame: number, desde: number, cps: number, max: number) =>
   frame < desde ? 0 : clamp(Math.floor(((frame - desde) * cps) / 30), 0, max)
 
-const EMAIL = 'matheus.felipe@lamusic.com.br'
+// O login não tem mais e-mail nem senha: é WhatsApp + código de 8 dígitos
+// (migrations 056/057). As constantes vêm da própria tela pra não divergirem
+// dela — era exatamente assim que o vídeo ia ensinar um caminho que não existe.
 
 /** Frames de espera antes da voz entrar em cada cena. A vinheta de abertura
  *  precisa de mais: o logo tem que assentar e o whoosh sair da frente antes
@@ -181,28 +189,44 @@ const CenaIntro: React.FC = () => {
   )
 }
 
+/**
+ * Login: DUAS telas na mesma cena, como no app — pedir o código e digitar o
+ * código. O corte entre elas (frame 150) é o momento em que a mensagem chega
+ * no WhatsApp; por isso o `popIn` sai ali, e não no clique do botão.
+ */
 const CenaLogin: React.FC = () => {
   const frame = useCurrentFrame()
+  // Frames ancorados no MP3 (silencedetect + ATRASO_PADRAO de 5):
+  //   t2 "coloca teu WhatsApp"            37–70   → toca o campo
+  //   t3 "Eu te mando um código…"         79–163  → toca Receber código
+  //   "na hora, na nossa conversa"        ~129    → o código CHEGA (troca a tela)
+  //   t4 "Digita ele aqui e pronto"       172–215 → digita e entra
   const kfs: CursorKeyframe[] = [
-    { frame: 8, x: 330, y: 790 },
-    { frame: 22, x: 205, y: 552, click: true },
-    { frame: 34, x: 305, y: 735 },
-    { frame: 118, x: 205, y: 628, click: true },
-    { frame: 130, x: 305, y: 735 },
-    { frame: 164, x: 205, y: 693, click: true },
-    { frame: 176, x: 310, y: 765 },
+    { frame: 8, x: 330, y: 800 },
+    { frame: 45, x: 205, y: 600, click: true }, // campo WhatsApp
+    { frame: 57, x: 305, y: 760 },
+    { frame: 92, x: 205, y: 672, click: true }, // Receber código (digitação já acabou)
+    { frame: 104, x: 320, y: 780 },
+    { frame: 178, x: 205, y: 612, click: true }, // campo Código (tela 2)
+    { frame: 190, x: 315, y: 770 },
+    { frame: 218, x: 205, y: 690, click: true }, // Entrar
+    { frame: 230, x: 320, y: 780 },
   ]
+  const modoCodigo = frame >= 134
   return (
     <Palco dedo={kfs}>
       <Login
-        focoEmail={frame >= 22 && frame < 118}
-        emailDigitado={digitado(frame, 26, 10, EMAIL.length)}
-        focoSenha={frame >= 118 && frame < 164}
-        senhaDigitada={digitado(frame, 126, 8, 8)}
-        entrando={frame >= 178}
+        focoTelefone={frame >= 45 && frame < 92}
+        telefoneDigitado={digitado(frame, 49, 10, TELEFONE.length)}
+        modoCodigo={modoCodigo}
+        focoCodigo={frame >= 178 && frame < 218}
+        codigoDigitado={digitado(frame, 182, 8, CODIGO.length)}
+        entrando={(frame >= 94 && frame < 134) || frame >= 220}
       />
-      <TypingTicks text={EMAIL} startFrame={26} cps={10} />
-      <TypingTicks text="••••••••" startFrame={126} cps={8} />
+      <TypingTicks text={TELEFONE} startFrame={49} cps={10} />
+      <TypingTicks text={CODIGO} startFrame={182} cps={8} />
+      {/* o código chegando no WhatsApp, em cima de "na hora, na nossa conversa" */}
+      <Sfx file={SFX.popIn} at={134} volume={0.3} />
     </Palco>
   )
 }
@@ -358,6 +382,108 @@ const CenaChamada: React.FC = () => {
 }
 
 /** Vem da Home: o dedo toca a aba ALUNOS lá embaixo e a carteira abre. */
+/* ------------------- o ciclo da aula experimental ------------------------ */
+
+/**
+ * A experimental na agenda. O dedo não toca nada aqui: a cena inteira é sobre
+ * RECONHECER a linha antes de tocar. Por isso a única coisa que acontece é a
+ * linha acender — o professor precisa aprender a diferença de relance, que é
+ * como ele vai encontrar na segunda de manhã.
+ */
+const CenaExpAgenda: React.FC = () => {
+  const frame = useCurrentFrame()
+  const kfs: CursorKeyframe[] = [
+    { frame: 20, x: 340, y: 720 },
+    { frame: 60, x: 250, y: 617 },
+  ]
+  return (
+    <Palco dedo={kfs}>
+      {/* índice 2 = a Helena, 16:00 (entre a Amanda e a musicalização).
+          Acende no meio de "Repara nessa aqui de quatro horas" (t1, 0–2,1s). */}
+      <AgendaTela aulaDestacada={frame >= 45 ? 2 : -1} />
+      <Sfx file={SFX.popIn} at={45} volume={0.26} />
+    </Palco>
+  )
+}
+
+/** A ficha: o contexto do lead antes de a criança entrar na sala. */
+const CenaExpFicha: React.FC = () => {
+  const frame = useCurrentFrame()
+  const kfs: CursorKeyframe[] = [
+    { frame: 8, x: 250, y: 617, click: true }, // abre pela linha da agenda
+    { frame: 24, x: 330, y: 760 },
+    { frame: 300, x: 330, y: 640 },
+  ]
+  return (
+    <Palco dedo={kfs}>
+      {/* o card acende junto com "A Helena tem sete anos" (t2, 3,7s) */}
+      <ExperimentalFicha destacarContexto={frame >= 116} />
+      <Sfx file={SFX.swoosh} at={10} volume={0.3} />
+      <Sfx file={SFX.popIn} at={116} volume={0.26} />
+    </Palco>
+  )
+}
+
+/**
+ * Registrar: três estados numa cena — botão, gravando, campos prontos. O corte
+ * pro resultado (frame 250) é o Fábio devolvendo o áudio já separado; o `chime`
+ * marca esse momento, que é o que a cena existe pra mostrar.
+ */
+const CenaExpRegistrar: React.FC = () => {
+  const frame = useCurrentFrame()
+  const kfs: CursorKeyframe[] = [
+    { frame: 10, x: 330, y: 760 },
+    { frame: 85, x: 215, y: 560, click: true }, // toca o microfone em "toca e fala"
+    { frame: 101, x: 330, y: 800 },
+    { frame: 200, x: 320, y: 700 },
+  ]
+  // Os campos aparecem quando a voz NOMEIA os dois destinos ("o que fica pra
+  // escola de um lado, e do outro o que a mãe vai receber", ~5,5s): o
+  // espectador vê a separação no instante em que a ouve.
+  const etapa: 0 | 1 | 2 = frame >= 172 ? 2 : frame >= 89 ? 1 : 0
+  return (
+    <Palco dedo={kfs}>
+      <ExperimentalRegistrar etapa={etapa} segundos={(frame - 89) / 30} />
+      <Sfx file={SFX.popIn} at={89} volume={0.3} />
+      <Sfx file={SFX.chime} at={172} volume={0.28} />
+    </Palco>
+  )
+}
+
+/** Confirmar: nada vai pra família sem o OK, e o "pronto" diz a quem chegou. */
+const CenaExpConfirmar: React.FC = () => {
+  const frame = useCurrentFrame()
+  const kfs: CursorKeyframe[] = [
+    { frame: 14, x: 330, y: 700 },
+    { frame: 150, x: 215, y: 690, click: true }, // "Confirmou?" (t3, 4,8s)
+    { frame: 166, x: 330, y: 780 },
+  ]
+  return (
+    <Palco dedo={kfs}>
+      {/* as três linhas do "feito" caem em cima de "eu lanço a presença,
+          mando a devolutiva e aviso o comercial" (t4–t6, 6,1s–11,2s) */}
+      <ExperimentalConfirmar confirmado={frame >= 166} pressionado={frame >= 150 && frame < 166} />
+      <Sfx file={SFX.chime} at={170} volume={0.32} />
+    </Palco>
+  )
+}
+
+/** Não veio: um toque. A cena é curta porque a tela é curta — é o ponto. */
+const CenaExpFalta: React.FC = () => {
+  const frame = useCurrentFrame()
+  const kfs: CursorKeyframe[] = [
+    { frame: 12, x: 330, y: 720 },
+    { frame: 90, x: 215, y: 800, click: true }, // "Um toque e o comercial já sabe" (t2, 2,8s)
+    { frame: 106, x: 330, y: 860 },
+  ]
+  return (
+    <Palco dedo={kfs}>
+      <ExperimentalFalta feito={frame >= 108} pressionado={frame >= 90 && frame < 108} />
+      <Sfx file={SFX.popIn} at={112} volume={0.3} />
+    </Palco>
+  )
+}
+
 const CenaAlunos: React.FC = () => {
   const frame = useCurrentFrame()
   const TROCA = 36 // a aba só responde depois do toque assentar
@@ -596,6 +722,11 @@ const CENAS: Record<string, React.FC> = {
   sucesso: CenaSucesso,
   presenca: CenaPresenca,
   chamada: CenaChamada,
+  'exp-agenda': CenaExpAgenda,
+  'exp-ficha': CenaExpFicha,
+  'exp-registrar': CenaExpRegistrar,
+  'exp-confirmar': CenaExpConfirmar,
+  'exp-falta': CenaExpFalta,
   alunos: CenaAlunos,
   ficha: CenaFicha,
   turma: CenaTurma,
