@@ -151,6 +151,19 @@ export default function EquipePage() {
   )
 }
 
+/**
+ * "entrou ontem" responde a pergunta que a coordenação faz na segunda de manhã:
+ * liberei — usou? Data cheia só depois de uma semana, quando "há N dias" já
+ * cansou de ser útil.
+ */
+function quando(iso: string): string {
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
+  if (dias <= 0) return 'hoje'
+  if (dias === 1) return 'ontem'
+  if (dias < 7) return `há ${dias} dias`
+  return `em ${new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
+}
+
 function Linha({
   p, enviando, onLiberar,
 }: { p: ProfessorParaLiberar; enviando: boolean; onLiberar: () => void }) {
@@ -169,8 +182,10 @@ function Linha({
               <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" /> sem WhatsApp no cadastro
             </span>
           )}
-          {p.liberado && !p.ultimo_acesso && (
-            <span className="text-[11.5px] text-text-muted">liberado, ainda não entrou</span>
+          {p.liberado && (
+            <span className="text-[11.5px] text-text-muted">
+              {p.ultimo_acesso ? `entrou ${quando(p.ultimo_acesso)}` : 'liberado, ainda não entrou'}
+            </span>
           )}
         </div>
       </div>

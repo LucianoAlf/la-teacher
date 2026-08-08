@@ -1062,6 +1062,12 @@ export interface ProfessorParaLiberar {
   primeiro_nome: string
   tem_whatsapp: boolean
   liberado: boolean
+  /**
+   * Último login DE VERDADE (`auth.users.last_sign_in_at`, migration 059).
+   * Até a 058 isto vinha de `usuarios.ultimo_acesso`, coluna que ninguém no
+   * banco inteiro escreve — o painel carimbava "ainda não entrou" em todo
+   * mundo, pra sempre. null aqui agora significa mesmo que nunca entrou.
+   */
   ultimo_acesso: string | null
   /** Quantas experimentais ele tem marcadas nos próximos 7 dias. É a fila de
    *  quem ganha mais em entrar hoje — por isso a RPC já devolve ordenado. */
