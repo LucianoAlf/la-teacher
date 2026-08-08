@@ -36,7 +36,7 @@ Documentation=https://github.com/LucianoAlf/la-teacher
 Type=oneshot
 WorkingDirectory=/home/fabio/fabio-chat-bridge
 EnvironmentFile=/home/fabio/.hermes/.env
-ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event pendencia --professor-id 25 --channel whatsapp --force
+ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event pendencia --channel whatsapp --force
 
 # ============================================================================
 # ~/.config/systemd/user/fabio-pendencia-noite.timer
@@ -64,7 +64,7 @@ Documentation=https://github.com/LucianoAlf/la-teacher
 Type=oneshot
 WorkingDirectory=/home/fabio/fabio-chat-bridge
 EnvironmentFile=/home/fabio/.hermes/.env
-ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event pendencia --professor-id 25 --channel whatsapp --force
+ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event pendencia --channel whatsapp --force
 
 # ============================================================================
 # ~/.config/systemd/user/fabio-pendencia-manha.timer
@@ -91,7 +91,7 @@ WantedBy=timers.target
 # AINDA FALTA (nao esta neste arquivo):
 # - escalonamento para coordenacao e grupo depois de N dias sem registro. O
 #   worker hoje so fala com o professor. Ver task #80.
-# - generalizar para todos os professores: hoje e --professor-id 25 fixo,
+# - generalizar para todos os professores: hoje e fixo,
 #   igual ao briefing do piloto.
 
 # ============================================================================
@@ -105,7 +105,7 @@ Documentation=https://github.com/LucianoAlf/la-teacher
 Type=oneshot
 WorkingDirectory=/home/fabio/fabio-chat-bridge
 EnvironmentFile=/home/fabio/.hermes/.env
-ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event escalonamento --professor-id 25 --channel whatsapp --force
+ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event escalonamento --channel whatsapp --force
 
 # ============================================================================
 # ~/.config/systemd/user/fabio-escalonamento.timer    (ATIVO, so professor 25)

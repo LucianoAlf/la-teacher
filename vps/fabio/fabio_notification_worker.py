@@ -84,9 +84,22 @@ def rpc(name: str, body: Dict[str, Any]) -> Any:
 
 
 def active_professors(professor_id: Optional[int] = None) -> list[Dict[str, Any]]:
+    """Professores ATIVOS **e com login liberado**.
+
+    O `usuario_id=not.is.null` é o que tira o Fábio do piloto de uma pessoa só.
+    Até 08/08/2026 o recorte era `--professor-id 25` cravado em quatro units do
+    systemd: pra abrir pra mais gente, alguém teria que lembrar de editar
+    arquivo na VPS — e o normal seria não lembrar.
+
+    Agora o recorte é o próprio acesso: liberou no painel, passa a receber
+    briefing e cobrança; não liberou, não é cobrado por uma tela que não
+    consegue abrir. Cobrar quem não tem como registrar é o jeito mais rápido de
+    o professor aprender a ignorar o Fábio.
+    """
     params = {
         "select": "id,nome,telefone_whatsapp,ativo",
         "ativo": "eq.true",
+        "usuario_id": "not.is.null",
         "order": "id.asc",
     }
     if professor_id is not None:

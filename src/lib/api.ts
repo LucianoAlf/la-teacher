@@ -1051,3 +1051,50 @@ export async function confirmarRegistroExperimental(
   if (error) throw error
   return res as unknown as ResultadoConfirmacao
 }
+
+// ---------------------------------------------------------------------------
+// Painel da equipe (admin) — liberar o acesso dos professores
+// ---------------------------------------------------------------------------
+
+export interface ProfessorParaLiberar {
+  professor_id: number
+  nome: string
+  primeiro_nome: string
+  tem_whatsapp: boolean
+  liberado: boolean
+  ultimo_acesso: string | null
+  /** Quantas experimentais ele tem marcadas nos próximos 7 dias. É a fila de
+   *  quem ganha mais em entrar hoje — por isso a RPC já devolve ordenado. */
+  experimentais_7d: number
+}
+
+/** A lista da equipe. LEVANTA `apenas_admin` pra quem não é admin (057). */
+export async function professoresParaLiberar(): Promise<ProfessorParaLiberar[]> {
+  // rpcSolta: RPC nasceu na migration 057, depois da última geração do db.ts.
+  const { data: res, error } = await rpcSolta('app_professores_para_liberar', {})
+  if (error) throw error
+  return (res as unknown as ProfessorParaLiberar[]) ?? []
+}
+
+export interface ResultadoLiberacao {
+  ok: boolean
+  professor_id?: number
+  ja_estava_liberado?: boolean
+  /** "Liberado" sem convite é acesso que a pessoa não sabe que tem. */
+  convite_enviado?: boolean
+  erro?: string
+}
+
+/**
+ * Libera o acesso e manda o convite no WhatsApp. Reenviar pra quem já está
+ * liberado é o caso mais comum depois de "perdi a mensagem" — por isso a
+ * função manda o convite de novo em vez de recusar.
+ */
+export async function liberarAcessoProfessor(professorId: number): Promise<ResultadoLiberacao> {
+  if (SOMENTE_LEITURA) throw new Error('app em modo somente leitura')
+  const { data, error } = await supabase.functions.invoke('professor-liberar-acesso', {
+    body: { professor_id: professorId },
+  })
+  if (error && !data) return { ok: false, erro: 'rede' }
+  return (data ?? { ok: false, erro: 'indisponivel' }) as ResultadoLiberacao
+}

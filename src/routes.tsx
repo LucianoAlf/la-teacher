@@ -4,6 +4,8 @@ import ExperimentalFichaPage from './pages/app/ExperimentalFicha'
 import ExperimentalRegistrarPage from './pages/app/ExperimentalRegistrar'
 import ExperimentalConfirmarPage from './pages/app/ExperimentalConfirmar'
 import ExperimentalFaltaPage from './pages/app/ExperimentalFalta'
+import EquipePage from './pages/app/Equipe'
+import { RequireAdmin } from './pages/app/RequireAdmin'
 import LoginPage from './pages/app/Login'
 import NovaSenhaPage from './pages/app/NovaSenha'
 import IntroPage from './pages/app/Intro'
@@ -102,6 +104,14 @@ export const router = createBrowserRouter(
           // o que vai acontecer escrito antes do toque que manda WhatsApp.
           { path: '/app/experimental/:vinculoId/falta', element: <ExperimentalFaltaPage /> },
           ],
+        },
+        {
+          // Guard PRÓPRIO, fora do RequireProfessor: o admin da escola não tem
+          // professor vinculado, e o guard do professor manda quem não tem pra
+          // "Vínculo pendente" — o dono do painel bateria na tela de quem não
+          // tem acesso.
+          element: <RequireAdmin />,
+          children: [{ path: '/app/equipe', element: <EquipePage /> }],
         },
         // Vitrine do design system — SÓ em desenvolvimento. Em produção a rota
         // nem existe (cai no catch-all → /app), pra nenhum professor tropeçar.
