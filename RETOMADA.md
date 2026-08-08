@@ -76,8 +76,17 @@ devolutiva §78). O selo honesto é "o professor confirmou e havia conteúdo".
 **Recomendação:** o painel nasce com os 4 ✅. Repertório e Jornada entram quando o
 Fábio tiver a régua — bloco próprio, não remendo.
 
-O que **ainda falta**: o 3º bloco, o **mobile** (desenho próprio, não o painel
-espremido) e a spec. Layout se resolve **mostrando mockup**, não descrevendo.
+**Mobile decidido:** é **plantão, não escritório** — só o que pede decisão agora,
+com o botão de resolver ali, chegando por push. Não é o painel espremido.
+
+**3º bloco: cortado de propósito.** Os 4 sinais já cobrem risco, destaque,
+silêncio e estagnação. Retenção e experimentais viram **filtro dentro do bloco
+2**. Um terceiro bloco nasce de falta sentida, não de espaço vazio na tela.
+
+📄 **A spec está escrita e commitada:**
+`docs/superpowers/specs/2026-08-08-painel-coordenacao-design.md`.
+Falta o **plano de implementação** (`superpowers:writing-plans`) — e antes dele,
+o review do Alf na spec.
 
 **Antes de escrever tela, invocar `superpowers:brainstorming`.** É a regra da
 casa e ela existe porque telas chutadas viram retrabalho.
