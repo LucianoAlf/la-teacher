@@ -93,8 +93,28 @@ estava verde:**
    silenciosamente descartado"*. Eu li o aviso e caí nele: a RPC devolvia
    `semaforo`, com teste e mutante provando, e o dado morria antes do prompt.
 
+### Segunda rodada, com o Alf olhando a tela (`062bc96`, migrations 079 e 080)
+
+*"Achei animal, tá aprovado"* — e três ajustes na sequência:
+
+- **Sidebar grifava dois itens ao mesmo tempo.** `NavLink` sem `end` acende por
+  PREFIXO, e `/app/coordenacao` é prefixo de `/app/coordenacao/feedback`.
+- **079 — filtros de coração e professor.** Escolher um coração TROCA a regra da
+  lista (grupo inteiro, verde calado incluído), não só o recorte; `sem_resposta`
+  é um coração de verdade; cada faceta ignora o próprio filtro e respeita as
+  outras. 9 passos, **8/8 mutantes**.
+- **080 — um número só.** O KPI dizia `0 de 1155` e a lista, na mesma tela,
+  `1161`. O grão aqui é **(aluno, professor)** — quem faz aula com dois
+  professores é respondido por cada um. Quem estava certo era o 1161: somar as
+  43 mesas dá pares. **É o mesmo defeito das duas contagens de manhã, voltando
+  pela porta dos fundos.** 5 passos, **4/4 mutantes**.
+
+Pilotado ao vivo como admin, com 5 respostas de teste (apagadas, tabela em 0):
+`Saudável` → mostra o verde calado · `Sem resposta` → 1161 nos três lugares ·
+`professor Matheus` → "4 de 21", e **21 é exatamente o que a mesa dele mostra**.
+
 **Aberto:** o LA Report continua sem ler a observação (lá o semáforo é só o
-coração no health score); e a tela nova ainda não foi vista com olho humano.
+coração no health score).
 
 ---
 
