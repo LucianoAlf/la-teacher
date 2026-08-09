@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { SOMENTE_LEITURA } from './config'
+import { extensaoDoMime } from './audio'
 
 /**
  * Camada de dados do app: SOMENTE wrappers das RPCs app_*.
@@ -1414,10 +1415,16 @@ export async function feedbackProgresso(): Promise<FeedbackProgresso> {
  * era usado pelo LA Report (transcrição de áudio do WhatsApp pro
  * pré-atendimento) no mesmo projeto Supabase compartilhado, e foi
  * sobrescrito por engano em 09/08. Ver INCIDENTE em RETOMADA.md.
+ *
+ * O nome do arquivo SEGUE O MIME DA GRAVAÇÃO. Estava cravado
+ * `observacao.webm`, e o iOS/Safari grava `audio/mp4` — o Whisper escolhe o
+ * decoder pela extensão, então todo iPhone mandava um m4a disfarçado de webm
+ * e recebia erro. A `transcrever-observacao` também deriva o nome por conta
+ * própria; esta linha é a primeira das duas camadas, não a única.
  */
 export async function transcreverAudio(blob: Blob): Promise<string> {
   const form = new FormData()
-  form.append('audio', blob, 'observacao.webm')
+  form.append('audio', blob, `observacao.${extensaoDoMime(blob.type)}`)
   const { data, error } = await supabase.functions.invoke('transcrever-observacao', {
     body: form,
   })

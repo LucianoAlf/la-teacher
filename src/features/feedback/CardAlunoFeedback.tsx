@@ -17,6 +17,19 @@ import { CampoObservacao } from './CampoObservacao'
  * Um card com coração e perguntas vazias fica visivelmente começado — é o que
  * o Fábio vai cobrar.
  *
+ * DUAS VERDADES, DE PROPÓSITO. `estado` é o que a tela mostra (muda no toque,
+ * sem esperar a rede — é o que faz "cada toque salva" parecer instantâneo);
+ * `confirmado` é o que o servidor **respondeu que gravou**. O ✓ sai de
+ * `confirmado`, nunca de `estado`. Antes saía de `estado`, e o resultado era o
+ * pior defeito possível numa tela de coleta: com a rede ruim o professor via
+ * 52 ✓ verdes, a barrinha em 0/52, e nada salvo. Um card que falhou mostra o
+ * alerta e ele **vence o ✓** — inclusive quando o aluno já estava completo
+ * antes e só a última mudança se perdeu.
+ *
+ * O toque que falhou NÃO é desfeito na tela: a escolha do professor continua
+ * visível pra ele reenviar (tocando no alerta) em vez de ter que lembrar o que
+ * tinha respondido.
+ *
  * `salvar()` manda o SNAPSHOT LOCAL inteiro (os 5 campos) — o `on conflict do
  * update` da 074 sobrescreve a linha inteira, sem coalesce (`observacao`
  * precisa poder ser apagada, e coalesce tornaria isso impossível). Os botões
@@ -38,19 +51,24 @@ export function CardAlunoFeedback({
   aoFalhar: (mensagem: string) => void
 }) {
   const [estado, setEstado] = useState(aluno)
+  const [confirmado, setConfirmado] = useState(aluno)
+  const [falhou, setFalhou] = useState(false)
   const [aberto, setAberto] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const filaRef = useRef<Promise<void>>(Promise.resolve())
   const emVooRef = useRef(0)
 
+  // Sai de `confirmado`: o ✓ é recibo do servidor, não eco do toque.
   const completo =
-    !!estado.feedback && !!estado.pratica_em_casa && !!estado.evolucao && !!estado.animo
+    !!confirmado.feedback &&
+    !!confirmado.pratica_em_casa &&
+    !!confirmado.evolucao &&
+    !!confirmado.animo
 
-  function salvar(mudanca: Partial<FeedbackAluno>) {
-    const novo = { ...estado, ...mudanca }
-    setEstado(novo)
+  function enviar(novo: FeedbackAluno) {
     if (!novo.feedback) return
     const feedback = novo.feedback
+    setFalhou(false)
     setSalvando(true)
     emVooRef.current += 1
     filaRef.current = filaRef.current.then(() =>
@@ -62,13 +80,31 @@ export function CardAlunoFeedback({
         animo: novo.animo,
         observacao: novo.observacao,
       })
-        .then((p) => aoSalvar({ total: p.total, respondidos: p.respondidos }))
-        .catch(() => aoFalhar('Não consegui salvar. Toca de novo.'))
+        .then((p) => {
+          // A fila serializa as chamadas desta linha, então o último sucesso é
+          // sempre o snapshot mais novo que o servidor aceitou.
+          setConfirmado(novo)
+          // Limpa um alerta de uma chamada ANTERIOR que falhou: se a mais nova
+          // passou, o servidor está com o dado mais recente e o alerta viraria
+          // mentira ao contrário (assustar sobre algo que foi salvo).
+          setFalhou(false)
+          aoSalvar({ total: p.total, respondidos: p.respondidos })
+        })
+        .catch(() => {
+          setFalhou(true)
+          aoFalhar('Não consegui salvar. Toca no alerta pra tentar de novo.')
+        })
         .finally(() => {
           emVooRef.current -= 1
           if (emVooRef.current === 0) setSalvando(false)
         }),
     )
+  }
+
+  function salvar(mudanca: Partial<FeedbackAluno>) {
+    const novo = { ...estado, ...mudanca }
+    setEstado(novo)
+    enviar(novo)
   }
 
   return (
@@ -83,10 +119,21 @@ export function CardAlunoFeedback({
               : null}
           </p>
         </div>
-        {completo ? (
-          <i className="fa-solid fa-circle-check text-success-text" role="img" aria-label="respondido" />
-        ) : salvando ? (
+        {salvando ? (
           <i className="fa-solid fa-circle-notch fa-spin text-text-muted" role="status" aria-label="salvando" />
+        ) : falhou ? (
+          // Vence o ✓ de propósito: se a última gravação não passou, o card não
+          // pode se apresentar como pronto — nem quando já estava completo antes.
+          <button
+            type="button"
+            onClick={() => enviar(estado)}
+            aria-label="Não salvou. Tentar de novo"
+            className="-m-1 p-1 text-danger-text"
+          >
+            <i className="fa-solid fa-triangle-exclamation" aria-hidden />
+          </button>
+        ) : completo ? (
+          <i className="fa-solid fa-circle-check text-success-text" role="img" aria-label="respondido" />
         ) : null}
       </div>
 

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button, Card, EmptyState, Skeleton, Toast, useToast } from '../../components/ui'
 import { cx } from '../../lib/cx'
 import { useCarteira } from '../../features/alunos/useCarteira'
-import { agruparPorCurso, contarPorUnidade, normalizar, type UnidadeContagem } from '../../features/alunos/carteira'
+import { agruparPorCurso, contarAlunos, contarPorUnidade, normalizar, type UnidadeContagem } from '../../features/alunos/carteira'
 import { AlunoRow } from '../../features/alunos/AlunoRow'
 import type { CarteiraAluno } from '../../lib/api'
 import { AppFrame } from './AppFrame'
@@ -64,7 +64,7 @@ export default function AlunosPage() {
         {multiUnidade && (
           <FiltroUnidades
             unidades={unidades}
-            total={alunos.length}
+            total={contarAlunos(alunos)}
             selecionada={unidade}
             onSelecionar={setUnidade}
           />

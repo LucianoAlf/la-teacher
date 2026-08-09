@@ -1,6 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { enfileirarAudioExperimental } from '../../lib/api'
-import { extensaoDoMime } from '../registro/useRecorder'
+import { extensaoDoMime } from '../../lib/audio'
 
 const BUCKET = 'fabio-audios'
 

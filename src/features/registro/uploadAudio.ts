@@ -1,6 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { enfileirarAudio, ErroGravacaoConhecido, type ErroGravacao } from '../../lib/api'
-import { extensaoDoMime } from './useRecorder'
+import { extensaoDoMime } from '../../lib/audio'
 import { listarFila, removerDaFila, salvarNaFila } from './filaOffline'
 
 const BUCKET = 'fabio-audios'

@@ -31,7 +31,32 @@ function json(body: unknown, status = 200) {
   })
 }
 
-const LIMITE_BYTES = 8 * 1024 * 1024 // ~2 minutos de webm/opus
+// 25 MB é o teto do próprio endpoint de transcrição da OpenAI — abaixo disso
+// não adianta recusar aqui, e acima disso não adianta encaminhar. O gravador
+// já para sozinho em 5 minutos (LIMITE_SEGUNDOS): 5 min de AAC do iPhone dá
+// ~5 MB, de webm/opus dá ~1,2 MB. O limite antigo (8 MB) descrevia "~2
+// minutos de webm/opus" e podia recusar uma gravação legítima de iPhone.
+const LIMITE_BYTES = 25 * 1024 * 1024
+
+/**
+ * Extensão a partir do mime — o Whisper escolhe o decoder pela EXTENSÃO do
+ * arquivo, não pelo Content-Type. iOS/Safari grava `audio/mp4`; mandar isso
+ * como `.webm` (que era o nome cravado aqui) falha em 100% dos iPhones.
+ *
+ * Deriva do mime do arquivo recebido, não do nome que o cliente mandou: um
+ * cliente que erre o nome continua funcionando. Espelha
+ * `src/lib/audio.ts` — os dois lados precisam concordar.
+ */
+function extensaoDoMime(mime: string): string {
+  const m = (mime || '').toLowerCase()
+  if (m.includes('mp4') || m.includes('m4a') || m.includes('aac')) return 'm4a'
+  if (m.includes('webm')) return 'webm'
+  if (m.includes('ogg') || m.includes('oga') || m.includes('opus')) return 'ogg'
+  if (m.includes('wav')) return 'wav'
+  if (m.includes('flac')) return 'flac'
+  if (m.includes('mpeg') || m.includes('mp3')) return 'mp3'
+  return 'webm'
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -57,8 +82,15 @@ Deno.serve(async (req) => {
     if (!(arquivo instanceof File)) return json({ erro: 'sem_audio' }, 400)
     if (arquivo.size > LIMITE_BYTES) return json({ erro: 'audio_longo_demais' }, 413)
 
+    // O mime do File vem do blob que o MediaRecorder produziu, então ele diz
+    // a verdade sobre o container. Se vier vazio (browser exótico), o nome
+    // que o cliente mandou é o segundo palpite.
+    const ext = arquivo.type
+      ? extensaoDoMime(arquivo.type)
+      : (arquivo.name.split('.').pop() || 'webm').toLowerCase()
+
     const envio = new FormData()
-    envio.append('file', arquivo, 'observacao.webm')
+    envio.append('file', arquivo, `observacao.${ext}`)
     envio.append('model', 'whisper-1')
     envio.append('language', 'pt')
 

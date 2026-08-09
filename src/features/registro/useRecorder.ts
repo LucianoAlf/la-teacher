@@ -19,13 +19,6 @@ export function escolherMime(): string {
   return '' // deixa o browser decidir
 }
 
-/** Extensão de arquivo a partir do mime (audio/mp4 → m4a; webm → webm). */
-export function extensaoDoMime(mime: string): string {
-  if (mime.includes('mp4')) return 'm4a'
-  if (mime.includes('webm')) return 'webm'
-  return 'webm'
-}
-
 export interface Recorder {
   estado: EstadoGravacao
   /** Duração corrente (ou final) em segundos. */
