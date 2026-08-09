@@ -127,6 +127,49 @@ O que ele pediu, na letra:
 Ordem que ele deu: **primeiro o professor preencher dentro do app**, depois a
 governança da semana com o Fábio lembrando.
 
+### O QUE EU MEDI ANTES DE DESENHAR (e corrige o que eu tinha dito)
+
+- **`aluno_feedback_professor` está VAZIA.** Zero linhas. O formulário do link
+  da Lia existe, tem 3 sessões criadas, e nenhum professor respondeu um aluno.
+  `alunos_health_score_historico` também: zero.
+- Os **107 "críticos"** que eu te mostrei **não são o coração do professor** —
+  são `calcular_health_score_alunos_batch`, score calculado por máquina, com
+  vocabulário próprio (saudavel/atencao/critico) e `health_score_updated_by`
+  nulo em 100% dos alunos.
+- **`calcular_health_score_aluno` LÊ `aluno_feedback_professor`**, com peso em
+  `config_health_score_aluno`. Como a tabela é vazia, **o pilar pedagógico do
+  score sempre valeu zero.** O score que "falhou" (os Atenção evadindo mais que
+  os Crítico) rodava com pagamento, tempo, fase e a presença que a 012 provou
+  ser 4.254 verdes falsos — sem a única coisa que só o professor sabe.
+- Existe `calcular_health_score_aluno_v2_sombra` com `confianca`, `cobertura` e
+  `modelo_pronto` — alguém já começou a versão honesta. Descobrir de quem é.
+- O link da Lia **nunca rodou de verdade**: era manual (mandar no WhatsApp na
+  mão) e hoje não se manda mais. Está de enfeite. Não é trabalho de desligar.
+
+### DECIDIDO NO BRAINSTORM (Alf, 08/08 madrugada — modal a modal)
+
+| Decisão | O que ficou |
+|---|---|
+| Áudio | **Complemento**, não substituto. Coração + justificativa por aluno; áudio opcional pra detalhar um caso. (Eu vou desenhar a obrigatoriedade como cumprível por texto **ou** áudio.) |
+| Onde mora | **Permanente dentro de Alunos** + **card na Home na última semana do mês** + lembrete do Fábio no WhatsApp com percentual e o porquê ("tá chegando a renovação", "pra evitar evasão") |
+| Quem entra na mesa | **Toda a carteira, separada em dois blocos**: "você deu aula pra esses" × "esses você não viu" (com dias). Quem sumiu é justamente quem mais importa |
+| Fronteira do texto cru | Coordenação e Fábio leem **cru**. **NUNCA** sai pro aluno/responsável nem pra devolutiva. **Trava no BANCO**, não na tela |
+| Escopo v1 por aluno | Coração + justificativa + **3 perguntas**: pratica em casa · está evoluindo · ânimo. (Expectativa × anamnese fica pra depois) |
+| Onde grava | **`aluno_feedback_professor`** — a tabela que o score já lê. *"Não cria duas verdades."* As 3 perguntas novas viram colunas nela. Peso chutado é **dívida a pagar no LA Report**, não motivo pra tabela paralela |
+| Governança | **Salva a cada toque** (38 alunos × 4 campos: botão Salvar no fim é convite a perder trabalho). Fábio lembra segunda da última semana, de novo quinta, e dia 1º quem não fechou aparece pra coordenação — escada da 066 |
+
+### REQUISITO NOVO: MAPA DE ADERÊNCIA (pedido do Alf no meio do brainstorm)
+
+*"A gente vai plantar uma cultura, e isso vai demorar."* Ele quer **medir a
+adesão** dos professores às coisas que alimentam o mapa de sinais — semáforo
+preenchido, **aluno sem anamnese**, registro de aula — **com evolução no
+tempo**: *"começou com 50%, agora 60%, agora 70%"*. E disse que **os
+coordenadores gostam muito disso**.
+
+É **fatia própria** (painel), não entra na spec da coleta. Mas a coleta tem que
+**deixar o número calculável** desde o dia 1: respondidos / carteira, por
+professor, por competência.
+
 ## ▶ PASSO ANTERIOR (concluído nesta sessão)
 
 **UI v2 do painel da coordenação** — pedido do Alf em 08/08, à noite, olhando o
