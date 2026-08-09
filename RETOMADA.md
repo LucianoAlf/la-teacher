@@ -218,7 +218,13 @@ em 5 semanas. Mesma armadilha pegou o presence MCP: as "3 chamadas" eram 3
 registros; ele **nunca foi invocado**. Contar ocorrência de string ≠ contar
 evento.
 
-### Achados abertos, em ordem de risco (nenhum bloqueia o que está no ar)
+### Achados — todos fechados (decisão técnica é minha, não do Alf)
+
+> Combinado em 09/08, depois de eu errar: **o Alf não é técnico e não recebe
+> decisão técnica.** "DEFAULT PRIVILEGES" e "porta em 0.0.0.0" não são escolhas
+> dele — são minhas. O que sobe pra ele é o que muda o negócio: o que o
+> professor vê, o que a coordenação vê, o que ele perde de alcance. O resto eu
+> decido, faço, e conto o que ficou.
 
 1. ✅ **`skill_manage` FORA do canal do professor** — resolvido em 09/08, à noite.
    Eu tinha proposto inlinar o SKILL.md no prompt; **o Alf derrubou a ideia** e
@@ -245,13 +251,26 @@ evento.
      ele só enumera toolsets *configuráveis*, então `skills_leitura` some da
      lista e parece que o professor perdeu `skill_view`. Quase reportei que
      tinha quebrado o Fábio.
-2. **DEFAULT PRIVILEGES faz o vazamento se regenerar**: toda tabela nova criada
-   pelo `postgres` já nasce com `fabio_agent=r`
-   (`{...,fabio_agent=r/postgres,...}`). Revogar os 374 hoje é enxugar gelo — e
-   **revogar agora desfaria a capacidade admin que o Alf pediu pra manter**, já
-   que o role virou exclusivo do canal dele. É decisão dele, não minha.
-3. **A porta 8644 (webhook) escuta em `0.0.0.0`**, não em localhost — a 8652 é
-   só local. Tem `secret` e `rate_limit`, mas está exposta na internet.
+2. ✅ **DEFAULT PRIVILEGES — DECIDIDO: fica como está.** Toda tabela nova criada
+   pelo `postgres` nasce com `fabio_agent=r`. Isso **não é defeito na
+   arquitetura de hoje**: depois do `no_mcp`, o `fabio_agent` só é alcançável
+   pelo canal admin do Alf, e um role de ferramenta administrativa que
+   acompanha o banco é o comportamento desejado. Revogar quebraria justamente
+   a capacidade que ele escolheu manter. Não é decisão do Alf — é técnica, e
+   está tomada.
+   ⚠️ **O que reabre isso:** devolver qualquer MCP de banco ao
+   `platform_toolsets.api_server`. O role atrás dele enxerga o schema inteiro,
+   **inclusive tabelas que ainda não existem**. Se um dia isso for preciso,
+   role novo com grant estreito, não o `fabio_agent`.
+3. ✅ **A porta 8644 NÃO é problema — eu marquei errado.** Ela escuta em
+   `0.0.0.0` porque **precisa**: é a rota `registro-aula`, chamada de fora
+   (POSTs reais, o último em 08/08). E é protegida: HMAC obrigatório por rota,
+   validado no boot, e o adapter recusa o modo sem-auth quando o host não é
+   loopback. Medido em 09/08 no caminho certo (`/webhooks/registro-aula`, não
+   `/registro-aula`): sem assinatura → **401**, HMAC errada → **401**, com
+   `Invalid signature` no log e zero trabalho gerado.
+   Lição: "porta em 0.0.0.0" não é achado — achado é *precisa estar aberta?* e
+   *está protegida?*. Eu reportei risco sem responder nenhuma das duas.
 4. **`fabio_presence_mcp` continua sem escopo** (`professor_id` arbitrário), mas
    agora é inalcançável pelo professor (`no_mcp`) e **nunca foi invocado**. Usa
    **service_role**, não `fabio_agent` — então revogar grant não fecharia ele.
