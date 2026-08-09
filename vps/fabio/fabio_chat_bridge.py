@@ -20,7 +20,7 @@ import sys
 import threading
 import time
 import unicodedata
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -988,13 +988,160 @@ def compact_pedagogical_context(ctx: Optional[Dict[str, Any]]) -> str:
         return str(ctx)[:5000]
 
 
-def _format_today_schedule(ctx: Dict[str, Any]) -> str:
+# ---------------------------------------------------------------------------
+# DE QUE DIA A PERGUNTA ESTA FALANDO
+#
+# 09/08/2026: "como esta minha agenda de amanha?" foi respondido pelo atalho com
+# a agenda de HOJE, e ainda rotulada "de hoje". Era domingo (0 aulas); na
+# segunda ele tinha 5. O professor que se planeja com isso chega achando que
+# nao tem aula.
+#
+# A causa nao foi o parser errar o dia: e que parser nao existia. `asks_today`
+# aceitava "minhas aulas" e "minha agenda" -- frases que nao falam de dia
+# nenhum -- como prova de que a pergunta era sobre hoje.
+#
+# O RPC fabio_contexto_professor sempre soube servir outro dia (p_data) e
+# devolve o dia servido em hoje.data. A capacidade existia; o atalho e que nao
+# usava.
+#
+# Contrato daqui pra frente: ou este modulo sabe QUAL dia foi pedido, ou
+# try_fast_response devolve None e a pergunta segue pro Hermes. Chutar hoje e
+# pior do que demorar, porque "nao encontrei aulas" e uma negativa afirmada --
+# o pior formato pra estar errado.
+# ---------------------------------------------------------------------------
+
+# Marcador de PERIODO: fala de mais de um dia. O atalho nao sabe somar semana,
+# e principalmente nao pode reduzir "minha agenda da semana" a hoje.
+# O \b nao e decoracao: sem ele "ano" casa dentro de "piano".
+_PERIODO_RE = re.compile(
+    r"\b(semanas?|semanal|mes|meses|mensal|quinzenas?|bimestres?|semestres?|"
+    r"anos?|periodos?|proximos dias|todos os dias|por dia)\b"
+)
+
+# Abreviacoes de 3 letras (seg/ter/qua) ficam de fora de proposito: "ter" e
+# palavra comum em portugues ("vou ter aula") e viraria terca-feira.
+_DIAS_SEMANA = {
+    "segunda": (0, "segunda", "na"),
+    "terca": (1, "terça", "na"),
+    "quarta": (2, "quarta", "na"),
+    "quinta": (3, "quinta", "na"),
+    "sexta": (4, "sexta", "na"),
+    "sabado": (5, "sábado", "no"),
+    "domingo": (6, "domingo", "no"),
+}
+_DIA_SEMANA_RE = re.compile(
+    r"\b(segunda|terca|quarta|quinta|sexta|sabado|domingo)s?\b(?:[ -]?feiras?\b)?"
+)
+
+# Ordem importa: "depois de amanha" contem "amanha", e o trecho casado e
+# consumido antes do proximo padrao rodar.
+_MARCADORES_OFFSET = [
+    (re.compile(r"\bdepois de amanha\b"), 2, "depois de amanhã", "depois de amanhã"),
+    (re.compile(r"\banteontem\b"), -2, "anteontem", "anteontem"),
+    (re.compile(r"\bamanha\b"), 1, "amanhã", "amanhã"),
+    (re.compile(r"\bontem\b"), -1, "ontem", "ontem"),
+    (re.compile(r"\b(hoje|hj)\b"), 0, "hoje", "hoje"),
+]
+_DATA_DDMM_RE = re.compile(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b")
+_DIA_DO_MES_RE = re.compile(r"\bdia (\d{1,2})\b")
+
+# Fora dessa janela a leitura vira chute (ex.: "dia 12" de um ano atras).
+_HORIZONTE_PASSADO = 60
+_HORIZONTE_FUTURO = 120
+
+
+def _data_valida(ano: int, mes: int, dia: int) -> Optional[date]:
+    try:
+        return date(ano, mes, dia)
+    except ValueError:
+        return None
+
+
+def _resolver_dia_pedido(norm: str) -> Optional[Dict[str, Any]]:
+    """De que dia fala a pergunta. None = nao sei -- e nao saber nao vira hoje.
+
+    None NAO significa "nao tem aula": significa "este atalho nao sabe". Quem
+    recebe None manda a pergunta pro Hermes, que e lento e certo, em vez de
+    rapido e errado.
+    """
+    if _PERIODO_RE.search(norm):
+        return None
+
+    hoje = date.fromisoformat(today_brt())
+    resto = norm
+    achados: list[tuple[date, str, str]] = []
+
+    def consumir(m: "re.Match[str]") -> None:
+        nonlocal resto
+        resto = resto[:m.start()] + " " + resto[m.end():]
+
+    for pat, offset, label, sufixo in _MARCADORES_OFFSET:
+        m = pat.search(resto)
+        if m:
+            consumir(m)
+            achados.append((hoje + timedelta(days=offset), label, sufixo))
+
+    m = _DIA_SEMANA_RE.search(resto)
+    if m:
+        consumir(m)
+        idx, nome, prep = _DIAS_SEMANA[m.group(1)]
+        delta = (idx - hoje.weekday()) % 7
+        if delta == 0:
+            # "segunda" dita numa segunda: hoje ou a proxima? Nao da pra saber,
+            # e ambiguidade aqui vira resposta confiante sobre o dia errado.
+            return None
+        alvo = hoje + timedelta(days=delta)
+        achados.append((alvo, f"{nome} ({alvo:%d/%m})", f"{prep} {nome} ({alvo:%d/%m})"))
+
+    m = _DATA_DDMM_RE.search(resto)
+    if m:
+        consumir(m)
+        ano = int(m.group(3) or hoje.year)
+        if ano < 100:
+            ano += 2000
+        alvo = _data_valida(ano, int(m.group(2)), int(m.group(1)))
+        if alvo is None:
+            return None
+        achados.append((alvo, f"{alvo:%d/%m}", f"em {alvo:%d/%m}"))
+
+    m = _DIA_DO_MES_RE.search(resto)
+    if m:
+        consumir(m)
+        n = int(m.group(1))
+        alvo = _data_valida(hoje.year, hoje.month, n)
+        if alvo is None or alvo < hoje:
+            # Ja passou neste mes (ou nem existe nele): a leitura natural de
+            # "dia 3" no dia 28 e o dia 3 do mes que vem.
+            prox = (hoje.replace(day=1) + timedelta(days=32)).replace(day=1)
+            alvo = _data_valida(prox.year, prox.month, n)
+        if alvo is None:
+            return None
+        achados.append((alvo, f"{alvo:%d/%m}", f"em {alvo:%d/%m}"))
+
+    if len(achados) > 1:
+        # "hoje e amanha", "segunda ou terca": mais de um dia na mesma frase.
+        return None
+    if not achados:
+        # Nenhum dito sobre dia. "minha agenda" seco quer dizer hoje -- e era o
+        # unico caso que o codigo antigo acertava.
+        return {"iso": hoje.isoformat(), "label": "hoje", "sufixo": "hoje",
+                "passado": False, "explicito": False}
+
+    alvo, label, sufixo = achados[0]
+    if not (-_HORIZONTE_PASSADO <= (alvo - hoje).days <= _HORIZONTE_FUTURO):
+        return None
+    return {"iso": alvo.isoformat(), "label": label, "sufixo": sufixo,
+            "passado": alvo < hoje, "explicito": True}
+
+
+def _format_day_schedule(ctx: Dict[str, Any], dia: Dict[str, Any]) -> str:
     first = ctx.get("primeiro_nome") or ctx.get("nome") or "Professor"
-    hoje = ctx.get("hoje") if isinstance(ctx.get("hoje"), dict) else {}
-    aulas = hoje.get("aulas") or []
+    # A chave continua "hoje" no RPC, mas carrega o dia que foi PEDIDO.
+    bloco = ctx.get("hoje") if isinstance(ctx.get("hoje"), dict) else {}
+    aulas = bloco.get("aulas") or []
     if not aulas:
-        return f"{first}, não encontrei aulas na sua agenda de hoje."
-    lines = [f"{first}, suas aulas de hoje são:", ""]
+        return f"{first}, não encontrei aulas na sua agenda de {dia['label']}."
+    lines = [f"{first}, suas aulas de {dia['label']} {'foram' if dia['passado'] else 'são'}:", ""]
     for aula in aulas:
         hora = aula.get("hora") or "--:--"
         curso = aula.get("curso") or "Aula"
@@ -1003,16 +1150,17 @@ def _format_today_schedule(ctx: Dict[str, Any]) -> str:
         for aluno in alunos:
             lines.append(f"• {aluno}")
         lines.append("")
-    total = hoje.get("total_aulas") or len(aulas)
-    lines.append(f"Você tem *{total} aulas* hoje.")
+    total = bloco.get("total_aulas") or len(aulas)
+    verbo = "teve" if dia["passado"] else "tem"
+    lines.append(f"Você {verbo} *{total} aula{'s' if total != 1 else ''}* {dia['sufixo']}.")
     return "\n".join(lines).strip()
 
 
-def _format_today_counts(ctx: Dict[str, Any]) -> str:
+def _format_day_counts(ctx: Dict[str, Any], dia: Dict[str, Any]) -> str:
     first = ctx.get("primeiro_nome") or ctx.get("nome") or "Professor"
-    hoje = ctx.get("hoje") if isinstance(ctx.get("hoje"), dict) else {}
-    aulas = hoje.get("aulas") or []
-    total_aulas = hoje.get("total_aulas") or len(aulas)
+    bloco = ctx.get("hoje") if isinstance(ctx.get("hoje"), dict) else {}
+    aulas = bloco.get("aulas") or []
+    total_aulas = bloco.get("total_aulas") or len(aulas)
     atendimentos = sum(len(a.get("alunos") or []) for a in aulas)
     unicos = []
     seen = set()
@@ -1023,10 +1171,12 @@ def _format_today_counts(ctx: Dict[str, Any]) -> str:
                 seen.add(key)
                 unicos.append(aluno)
     if not aulas:
-        return f"{first}, não encontrei aulas na sua agenda de hoje."
+        return f"{first}, não encontrei aulas na sua agenda de {dia['label']}."
+    sufixo = dia["sufixo"]
+    verbo = "teve" if dia["passado"] else "tem"
     if atendimentos == len(unicos):
-        return f"{first}, hoje você tem *{len(unicos)} alunos* na agenda, em *{total_aulas} aulas*."
-    return f"{first}, hoje você tem *{atendimentos} atendimentos de alunos* em *{total_aulas} aulas*. Contando alunos únicos, são *{len(unicos)} alunos diferentes*."
+        return f"{first}, {sufixo} você {verbo} *{len(unicos)} alunos* na agenda, em *{total_aulas} aulas*."
+    return f"{first}, {sufixo} você {verbo} *{atendimentos} atendimentos de alunos* em *{total_aulas} aulas*. Contando alunos únicos, são *{len(unicos)} alunos diferentes*."
 
 
 def _aula_minutes(hora: str) -> Optional[int]:
@@ -1491,25 +1641,44 @@ def try_fast_response(row: Dict[str, Any]) -> Optional[str]:
     if any(b in norm for b in blocked):
         return None
 
-    professor_id = int(row["professor_id"])
-    ctx = professor_context(professor_id)
-    if not isinstance(ctx, dict) or not ctx.get("ok"):
-        return None
-    first = ctx.get("primeiro_nome") or ctx.get("nome") or "Professor"
-
     # Conversational check-ins/reflections must go through Hermes/GPT.
     # The bridge should not write the professor-facing prose for these.
     if _is_day_reflection_question(norm) or _is_light_checkin(norm):
         return None
 
-    asks_today = "hoje" in norm or "hj" in norm or "minhas aulas" in norm or "minha agenda" in norm
-    asks_schedule = any(p in norm for p in ["quais minhas aulas", "minhas aulas", "minha agenda", "aulas de hoje", "agenda de hoje", "horarios de hoje", "horários de hoje"])
+    asks_schedule = any(p in norm for p in ["quais minhas aulas", "minhas aulas", "minha agenda", "aulas de hoje", "agenda de hoje", "horarios de hoje"])
     asks_count = any(p in norm for p in ["quantos alunos", "quantas aulas", "qtd alunos", "qtd de alunos", "total de alunos"])
-    if asks_count and asks_today:
-        return _format_today_counts(ctx)
-    if asks_schedule and asks_today:
-        return _format_today_schedule(ctx)
-    return None
+    if not (asks_schedule or asks_count):
+        return None
+
+    # O dia sai do TEXTO. Se nao der pra saber qual e, o atalho se cala: quem
+    # nao sabe o dia nao pode afirmar que nao ha aula nele.
+    dia = _resolver_dia_pedido(norm)
+    if dia is None:
+        return None
+    # "quantos alunos eu tenho", sem dia nenhum, e pergunta de carteira e nao de
+    # agenda -- responder com a contagem de hoje daria um numero certo para a
+    # pergunta errada. So conta quando o dia foi dito ou quando ele falou da
+    # propria agenda.
+    if asks_count and not asks_schedule and not dia["explicito"]:
+        return None
+
+    professor_id = int(row["professor_id"])
+    ctx = professor_context(professor_id, dia["iso"])
+    if not isinstance(ctx, dict) or not ctx.get("ok"):
+        return None
+    # Trava final: o RPC devolve em hoje.data o dia que serviu. Se nao for o que
+    # foi pedido, calar -- responder aqui seria de novo falar de um dia enquanto
+    # o professor perguntou de outro.
+    servido = (ctx.get("hoje") or {}).get("data")
+    if servido and servido != dia["iso"]:
+        log("fast_path_dia_divergente", professor_id=professor_id,
+            pedido=dia["iso"], servido=servido)
+        return None
+
+    if asks_count:
+        return _format_day_counts(ctx, dia)
+    return _format_day_schedule(ctx, dia)
 
 
 def generate_answer(row: Dict[str, Any]) -> tuple[str, str]:
