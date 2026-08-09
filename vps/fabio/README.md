@@ -7,6 +7,7 @@ O repo é a fonte de leitura; **a VPS é onde executa**. Ao editar aqui, subir c
 |---|---|---|
 | `fabio_auditoria.py` | Auditoria: diagnostica, **conserta o que dá**, reporta o resto | `fabio-auditoria.timer` → 7h e 21h (BRT) |
 | `hermes-platform-toolsets.yaml.txt` | Fragmento do `~/.hermes/config.yaml`: **a fronteira entre professor e admin** | gateway do Hermes |
+| `hermes-plugins/la-skills-leitura/` | Plugin que registra o toolset `skills_leitura` (skill sem `skill_manage`) | `~/.hermes/plugins/` |
 
 ## A fronteira professor × admin é o CANAL (09/08/2026)
 
@@ -21,8 +22,13 @@ esse dado — que o modelo não consegue influenciar — para escolher o canal:
 
 | Identidade | Canal | O que alcança |
 |---|---|---|
-| `professor` | `api_server` (8652) | `memory, skill_manage, skill_view, skills_list, todo, vision_analyze` — e nada mais |
-| `admin` | `cli` oneshot | tudo, inclusive o `lareport` (SQL). ~28s a ~140s por resposta |
+| `professor` | `api_server` (8652) | `memory, skill_view, skills_list, todo, vision_analyze` — e nada mais |
+| `admin` | `cli` oneshot | tudo, inclusive o `lareport` (SQL) e `skill_manage`. ~11s a ~140s |
+
+O professor **carrega** skill (são 77, escolhidas na conversa) mas não **escreve**
+nelas — `skill_manage` só existe no canal admin. O porquê está no cabeçalho do
+`hermes-platform-toolsets.yaml.txt`; o resumo é que escrever numa skill é
+escrever no próprio guardrail, e isso fica valendo pra todos os professores.
 
 **Não existe fallback do professor para o oneshot.** O caminho `cli` concede
 *mais* que o da API (terminal, file, SQL): cair pra lá quando a API falha seria
