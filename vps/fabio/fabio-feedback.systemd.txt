@@ -18,9 +18,18 @@
 # custava o mes inteiro de entrega a coordenacao. O banco (076) ja faz o
 # re-claim: linha 'falhou', ou 'processando' com lease expirado, pode ser
 # reservada de novo no MESMO dia (dia_referencia nao muda so por isso). As
-# passagens 2 e 3 sao SO recuperacao — quando a 1a deu certo elas batem
-# 'ja_cobrado_hoje' (professor) ou 'ja_entregue_hoje' (coordenacao) e nao
-# mandam nada de novo. Elas nao existem pra mandar tres mensagens.
+# passagens 2 e 3 EXISTEM pra recuperacao — na maioria dos dias, quando a 1a
+# deu certo elas batem 'ja_cobrado_hoje' (professor) ou 'ja_entregue_hoje'
+# (coordenacao) e nao mandam nada de novo. Isso NAO e garantia, e nao muda o
+# desenho: o worker e DELIBERADAMENTE at-least-once (076 + fabio_notification_
+# worker.py), igual o resto da casa (018, 066). A janela real de duplicata:
+# se deliver() manda a mensagem com sucesso e a chamada seguinte que FECHA a
+# notificacao (mark_sent -> rpc() -> fabio_marcar_notificacao_enviada) levanta
+# excecao (rede, HTTP >=400 — rpc() vira RuntimeError pra qualquer um dos
+# dois), o except do worker cai no mark_failed e a linha vira 'falhou' com a
+# mensagem JA entregue. A passagem seguinte re-reclama essa linha 'falhou' e
+# manda de novo — duplicata real, nao hipotetica, e nao rara o bastante pra
+# chamar as passagens 2 e 3 de "so recuperacao" sem essa ressalva.
 #
 # CUSTO DE RODAR TRES VEZES: quase nada. O worker sai por `fora_da_regua` em
 # ~27 dos 30 dias do mes (so lembrete/reforco/coordenacao tem fase) — nesses

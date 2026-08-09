@@ -243,6 +243,73 @@ from pg_policies
 where schemaname = 'public' and tablename = 'aluno_feedback_professor'
   and coalesce(qual, '') like '%auth.role()%';
 
+-- ─── A fronteira family-safe: observação nunca sai pra quem alimenta a família
+-- Mutante 4 do plano ("observacao passa a ser selecionada num caminho
+-- family-safe") não tinha prova em lugar nenhum — nem 073/074/075/076 nem os
+-- 4 scripts/mutantes-0NN.mjs cobriam isso. V11 (RLS) protege professor A de
+-- ler o texto de professor B; isto aqui é outra fronteira: um caminho que já
+-- RODA como service_role e legitimamente devolve dado pra um responsável não
+-- pode devolver o texto que o professor escreveu pra coordenação.
+--
+-- O conjunto é medido NO CATÁLOGO (padrão de nome), não uma lista digitada —
+-- task-10-report.md tem a evidência de cada família:
+--   • '%devolutiva%'  — fabio_devolutiva_* / app_devolutiva_* / fn_devolutiva_fonte.
+--     020c já documenta a fronteira ("o worker não vê campos crus") — este
+--     passo é a prova automatizada dessa frase.
+--   • '%pedagogico%'  — get_relatorio_pedagogico_aluno[_interno_20260712] e
+--     get_historico_pedagogico_aluno[_interno_20260712]. Confirmado na FONTE
+--     da edge function gerar-relatorio-pedagogico (fora deste repo, não
+--     testável em SQL): o prompt da IA diz literalmente "relatório
+--     pedagógico... destinado ao responsável/familiar".
+--   • '%responsavel%' — nenhum objeto usa esse nome hoje; mantido como rede
+--     porque é o nome que o próprio plano cita como candidato.
+--   • '%anamnese%'    — a ficha que a família preenche/lê por token público
+--     (get_anamnese_publica, get_convite_anamnese, salvar_anamnese_online...).
+-- NÃO uso '%relatorio%' sozinho: pegaria ~30 relatórios gerenciais / comerciais
+-- / admin (get_dados_relatorio_gerencial, montar_relatorio_coordenacao_payload_v3,
+-- capturar_relatorio_coordenacao_canonico_v2...) que são STAFF-facing, não
+-- família. Também não uso '%ficha%' nem '%aluno%' soltos: pegariam
+-- app_aluno_ficha (ficha do PROFESSOR sobre o aluno, gated por
+-- fn_professor_do_usuario — não é família) e vw_aluno_sucesso_lista (CRM da
+-- coordenação, que JÁ seleciona fb.observacao hoje — de propósito, é a
+-- exceção que a própria 074 sanciona via policy feedback_coordenacao_le). Um
+-- padrão largo teria acusado um caminho são.
+--
+-- Marcador DUPLO — não só 'observacao' sozinho — é o que separa isto de falso
+-- positivo: só acusa quando a MESMA definição cita 'aluno_feedback_professor'
+-- (prova que a rotina toca a tabela) E 'observacao' (singular). Sem o duplo,
+-- qualquer rotina family-facing que mencionasse "observação" só em texto de
+-- erro/comentário já reprovaria à toa. E o singular importa: fn_professor_do_
+-- usuario e afins nunca entram aqui, mas se entrassem, 'professores.observacoes'
+-- (plural) NUNCA bate '%observacao%' — o 9º caractere diverge (observaç[o]es
+-- vs observaç[ã]o) — então a coluna homônima de outra tabela (professores,
+-- aluno_transferencias, pesquisa_evasao_desfechos...) não derruba este passo
+-- sozinha; ela só pesa se a MESMA rotina family-facing TAMBÉM mencionar
+-- aluno_feedback_professor, o que hoje nenhuma menciona.
+--
+-- NULL-safe por construção, não por coalesce residual: count(*) nunca é NULL
+-- (zero linhas = 0, não NULL), e os dois ilike comparam contra
+-- coalesce(pg_get_functiondef(...), '')/coalesce(definition, '') — um corpo
+-- ilegível não vira NULL silencioso que escaparia do ilike e do WHERE.
+insert into _res
+select 'nenhuma rotina family-facing (devolutiva/pedagogico/responsavel/anamnese) seleciona observacao de aluno_feedback_professor',
+       'sim',
+       case when count(*) = 0 then 'sim' else 'NAO — ' || string_agg(nome, ', ') end
+from (
+  select p.proname as nome, coalesce(pg_get_functiondef(p.oid), '') as def
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname ilike any (array['%devolutiva%', '%pedagogico%', '%responsavel%', '%anamnese%'])
+  union all
+  select v.viewname, coalesce(v.definition, '')
+    from pg_views v
+   where v.schemaname = 'public'
+     and v.viewname ilike any (array['%devolutiva%', '%pedagogico%', '%responsavel%', '%anamnese%'])
+) alvo
+where def ilike '%aluno_feedback_professor%'
+  and def ilike '%observacao%';
+
 -- ─── Veredito ───────────────────────────────────────────────────────────────
 -- Alias `resumo` com `falhas` NUMÉRICO: é o contrato que
 -- `scripts/rodar-teste-sql.mjs` exige (`typeof resumo.falhas !== 'number'`) e

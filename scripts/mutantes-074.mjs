@@ -15,6 +15,15 @@
 // `origem` é literal fixo na função, então os dois nunca teriam como divergir
 // nem sob o bug. O `.test.sql` planta sentinelas manuais antes da 2ª escrita
 // pra tornar o mutante falseável de verdade.
+//
+// V13 é de outra task (a fronteira family-safe do mutante 4 do plano, nunca
+// coberta): nenhuma função criada por ESTA migration é family-facing, então
+// o mutante redefine — só dentro da transação do ensaio, via `create or
+// replace function` — uma rotina family-facing REAL de outra migration
+// (fabio_devolutiva_contexto, 020c) pra acrescentar 1 campo que lê
+// aluno_feedback_professor.observacao. O rollback do runner desfaz a
+// redefinição igual desfaz o resto; nenhuma outra rotina desta 074 toca
+// fabio_devolutiva_contexto, então só o passo novo (catálogo) deveria cair.
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
@@ -139,6 +148,85 @@ const MUTANTES = [
          origem           = excluded.origem,
          respondido_em    = excluded.respondido_em,
          atualizado_em    = now();`,
+  },
+  {
+    nome: 'V13 — a devolutiva passa a levar a observacao do semaforo [furou a fronteira family-safe]',
+    pega: 'passo "nenhuma rotina family-facing (devolutiva/pedagogico/responsavel/anamnese) seleciona observacao de aluno_feedback_professor"',
+    // Ancora no fim do arquivo (o ultimo `revoke`, unico) e ACRESCENTA um
+    // `create or replace function` que redefine fabio_devolutiva_contexto
+    // (020c) so dentro da transacao do ensaio — o rollback do runner desfaz
+    // igual desfaz qualquer outro DDL deste arquivo. E o defeito REAL que o
+    // mutante 4 do plano descrevia: um caminho family-facing (o worker do
+    // Fabio le exatamente este jsonb pra escrever a devolutiva que vai pro
+    // responsavel) passa a expor aluno_feedback_professor.observacao — o
+    // texto interno que 020c documentava como intencionalmente inacessivel
+    // ("o worker nao ve campos crus... nada de observacao/obs_gerais/
+    // materiais").
+    de: `revoke all on function public.app_professor_feedback_salvar(integer, text, text, text, text, text, date) from public, anon;`,
+    para: `revoke all on function public.app_professor_feedback_salvar(integer, text, text, text, text, text, date) from public, anon;
+
+-- MUTANTE V13 (074): redefine fabio_devolutiva_contexto (020c) SO dentro
+-- desta transacao de teste — o rollback do runner desfaz. "So mais um campo
+-- de contexto pro Fabio" e exatamente o furo que a fronteira family-safe
+-- existe pra impedir.
+create or replace function public.fabio_devolutiva_contexto(p_devolutiva_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'public'
+stable
+as $function$
+declare
+  d public.fabio_devolutivas%rowtype;
+  r public.fabio_registros_aula%rowtype;
+  t public.fabio_registros_aula%rowtype;
+  a public.alunos%rowtype;
+  v_skill public.fabio_skills%rowtype;
+  v_idade integer;
+begin
+  select * into d from public.fabio_devolutivas where id = p_devolutiva_id;
+  if not found then return jsonb_build_object('ok', false, 'erro', 'devolutiva não encontrada'); end if;
+
+  select * into r from public.fabio_registros_aula where id = d.registro_fatia_id;
+  if not found then return jsonb_build_object('ok', false, 'erro', 'registro não encontrado'); end if;
+
+  -- tronco: só existe quando é fatia de turma
+  if r.parent_id is not null then
+    select * into t from public.fabio_registros_aula where id = r.parent_id;
+  end if;
+
+  select * into a from public.alunos where id = d.aluno_id;
+  select * into v_skill from public.fabio_skills where nome = 'devolutiva_aula' and ativa;
+
+  -- Idade da DATA DE NASCIMENTO, sempre. alunos.idade_atual é cache e envelhece
+  -- errado (fica parado enquanto o aluno faz aniversário).
+  if a.data_nascimento is not null then
+    v_idade := date_part('year', age(a.data_nascimento))::integer;
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'devolutiva_id', d.id,
+    'professor_id', d.professor_id,
+    'professor_nome', (select p.nome from public.professores p where p.id = d.professor_id),
+    -- AQUI mora a fronteira: nada de observacao/obs_gerais/materiais.
+    'fonte', public.fn_devolutiva_fonte(coalesce(t.campos, '{}'::jsonb), coalesce(r.campos, '{}'::jsonb)),
+    'aluno', jsonb_build_object(
+      'id', a.id,
+      'nome', a.nome,
+      'primeiro_nome', split_part(btrim(a.nome), ' ', 1),
+      'data_nascimento', a.data_nascimento,
+      'idade', v_idade,
+      'responsavel_nome', nullif(btrim(coalesce(a.responsavel_nome,'')), ''),
+      'curso', (select c.nome from public.cursos c where c.id = a.curso_id)),
+    'skill', case when v_skill.id is null then null else jsonb_build_object(
+      'id', v_skill.id, 'versao', v_skill.versao, 'conteudo', v_skill.conteudo) end,
+    'destinatario_override', d.destinatario_override,
+    'observacao_semaforo', (select f.observacao from public.aluno_feedback_professor f
+                              where f.aluno_id = d.aluno_id and f.professor_id = d.professor_id
+                              order by f.competencia desc limit 1)
+  );
+end $function$;`,
   },
 ]
 

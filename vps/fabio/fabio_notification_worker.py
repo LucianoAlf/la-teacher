@@ -52,6 +52,14 @@ EVENTS = {
     "briefing": EventSpec("briefing_matinal", "informativa", DEFAULT_BRIEFING_TIME),
     "pendencia": EventSpec("pendencia_registro", "governanca", DEFAULT_PENDENCIA_TIME),
     "escalonamento": EventSpec("pendencia_escalonada", "governanca", DEFAULT_ESCALONAMENTO_TIME),
+    # Só o target_time é lido pra "feedback" (decide is_due em main()). tipo=
+    # "feedback_lembrete" e categoria="governanca" aqui NUNCA chegam a
+    # claim_notification nem a can_notify com este spec: "feedback" sai de
+    # due_events antes do laço que chamaria run_event/claim_notification (ver
+    # main()), e run_feedback() compõe o próprio p_tipo como f"feedback_{fase}"
+    # (lembrete/reforco/coordenacao) direto nas chamadas a
+    # fn_reservar_cobranca_feedback[_coordenacao] — sem passar por aqui. Não
+    # renomeie tipo/categoria pensando que isso muda o que sai no WhatsApp.
     "feedback": EventSpec("feedback_lembrete", "governanca", DEFAULT_FEEDBACK_TIME),
 }
 
@@ -1112,7 +1120,13 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="ignore time window")
     parser.add_argument("--window-minutes", type=int, default=DEFAULT_WINDOW_MINUTES)
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--date", help="BRT date YYYY-MM-DD for briefing; defaults to today")
+    parser.add_argument("--date", help=(
+        "BRT date YYYY-MM-DD. Feeds briefing's p_data, but ALSO reaches "
+        "--event feedback as p_dia (run_feedback -> fn_feedback_cobranca_do_dia "
+        "-> fn_reservar_cobranca_feedback[_coordenacao]), which sets "
+        "dia_referencia — the feedback dedupe key. Debugging with "
+        "'--event feedback --date YYYY-MM-DD' WITHOUT --dry-run reserves and "
+        "sends a REAL WhatsApp message dated for that day. Defaults to today."))
     args = parser.parse_args()
 
     now = datetime.now(BRT)
