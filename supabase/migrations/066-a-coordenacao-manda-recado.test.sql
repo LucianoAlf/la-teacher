@@ -24,7 +24,10 @@ select
         select 1 from public.fabio_notificacoes n
          where n.professor_id = p.id
            and n.tipo = 'pendencia_registro'
-           and n.dia_referencia = current_date
+           -- BRT, como a coluna gerada — current_date (UTC) diverge dela
+           -- entre 21h e meia-noite BRT e este probe acharia "cobrável"
+           -- um professor que a dedupe do ON CONFLICT recusa.
+           and n.dia_referencia = (now() at time zone 'America/Sao_Paulo')::date
            and n.canal = 'whatsapp')
     order by p.id
     limit 1) as prof;

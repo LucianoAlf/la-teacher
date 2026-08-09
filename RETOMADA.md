@@ -125,9 +125,18 @@ nem tem botão Cobrar — vira selo "tudo no Emusys". 21 passos, 10/10 mutantes,
 aplicada e conferida ao vivo (Isaque: "4 sem registro · 25 no Emusys", expandir
 com 25 aulas marcadas).
 
-⚠️ **teste:018 reprovando** (passos 37B/39B, de lease) desde ~21h — esta sessão
-não tocou nisso; é o território da sessão /loop da devolutiva. Chip de
-investigação criado; NÃO consertar às cegas por cima de trabalho alheio.
+✅ **teste:018 RESOLVIDO — e a sessão /loop da devolutiva era INOCENTE.**
+Auditado em 08/08 ~21h30: as 4 funções da 018 em produção **idênticas** ao repo
+(diff por `pg_get_functiondef`), zero worktree sujo, zero commit perdido. O
+vermelho era o TESTE: `dia_referencia` é coluna **gerada em BRT** e o banco
+roda em **UTC** — todo dia entre **21h e meia-noite BRT** o `current_date` já
+é o dia seguinte, o delete de limpeza procura um dia que ainda não existe e
+vira no-op, e as partes do teste se contaminam (a linha `enviada` que a PARTE
+2 deixa trava o claim das PARTES 3A/3B: 11 passos vermelhos, não 2 — o "37B/
+39B" do chip era só o fim visível da lista). Por isso 19h passava e 21h20
+reprovava: hora, não código. Consertado nos testes (018: os 3 deletes; 066: o
+probe de "cobrável", que divergia da dedupe do ON CONFLICT), verde DENTRO da
+janela de falha. Armadilha registrada abaixo.
 
 ### ⚠️ BLOCO 2 ("o que os professores registraram") — MEDIDO EM 08/08, À NOITE
 
@@ -563,6 +572,15 @@ e o runner reprova quando não consegue tirar a impressão digital inicial. Ante
 de acreditar num vermelho da suíte (e principalmente antes de culpar o commit de
 outra pessoa), **rodar o `teste:NNN` isolado**. Falha de infra e defeito de
 verdade têm a mesma cor na saída.
+
+**`current_date` é UTC; `dia_referencia` é gerada em BRT — entre 21h e
+meia-noite BRT os dois discordam.** O teste da 018 passou às 19h e reprovou às
+21h20 do MESMO dia com o MESMO código: o delete de limpeza filtrava
+`dia_referencia = current_date` (que já era "amanhã") e virava no-op, e as
+partes do teste se contaminavam. Vermelho que nasce em horário redondo pede
+suspeita de fuso ANTES de suspeita de commit — e a comparação honesta com
+produção é `pg_get_functiondef`, não memória. Filtro sobre coluna gerada usa a
+MESMA expressão da coluna: `(now() at time zone 'America/Sao_Paulo')::date`.
 
 **Número de migration livre no `git log` pode estar ocupado no disco.** Outra
 sessão pode ter escrito `NNN-*.sql` no worktree principal e ainda não ter

@@ -90,8 +90,12 @@ declare a jsonb; b jsonb; v_id uuid; v_tok uuid; v_prof integer := 25;
 begin
   -- O briefing de hoje existe e está 'enviada' — o claim recusaria, com razão.
   -- Some com ele SÓ DENTRO DESTA TRANSAÇÃO, que termina em ROLLBACK.
+  -- "Hoje" tem que ser o da COLUNA: `dia_referencia` é gerada em
+  -- America/Sao_Paulo e o banco roda em UTC — `current_date` diverge dela
+  -- todo dia entre 21h e meia-noite BRT, e este delete virava no-op.
   delete from public.fabio_notificacoes
-   where professor_id=v_prof and tipo='briefing_matinal' and dia_referencia=current_date;
+   where professor_id=v_prof and tipo='briefing_matinal'
+     and dia_referencia=(now() at time zone 'America/Sao_Paulo')::date;
 
   a := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','corpo legado');
   v_id := (a->>'notificacao_id')::uuid;
@@ -127,7 +131,8 @@ do $t$
 declare a jsonb; b jsonb; c jsonb; v_id uuid; v_tokA uuid; v_tokB uuid; v_prof integer := 25;
 begin
   delete from public.fabio_notificacoes
-   where professor_id=v_prof and tipo='briefing_matinal' and dia_referencia=current_date;
+   where professor_id=v_prof and tipo='briefing_matinal'
+     and dia_referencia=(now() at time zone 'America/Sao_Paulo')::date;
 
   a := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','A1',null,true);
   v_id := (a->>'notificacao_id')::uuid;
@@ -165,7 +170,8 @@ do $t$
 declare a jsonb; b jsonb; c jsonb; v_id uuid; v_tokA uuid; v_tokB uuid; v_prof integer := 25;
 begin
   delete from public.fabio_notificacoes
-   where professor_id=v_prof and tipo='briefing_matinal' and dia_referencia=current_date;
+   where professor_id=v_prof and tipo='briefing_matinal'
+     and dia_referencia=(now() at time zone 'America/Sao_Paulo')::date;
 
   a := public.fabio_claim_notificacao(v_prof,'briefing_matinal','informativa','app','B1',null,true);
   v_id := (a->>'notificacao_id')::uuid;
