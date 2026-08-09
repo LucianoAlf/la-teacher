@@ -11,6 +11,51 @@
 
 ---
 
+## ✅ 09/08 NOITE — a observação do professor ganhou leitor
+
+Ordem do Alf, depois de eu propor deixar pra depois: *"Nada! Os professores já
+vão começar a vir amanhã e vão começar a já responder! Tem que fazer agora!"*
+
+**O buraco:** o campo da mesa convida com *"Algo que vale a coordenação saber"*
+e, medido por grep no `src` daqui **e** no do LA Report, a coluna `observacao`
+não era lida por **ninguém**. A coordenação via só cumprimento (quem respondeu,
+no Painel Farmer e na cobrança da 076) e o coração diluído em 20% do
+`health_score`. As três perguntas não iam a lugar nenhum.
+
+**No ar** (`f13485f`, migrations 077 e 078 aplicadas em produção):
+
+| O quê | Onde | Prova |
+|---|---|---|
+| `app_coordenacao_feedback_mes` — resumo + quem precisa de olho | 077 | 11 passos verdes, **8/8 mutantes**; em prod: 1.160 alunos, 43 professores, Barra 260 · CG 487 · Recreio 413 |
+| Tela `/app/coordenacao/feedback` (3º item da sidebar) | `CoordenacaoFeedback.tsx` + `LinhaSemaforo.tsx` | **falta screenshot ao vivo** — preciso de sessão de admin no preview |
+| O Fábio LÊ o semáforo (3 competências, só as do próprio professor) | 078 | 7 passos verdes, **5/5 mutantes**; o V2 guarda a fronteira |
+| Gatilho `estado_aluno` no prefetch do bridge | `vps/fabio/fabio_chat_bridge.py` | conversando: citou o desânimo e propôs "ir com leveza"; sem a linha, não inventou |
+
+**Quem entra na lista:** vermelho, amarelo, **ou qualquer coração com recado
+escrito**. Verde calado fica fora — lista que devolve a escola inteira é a mesma
+parede de texto do escalonamento diário. Corte em 200 que sempre se anuncia.
+
+**Três coisas que só apareceram porque eu abri e conversei, não porque o teste
+estava verde:**
+
+1. O mutante **V7 sobreviveu** (filtro de unidade). O código estava certo; o
+   TESTE é que tinha os 3 alunos na mesma unidade — ignorar o filtro não mudava
+   nada. Consertei o teste com uma isca de outra unidade.
+2. `[prefetch] nao acionado`: **"como está a Amanda?" não casava com gatilho
+   nenhum**. A pergunta mais natural do professor sobre o dado mais fresco que
+   existe. O gatilho novo é FRACO de propósito — quando só ele acende e ninguém
+   é resolvido pelo nome, o prefetch devolve `None`, senão "como está minha
+   agenda" injetaria bloco de aluno em toda conversa (provado: `nao acionado`).
+3. O dict do prefetch **escolhe chaves a dedo**, e o comentário dele avisa isso
+   em voz alta — *"TODO bloco novo precisa ser adicionado aqui à mão, senão é
+   silenciosamente descartado"*. Eu li o aviso e caí nele: a RPC devolvia
+   `semaforo`, com teste e mutante provando, e o dado morria antes do prompt.
+
+**Aberto:** o LA Report continua sem ler a observação (lá o semáforo é só o
+coração no health score); e a tela nova ainda não foi vista com olho humano.
+
+---
+
 ## 🔴 09/08 MADRUGADA — VÉSPERA DE AULA: o que foi consertado e o que falta
 
 O Alf, no domingo à noite: *"a gente tem que corrigir tudo que tiver quebrado.
@@ -22,7 +67,7 @@ Amanhã já tem aula. A gente tem que fechar esse buraco inteiro."*
 |---|---|---|
 | 1 | **Áudio da observação aceitava qualquer coisa que o cliente dissesse** (ver a correção logo abaixo — a explicação da "extensão" que eu vinha dando estava ERRADA) | função lê os BYTES e reembrulha; `transcrever-observacao` **v4** no ar, 6/6 casos verdes |
 | 2 | **✓ verde mentia** — `setEstado` antes da RPC, `catch` não desfazia | `confirmado` separado de `estado`; alerta clicável que reenvia e **vence** o ✓ |
-| 3 | **Dois números da mesma carteira** — 5 dos 6 professores com login viam contagens diferentes (Rafael 57 × 51) | chips contam aluno; a causa NÃO era arquivamento (a view já exclui: 0 em 1.221) — é aluno em mais de um curso |
+| 3 | **Dois números da mesma carteira** — 5 dos 6 professores com login viam contagens diferentes (Rafael 57 × 51) | chips contam aluno; a causa NÃO era arquivamento (a view já exclui: 0 em 1.221) **nem aluno em dois cursos** (só 1 na escola inteira) — é **renovação de contrato**, 54 linhas a mais em 26 professores. Ver "onde eu estava errado" abaixo |
 | 4 | **O Fábio não sabia o que é o Feedback do mês** e inventava "pesquisa sobre sua rotina" | seção nova na skill; provado conversando (6,3s, correto), sem ruído e com a fronteira de pé |
 | 5 | **A cobrança nunca parou de cobrar o que já subiu pra coordenação** | `dias_atraso`/`atraso_dias` × chave real `dias_em_atraso` — filtro morto desde sempre |
 
