@@ -1,0 +1,4 @@
+name: la-skills-leitura
+version: 1.0.0
+description: "Toolset skills_leitura — carrega e lista skill, mas nao escreve. Existe para o canal do professor (api_server) do Fabio."
+author: "LA Music"

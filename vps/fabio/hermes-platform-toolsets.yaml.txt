@@ -56,7 +56,7 @@
 
 platform_toolsets:
   api_server:
-  - skills
+  - skills_leitura      # <- NAO e `skills`. Ver abaixo.
   - memory
   - todo
   - vision
@@ -68,3 +68,47 @@ platform_toolsets:
   - no_mcp
   # ... demais plataformas inalteradas (telegram, discord, whatsapp, slack,
   # signal, homeassistant, qqbot, yuanbao, teams, google_chat)
+
+plugins:
+  enabled:
+  - la-skills-leitura
+  disabled: []
+
+# ─── POR QUE `skills_leitura` E NAO `skills` ─────────────────────────────────
+#
+# O toolset nativo `skills` empacota TRES ferramentas e nao ha como separar
+# por config: skills_list (lista), skill_view (le/carrega) e skill_manage
+# (create/patch/edit/delete/write_file/remove_file).
+#
+# Escrever numa skill e escrever no proprio guardrail. No canal do professor
+# isso e injecao PERSISTENTE: a edicao fica e passa a valer pra todo mundo.
+# Mas tirar `skills` inteiro nao serve — o Fabio tem 77 skills e as carrega
+# dinamicamente conforme a conversa (113 chamadas de skill_view so no chat).
+# Perder o skill_view seria perder a personalidade dele.
+#
+# O que a pesquisa dizia (arXiv 2510.26328, "Agent Skills Enable a New Class
+# of Realistic and Trivially Simple Prompt Injections"):
+#   - detectar injecao em skill nao funciona POR DEFINICAO — "Agent Skills are
+#     all instructions"; e escanear com LLM herda o jailbreak do scanner;
+#   - pedir aprovacao vaza: uma aprovacao benigna com "nao perguntar de novo"
+#     TRANSBORDA para acoes proximas e nocivas.
+#   → sobra guardrail de sistema: remover a capacidade.
+#
+# O proprio Hermes esta indo pra la (issue #33905 → #21849, PR #61792:
+# politica por actor/plataforma x ferramenta x allow/deny). Enquanto nao sai,
+# o plugin `la-skills-leitura` (espelhado em hermes-plugins/) registra o
+# toolset `skills_leitura` = [skills_list, skill_view]. QUANDO O HERMES TIVER
+# ISSO NATIVO, o plugin pode morrer e isto vira config.
+#
+# ⚠️ O `plugins.enabled` e obrigatorio: plugin em ~/.hermes/plugins/ e
+#    descoberto mas PULADO se nao estiver listado ("Skipping X (not in
+#    plugins.enabled)"). Habilitar com `hermes plugins enable la-skills-leitura`.
+#
+# ⚠️ NAO conferir isso pelo GET /v1/toolsets: aquele endpoint so enumera
+#    toolsets CONFIGURAVEIS, entao `skills_leitura` fica invisivel e parece que
+#    o professor perdeu skill_view. O probe honesto e resolver
+#    _get_platform_tools(cfg, "api_server") e passar em get_tool_definitions.
+#
+# Medido em 09/08 apos a troca:
+#   api_server   skill_view=True   skill_manage=False  sql=False  terminal=False
+#   cli          skill_view=True   skill_manage=True              terminal=True

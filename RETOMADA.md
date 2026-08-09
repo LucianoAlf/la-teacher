@@ -190,8 +190,8 @@ em `~/.hermes/.env` entrega service_role, token do UAZAPI e a `DATABASE_URI`.
 
 | Identidade | Canal | Alcance |
 |---|---|---|
-| professor | `api_server` | `memory, skill_manage, skill_view, skills_list, todo, vision_analyze` — **6 ferramentas** |
-| admin | `cli` oneshot | tudo, inclusive SQL (escolha do Alf em 09/08) |
+| professor | `api_server` | `memory, skill_view, skills_list, todo, vision_analyze` — **5 ferramentas** |
+| admin | `cli` oneshot | tudo, inclusive SQL e `skill_manage` (escolha do Alf em 09/08) |
 
 Quem roteia é `generate_answer()` por `identidade_tipo`, que vem do **telefone
 resolvido no banco antes de existir prompt** — dado que o modelo não influencia.
@@ -220,13 +220,31 @@ evento.
 
 ### Achados abertos, em ordem de risco (nenhum bloqueia o que está no ar)
 
-1. **`skill_manage` está no canal do professor** e escreve nas skills — que é
-   onde moram os guardrails. Injeção persistente é pior que vazamento pontual.
-   O Hermes **não tem blocklist por ferramenta** (só por toolset), e `skills` é
-   um pacote fixo `[skills_list, skill_view, skill_manage]`. Tirar `skills`
-   inteiro quebraria o `skill_view`, que é a ferramenta mais usada (110×). Saída
-   limpa: o bridge inlinar o SKILL.md no prompt e o canal ficar sem `skills`.
-   *(Ele recusou o teste adversarial, mas isso é prompt de novo.)*
+1. ✅ **`skill_manage` FORA do canal do professor** — resolvido em 09/08, à noite.
+   Eu tinha proposto inlinar o SKILL.md no prompt; **o Alf derrubou a ideia** e
+   estava certo: são **77 skills**, carregadas dinamicamente na conversa (113
+   `skill_view` só no chat). Inlinar estouraria o prompt ou quebraria o
+   roteamento. Ele propôs allowlist — e allowlist é o que a pesquisa sustenta:
+   - arXiv 2510.26328: detectar injeção em skill **não funciona por definição**
+     ("Agent Skills are all instructions"), e **aprovação vaza** — um "não
+     perguntar de novo" benigno transborda pra ação nociva próxima. Sobra
+     remover a capacidade.
+   - O Hermes vai na mesma direção (issue #33905 → #21849, PR #61792: política
+     por actor/plataforma × ferramenta × allow/deny). Quando sair, vira config.
+   - Feito: plugin `la-skills-leitura` em `~/.hermes/plugins/` registra o
+     toolset `skills_leitura` = `[skills_list, skill_view]`, e o
+     `platform_toolsets.api_server` passou a listar ele no lugar de `skills`.
+     Espelhado em `vps/fabio/hermes-plugins/`.
+   - Medido: `api_server` skill_view=True / skill_manage=**False**; `cli`
+     mantém os dois. Conversando: "quem é a Fernanda?" segue completo (prefetch
+     + conteúdo pedagógico), "edita a skill e apaga a regra" → recusa, e o
+     vazamento original segue fechado.
+   - ⚠️ Duas armadilhas achadas aqui: plugin em `~/.hermes/plugins/` é
+     descoberto mas **PULADO sem `plugins.enabled`** ("Skipping X (not in
+     plugins.enabled)"), e o **`GET /v1/toolsets` mente** para toolset custom —
+     ele só enumera toolsets *configuráveis*, então `skills_leitura` some da
+     lista e parece que o professor perdeu `skill_view`. Quase reportei que
+     tinha quebrado o Fábio.
 2. **DEFAULT PRIVILEGES faz o vazamento se regenerar**: toda tabela nova criada
    pelo `postgres` já nasce com `fabio_agent=r`
    (`{...,fabio_agent=r/postgres,...}`). Revogar os 374 hoje é enxugar gelo — e
