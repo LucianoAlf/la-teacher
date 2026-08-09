@@ -4,6 +4,7 @@ import {
   feedbackSalvar, CORACOES, PRATICA, EVOLUCAO, ANIMO,
   type FeedbackAluno, type Coracao, type Pratica, type Evolucao, type Animo,
 } from '../../lib/api'
+import { CampoObservacao } from './CampoObservacao'
 
 /**
  * A linha de um aluno na mesa.
@@ -146,18 +147,10 @@ export function CardAlunoFeedback({
             aoEscolher={(v) => salvar({ animo: v as Animo })}
           />
 
-          <div>
-            <span className="mb-1 block text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
-              Observação
-            </span>
-            <textarea
-              rows={2}
-              defaultValue={estado.observacao ?? ''}
-              onBlur={(e) => salvar({ observacao: e.target.value })}
-              placeholder="Algo que vale a coordenação saber — um elogio, um ponto de melhoria, uma mudança que você notou."
-              className="w-full resize-none rounded-lg border border-border-subtle bg-bg-inset px-3 py-2 text-[13px] text-text-primary placeholder:text-text-muted"
-            />
-          </div>
+          <CampoObservacao
+            valor={estado.observacao ?? ''}
+            aoConfirmar={(t) => salvar({ observacao: t })}
+          />
         </div>
       ) : null}
     </Card>

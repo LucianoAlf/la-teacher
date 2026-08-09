@@ -1404,3 +1404,18 @@ export async function feedbackProgresso(): Promise<FeedbackProgresso> {
   if (error) throw error
   return res as unknown as FeedbackProgresso
 }
+
+/**
+ * Transcreve um áudio curto (observação falada) e devolve o texto pro
+ * professor revisar. Nada é guardado no caminho: o dado só nasce quando ele
+ * salvar o texto (via feedbackSalvar), igual a se tivesse digitado.
+ */
+export async function transcreverAudio(blob: Blob): Promise<string> {
+  const form = new FormData()
+  form.append('audio', blob, 'observacao.webm')
+  const { data, error } = await supabase.functions.invoke('transcrever-audio', {
+    body: form,
+  })
+  if (error) throw error
+  return (data as { texto?: string })?.texto ?? ''
+}
