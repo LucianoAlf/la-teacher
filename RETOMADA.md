@@ -11,6 +11,70 @@
 
 ---
 
+## 🔴 09/08 MADRUGADA — VÉSPERA DE AULA: o que foi consertado e o que falta
+
+O Alf, no domingo à noite: *"a gente tem que corrigir tudo que tiver quebrado.
+Amanhã já tem aula. A gente tem que fechar esse buraco inteiro."*
+
+**Consertado e no ar** (`e08bfc9`, `043ab52`, `2693d21`, tudo em `origin/main`):
+
+| # | Defeito | Estado |
+|---|---|---|
+| 1 | **Microfone falhava em TODO iPhone** — `observacao.webm` cravado nos dois lados; iOS grava `audio/mp4` e o Whisper decide pela extensão | corrigido no cliente e na edge function; `transcrever-observacao` **v2** no ar |
+| 2 | **✓ verde mentia** — `setEstado` antes da RPC, `catch` não desfazia | `confirmado` separado de `estado`; alerta clicável que reenvia e **vence** o ✓ |
+| 3 | **Dois números da mesma carteira** — 5 dos 6 professores com login viam contagens diferentes (Rafael 57 × 51) | chips contam aluno; a causa NÃO era arquivamento (a view já exclui: 0 em 1.221) — é aluno em mais de um curso |
+| 4 | **O Fábio não sabia o que é o Feedback do mês** e inventava "pesquisa sobre sua rotina" | seção nova na skill; provado conversando (6,3s, correto), sem ruído e com a fronteira de pé |
+| 5 | **A cobrança nunca parou de cobrar o que já subiu pra coordenação** | `dias_atraso`/`atraso_dias` × chave real `dias_em_atraso` — filtro morto desde sempre |
+
+**O defeito 5 é a resposta ao medo do Alf** ("amanhã não sai todo esse monte de
+coisa atrasada deles"). Não sai mais:
+
+| Professor | Cobrança de antes | Depois |
+|---|---|---|
+| Rafael | 29 aulas / 11 dias | **10 / 3** |
+| Lohana | 27 / 12 | **9 / 3** |
+| Leonardo | 11 / 11 | **1 / 3** |
+| Daiana | 3 / 5 | **1 / 2** |
+| Rodrigo | 1 / 5 | **nada** |
+
+### ⚠️ O que foi MEDIDO e desarma dois sustos
+
+- **Ligar o timer do feedback hoje não manda nada.** `fn_feedback_cobranca_do_dia`
+  devolve fase `nenhuma` para 09/08 e 10/08; a primeira cobrança existe só em
+  **25/08**, com os 6 elegíveis. A janela (`fn_janela_feedback_aberta`) está
+  **fechada**.
+- **A cobrança de registro JÁ roda** — não começa amanhã. Os 5 receberam hoje
+  08:30 e ontem 20:50 (`fabio_notificacoes`, status `enviada`). As units
+  `fabio-pendencia-manha/noite` **não** restringem mais ao professor 25; só a
+  `Description=` do systemd é que ficou dizendo "piloto Matheus".
+
+### O que NÃO deu pra fazer, e por quê
+
+**Screenshot do fluxo do professor.** Eu não posso digitar senha em campo
+nenhum — vale mesmo com a credencial na mão e autorizada. A sessão viva no
+navegador é a do **admin** (`lucianoalf.la@gmail.com`), e ela não alcança
+`/app/feedback`: o Alf não tem vínculo de professor, a rota redireciona.
+
+O que deu pra provar sem login, com o Matheus de verdade, em transação
+descartada (`set_config('request.jwt.claim.sub', …)`, técnica dos testes da
+casa): mesa com 21 alunos → salvar coração vermelho + as 3 perguntas +
+observação → `completo: true`, progresso 1/21. **Resíduo zero** conferido
+depois (`aluno_feedback_professor` segue com 0 linhas).
+
+Falta o Alf entrar como o Matheus pra eu fotografar a tela.
+
+### Ainda aberto
+
+- **Fila offline no feedback.** O registro de aula tem; o semáforo não. Hoje a
+  falha é **honesta** (alerta + reenviar), mas o trabalho se perde se o
+  professor fechar o app. Não é urgente pra amanhã — a janela só abre em 25/08.
+- **O escalonamento manda 36 professores numa mensagem só** pro grupo da
+  coordenação, todo dia às 9h. Já era assim; ninguém lê uma parede dessas.
+- **`Description=` das units de pendência mentem** ("piloto Matheus, professor
+  25") desde que a cobrança deixou de ser fixa nele.
+
+---
+
 ## 🧭 POR ONDE COMEÇAR (duas frentes abertas, 09/08 à noite)
 
 Este arquivo tem seções de datas diferentes e mais de uma diz "próximo passo".
