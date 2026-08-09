@@ -11,6 +11,50 @@
 
 ---
 
+## ⛔ SEMÁFORO DO PROFESSOR: 7 tasks feitas, revisão final NÃO aprovou
+
+As migrations **073, 074 e 075 estão aplicadas em produção** e a tela está no
+repo (mesa, card na Home, entrada em Alunos, microfone). Mas a revisão do branch
+inteiro achou **dois bloqueadores que nenhuma revisão por task podia ver** —
+as sete compararam implementação contra o PLANO, e o plano tinha perdido a spec.
+
+**B1 — a fila da 075 é depósito sem coletor.** A 075 insere em
+`fabio_notificacoes` com `status='processando'` + lease, esperando que alguém
+reivindique depois. **Ninguém varre essa tabela.** O `fabio_notification_worker.py`
+tem 3 tipos fixos (`briefing_matinal`, `pendencia_registro`,
+`pendencia_escalonada`), decide pelo relógio e chama `fabio_claim_notificacao`,
+que **cria** a linha já reivindicada. O `on conflict` dessa função é restrito a
+`tipo in ('briefing_matinal','pendencia_registro')` — um `feedback_lembrete`
+não casa, então quem for plugar o envio toma **23505** contra o índice novo da
+075. E o cabeçalho da própria 066 já dizia: *"não há caixa onde o painel
+deposite um recado pra alguém levar depois"* — o padrão da casa é
+RESERVA → envia → CONCLUI na mesma chamada. A 075 faz só a primeira.
+
+**B2 — a coordenação não recebe nada.** A spec diz *"Dia 1º: entrega à
+coordenação a lista de quem não fechou"*. O código insere
+`destinatario_tipo='professor'` com um texto **para o professor**. A coordenação
+não aparece em lugar nenhum da 075. O erro nasceu no plano e por isso atravessou
+as sete revisões.
+
+**Importantes, antes de 43 professores abrirem:**
+- **Dois números da mesma carteira**: `Alunos.tsx` mostra o array cru de
+  `app_minha_carteira` (grão matrícula, sem filtrar arquivado); a mesa colapsa
+  por aluno e tira arquivado. **26 dos 43 professores veem contagens
+  diferentes**, diferença de até 6. O card leva de uma tela pra outra.
+- **O ✓ verde mente**: `setEstado` acontece antes da RPC e o `catch` não desfaz.
+  Rede ruim = 52 ✓ verdes, barrinha em 0/52, nada salvo. E o registro de aula
+  tem fila offline; este não tem.
+- **O microfone falha em todo iPhone**: o cliente manda nome fixo
+  `observacao.webm`, mas o `useRecorder` grava `audio/mp4` no iOS — e o helper
+  `extensaoDoMime()` já existe no repo e não foi usado. O Whisper decide pela
+  extensão.
+
+**Maior carteira real: 52 alunos** (professor 33), e são **43** professores com
+carteira — não 38/44 como o plano supunha.
+
+**Duas decisões humanas pendentes, sem as quais nada disso roda:** publicar a
+`transcrever-observacao` e agendar o cron da cobrança.
+
 ## ▶ PRÓXIMO PASSO: RADAR DO ALUNO (bloco 2 do painel — decidido 08/08, noite)
 
 O Alf escolheu o Radar e deu o tom: *"painel estratégico de gestão pedagógica —
