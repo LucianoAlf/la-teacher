@@ -98,7 +98,9 @@
     "teste:073": "node scripts/rodar-teste-sql.mjs supabase/migrations/073-o-semaforo-ganha-as-perguntas.sql supabase/migrations/073-o-semaforo-ganha-as-perguntas.test.sql",
     "mutantes:073": "node scripts/mutantes-073.mjs",
     "teste:074": "node scripts/rodar-teste-sql.mjs supabase/migrations/074-a-mesa-do-professor.sql supabase/migrations/074-a-mesa-do-professor.test.sql",
-    "mutantes:074": "node scripts/mutantes-074.mjs"
+    "mutantes:074": "node scripts/mutantes-074.mjs",
+    "teste:075": "node scripts/rodar-teste-sql.mjs supabase/migrations/075-o-fabio-cobra-o-semaforo.sql supabase/migrations/075-o-fabio-cobra-o-semaforo.test.sql",
+    "mutantes:075": "node scripts/mutantes-075.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
