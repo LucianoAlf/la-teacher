@@ -633,6 +633,39 @@ def _has_student_identity_intent(current_text: str, hist: list[Dict[str, Any]]) 
     return any(re.search(p, hay) for p in _STUDENT_IDENTITY_PATTERNS)
 
 
+# "COMO ESTA a Amanda?" nao casava com NENHUM dos gatilhos acima: nao pede
+# historico ("ultima aula", "o que foi feito"), nao pergunta quem e a pessoa, e
+# nao fala de experimental. Medido em 09/08/2026, com a resposta do mes ja
+# gravada no banco: `[prefetch] nao acionado` e o Fabio respondeu "ainda nao
+# tenho o historico pedagogico dela aqui na conversa".
+#
+# Isso passou a doer agora porque a 078 poe o SEMAFORO no prontuario — o dado
+# mais fresco que existe sobre o aluno mora justamente atras da pergunta mais
+# natural que o professor faz.
+#
+# GATILHO FRACO DE PROPOSITO: "como esta" tambem aparece em "como esta minha
+# agenda". Por isso, quando SO este gatilho acende, o prefetch so devolve bloco
+# se um aluno for de fato resolvido pelo nome — ver `pedagogical_prefetch`.
+# Gatilho impreciso que sempre injeta bloco vira ruido no prompt de toda
+# conversa, e ruido custa a resposta boa das outras perguntas.
+_STUDENT_STATE_PATTERNS = [
+    r"\bcomo (esta|ta|anda|vai|vem|foi)\b",
+    r"\bcomo (ela|ele) (esta|ta|anda|vai)\b",
+    r"\bestado (da|do) alun[oa]\b",
+    r"\bsemaforo\b",
+    r"\bfeedback do mes\b",
+    r"\b(evoluindo|regredindo|desanimad[oa]|animad[oa]|empacad[oa]|travad[oa])\b",
+    r"\bpratica(ndo)? em casa\b",
+]
+
+
+def _has_student_state_intent(current_text: str, hist: list[Dict[str, Any]]) -> bool:
+    # Só o texto de AGORA: "como está" numa mensagem de seis turnos atrás não
+    # diz nada sobre a pergunta desta.
+    hay = _norm_text(current_text)
+    return any(re.search(p, hay) for p in _STUDENT_STATE_PATTERNS)
+
+
 def _fetch_professor_roster(professor_id: int) -> list[Dict[str, Any]]:
     rows = sb_get("/rest/v1/vw_fabio_carteira_professor", {
         "select": "aluno_id,aluno_nome,curso_nome,professor_id,professor_nome,unidade_nome",
@@ -837,7 +870,8 @@ def pedagogical_prefetch(professor_id: int, current_text: str, hist: list[Dict[s
     quer_historico = _has_pedagogical_history_intent(current_text, hist)
     quer_identidade = _has_student_identity_intent(current_text, hist)
     quer_experimental = _has_experimental_agenda_intent(current_text, hist)
-    if not (quer_historico or quer_identidade or quer_experimental):
+    quer_estado = _has_student_state_intent(current_text, hist)
+    if not (quer_historico or quer_identidade or quer_experimental or quer_estado):
         return None
 
     # Perguntou pela experimental sem citar nome: a resposta certa e a AGENDA
@@ -857,8 +891,13 @@ def pedagogical_prefetch(professor_id: int, current_text: str, hist: list[Dict[s
                 "experimentais_agendadas": agendadas,
             }
     # "quem é" é a pergunta mais fraca das duas: quem pede histórico também quer
-    # saber quem é, mas não o contrário.
-    intent = "historico_pedagogico" if quer_historico else "identidade_aluno"
+    # saber quem é, mas não o contrário. "como está" é a mais fraca de todas —
+    # só nomeia o intent quando nenhuma das outras acendeu.
+    intent = (
+        "historico_pedagogico" if quer_historico
+        else "identidade_aluno" if quer_identidade
+        else "estado_aluno"
+    )
     resolved = _resolve_student_course_from_chat(professor_id, current_text, hist)
 
     # A carteira só tem MATRICULADO. Quem faz a experimental amanhã ainda é
@@ -898,6 +937,14 @@ def pedagogical_prefetch(professor_id: int, current_text: str, hist: list[Dict[s
                 # Fábio falar no passado de uma aula que não houve.
                 "experimental_agendada": exp,
             }
+        # Gatilho FRACO sozinho ("como está…") e ninguém resolvido: cala a boca.
+        # "Como está minha agenda?" acende o padrão sem falar de aluno nenhum —
+        # devolver um bloco "aluno não resolvido" ali põe ruído no prompt de
+        # toda conversa de rotina, e ruído estraga a resposta das OUTRAS
+        # perguntas. Os gatilhos fortes seguem avisando, porque neles o
+        # professor de fato falou de um aluno.
+        if not (quer_historico or quer_identidade or quer_experimental):
+            return None
         return {"intent": intent, "resolved": None, "erro": "aluno/curso não resolvido pelo contexto recente"}
     aluno_id = int(resolved["aluno_id"])
     course = resolved.get("curso_nome") or ""
@@ -921,6 +968,12 @@ def pedagogical_prefetch(professor_id: int, current_text: str, hist: list[Dict[s
         # que aconteceu com `cadastro` de manhã e com `experimental` à noite,
         # no mesmo dia e na mesma função.
         "experimental": prontuario.get("experimental") or {},
+        # O semáforo (migration 078). E aqui está o aviso de cima acontecendo
+        # pela TERCEIRA vez: em 09/08 eu pus a chave na RPC, provei com teste e
+        # mutante que ela sai do banco, perguntei pro Fábio — e ele respondeu
+        # sem citar nada, porque este dict escolhe chaves a dedo e eu não tinha
+        # adicionado esta linha. O dado chegava na porta e era jogado fora aqui.
+        "semaforo": prontuario.get("semaforo") or [],
         "ultima_aula_cronologica": latest_class,
         "ultimo_registro_com_conteudo": latest_content,
     }

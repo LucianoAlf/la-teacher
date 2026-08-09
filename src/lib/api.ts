@@ -1253,6 +1253,68 @@ export async function coordenacaoEmAberto(
   return data as unknown as CoordenacaoEmAberto
 }
 
+export interface CoordenacaoFeedbackAluno {
+  aluno_id: number
+  aluno_nome: string
+  cursos: string | null
+  unidade_id: string | null
+  unidade_nome: string | null
+  professor_id: number
+  professor_nome: string
+  feedback: Coracao | null
+  pratica_em_casa: Pratica | null
+  evolucao: Evolucao | null
+  animo: Animo | null
+  /** O texto que o professor escreveu OU falou. É o motivo desta tela existir. */
+  observacao: string | null
+  completo: boolean
+  respondido_em: string | null
+}
+
+export interface CoordenacaoFeedbackMes {
+  competencia: string
+  janela_aberta: boolean
+  resumo: {
+    alunos: number
+    respondidos: number
+    verde: number
+    amarelo: number
+    vermelho: number
+    sem_resposta: number
+    com_recado: number
+    professores: number
+    professores_ok: number
+  }
+  /** Total real de quem precisa de olho — pode ser maior que `alunos.length`. */
+  precisam_de_olho: number
+  truncado: boolean
+  alunos: CoordenacaoFeedbackAluno[]
+  filtros: { unidades: { unidade_id: string; nome: string; alunos: number }[] }
+}
+
+/**
+ * Bloco 2 do painel: o semáforo do mês (077).
+ *
+ * Devolve o resumo e SÓ quem precisa de olho — vermelho, amarelo, ou qualquer
+ * coração com observação escrita. Verde calado fica de fora de propósito:
+ * lista que devolve a escola inteira é a mesma parede de texto que ninguém lê.
+ *
+ * `truncado` nunca é decorativo: quando vier `true`, `precisam_de_olho` diz o
+ * tamanho real. Corte que não se anuncia lê como "é só isso".
+ */
+export async function coordenacaoFeedbackMes(
+  unidadeId: string | null = null,
+  competencia: string | null = null,
+): Promise<CoordenacaoFeedbackMes> {
+  const { data, error } = await rpcSolta('app_coordenacao_feedback_mes', {
+    p_competencia: competencia,
+    p_unidade_id: unidadeId,
+    p_limite: 200,
+  })
+  if (error) throw error
+  return data as unknown as CoordenacaoFeedbackMes
+}
+
 export interface ResultadoRecado {
   ok: boolean
   /** Só é true quando o WhatsApp SAIU. Reservar não é enviar. */

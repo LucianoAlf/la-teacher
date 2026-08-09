@@ -7,6 +7,7 @@ import ExperimentalFaltaPage from './pages/app/ExperimentalFalta'
 import EquipePage from './pages/app/Equipe'
 import CoordenacaoPage from './pages/app/Coordenacao'
 import PerfilCoordenacaoPage from './pages/app/PerfilCoordenacao'
+import CoordenacaoFeedbackPage from './pages/app/CoordenacaoFeedback'
 import { RequireAdmin } from './pages/app/RequireAdmin'
 import LoginPage from './pages/app/Login'
 import NovaSenhaPage from './pages/app/NovaSenha'
@@ -117,6 +118,9 @@ export const router = createBrowserRouter(
           element: <RequireAdmin />,
           children: [
             { path: '/app/coordenacao', element: <CoordenacaoPage /> },
+            // Bloco 2 do painel: o semáforo do mês — e o único lugar onde a
+            // observação escrita pelo professor tem leitor (077).
+            { path: '/app/coordenacao/feedback', element: <CoordenacaoFeedbackPage /> },
             // Perfil PRÓPRIO da coordenação: o /app/perfil mora dentro do
             // RequireProfessor e lê a RPC do professor, que devolve vazio pra
             // quem não tem vínculo — era a dona do painel batendo na tela de

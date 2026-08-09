@@ -34,6 +34,12 @@ const COLAPSADA_KEY = 'la-coord-sidebar-colapsada'
 
 const ITENS = [
   { id: 'painel', para: '/app/coordenacao', rotulo: 'Painel', icone: 'fa-solid fa-table-columns' },
+  {
+    id: 'feedback',
+    para: '/app/coordenacao/feedback',
+    rotulo: 'Feedback',
+    icone: 'fa-solid fa-heart-pulse',
+  },
   { id: 'equipe', para: '/app/equipe', rotulo: 'Equipe', icone: 'fa-solid fa-users' },
 ] as const
 
@@ -44,6 +50,7 @@ const ABAS = [
 ]
 const ROTA: Record<string, string> = {
   painel: '/app/coordenacao',
+  feedback: '/app/coordenacao/feedback',
   equipe: '/app/equipe',
   perfil: '/app/coordenacao/perfil',
 }
@@ -70,9 +77,11 @@ export function CoordenacaoFrame({
   const { pathname } = useLocation()
   const abaAtiva = pathname.startsWith('/app/coordenacao/perfil')
     ? 'perfil'
-    : pathname.startsWith('/app/equipe')
-      ? 'equipe'
-      : 'painel'
+    : pathname.startsWith('/app/coordenacao/feedback')
+      ? 'feedback'
+      : pathname.startsWith('/app/equipe')
+        ? 'equipe'
+        : 'painel'
 
   // Colapso persiste: quem trabalha o dia todo no painel não quer reajustar a
   // largura a cada navegação. Mesmo comportamento do Organizer.
