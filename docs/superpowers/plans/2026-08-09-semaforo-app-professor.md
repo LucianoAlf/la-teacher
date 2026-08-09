@@ -279,12 +279,16 @@ insert into _res values ('fn_hoje_brt e a data BRT, nao a UTC', 'sim',
        then 'sim' else 'NAO' end);
 
 -- ─── Veredito ───────────────────────────────────────────────────────────────
+-- Alias `resumo` com `falhas` NUMÉRICO: é o contrato que
+-- `scripts/rodar-teste-sql.mjs` exige (`typeof resumo.falhas !== 'number'`) e
+-- que os 54 `.test.sql` do repo usam. Um alias diferente faz o harness dizer
+-- "não veio resumo estruturado" e reprovar sem explicar.
 select json_build_object(
-  'falhas', coalesce(json_agg(json_build_object(
-      'passo', passo, 'esperado', esperado, 'obtido', obtido)) filter (
-      where esperado is distinct from obtido), '[]'::json),
-  'total', count(*)) as resultado
-from _res;
+  'falhas',  (select count(*) from _res where esperado is distinct from obtido),
+  'detalhe', (select coalesce(json_agg(json_build_object(
+                       'passo', passo, 'esperado', esperado, 'obtido', obtido)), '[]'::json)
+                from _res where esperado is distinct from obtido)
+) as resumo;
 ```
 
 - [ ] **Step 3: Rodar o teste e ver passar**
@@ -843,12 +847,16 @@ where schemaname = 'public' and tablename = 'aluno_feedback_professor'
   and coalesce(qual, '') like '%auth.role()%';
 
 -- ─── Veredito ───────────────────────────────────────────────────────────────
+-- Alias `resumo` com `falhas` NUMÉRICO: é o contrato que
+-- `scripts/rodar-teste-sql.mjs` exige (`typeof resumo.falhas !== 'number'`) e
+-- que os 54 `.test.sql` do repo usam. Um alias diferente faz o harness dizer
+-- "não veio resumo estruturado" e reprovar sem explicar.
 select json_build_object(
-  'falhas', coalesce(json_agg(json_build_object(
-      'passo', passo, 'esperado', esperado, 'obtido', obtido)) filter (
-      where esperado is distinct from obtido), '[]'::json),
-  'total', count(*)) as resultado
-from _res;
+  'falhas',  (select count(*) from _res where esperado is distinct from obtido),
+  'detalhe', (select coalesce(json_agg(json_build_object(
+                       'passo', passo, 'esperado', esperado, 'obtido', obtido)), '[]'::json)
+                from _res where esperado is distinct from obtido)
+) as resumo;
 ```
 
 - [ ] **Step 3: Adicionar os scripts e rodar o teste**
@@ -2064,12 +2072,16 @@ select 'authenticated NAO executa a cobranca', 'sim',
         'public.fn_enfileirar_cobranca_feedback(date)', 'execute')
        then 'NAO — authenticated executa' else 'sim' end;
 
+-- Alias `resumo` com `falhas` NUMÉRICO: é o contrato que
+-- `scripts/rodar-teste-sql.mjs` exige (`typeof resumo.falhas !== 'number'`) e
+-- que os 54 `.test.sql` do repo usam. Um alias diferente faz o harness dizer
+-- "não veio resumo estruturado" e reprovar sem explicar.
 select json_build_object(
-  'falhas', coalesce(json_agg(json_build_object(
-      'passo', passo, 'esperado', esperado, 'obtido', obtido)) filter (
-      where esperado is distinct from obtido), '[]'::json),
-  'total', count(*)) as resultado
-from _res;
+  'falhas',  (select count(*) from _res where esperado is distinct from obtido),
+  'detalhe', (select coalesce(json_agg(json_build_object(
+                       'passo', passo, 'esperado', esperado, 'obtido', obtido)), '[]'::json)
+                from _res where esperado is distinct from obtido)
+) as resumo;
 ```
 
 - [ ] **Step 4: Rodar o teste**
