@@ -34,6 +34,7 @@ ESCALONAMENTO_DIAS = int(os.getenv("FABIO_ESCALONAMENTO_DIAS", "3"))
 # COORDENACAO PEDAGOGICA (Marcos Quintela, Juliane, Fabio). Puxado da UAZAPI.
 GRUPO_COORDENACAO_JID = os.getenv("FABIO_GRUPO_COORDENACAO_JID", "120363304349910605@g.us")
 DEFAULT_ESCALONAMENTO_TIME = os.getenv("FABIO_NOTIFY_ESCALONAMENTO_TIME", "09:00")
+DEFAULT_FEEDBACK_TIME = os.getenv("FABIO_NOTIFY_FEEDBACK_TIME", "09:30")
 DEFAULT_WINDOW_MINUTES = int(os.getenv("FABIO_NOTIFY_WINDOW_MINUTES", "15"))
 DEFAULT_CHANNEL = os.getenv("FABIO_NOTIFY_CHANNEL", "whatsapp")
 SEND_EMPTY_BRIEFING = os.getenv("FABIO_NOTIFY_EMPTY_BRIEFING", "false").lower() in {"1", "true", "yes", "sim"}
@@ -51,6 +52,7 @@ EVENTS = {
     "briefing": EventSpec("briefing_matinal", "informativa", DEFAULT_BRIEFING_TIME),
     "pendencia": EventSpec("pendencia_registro", "governanca", DEFAULT_PENDENCIA_TIME),
     "escalonamento": EventSpec("pendencia_escalonada", "governanca", DEFAULT_ESCALONAMENTO_TIME),
+    "feedback": EventSpec("feedback_lembrete", "governanca", DEFAULT_FEEDBACK_TIME),
 }
 
 
@@ -506,6 +508,184 @@ def format_escalonamento(rows: list) -> Optional[str]:
     return "\n".join(out)
 
 
+MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+            "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+
+
+def _competencia_label(iso: str) -> str:
+    """2026-08-01 -> 'agosto/2026'."""
+    try:
+        d = datetime.strptime(str(iso)[:10], "%Y-%m-%d").date()
+    except Exception:
+        return str(iso)
+    return f"{MESES_PT[d.month - 1]}/{d.year}"
+
+
+def feedback_cobranca_do_dia(dia: Optional[str] = None) -> Dict[str, Any]:
+    return rpc("fn_feedback_cobranca_do_dia", {"p_dia": dia}) or {}
+
+
+def format_feedback_professor(prof: Dict[str, Any], item: Dict[str, Any], fase: str) -> str:
+    """O lembrete carrega o PERCENTUAL e o PORQUÊ (pedido do Alf).
+
+    O reforço não repete o porquê: quem chegou até ele já leu uma vez, e
+    repetir o discurso inteiro é o jeito rápido de virar ruído.
+    """
+    nome = first_name(prof)
+    ok = int(item.get("ok") or 0)
+    total = int(item.get("total") or 0)
+    faltam = int(item.get("faltam") or max(total - ok, 0))
+
+    if fase == "lembrete":
+        return "\n".join([
+            f"*{nome}, é semana do feedback dos alunos.*",
+            "",
+            f"Você já respondeu *{ok} de {total}*.",
+            "",
+            "É com isso que a coordenação enxerga o aluno antes da evasão — "
+            "e tem gente chegando na renovação.",
+            "",
+            "Abre o app em *Alunos* e fecha o mês. Leva poucos minutos.",
+        ])
+
+    plural = "aluno" if faltam == 1 else "alunos"
+    return "\n".join([
+        f"*{nome}, faltam {faltam} {plural} no seu feedback do mês.*",
+        "",
+        f"Você fechou {ok} de {total}.",
+        "",
+        "Dá pra terminar em poucos minutos pelo app, em *Alunos*.",
+    ])
+
+
+def format_feedback_coordenacao(competencia: str, professores: list,
+                                fecharam: int, elegiveis: int) -> Optional[str]:
+    """A lista do dia 1º. Mesma regra do escalonamento: tem que ser
+    ENCAMINHÁVEL — o coordenador copia o bloco de um professor e manda pra ele.
+    Por isso vai nome, unidade e quantos de quantos, não um resumo.
+    """
+    if not professores:
+        return None
+
+    REGUA = "━━━━━━━━━━━━━━"
+    out = [f"*Feedback dos alunos — {_competencia_label(competencia)}*",
+           f"_{fecharam} de {elegiveis} professores fecharam o mês_"]
+
+    for p in professores:
+        nome = p.get("nome") or f"professor {p.get('professor_id')}"
+        unidades = p.get("unidades") or []
+        ok = int(p.get("ok") or 0)
+        total = int(p.get("total") or 0)
+        faltam = int(p.get("faltam") or max(total - ok, 0))
+        out.append(REGUA)
+        out.append(f"*{nome}*" + (f" · {unidades[0]}" if len(unidades) == 1 else ""))
+        out.append(f"_faltaram {faltam} de {total} alunos_")
+
+    out.append(REGUA)
+    out.append("Quem está na lista não fechou o semáforo dos alunos no mês. "
+               "Dá pra copiar o bloco e mandar direto pro professor.")
+    return "\n".join(out)
+
+
+def run_feedback(channel: str, dry_run: bool,
+                 professor_id: Optional[int] = None,
+                 dia: Optional[str] = None) -> list[Dict[str, Any]]:
+    """RESERVA → envia → CONCLUI, o mesmo desenho da 066.
+
+    Nada é enfileirado para outro processo buscar depois: a fabio_notificacoes
+    não tem estado de entrada, então linha reservada e não enviada no mesmo
+    ciclo é linha que MENTE que está em voo.
+    """
+    resultados: list[Dict[str, Any]] = []
+    data = feedback_cobranca_do_dia(dia)
+    fase = (data.get("fase") or "nenhuma")
+    if fase == "nenhuma":
+        return [{"event": "feedback", "status": "fora_da_regua", "dia": data.get("dia")}]
+
+    professores = data.get("professores") or []
+    competencia = data.get("competencia")
+
+    # ── Dia 1º: uma mensagem só, pro grupo da coordenação ──────────────────
+    if fase == "coordenacao":
+        # `elegiveis` é o total de professores com carteira; a lista traz só
+        # quem NÃO fechou, então quem fechou é a diferença.
+        elegiveis = int(data.get("elegiveis") or 0)
+        fecharam = max(elegiveis - len(professores), 0)
+        corpo = format_feedback_coordenacao(competencia, professores, fecharam, elegiveis)
+        if not corpo:
+            return [{"event": "feedback", "fase": fase, "status": "todos_fecharam"}]
+        if dry_run:
+            return [{"event": "feedback", "fase": fase, "status": "dry_run_ready",
+                     "professores": len(professores), "content_preview": corpo}]
+        reserva = rpc("fn_reservar_cobranca_feedback_coordenacao", {
+            "p_corpo": corpo, "p_whatsapp": GRUPO_COORDENACAO_JID, "p_dia": dia,
+        }) or {}
+        if not reserva.get("reservado"):
+            return [{"event": "feedback", "fase": fase, "status": "ja_entregue",
+                     "motivo": reserva.get("motivo")}]
+        nid, token = reserva.get("notificacao_id"), reserva.get("lease_token")
+        try:
+            enviar_grupo(corpo)
+            if not mark_sent(nid, token):
+                log("feedback_coordenacao_entregue_mas_nao_fechada", notificacao_id=str(nid))
+            return [{"event": "feedback", "fase": fase, "status": "sent",
+                     "professores": len(professores)}]
+        except Exception as exc:
+            mark_failed(nid, str(exc), token)
+            return [{"event": "feedback", "fase": fase, "status": "failed",
+                     "error": str(exc)[:500]}]
+
+    # ── Janela do mês: um por professor ────────────────────────────────────
+    if professor_id is not None:
+        professores = [p for p in professores
+                       if int(p.get("professor_id") or 0) == int(professor_id)]
+    por_id = {int(p["id"]): p for p in active_professors()}
+
+    for item in professores:
+        pid = int(item.get("professor_id") or 0)
+        resultado: Dict[str, Any] = {"event": "feedback", "fase": fase,
+                                     "professor_id": pid, "status": "init"}
+        prof = por_id.get(pid)
+        if not prof:
+            resultado["status"] = "professor_sem_acesso_skip"
+            resultados.append(resultado)
+            continue
+        corpo = format_feedback_professor(prof, item, fase)
+        if dry_run:
+            resultado["status"] = "dry_run_ready"
+            resultado["content_preview"] = corpo
+            resultados.append(resultado)
+            continue
+
+        reserva = rpc("fn_reservar_cobranca_feedback", {
+            "p_professor_id": pid,
+            "p_tipo": f"feedback_{fase}",
+            "p_corpo": corpo,
+            "p_dia": dia,
+        }) or {}
+        if not reserva.get("reservado"):
+            resultado["status"] = "nao_reservado"
+            resultado["motivo"] = reserva.get("motivo")
+            resultados.append(resultado)
+            continue
+
+        nid, token = reserva.get("notificacao_id"), reserva.get("lease_token")
+        try:
+            deliver(pid, channel, corpo)
+            if not mark_sent(nid, token):
+                log("feedback_entregue_mas_nao_fechada",
+                    notificacao_id=str(nid), professor_id=pid)
+                resultado["aviso"] = "entregue_mas_nao_fechada"
+            resultado["status"] = "sent"
+        except Exception as exc:
+            mark_failed(nid, str(exc), token)
+            resultado["status"] = "failed"
+            resultado["error"] = str(exc)[:500]
+        resultados.append(resultado)
+
+    return resultados
+
+
 def enviar_grupo(texto: str) -> Dict[str, Any]:
     """Envia pro grupo da coordenacao pela UAZAPI.
 
@@ -809,7 +989,7 @@ def run_devolutivas(channel: str, dry_run: bool, professor_id: Optional[int] = N
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "escalonamento", "all"], default="all")
+    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "escalonamento", "feedback", "all"], default="all")
     parser.add_argument("--professor-id", type=int)
     parser.add_argument("--channel", choices=["whatsapp", "app"], default=DEFAULT_CHANNEL)
     parser.add_argument("--dry-run", action="store_true")
@@ -868,6 +1048,18 @@ def main() -> int:
         except Exception as exc:
             results.append({"event": "escalonamento", "status": "error", "error": str(exc)[:500]})
         log("event_result", **results[-1])
+
+    if "feedback" in due_events:
+        due_events = [e for e in due_events if e != "feedback"]
+        try:
+            feedback_results = run_feedback(args.channel, args.dry_run,
+                                            args.professor_id, args.date)
+        except Exception as exc:
+            feedback_results = [{"event": "feedback", "status": "error",
+                                 "error": str(exc)[:500]}]
+        for r in feedback_results:
+            log("event_result", **r)
+        results.extend(feedback_results)
 
     rows = active_professors(args.professor_id) if due_events else []
     for prof in rows:

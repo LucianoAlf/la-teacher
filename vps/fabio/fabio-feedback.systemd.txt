@@ -1,0 +1,27 @@
+# ~/.config/systemd/user/fabio-feedback.service
+[Unit]
+Description=Fábio — cobra o feedback mensal dos alunos e entrega a lista à coordenação
+Documentation=https://github.com/LucianoAlf/la-teacher
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+EnvironmentFile=/home/fabio/.hermes/.env
+ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event feedback --channel whatsapp --force
+
+# ~/.config/systemd/user/fabio-feedback.timer
+[Unit]
+Description=Timer do feedback mensal as 09:30 BRT (12:30 UTC)
+
+[Timer]
+OnCalendar=*-*-* 12:30:00
+AccuracySec=1m
+Persistent=true
+Unit=fabio-feedback.service
+
+[Install]
+WantedBy=timers.target
+
+# LIGAR (decisão do Alf — NÃO rodar sem a palavra dele):
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now fabio-feedback.timer
