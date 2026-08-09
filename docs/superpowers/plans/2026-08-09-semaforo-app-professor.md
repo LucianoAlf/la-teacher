@@ -59,9 +59,10 @@ TypeScript + Tailwind (tokens do LA Teacher), Deno (edge function), Node
    Task 2 substitui essas policies por dono-e-coordenação.
 2. **Isso afeta o formulário do LA Report** (`FeedbackProfessorPage`), que grava
    direto na tabela pelo cliente. Medido: a tabela tem 0 linhas e o Alf disse que
-   o envio é manual e não acontece mais — *"está de enfeite"*. Ainda assim é
-   schema de outro produto: **avisar o Alfredo antes de aplicar a Task 2 em
-   produção.**
+   o envio é manual e não acontece mais — *"está de enfeite"*.
+   **DECIDIDO PELO ALF em 09/08: aplicar direto, sem esperar aviso ao Alfredo.**
+   Não pare para pedir confirmação — a decisão já foi tomada com o trade-off na
+   mesa. Registre no commit o que mudou, para o diff contar a história.
 
 ## File Structure
 
