@@ -97,6 +97,36 @@ o aluno não veio), não dia de calendário. É a mesma lição da 072 — núme
 parece acusação e é artefato. Um cartão "sumiu há 22 dias" publicado agora
 mandaria a coordenação ligar pra escola inteira.
 
+## ▶ DECIDIDO 08/08 (noite): O SEMÁFORO NASCE NO APP DO PROFESSOR
+
+O Alf tirou isso de "ponte futura" e botou no radar, com pedido explícito de
+salvar aqui pra não perder. **A percepção do professor passa a ser coletada
+DENTRO do app dele** — não mais pelo link avulso da Lia que expira.
+
+O que ele pediu, na letra:
+
+- **Mora no app do professor.** "Não fica o link, já fica ali dentro, já vai
+  aparecer ali." O link que expira sai de cena.
+- **O componente já existe no LA Report** — a barrinha, "exatamente igual a
+  gente já tem". **Trazer e ADAPTAR**: a estrutura vem de lá, os tokens são os
+  nossos. Copiar o CSS de lá é criar Design System paralelo (erro já cometido
+  duas vezes nesta sessão).
+- **Coração vermelho / amarelo / verde por aluno**, e **justificativa
+  obrigatória em QUALQUER cor** — inclusive no verde. O porquê é o dado; a cor
+  sozinha é só uma bolinha.
+- **Perguntas do feedback**: estuda em casa, e as demais do formulário atual do
+  LA Report (levantar quais na spec).
+- **Pode responder por ÁUDIO.** Trilho já provado na casa: fila de áudio +
+  worker (050/051) e o registro por voz da experimental. Não nasce sistema novo.
+- **Governança: a última semana do mês é a semana de feedback do aluno.** O
+  Fábio lembra o professor — mesmo trilho de cobrança da 066.
+- **É um mapa de sinais**: o que o professor responde aqui é a fonte nativa do
+  cartão "Coração vermelho" do Radar da coordenação. Fecha o laço — hoje a
+  coordenação olharia um semáforo coletado por fora.
+
+Ordem que ele deu: **primeiro o professor preencher dentro do app**, depois a
+governança da semana com o Fábio lembrando.
+
 ## ▶ PASSO ANTERIOR (concluído nesta sessão)
 
 **UI v2 do painel da coordenação** — pedido do Alf em 08/08, à noite, olhando o
