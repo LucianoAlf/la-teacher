@@ -14,7 +14,13 @@ export function CardFeedbackHome() {
   const [p, setP] = useState<FeedbackProgresso | null>(null)
 
   useEffect(() => {
-    feedbackProgresso().then(setP).catch(() => setP(null))
+    let vivo = true
+    feedbackProgresso()
+      .then((r) => vivo && setP(r))
+      .catch(() => vivo && setP(null))
+    return () => {
+      vivo = false
+    }
   }, [])
 
   if (!p || !p.janela_aberta || p.total === 0 || p.respondidos >= p.total) return null
