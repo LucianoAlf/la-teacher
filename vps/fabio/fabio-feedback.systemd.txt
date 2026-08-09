@@ -63,9 +63,19 @@
 # quando a linha anterior esta 'falhou' ou tem lease morto. Nunca reclama
 # linha 'enviada', nem 'processando' com lease ainda vivo.
 #
-# ⚠️ NAO INSTALADO NEM HABILITADO NESTA TASK. O comando de ligar fica
-# comentado no fim deste arquivo, depois do [Install] — nao rodar sem a
-# palavra do Alf (ver bloco LIGAR).
+# ✅ INSTALADO E LIGADO em 09/08/2026, ~22:20 UTC, com a palavra do Alf.
+# `systemctl --user is-enabled fabio-feedback.timer` → enabled.
+#
+# O que foi medido no momento de ligar, porque `Persistent=true` numa primeira
+# habilitacao PODERIA disparar um catch-up dos horarios do dia que ja passaram
+# (12:30/15:30/18:30 UTC — os tres ja tinham passado as 22:20):
+#   - `list-timers` → LAST = "-", NEXT = seg 10/08 12:30 UTC (nao houve catch-up)
+#   - `systemctl --user status fabio-feedback.service` → inactive (dead)
+#   - `journalctl --user -u fabio-feedback.service --since -10min` → No entries
+#   - `select count(*) from fabio_notificacoes where tipo like 'feedback%'` → 0
+# Ou seja: ligou sem mandar nada. E mesmo que tivesse disparado, a fase de
+# 09/08 e 10/08 e `nenhuma` (fn_feedback_cobranca_do_dia) — a primeira cobranca
+# de verdade so existe em 25/08, com 6 elegiveis.
 
 # ============================================================================
 # ~/.config/systemd/user/fabio-feedback.service
@@ -100,6 +110,10 @@ Unit=fabio-feedback.service
 [Install]
 WantedBy=timers.target
 
-# LIGAR (decisão do Alf — NÃO rodar sem a palavra dele):
+# JÁ LIGADO (09/08/2026, com a palavra do Alf). Os comandos abaixo são o que
+# foi rodado — ficam aqui pra reinstalar se a VPS for do zero:
 #   systemctl --user daemon-reload
 #   systemctl --user enable --now fabio-feedback.timer
+#
+# DESLIGAR, se um dia precisar:
+#   systemctl --user disable --now fabio-feedback.timer
