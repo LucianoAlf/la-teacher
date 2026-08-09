@@ -24,12 +24,29 @@
 // para de mudar qualquer coisa de verdade (mesma armadilha do V5 da 075,
 // medida depois daquele deploy).
 //
-// V4 pega a conclusão sem checar o lease. `fabio_marcar_notificacao_enviada`
-// não é definida por esta migration — é reusada de uma migration anterior
-// (medido: `(p_notificacao_id uuid, p_lease_token uuid, p_recibo text)
-// returns boolean`) — então o mutante precisa REDEFINI-LA dentro da própria
-// transação descartável, com a MESMA assinatura, ignorando o token. O
-// ROLLBACK do runner devolve a função real no final; nada some de produção.
+// V4 pega a conclusão sem checar o lease. Duas âncoras podres foram achadas
+// na revisão de 09/08 e as DUAS precisavam de correção independente:
+//   (a) `mutado.replace(de, para)` com `para` STRING interpreta `$$` na
+//       string de SUBSTITUIÇÃO como o escape de "$" — vira `$` sozinho, que
+//       não é delimitador de dollar-quote válido, e o mutante morria de erro
+//       de sintaxe, não da asserção. `node -e "console.log('A'.replace('A','x
+//       \$\$ y'))"` imprime `x $ y` — reproduzido e confirmado antes de
+//       corrigir. Fix: replacer em FUNÇÃO (`() => parte.para`), que devolve o
+//       texto literal sem nenhuma interpretação de `$`.
+//   (b) mesmo com o `$$` corrigido, `fabio_marcar_notificacao_enviada` real
+//       (018) tem PARÂMETROS NOMEADOS (`p_notificacao_id`, `p_lease_token`,
+//       `p_recibo`). `create or replace function` recusa mudar o NOME de um
+//       parâmetro existente (`cannot change name of input parameter`) — a
+//       versão anterior deste mutante declarava `(uuid, uuid, text)` sem
+//       nome nenhum, e o CREATE OR REPLACE quebrava antes de qualquer teste
+//       rodar. Fix: nomes e assinatura idênticos aos medidos em 018, e tag
+//       `$mut$` em vez de `$$` (defesa extra, redundante com o fix do
+//       replacer, mas o revisor pediu as duas).
+// As DUAS causas eram fatais sozinhas — cada uma, isolada, já derrubava o
+// CREATE OR REPLACE antes de qualquer assert rodar, e `rodar-teste-sql.mjs`
+// sai com código≠0 tanto pra "SQL quebrou" quanto pra "falhas>0": o mutante
+// morria, mas nunca pela asserção "concluir com token errado nao fecha" —
+// morria mudo. Corrigido, ele tem que morrer FALANDO.
 //
 // V5 pega reforço/coordenação cobrando quem já fechou o mês — o defeito que
 // ensina o professor a ignorar o Fábio (mesma lição da 075, agora na
@@ -42,6 +59,16 @@
 // V7 é a mesma armadilha de permissão das tasks anteriores (073/074/075):
 // `create or replace function` PRESERVA privilégio — só um `grant` a mais
 // prova que os `revoke` desta migration fecham a porta de verdade.
+//
+// V8 (decisão do dono do plano, 09/08): a RESERVA ganhou volta — `do nothing`
+// virou `do update` que reclama linha 'falhou' ou 'processando' com lease
+// VENCIDO. Tirar a checagem `lease_expira_em < now()` reabre o defeito de
+// envio duplicado: um lease AINDA VIVO vira reclamável, ou seja, dois workers
+// podem mandar a MESMA cobrança. Não precisou de um teste novo pra pegar —
+// "dedupe do professor no mesmo dia" já reserva, tenta reservar nas costas
+// (lease fresquinho, bem vivo) e exige `ja_cobrado_hoje`; com a checagem de
+// lease fora, essa segunda chamada reclama e devolve `reservado:true`, e o
+// teste já existente morre por conta própria.
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
@@ -80,7 +107,7 @@ const MUTANTES = [
     partes: [
       {
         de: `create unique index if not exists fabio_notificacoes_feedback_coord_dia_unico
-  on public.fabio_notificacoes (tipo, dia_referencia)
+  on public.fabio_notificacoes (tipo, dia_referencia, destinatario_whatsapp)
   where tipo = 'feedback_coordenacao';`,
         para: `drop index if exists public.fabio_notificacoes_feedback_coord_dia_unico;
 create unique index if not exists fabio_notificacoes_feedback_coord_dia_unico
@@ -88,7 +115,7 @@ create unique index if not exists fabio_notificacoes_feedback_coord_dia_unico
   where tipo = 'feedback_coordenacao';`,
       },
       {
-        de: `on conflict (tipo, dia_referencia)`,
+        de: `on conflict (tipo, dia_referencia, destinatario_whatsapp)`,
         para: `on conflict (professor_id, tipo, dia_referencia)`,
       },
     ],
@@ -96,15 +123,27 @@ create unique index if not exists fabio_notificacoes_feedback_coord_dia_unico
   {
     nome: 'V4 — conclusao fecha com qualquer lease token',
     pega: 'passo "concluir com token errado nao fecha"',
-    de: `  'destinatario_tipo coordenacao, JID em destinatario_whatsapp. So service_role.';`,
-    para: `  'destinatario_tipo coordenacao, JID em destinatario_whatsapp. So service_role.';
+    de: `  'volta da reserva do professor. So service_role.';`,
+    para: `  'volta da reserva do professor. So service_role.';
 
--- MUTANTE V4: ignora o lease_token, qualquer token "fecha" a notificacao.
--- Assinatura medida no banco em 09/08: (p_notificacao_id uuid, p_lease_token
--- uuid, p_recibo text) returns boolean — precisa bater pra SUBSTITUIR a
--- funcao real dentro da transacao descartavel, nao criar um overload.
-create or replace function public.fabio_marcar_notificacao_enviada(uuid, uuid, text)
-returns boolean language sql as $$ select true; $$;`,
+-- MUTANTE V4: ignora o lease_token, fecha qualquer 'processando' so pelo id.
+-- Nomes de parametro tem que bater com a funcao real (018) — CREATE OR
+-- REPLACE recusa "cannot change name of input parameter" se os nomes
+-- mudarem (medido, achado da revisao de 09/08). Tag $mut$, nao $$: reforca o
+-- fix do replacer em funcao la embaixo (mutado.replace(de, () => para)) —
+-- $$ dentro de uma STRING de substituicao do String.replace e um padrao
+-- especial ($$ vira $ literal) e corrompia o dollar-quote antes dos dois
+-- fixes.
+create or replace function public.fabio_marcar_notificacao_enviada(
+  p_notificacao_id uuid, p_lease_token uuid default null, p_recibo text default null)
+returns boolean language plpgsql security definer set search_path to 'public'
+as $mut$
+declare v_n integer;
+begin
+  update public.fabio_notificacoes set status='enviada', enviada_em=now()
+   where id = p_notificacao_id and status='processando';
+  get diagnostics v_n = row_count; return v_n > 0;
+end $mut$;`,
   },
   {
     nome: 'V5 — reforco e coordenacao voltam a cobrar quem JA fechou',
@@ -127,6 +166,39 @@ returns boolean language sql as $$ select true; $$;`,
   from public, anon, authenticated;
 
 grant execute on function public.fn_reservar_cobranca_feedback(int,text,text,date) to anon;`,
+  },
+  {
+    nome: 'V8 — lease AINDA VIVO vira reclamavel (envio duplicado)',
+    pega: 'passo "dedupe do professor no mesmo dia (lease vivo nao reclama)"',
+    // Só na reserva do PROFESSOR: o comentário "reclamo (professor)" é a
+    // âncora que separa este bloco do gêmeo idêntico na reserva da
+    // coordenação ("reclamo (coordenacao)") — sem essa distinção as duas
+    // ficariam com o MESMO texto e a checagem de unicidade acusaria 2.
+    de: `  -- reclamo (professor): dono anterior falhou, ou lease vencido de verdade.
+  do update set
+    status          = 'processando',
+    tentativas      = fabio_notificacoes.tentativas + 1,
+    corpo           = excluded.corpo,
+    lease_token     = excluded.lease_token,
+    lease_expira_em = excluded.lease_expira_em,
+    last_error      = null
+  where
+    fabio_notificacoes.status = 'falhou'
+    or (fabio_notificacoes.status = 'processando'
+        and fabio_notificacoes.lease_expira_em < now())
+  returning id into v_id;`,
+    para: `  -- reclamo (professor): dono anterior falhou, ou lease vencido de verdade.
+  do update set
+    status          = 'processando',
+    tentativas      = fabio_notificacoes.tentativas + 1,
+    corpo           = excluded.corpo,
+    lease_token     = excluded.lease_token,
+    lease_expira_em = excluded.lease_expira_em,
+    last_error      = null
+  where
+    fabio_notificacoes.status = 'falhou'
+    or (fabio_notificacoes.status = 'processando')
+  returning id into v_id;`,
   },
 ]
 
@@ -158,7 +230,15 @@ for (const m of MUTANTES) {
   }
 
   let mutado = fonte
-  for (const parte of partes) mutado = mutado.replace(parte.de, parte.para)
+  // Replacer em FUNÇÃO, não string: `String.prototype.replace` trata `$$`
+  // (e `$&`, `$1`, etc.) na string de SUBSTITUIÇÃO como padrão especial,
+  // mesmo quando o padrão de busca é uma string literal — `$$` vira `$`
+  // sozinho. O V4 carrega corpo de função com `$mut$ ... $mut$`, mas
+  // qualquer mutante futuro que carregue um dollar-quote (`$$` incluso) cairia
+  // na mesma armadilha. Uma função de substituição devolve o texto literal,
+  // sem essa interpretação. (achado da revisão, 09/08 — reproduzido com
+  // `node -e "console.log('A'.replace('A','x $$ y'))"` → `x $ y`.)
+  for (const parte of partes) mutado = mutado.replace(parte.de, () => parte.para)
 
   writeFileSync(TEMP, mutado)
   let passou = true

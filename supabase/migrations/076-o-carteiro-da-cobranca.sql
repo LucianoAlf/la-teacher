@@ -2,8 +2,14 @@
 --
 -- A 075 enfileirava e ninguém buscava. Aqui a fila vira o que a casa já usa em
 -- briefing, pendência e devolutiva: RESERVA ('processando' + lease) → envia →
--- CONCLUI. Quem executa os três passos é o fabio_notification_worker.py; o
--- banco só responde "quem cobrar hoje" e "reserve esta linha pra mim".
+-- CONCLUI — e, a partir desta revisão (09/08), com a MESMA volta que aquelas
+-- três já têm: uma RESERVA que morreu no meio do caminho pode ser reclamada,
+-- não só criada. A primeira versão desta migration copiava só a forma dos três
+-- passos e usava `on conflict ... do nothing` — tinha o desenho, mas não a
+-- resiliência (ver "POR QUE A RESERVA GANHOU VOLTA", no fim deste cabeçalho).
+-- Quem executa os três passos é o fabio_notification_worker.py; o banco
+-- responde "quem cobrar hoje", "reserve esta linha pra mim" e, se for o caso,
+-- "pode reclamar esta MESMA linha de novo".
 --
 -- POR QUE NÃO FICA UM pg_cron ENFILEIRANDO
 -- `status` não tem estado de entrada: aceita 'processando', 'enviada', 'falhou'
@@ -19,6 +25,36 @@
 -- é `destinatario_tipo='coordenacao'`, `professor_id` nulo e o JID em
 -- `destinatario_whatsapp`. O CHECK é ESTENDIDO, nunca substituído — os três
 -- ramos que já existiam continuam palavra por palavra.
+--
+-- POR QUE A RESERVA GANHOU VOLTA (revisão de 09/08, achado da revisão de código)
+-- A primeira versão copiou o `on conflict ... do nothing` da 066 sem examinar
+-- se ele servia AQUI. Pra 066 serve: o recado é disparado por gente, e gente
+-- re-clica se algo falhar. Esta fila não tem quem re-clique — ela dispara em
+-- exatamente três dias do mês (o dia 1º, e os dois âncorados no fim do mês
+-- anterior), o timer roda uma vez por dia, e no dia seguinte a um desses três
+-- a função já responde `fase:'nenhuma'`. Um worker que morre entre a RESERVA e
+-- o envio, ou um envio de WhatsApp que falha, deixava a linha presa em
+-- 'processando' com lease morto — e toda chamada seguinte no mesmo dia batia
+-- em `ja_cobrado_hoje`/`ja_entregue_hoje`, achando que já tinha sido feito. Sem
+-- uma segunda chance NO MESMO CICLO, aquele professor (ou a coordenação
+-- inteira) perdia a cobrança até o mês seguinte. Por isso os dois
+-- `do nothing` viraram `do update` que RECLAMA a própria linha quando ela está
+-- seguramente livre — mesma forma que fabio_claim_notificacao já usa (018):
+--   • reclamável quando `status='falhou'`, ou `status='processando'` com
+--     `lease_expira_em` JÁ VENCIDO — o dono anterior sumiu de verdade;
+--   • NUNCA reclamável quando `status='enviada'` (ou `pulada_*`) — essa é a
+--     cerca contra o envio duplicado — nem quando `processando` com lease
+--     AINDA VIVO: outro worker pode estar no meio do envio agora, e reclamar
+--     aqui seria a mesma linha sendo mandada duas vezes;
+--   • ao reclamar: `lease_token`/`lease_expira_em` novos, `tentativas+1`,
+--     `corpo` fresco (o texto de "faltam N alunos" pode ter mudado desde a
+--     tentativa morta), `last_error` limpo;
+--   • `criado_em` NUNCA muda no reclaim — `dia_referencia` é GERADA a partir
+--     dele, e mexer nela moveria a própria chave de dedupe pra outro dia.
+-- Quando o WHERE do DO UPDATE não bate (linha não está numa situação segura
+-- pra reclamar), o Postgres não insere nem atualiza nada e a cláusula
+-- RETURNING não devolve linha — o `if v_id is null` de cada função continua
+-- valendo, com o mesmo motivo de antes.
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 1. O destinatário aprende 'coordenacao'
@@ -51,8 +87,18 @@ create unique index if not exists fabio_notificacoes_feedback_prof_dia_unico
   on public.fabio_notificacoes (professor_id, tipo, dia_referencia)
   where tipo = any (array['feedback_lembrete','feedback_reforco']);
 
+-- `destinatario_whatsapp` entrou na chave na revisão de 09/08: hoje só existe
+-- UM grupo de coordenação, então (tipo, dia_referencia) e (tipo,
+-- dia_referencia, destinatario_whatsapp) dedupam igual. No dia em que um
+-- segundo grupo existir (por unidade, por exemplo), a chave de 2 colunas
+-- trataria os dois GRUPOS DIFERENTES como o mesmo destinatário — o segundo JID
+-- do dia bateria em `ja_entregue_hoje` e nunca receberia nada.
+-- `drop` explícito porque este índice JÁ EXISTE em produção (076 aplicada em
+-- 09/08 com a definição antiga): `create ... if not exists` casa por NOME —
+-- sem o drop, a definição nova nunca substitui a antiga.
+drop index if exists public.fabio_notificacoes_feedback_coord_dia_unico;
 create unique index if not exists fabio_notificacoes_feedback_coord_dia_unico
-  on public.fabio_notificacoes (tipo, dia_referencia)
+  on public.fabio_notificacoes (tipo, dia_referencia, destinatario_whatsapp)
   where tipo = 'feedback_coordenacao';
 
 -- ───────────────────────────────────────────────────────────────────────────
@@ -148,10 +194,15 @@ language plpgsql volatile security definer set search_path to 'public'
 as $$
 declare
   v_dia       date        := coalesce(p_dia, public.fn_hoje_brt());
-  -- `dia_referencia` é GERADA a partir de criado_em. Escrever criado_em como a
-  -- meia-noite BRT de v_dia ancora a dedupe no dia SIMULADO — em produção v_dia
-  -- já é hoje, então não muda nada.
-  v_criado_em timestamptz := (v_dia::timestamp) at time zone 'America/Sao_Paulo';
+  -- `dia_referencia` é GERADA a partir de criado_em. Em produção (p_dia nulo,
+  -- v_dia = hoje de verdade) grava o INSTANTE real — é o que faz qualquer
+  -- leitura de `enviada_em - criado_em`, na tabela compartilhada, medir tempo
+  -- de fila de verdade em vez de sempre bater em meia-noite. Só quando v_dia é
+  -- um dia SIMULADO (o teste passando p_dia explícito, diferente de hoje) é
+  -- que criado_em precisa virar meia-noite BRT daquele dia, pra
+  -- dia_referencia — a chave de dedupe — cair no dia certo.
+  v_criado_em timestamptz := case when v_dia = public.fn_hoje_brt() then now()
+                                   else (v_dia::timestamp) at time zone 'America/Sao_Paulo' end;
   v_id        uuid;
   v_token     uuid;
   v_ativo     boolean;
@@ -195,7 +246,18 @@ begin
      'processando', 1, v_token, now() + interval '10 minutes', v_criado_em)
   on conflict (professor_id, tipo, dia_referencia)
     where tipo = any (array['feedback_lembrete','feedback_reforco'])
-  do nothing
+  -- reclamo (professor): dono anterior falhou, ou lease vencido de verdade.
+  do update set
+    status          = 'processando',
+    tentativas      = fabio_notificacoes.tentativas + 1,
+    corpo           = excluded.corpo,
+    lease_token     = excluded.lease_token,
+    lease_expira_em = excluded.lease_expira_em,
+    last_error      = null
+  where
+    fabio_notificacoes.status = 'falhou'
+    or (fabio_notificacoes.status = 'processando'
+        and fabio_notificacoes.lease_expira_em < now())
   returning id into v_id;
 
   if v_id is null then
@@ -218,7 +280,8 @@ language plpgsql volatile security definer set search_path to 'public'
 as $$
 declare
   v_dia       date        := coalesce(p_dia, public.fn_hoje_brt());
-  v_criado_em timestamptz := (v_dia::timestamp) at time zone 'America/Sao_Paulo';
+  v_criado_em timestamptz := case when v_dia = public.fn_hoje_brt() then now()
+                                   else (v_dia::timestamp) at time zone 'America/Sao_Paulo' end;
   v_id        uuid;
   v_token     uuid;
 begin
@@ -242,9 +305,20 @@ begin
      'Feedback do mês — quem não fechou', btrim(p_corpo), 'coordenacao',
      btrim(p_whatsapp), 'processando', 1, v_token,
      now() + interval '10 minutes', v_criado_em)
-  on conflict (tipo, dia_referencia)
+  on conflict (tipo, dia_referencia, destinatario_whatsapp)
     where tipo = 'feedback_coordenacao'
-  do nothing
+  -- reclamo (coordenacao): mesma regra do professor, ver cabecalho.
+  do update set
+    status          = 'processando',
+    tentativas      = fabio_notificacoes.tentativas + 1,
+    corpo           = excluded.corpo,
+    lease_token     = excluded.lease_token,
+    lease_expira_em = excluded.lease_expira_em,
+    last_error      = null
+  where
+    fabio_notificacoes.status = 'falhou'
+    or (fabio_notificacoes.status = 'processando'
+        and fabio_notificacoes.lease_expira_em < now())
   returning id into v_id;
 
   if v_id is null then
@@ -277,7 +351,9 @@ comment on function public.fn_feedback_cobranca_do_dia(date) is
   'quem cobrar, ancorado no fim do mes. Nao escreve nada. So service_role.';
 comment on function public.fn_reservar_cobranca_feedback(int, text, text, date) is
   'Reserva a cobranca do feedback de UM professor (processando + lease) antes '
-  'do envio. Respeita ferias via fn_fabio_pode_notificar. So service_role.';
+  'do envio, com volta: falhou ou lease morto pode ser reclamado, enviada e '
+  'lease vivo nunca. Respeita ferias via fn_fabio_pode_notificar. So service_role.';
 comment on function public.fn_reservar_cobranca_feedback_coordenacao(text, text, date) is
   'Reserva a entrega do dia 1o pro GRUPO da coordenacao: professor_id nulo, '
-  'destinatario_tipo coordenacao, JID em destinatario_whatsapp. So service_role.';
+  'destinatario_tipo coordenacao, JID em destinatario_whatsapp, com a mesma '
+  'volta da reserva do professor. So service_role.';

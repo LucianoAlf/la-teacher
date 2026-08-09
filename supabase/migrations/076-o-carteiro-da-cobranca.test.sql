@@ -8,9 +8,10 @@ declare
   v_antes  jsonb;
   v_r      jsonb;
   v_r2     jsonb;
+  v_r3     jsonb;
+  v_r4     jsonb;
   v_mes    date;
   v_ultimo date;
-  v_fase   text;
   v_lemb   date;
   v_ref    date;
   v_i      int;
@@ -61,23 +62,29 @@ begin
     'ainda existe');
 
   -- ── O quarto ramo do CHECK, sem perder os três antigos ──────────────────
+  -- `exists(...)`, não subquery escalar solta: uma subquery escalar sobre
+  -- pg_constraint devolve NULL (não false) quando a constraint não bate — e
+  -- `not ok` com ok NULL é NULL, que o `where not ok` da apuração final
+  -- exclui em silêncio. Uma migration que derrubasse ou renomeasse o CHECK
+  -- passaria aqui SEM registrar falha nenhuma. `exists` nunca é NULL: bate
+  -- em true ou false, sempre um dos dois. (achado da revisão, 09/08)
   insert into _res values (
     'destinatario_tipo aceita coordenacao',
-    (select pg_get_constraintdef(oid) like '%coordenacao%'
-       from pg_constraint
-      where conrelid='public.fabio_notificacoes'::regclass
-        and conname='fabio_notificacoes_destinatario_tipo_check'),
-    'check nao estendido');
+    exists (select 1 from pg_constraint
+             where conrelid='public.fabio_notificacoes'::regclass
+               and conname='fabio_notificacoes_destinatario_tipo_check'
+               and pg_get_constraintdef(oid) like '%coordenacao%'),
+    'check nao estendido ou nao existe');
 
   insert into _res values (
     'os tres ramos antigos continuam no chk_notificacao_destinatario',
-    (select pg_get_constraintdef(oid) like '%pulada_sem_destinatario%'
-        and pg_get_constraintdef(oid) like '%comercial%'
-        and pg_get_constraintdef(oid) like '%professor%'
-       from pg_constraint
-      where conrelid='public.fabio_notificacoes'::regclass
-        and conname='chk_notificacao_destinatario'),
-    'ramo antigo perdido');
+    exists (select 1 from pg_constraint
+             where conrelid='public.fabio_notificacoes'::regclass
+               and conname='chk_notificacao_destinatario'
+               and pg_get_constraintdef(oid) like '%pulada_sem_destinatario%'
+               and pg_get_constraintdef(oid) like '%comercial%'
+               and pg_get_constraintdef(oid) like '%professor%'),
+    'ramo antigo perdido ou constraint nao existe');
 
   -- ── Reserva do professor ────────────────────────────────────────────────
   select id into v_prof from public.professores
@@ -100,10 +107,12 @@ begin
                        and dia_referencia = date '2026-08-25'),
       v_r::text);
 
-    -- Segunda chamada no MESMO dia não cria linha nova.
+    -- Segunda chamada no MESMO dia, com lease AINDA VIVO, não cria linha nova
+    -- nem reclama a existente — é também o caso que prova que um lease vivo
+    -- nunca é reclamável (mutante V8 mexe exatamente nesta cerca).
     v_r2 := public.fn_reservar_cobranca_feedback(
               v_prof, 'feedback_lembrete', 'corpo de teste', date '2026-08-25');
-    insert into _res values ('dedupe do professor no mesmo dia',
+    insert into _res values ('dedupe do professor no mesmo dia (lease vivo nao reclama)',
       not (v_r2->>'reservado')::boolean and v_r2->>'motivo' = 'ja_cobrado_hoje',
       v_r2::text);
 
@@ -125,6 +134,51 @@ begin
     exception when others then
       insert into _res values ('tipo invalido barrado', sqlerrm like '%tipo_invalido%', sqlerrm);
     end;
+
+    -- ── RESERVA tem volta (revisão 09/08) ─────────────────────────────────
+    -- Linha nova, tipo/dia diferentes da de cima pra não colidir com a que
+    -- já está 'enviada'. A cadeia: processando fresco → lease morto (worker
+    -- caiu) → reclamado com token novo → marcado enviada → tentativa de
+    -- reclamar de novo (bloqueada) → marcado falhou → reclamado de novo.
+    v_r := public.fn_reservar_cobranca_feedback(
+             v_prof, 'feedback_reforco', 'corpo original', date '2026-08-28');
+
+    -- Simula o worker morrendo entre a RESERVA e o envio: lease no passado.
+    update public.fabio_notificacoes
+       set lease_expira_em = now() - interval '1 minute'
+     where id = (v_r->>'notificacao_id')::uuid;
+
+    v_r2 := public.fn_reservar_cobranca_feedback(
+              v_prof, 'feedback_reforco', 'corpo depois do worker cair', date '2026-08-28');
+    insert into _res values ('processando com lease morto pode ser reclamado',
+      (v_r2->>'reservado')::boolean
+        and (v_r2->>'notificacao_id') = (v_r->>'notificacao_id')
+        and (v_r2->>'lease_token') is distinct from (v_r->>'lease_token'),
+      format('r1=%s  r2=%s', v_r::text, v_r2::text));
+
+    -- 'enviada' é a cerca: nem lease morto reclama uma linha já entregue.
+    update public.fabio_notificacoes
+       set status = 'enviada', enviada_em = now()
+     where id = (v_r2->>'notificacao_id')::uuid;
+
+    v_r3 := public.fn_reservar_cobranca_feedback(
+              v_prof, 'feedback_reforco', 'corpo depois de enviada', date '2026-08-28');
+    insert into _res values ('enviada nao pode ser reclamada',
+      not (v_r3->>'reservado')::boolean and v_r3->>'motivo' = 'ja_cobrado_hoje',
+      v_r3::text);
+
+    -- 'falhou' pode ser reclamado — é o caso do envio que deu erro.
+    update public.fabio_notificacoes
+       set status = 'falhou'
+     where id = (v_r2->>'notificacao_id')::uuid;
+
+    v_r4 := public.fn_reservar_cobranca_feedback(
+              v_prof, 'feedback_reforco', 'corpo apos falha', date '2026-08-28');
+    insert into _res values ('falhou pode ser reclamado',
+      (v_r4->>'reservado')::boolean
+        and (v_r4->>'notificacao_id') = (v_r2->>'notificacao_id')
+        and (v_r4->>'lease_token') is distinct from (v_r2->>'lease_token'),
+      v_r4::text);
   end if;
 
   -- ── "X de Y fecharam" só é verdade se `elegiveis` contar quem fechou ────
@@ -133,26 +187,30 @@ begin
   -- prova vale mesmo depois que a coleta real começar.
   v_antes := public.fn_feedback_cobranca_do_dia(date '2026-09-01');
 
-  select v.professor_id into v_prof2
-    from public.vw_jornada_professor_atual v
-    join public.professores p on p.id = v.professor_id
-    join public.alunos a on a.id = v.aluno_id and a.arquivado_em is null
-   where p.ativo and p.usuario_id is not null
-   group by v.professor_id
-   order by count(distinct v.aluno_id) asc, v.professor_id
+  -- O pivô PRECISA vir da própria lista "antes": escolher por "menor
+  -- carteira" arriscava sortear alguém que já tivesse fechado 100% (delta
+  -- viraria 0, não -1, e o teste ficaria vermelho à toa quando a coleta real
+  -- de agosto chegasse). Escolhendo de dentro de v_antes->'professores' ele
+  -- está garantidamente na lista antes de eu fechar a carteira dele.
+  -- (achado da revisão, 09/08)
+  select (e->>'professor_id')::int into v_prof2
+    from jsonb_array_elements(v_antes->'professores') e
    limit 1;
 
   if v_prof2 is null then
     insert into _res values ('quem fechou sai da lista', false,
-      'nenhum professor com carteira — teste nao pode rodar');
+      'nenhum professor pendente em 01/09 — teste nao pode rodar');
   else
     -- A carteira tem grão de matrícula/disciplina: o mesmo aluno aparece duas
     -- vezes quando faz dois cursos com o mesmo professor. Sem o `distinct`, o
-    -- insert estoura na chave única.
+    -- insert estoura na chave única. `origem` marcado — mesma prática da
+    -- 075 — pra uma linha plantada em teste nunca se confundir com dado real
+    -- se algum dia vazar de um BEGIN/ROLLBACK que não deu rollback.
     insert into public.aluno_feedback_professor
-      (professor_id, aluno_id, unidade_id, competencia, feedback, pratica_em_casa, evolucao, animo)
+      (professor_id, aluno_id, unidade_id, competencia, feedback, pratica_em_casa,
+       evolucao, animo, origem)
     select distinct v.professor_id, v.aluno_id, v.unidade_id, date '2026-08-01',
-           'verde', 'sim', 'evoluindo', 'animado'
+           'verde', 'sim', 'evoluindo', 'animado', 'teste_mutante_076'
       from public.vw_jornada_professor_atual v
       join public.alunos a on a.id = v.aluno_id and a.arquivado_em is null
      where v.professor_id = v_prof2
@@ -204,7 +262,13 @@ begin
     not (v_r2->>'reservado')::boolean and v_r2->>'motivo' = 'ja_entregue_hoje',
     v_r2::text);
 
-  -- ── Portas fechadas ─────────────────────────────────────────────────────
+  -- ── Portas fechadas — e a que TEM que ficar aberta ──────────────────────
+  -- Presença é afirmação, não ausência: provar que anon/authenticated estão
+  -- de fora não prova que o chamador de verdade (service_role, via
+  -- fabio_notification_worker.py) ainda consegue entrar. 018 documenta essa
+  -- exata armadilha neste repo — um `drop function` antes do `create` leva
+  -- os grants junto, e a suíte continuava verde porque só checava quem
+  -- devia estar FORA, nunca quem devia estar DENTRO. (achado da revisão, 09/08)
   insert into _res values ('anon nao executa as tres',
     not has_function_privilege('anon','public.fn_feedback_cobranca_do_dia(date)','execute')
     and not has_function_privilege('anon','public.fn_reservar_cobranca_feedback(int,text,text,date)','execute')
@@ -215,6 +279,11 @@ begin
     and not has_function_privilege('authenticated','public.fn_reservar_cobranca_feedback(int,text,text,date)','execute')
     and not has_function_privilege('authenticated','public.fn_reservar_cobranca_feedback_coordenacao(text,text,date)','execute'),
     'authenticated executa alguma');
+  insert into _res values ('service_role executa as tres',
+    has_function_privilege('service_role','public.fn_feedback_cobranca_do_dia(date)','execute')
+    and has_function_privilege('service_role','public.fn_reservar_cobranca_feedback(int,text,text,date)','execute')
+    and has_function_privilege('service_role','public.fn_reservar_cobranca_feedback_coordenacao(text,text,date)','execute'),
+    'service_role sem execute em alguma das tres');
 end $$;
 
 select json_build_object(
