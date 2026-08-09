@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Card } from '../../components/ui'
 import {
   feedbackSalvar, CORACOES, PRATICA, EVOLUCAO, ANIMO,
@@ -15,6 +15,17 @@ import {
  * O ✓ só aparece quando o aluno está COMPLETO (coração + as três perguntas).
  * Um card com coração e perguntas vazias fica visivelmente começado — é o que
  * o Fábio vai cobrar.
+ *
+ * `salvar()` manda o SNAPSHOT LOCAL inteiro (os 5 campos) — o `on conflict do
+ * update` da 074 sobrescreve a linha inteira, sem coalesce (`observacao`
+ * precisa poder ser apagada, e coalesce tornaria isso impossível). Os botões
+ * continuam clicáveis durante o salvamento de propósito — travar a UI
+ * contrariaria o "cada toque salva" — então dois toques rápidos disparam duas
+ * chamadas. Sem serialização, a resposta mais velha podia chegar por último e
+ * sobrescrever o campo mais novo (perda silenciosa). `filaRef` encadeia as
+ * chamadas desta LINHA: a próxima só sai depois que a anterior respondeu, e
+ * o `.catch` interno garante que o elo nunca rejeita — se rejeitasse, a fila
+ * travaria pra sempre pros próximos toques.
  */
 export function CardAlunoFeedback({
   aluno,
@@ -28,30 +39,35 @@ export function CardAlunoFeedback({
   const [estado, setEstado] = useState(aluno)
   const [aberto, setAberto] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const filaRef = useRef<Promise<void>>(Promise.resolve())
+  const emVooRef = useRef(0)
 
   const completo =
     !!estado.feedback && !!estado.pratica_em_casa && !!estado.evolucao && !!estado.animo
 
-  async function salvar(mudanca: Partial<FeedbackAluno>) {
+  function salvar(mudanca: Partial<FeedbackAluno>) {
     const novo = { ...estado, ...mudanca }
     setEstado(novo)
     if (!novo.feedback) return
+    const feedback = novo.feedback
     setSalvando(true)
-    try {
-      const p = await feedbackSalvar({
+    emVooRef.current += 1
+    filaRef.current = filaRef.current.then(() =>
+      feedbackSalvar({
         alunoId: novo.aluno_id,
-        feedback: novo.feedback,
+        feedback,
         praticaEmCasa: novo.pratica_em_casa,
         evolucao: novo.evolucao,
         animo: novo.animo,
         observacao: novo.observacao,
       })
-      aoSalvar({ total: p.total, respondidos: p.respondidos })
-    } catch {
-      aoFalhar('Não consegui salvar. Toca de novo.')
-    } finally {
-      setSalvando(false)
-    }
+        .then((p) => aoSalvar({ total: p.total, respondidos: p.respondidos }))
+        .catch(() => aoFalhar('Não consegui salvar. Toca de novo.'))
+        .finally(() => {
+          emVooRef.current -= 1
+          if (emVooRef.current === 0) setSalvando(false)
+        }),
+    )
   }
 
   return (
@@ -61,13 +77,15 @@ export function CardAlunoFeedback({
           <p className="truncate text-[15px] font-bold text-text-primary">{estado.nome}</p>
           <p className="text-[11.5px] text-text-muted">
             {estado.cursos ?? 'Sem curso'}
-            {estado.dias_sem_aula != null ? ` · você não vê há ${estado.dias_sem_aula} dias` : null}
+            {estado.dias_sem_aula != null
+              ? ` · você não vê há ${estado.dias_sem_aula} ${estado.dias_sem_aula === 1 ? 'dia' : 'dias'}`
+              : null}
           </p>
         </div>
         {completo ? (
-          <i className="fa-solid fa-circle-check text-success-text" aria-label="respondido" />
+          <i className="fa-solid fa-circle-check text-success-text" role="img" aria-label="respondido" />
         ) : salvando ? (
-          <i className="fa-solid fa-circle-notch fa-spin text-text-muted" aria-label="salvando" />
+          <i className="fa-solid fa-circle-notch fa-spin text-text-muted" role="status" aria-label="salvando" />
         ) : null}
       </div>
 
@@ -79,7 +97,7 @@ export function CardAlunoFeedback({
             type="button"
             onClick={() => {
               setAberto(true)
-              void salvar({ feedback: c.valor as Coracao })
+              salvar({ feedback: c.valor as Coracao })
             }}
             aria-pressed={estado.feedback === c.valor}
             className={`flex flex-1 flex-col items-center gap-1 rounded-xl border py-2 transition-colors ${
@@ -110,22 +128,22 @@ export function CardAlunoFeedback({
       {aberto || estado.feedback ? (
         <div className="mt-3 space-y-3 border-t border-border-subtle pt-3">
           <Pergunta
-            rotulo="Pratica em casa?"
+            rotulo="Prática em casa?"
             opcoes={PRATICA}
             valor={estado.pratica_em_casa}
-            aoEscolher={(v) => void salvar({ pratica_em_casa: v as Pratica })}
+            aoEscolher={(v) => salvar({ pratica_em_casa: v as Pratica })}
           />
           <Pergunta
             rotulo="Está evoluindo?"
             opcoes={EVOLUCAO}
             valor={estado.evolucao}
-            aoEscolher={(v) => void salvar({ evolucao: v as Evolucao })}
+            aoEscolher={(v) => salvar({ evolucao: v as Evolucao })}
           />
           <Pergunta
             rotulo="Como está o ânimo?"
             opcoes={ANIMO}
             valor={estado.animo}
-            aoEscolher={(v) => void salvar({ animo: v as Animo })}
+            aoEscolher={(v) => salvar({ animo: v as Animo })}
           />
 
           <div>
@@ -135,7 +153,7 @@ export function CardAlunoFeedback({
             <textarea
               rows={2}
               defaultValue={estado.observacao ?? ''}
-              onBlur={(e) => void salvar({ observacao: e.target.value })}
+              onBlur={(e) => salvar({ observacao: e.target.value })}
               placeholder="Algo que vale a coordenação saber — um elogio, um ponto de melhoria, uma mudança que você notou."
               className="w-full resize-none rounded-lg border border-border-subtle bg-bg-inset px-3 py-2 text-[13px] text-text-primary placeholder:text-text-muted"
             />

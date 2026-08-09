@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { EmptyState, Skeleton, Toast, useToast } from '../../components/ui'
+import { EmptyState, Skeleton } from '../../components/ui'
 import { CardAlunoFeedback } from './CardAlunoFeedback'
 import { feedbackMesa, type FeedbackMesa as Mesa } from '../../lib/api'
 
@@ -9,9 +9,13 @@ import { feedbackMesa, type FeedbackMesa as Mesa } from '../../lib/api'
  * Dois blocos de propósito: quem o professor viu no mês e quem ele NÃO viu.
  * Esconder quem sumiu esconderia justamente o aluno que mais importa — dias
  * desde a última aula é o sinal mais forte do modelo de evasão.
+ *
+ * `show` é o toast da PÁGINA (padrão de `Devolutivas.tsx`: um único
+ * `useToast()` no dono, repassado por prop) — a mesa não abre um toast
+ * próprio, senão duas superfícies de toast disputariam a mesma posição fixa
+ * dentro do `AppFrame`.
  */
-export function MesaFeedback() {
-  const { message, visible, show } = useToast()
+export function MesaFeedback({ show }: { show: (mensagem: string) => void }) {
   const [mesa, setMesa] = useState<Mesa | null>(null)
   const [erro, setErro] = useState(false)
   const [progresso, setProgresso] = useState({ total: 0, respondidos: 0 })
@@ -77,7 +81,7 @@ export function MesaFeedback() {
                 <CardAlunoFeedback
                   key={a.aluno_id}
                   aluno={a}
-                  aoSalvar={setProgresso}
+                  aoSalvar={(p) => setProgresso((atual) => progressoSeguro(atual, p))}
                   aoFalhar={show}
                 />
               ))}
@@ -90,7 +94,7 @@ export function MesaFeedback() {
                 <CardAlunoFeedback
                   key={a.aluno_id}
                   aluno={a}
-                  aoSalvar={setProgresso}
+                  aoSalvar={(p) => setProgresso((atual) => progressoSeguro(atual, p))}
                   aoFalhar={show}
                 />
               ))}
@@ -98,10 +102,23 @@ export function MesaFeedback() {
           ) : null}
         </>
       )}
-
-      <Toast message={message} visible={visible} />
     </>
   )
+}
+
+/**
+ * `respondidos` só cresce nesta tela — não existe "desmarcar" um campo já
+ * respondido. A fila de `CardAlunoFeedback` serializa por LINHA, não pela
+ * mesa inteira: duas linhas diferentes ainda podem responder fora de ordem
+ * entre si, e cada resposta carrega uma contagem GLOBAL recém-lida no banco
+ * (074, `app_professor_feedback_progresso`). Sem este guard, uma resposta
+ * atrasada de uma linha podia fazer a barrinha recuar na frente do professor.
+ */
+function progressoSeguro(
+  atual: { total: number; respondidos: number },
+  novo: { total: number; respondidos: number },
+): { total: number; respondidos: number } {
+  return novo.respondidos < atual.respondidos ? atual : novo
 }
 
 function Bloco({
