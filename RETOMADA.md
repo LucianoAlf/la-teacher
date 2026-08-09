@@ -55,7 +55,33 @@ Spec e plano reabertos em `c6b8c95`:
 - **Task 9 — o worker leva**: evento `feedback` no
   `fabio_notification_worker.py`, no mesmo desenho do `escalonamento` (unit
   systemd própria + `--force`). **O gatilho nasce DESLIGADO** — ligar o timer é
-  o momento em que 43 professores passam a receber WhatsApp, e é palavra do Alf.
+  o momento em que os professores passam a receber WhatsApp, e é palavra do Alf.
+  Commits `357717f`, `ea33269`, `8c864b1`.
+
+### ⚠️ O alcance real é 6 professores, não 43 (medido em 09/08)
+
+Eu venho repetindo "43 professores" — inclusive na frase que o Alf leria pra
+decidir se liga o timer. Está errado, e o erro é grande:
+
+| Corte | Quantos |
+|---|---|
+| Professores com carteira | **43** |
+| …ativos | 43 |
+| …**com `usuario_id`** (login liberado no painel) | **6** |
+| …e com WhatsApp | 6 |
+
+A cobrança filtra `p.ativo and p.usuario_id is not null` **de propósito** —
+cobrar quem não consegue abrir a tela é o jeito mais rápido de ensinar o
+professor a ignorar o Fábio. Consequências práticas:
+
+- A primeira mensagem à coordenação vai dizer *"X de 6 professores fecharam"*,
+  e a coordenação tem 43 na cabeça. Ou avisa antes, ou o denominador vira a
+  primeira coisa que eles descobrem sozinhos.
+- Os Importantes de tela abaixo (contagem dupla, ✓ verde que mente, microfone
+  no iPhone) valem pra quem abre o app — **6 hoje**, 43 quando o painel liberar
+  o resto.
+- Liberar mais professores no painel de equipe **aumenta o alcance da cobrança
+  automaticamente**. Não tem lista paralela pra manter.
 
 **Decisão de arquitetura que ficou:** **não existe `pg_cron` nesta entrega.** O
 banco só responde *quem cobrar hoje* e *reserve esta linha pra mim*; quem decide
@@ -109,7 +135,7 @@ coordenação a lista de quem não fechou"*. O código insere
 não aparece em lugar nenhum da 075. O erro nasceu no plano e por isso atravessou
 as sete revisões.
 
-**Importantes, antes de 43 professores abrirem:**
+**Importantes, antes de os professores abrirem** (6 hoje, ver o corte acima)**:**
 - **Dois números da mesma carteira**: `Alunos.tsx` mostra o array cru de
   `app_minha_carteira` (grão matrícula, sem filtrar arquivado); a mesa colapsa
   por aluno e tira arquivado. **26 dos 43 professores veem contagens
@@ -129,7 +155,7 @@ carteira — não 38/44 como o plano supunha.
 foi publicada (v1, commit `140807e`, outra sessão) e o incidente da edge
 function do LA Report está fechado. **Resta uma:** ligar o timer da cobrança —
 `systemctl --user enable --now fabio-feedback.timer` na VPS. É o instante em
-que 43 professores passam a receber WhatsApp.
+que os professores passam a receber WhatsApp (6 hoje).
 
 ### ✅ ESTADO REAL, medido em 09/08 à noite (o que mudou depois do texto acima)
 

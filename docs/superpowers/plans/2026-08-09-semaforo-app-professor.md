@@ -2974,7 +2974,9 @@ git add supabase/migrations/076-o-carteiro-da-cobranca.sql supabase/migrations/0
 
 **⚠️ O GATILHO NASCE DESLIGADO.** O código vai pra VPS; a unit `.timer`
 **não** é instalada nem habilitada nesta task. Ligar o timer é o momento em que
-43 professores passam a receber WhatsApp — é decisão do Alf, não minha. Deixe
+**6** professores passam a receber WhatsApp — é decisão do Alf, não minha. (Eu
+escrevi "43" aqui e estava errado: 43 têm carteira, mas a régua filtra
+`usuario_id is not null` e só **6** têm login liberado. Medido no banco.) Deixe
 o comando de ligar escrito no relatório, sem executá-lo.
 
 - [ ] **Step 1: Ler o arquivo antes de escrever**
