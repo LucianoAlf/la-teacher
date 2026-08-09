@@ -23,8 +23,8 @@ se coloca no lugar dos coordenadores"*. Antes de tela: **brainstorm + spec**
 | Risco de evasão | `vw_risco_evasao_atual` | baixo 969 · atenção 143 · **crítico 45** |
 | Renovação chegando | `vw_jornada_marcos` (`perto_renovacao`) | **102 alunos** |
 | Inadimplência | `aluno_jornada_matricula_disciplina.inadimplente_emusys` | 44 — **NUNCA aparece pro professor** (fronteira dura do Alf) |
-| Aviso prévio | `movimentacoes_admin.emusys_aviso_previo_id` | **0 hoje — confirmar se é o campo certo** antes de prometer o sinal |
-| Faltas seguidas | `aluno_presenca` fonte forte | régua a definir no spec |
+| Aviso prévio | `movimentacoes_admin` **`tipo = 'aviso_previo'`** | **CONFIRMADO 08/08**: 128 no total, **33 com `mes_saida` ainda à frente** (a janela em que dá pra salvar), 30 avisos em 60d. Tem professor, unidade, nome e motivo em 33/33 |
+| Faltas seguidas | `aluno_presenca` fonte forte | régua a definir no spec — **mas a base forte é de 24 alunos** (ver abaixo) |
 
 Desenho aprovado em direção (não em tela): seção "Radar do aluno" com CARTÕES
 DE SINAL — contagem + os casos mais urgentes + a AÇÃO que o sinal pede ("liga
@@ -62,6 +62,40 @@ se perder:
   Radar da coordenação.
 - Ponte futura anotada: a coleta do semáforo (hoje link avulso da Lia que
   expira) pode virar nativa no app do professor / Fábio. É fatia, não agora.
+
+### MEDIDO DEPOIS (08/08, madrugada): o que muda no cartão "Sumiu da escola"
+
+Fui confirmar as fontes que faltavam antes do spec. Três achados que mudam o
+desenho — todos medidos, nenhum de memória:
+
+1. **Aviso prévio existe e está vivo.** O campo certo é `tipo`, não a coluna
+   `emusys_aviso_previo_id` (essa é 0/1700 — nunca foi preenchida; foi ela que
+   me fez escrever "0" ontem). São **33 avisos com saída ainda à frente**, e a
+   linha já traz professor + unidade + motivo. É cartão de primeira: o aluno
+   avisou que sai e **ainda está em aula** — é a última janela pedagógica.
+2. **Costurar esse aviso ao aluno do LA Teacher é frágil.** Dos 33 abertos,
+   **21 não acham par** por `alunos.emusys_student_id` e **5 caem em ID
+   ambíguo** (o mesmo `emusys_student_id` em pessoas diferentes — a colisão que
+   já está registrada). O cartão tem que viver do nome/professor da própria
+   linha ADM, não de um join que finge precisão.
+3. **"Dias desde a última aula" NÃO pode sair da presença forte do LA Teacher:**
+   a base forte inteira é **40 registros, 24 alunos** (piloto). Existe pronto
+   no LA Report: `vw_absenteismo_aluno` (`dias_sem_presenca`, 1.509 linhas) e
+   `vw_aluno_sucesso_lista` (1.122). **As duas discordam** — ≥14 dias dá 693 ×
+   403; ≥30 dá 456 × 187. Escolher uma é decisão de spec, e a divergência
+   precisa de explicação antes de virar cartão.
+
+**A armadilha do recesso (a mais importante).** O histograma de
+`dias_sem_presenca` tem um buraco exato entre 13 e 22 dias. Não é dado sujo, é
+o calendário: `aulas_emusys` mostra a semana de **20/07 sem NENHUMA aula** e a
+de 27/07 com 185 (contra ~2.100 das semanas normais). Teve **recesso de duas
+semanas**. Ou seja: em agosto **todo mundo ganha ~15 dias de "sumiço" de
+graça**, e os 693 "há 14 dias sem presença" são, em maioria, férias.
+
+→ Regra pro spec: o cartão conta **aula perdida** (aula que existiu na agenda e
+o aluno não veio), não dia de calendário. É a mesma lição da 072 — número que
+parece acusação e é artefato. Um cartão "sumiu há 22 dias" publicado agora
+mandaria a coordenação ligar pra escola inteira.
 
 ## ▶ PASSO ANTERIOR (concluído nesta sessão)
 
