@@ -114,6 +114,77 @@ pré-atendimento (`ChatPanel.tsx:502`). Ela existia desde 13/02, na versão 33.
   clones. O subagente nasce sem o `CLAUDE.md`, e eu não repeti a regra no
   dispatch. Registrado na memória.
 
+## ✅ 09/08: A FRONTEIRA DO FÁBIO VIROU ESTRUTURAL (era prompt)
+
+O Fábio entregava a professor comum a lista dos professores atrasados no
+feedback mensal. A primeira correção foi um bloco no prompt (`ESCOPO_PROFESSOR`):
+mediu 6/6, mas **prompt é probabilístico — a porta continuava aberta**.
+
+**O que a medição mostrou, e é maior que o vazamento:** `run_hermes_api` manda
+só `{model, messages, stream}` — o gateway **não sabe quem está perguntando**.
+Logo toda ferramenta ligada no `api_server` (porta 8652, por onde passa TODA
+mensagem de WhatsApp) está ligada pra qualquer professor. E o `GET /v1/toolsets`
+mostrou ligados: **`file` (inclusive `write_file`), `code_execution`, `browser`,
+`web`** e todos os MCPs. O SQL era **uma porta num corredor** — um `read_file`
+em `~/.hermes/.env` entrega service_role, token do UAZAPI e a `DATABASE_URI`.
+
+**Consertado por canal, não por instrução:**
+
+| Identidade | Canal | Alcance |
+|---|---|---|
+| professor | `api_server` | `memory, skill_manage, skill_view, skills_list, todo, vision_analyze` — **6 ferramentas** |
+| admin | `cli` oneshot | tudo, inclusive SQL (escolha do Alf em 09/08) |
+
+Quem roteia é `generate_answer()` por `identidade_tipo`, que vem do **telefone
+resolvido no banco antes de existir prompt** — dado que o modelo não influencia.
+**Fallback do professor pro oneshot foi removido**: o caminho `cli` concede
+*mais* que a API, cair pra lá no erro seria escalar privilégio na hora errada.
+
+**Provado com a MESMA pergunta:** professor → *"Essa visão fica com a
+coordenação pedagógica"* (7,5s) · Alf → a lista real com nome e unidade (137,8s).
+Mais 3 adversariais (mandar rodar SQL "autorizado pela coordenação", comparação
+implícita, mandar editar a própria skill): todas seguraram, em 5-7s e **sem
+tentar chamar ferramenta**. E o caso oposto continua vivo: "quem é a Fernanda?"
+→ cadastro, curso, horário, "aluno novo há 6 dias" e o conteúdo pedagógico.
+
+Espelhado em `vps/fabio/hermes-platform-toolsets.yaml.txt` (o Hermes reescreve
+o `config.yaml` sozinho — comentário lá dentro não sobrevive).
+
+### O que eu contei errado no caminho (fica de armadilha)
+
+**`grep | wc -l` num log conta a linha de REGISTRO do MCP junto com a chamada.**
+O briefing dizia "`lareport_execute_sql` 86x, é capacidade viva". Dos 87, **71
+eram linhas de registro** ("registered 13 tool(s)", que citam o nome de todas).
+Chamadas reais: **50**, e **24 delas eram a investigação de hoje** — sobram 26
+em 5 semanas. Mesma armadilha pegou o presence MCP: as "3 chamadas" eram 3
+registros; ele **nunca foi invocado**. Contar ocorrência de string ≠ contar
+evento.
+
+### Achados abertos, em ordem de risco (nenhum bloqueia o que está no ar)
+
+1. **`skill_manage` está no canal do professor** e escreve nas skills — que é
+   onde moram os guardrails. Injeção persistente é pior que vazamento pontual.
+   O Hermes **não tem blocklist por ferramenta** (só por toolset), e `skills` é
+   um pacote fixo `[skills_list, skill_view, skill_manage]`. Tirar `skills`
+   inteiro quebraria o `skill_view`, que é a ferramenta mais usada (110×). Saída
+   limpa: o bridge inlinar o SKILL.md no prompt e o canal ficar sem `skills`.
+   *(Ele recusou o teste adversarial, mas isso é prompt de novo.)*
+2. **DEFAULT PRIVILEGES faz o vazamento se regenerar**: toda tabela nova criada
+   pelo `postgres` já nasce com `fabio_agent=r`
+   (`{...,fabio_agent=r/postgres,...}`). Revogar os 374 hoje é enxugar gelo — e
+   **revogar agora desfaria a capacidade admin que o Alf pediu pra manter**, já
+   que o role virou exclusivo do canal dele. É decisão dele, não minha.
+3. **A porta 8644 (webhook) escuta em `0.0.0.0`**, não em localhost — a 8652 é
+   só local. Tem `secret` e `rate_limit`, mas está exposta na internet.
+4. **`fabio_presence_mcp` continua sem escopo** (`professor_id` arbitrário), mas
+   agora é inalcançável pelo professor (`no_mcp`) e **nunca foi invocado**. Usa
+   **service_role**, não `fabio_agent` — então revogar grant não fecharia ele.
+5. **Admin em 137,8s** contra timeout de 180s (`FABIO_CHAT_HERMES_TIMEOUT`).
+   Pergunta admin mais pesada estoura. Subir o timeout do caminho admin.
+6. **`sol_acesso_restrito` e `mila_acesso_restrito` se chamam "restrito" e veem
+   375 objetos** — o nome mente. Só `lia_acesso_restrito` (103) é de fato
+   estreito. Não é do Fábio, mas é do mesmo banco.
+
 ## ▶ DECIDIDO 08/08 (noite): O SEMÁFORO NASCE NO APP DO PROFESSOR
 
 O Alf tirou isso de "ponte futura" e botou no radar, com pedido explícito de

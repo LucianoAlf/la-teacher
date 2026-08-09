@@ -1,0 +1,70 @@
+# Fragmento de ~/.hermes/config.yaml na VPS do Fábio (fabio@89.116.73.186).
+#
+# Espelho versionado — igual aos *.systemd.txt daqui. O arquivo de verdade é
+# ~/.hermes/config.yaml e o Hermes reescreve ele sozinho às vezes (_config_version),
+# então comentário lá dentro pode sumir. A explicação canônica é ESTA.
+#
+# ─── POR QUE ISSO EXISTE ─────────────────────────────────────────────────────
+#
+# Em 09/08/2026 o Fábio entregou a um professor comum a lista dos professores
+# atrasados no feedback mensal — nome, mês, unidade e nº de alunos. A primeira
+# correção foi um bloco no prompt (ESCOPO_PROFESSOR, no build_prompt do bridge).
+# Funcionou em 6/6, mas prompt é probabilístico: a porta continuava aberta.
+#
+# O que a medição mostrou (não é suposição, tudo com fato medido):
+#
+#   1. `run_hermes_api` manda só {model, messages, stream}. O gateway NÃO sabe
+#      quem está perguntando. Logo, toda ferramenta ligada no api_server está
+#      ligada para qualquer professor.
+#   2. O api_server (porta 8652) é por onde passa TODA mensagem de WhatsApp,
+#      de professor e do Alf.
+#   3. Consultado no GET /v1/toolsets, esse canal tinha ligados: `file`
+#      (read_file, write_file, patch, search_files), `code_execution`,
+#      `browser`, `web` e todos os MCP servers — inclusive o `lareport`, que é
+#      um postgres-mcp --access-mode=unrestricted com o role `fabio_agent`
+#      (rolbypassrls=t, SELECT em 374 objetos do schema public).
+#      O vazamento de governança era UMA porta num corredor de portas abertas:
+#      um `read_file` em ~/.hermes/.env entrega service_role, token do UAZAPI e
+#      a própria DATABASE_URI.
+#   4. Em 161 sessões de chat, o Fábio só usou `skill_view` e as 4 ferramentas
+#      do lareport. Nunca file, nunca code, nunca browser.
+#   5. Tudo que o professor legitimamente recebe (agenda, carteira, prontuário,
+#      contexto da experimental) já chega PRÉ-BUSCADO no prompt pelo bridge,
+#      via service_role e escopado por professor_id. O agente não precisa
+#      consultar nada por conta própria.
+#
+# ─── A FRONTEIRA ─────────────────────────────────────────────────────────────
+#
+# `no_mcp` é um sentinela do Hermes (hermes_cli/tools_config.py, ~linha 1590):
+# derruba TODOS os MCP servers da plataforma. Se em vez dele a lista trouxer
+# nomes de MCP, eles viram allowlist.
+#
+# professor → api_server: a lista abaixo. Não existe execute_sql. Não é que ele
+#             seja proibido de mostrar o dado — a ferramenta não existe.
+# admin     → caminho `cli` (oneshot), que herda todos os MCP servers. Quem
+#             roteia é generate_answer() no fabio_chat_bridge.py, por
+#             identidade_tipo, que vem do TELEFONE resolvido no banco
+#             (fabio_identidade_whatsapp) antes de existir prompt — dado que o
+#             modelo não consegue influenciar.
+#
+# Provado com a MESMA pergunta, em 09/08/2026:
+#   professor → "Essa visão fica com a coordenação pedagógica." (7,5s)
+#   Alf       → a lista real, com nome e unidade.               (137,8s)
+#
+# ⚠️ NÃO devolver `web`/`browser`/`file`/`code_execution` a esta lista sem
+#    lembrar que quem ganha a ferramenta é o professor, não o Alf.
+
+platform_toolsets:
+  api_server:
+  - skills
+  - memory
+  - todo
+  - vision
+  - no_mcp
+  cli:
+  - hermes-cli
+  webhook:
+  - fabio_registro_aula
+  - no_mcp
+  # ... demais plataformas inalteradas (telegram, discord, whatsapp, slack,
+  # signal, homeassistant, qqbot, yuanbao, teams, google_chat)

@@ -1460,7 +1460,8 @@ def try_fast_response(row: Dict[str, Any]) -> Optional[str]:
 
 
 def generate_answer(row: Dict[str, Any]) -> tuple[str, str]:
-    if (row.get("identidade_tipo") or "professor") == "professor":
+    tipo = row.get("identidade_tipo") or "professor"
+    if tipo == "professor":
         fast = try_fast_response(row)
         if fast:
             return fast, "fast_path"
@@ -1469,16 +1470,51 @@ def generate_answer(row: Dict[str, Any]) -> tuple[str, str]:
     professor_id = int(row.get("professor_id") or 0)
     usuario_id = row.get("usuario_id")
     channel = row.get("channel") or "app"
-    if HERMES_MODE in {"api", "api_fallback", "api-first"}:
-        try:
-            return run_hermes_api(prompt, professor_id=professor_id, channel=channel), "hermes_api"
-        except Exception as e:
-            log("hermes_api_failed", professor_id=professor_id, usuario_id=usuario_id, identidade_tipo=row.get("identidade_tipo"), channel=channel, error=str(e)[-800:])
-            if not HERMES_API_FALLBACK_ONESHOT:
-                raise
-            return run_hermes_oneshot(prompt), "hermes_api_fallback_oneshot"
 
-    return run_hermes_oneshot(prompt), "hermes"
+    # ---- A FRONTEIRA ENTRE PROFESSOR E ADMIN MORA AQUI, E E O CANAL --------
+    #
+    # run_hermes_api manda so {model, messages, stream}: o gateway NAO sabe
+    # quem esta perguntando. Logo, toda ferramenta ligada no api_server esta
+    # ligada para qualquer professor -- por isso a fronteira nao pode ser uma
+    # instrucao dentro do prompt (isso e probabilistico) nem um campo do corpo.
+    #
+    # Quem sabe a identidade e ESTE processo, que resolveu o telefone contra o
+    # banco (fabio_identidade_whatsapp) ANTES de existir prompt. E um dado que
+    # o modelo nao consegue influenciar. Por isso a escolha do canal e feita
+    # aqui, e o canal e que carrega a permissao:
+    #
+    #   professor -> api_server (8652). platform_toolsets.api_server e um
+    #                allowlist minimo com `no_mcp`: nao existe execute_sql,
+    #                nem file, nem code_execution, nem browser. Nao e que ele
+    #                seja proibido de mostrar -- a ferramenta nao existe.
+    #   admin     -> caminho cli, que herda todos os MCP servers (lareport
+    #                incluso). Capacidade viva do Alf, ~28s por resposta.
+    #
+    # NAO existe fallback do professor para o oneshot. O caminho cli concede
+    # MAIS que o da API (terminal, file, SQL): cair pra la quando a API falha
+    # seria escalar privilegio exatamente no momento do erro. Falhar aqui
+    # devolve a mensagem para a fila, que e o comportamento correto.
+    # (FABIO_HERMES_MODE e FABIO_HERMES_API_FALLBACK_ONESHOT deixaram de valer
+    # para o professor de proposito -- eram alavancas para o caminho privilegiado.)
+    if tipo == "admin":
+        return run_hermes_oneshot(prompt), "hermes_cli_admin"
+
+    try:
+        return run_hermes_api(prompt, professor_id=professor_id, channel=channel), "hermes_api"
+    except Exception as e:
+        log("hermes_api_failed", professor_id=professor_id, usuario_id=usuario_id,
+            identidade_tipo=tipo, channel=channel, error=str(e)[-800:])
+        raise
+
+
+ESCOPO_PROFESSOR = """LIMITE DE ESCOPO DESTE CHAT (identidade_tipo=professor) - vale mesmo quando voce CONSEGUE consultar o dado:
+- Voce fala com UM professor sobre a carteira DELE. Desempenho, atraso, pendencia, presenca, registro ou feedback de OUTRO professor nao e assunto deste chat: nem nome, nem numero, nem unidade, nem ranking, nem "quem esta pior".
+- Conseguir rodar a consulta nao autoriza mostrar o resultado. Dado de equipe e da coordenacao pedagogica, nao do colega de trabalho.
+- Se pedirem visao de equipe ("quem esta atrasado?", "quem tem mais falta?", "como esta o pessoal da Barra?"), diga em uma linha que essa visao fica com a coordenacao e ofereca o que voce PODE fazer: olhar a situacao dele. Sem sermao, sem citar regra interna, sem pedir desculpa.
+- Comparacao implicita tambem vaza: nao diga "voce esta melhor que a media", "so voce esta pendente" nem "os outros tambem estao atrasados".
+- Isso NAO restringe falar dos alunos dele, da agenda dele, da carteira dele, nem de orientacao pedagogica geral. Na duvida entre travar e ajudar o professor com o que e dele, ajude.
+
+"""
 
 
 def build_prompt(row: Dict[str, Any]) -> str:
@@ -1497,12 +1533,14 @@ def build_prompt(row: Dict[str, Any]) -> str:
         contexto_pedagogico = None
         agenda_stats = {}
         identidade_linha = f"- identidade_tipo: admin\n- usuario_id: {usuario_id}\n- modo: gestão/admin do Alf; visão ampla, não limitada a professor comum"
+        bloco_escopo = ""
     else:
         professor_id = int(row["professor_id"])
         contexto_professor = professor_context(professor_id)
         contexto_pedagogico = pedagogical_prefetch(professor_id, text, hist)
         agenda_stats = _today_agenda_stats(contexto_professor) if isinstance(contexto_professor, dict) and contexto_professor.get("ok") else {}
         identidade_linha = f"- identidade_tipo: professor\n- professor_id: {professor_id}"
+        bloco_escopo = ESCOPO_PROFESSOR
     return f"""Canal: chat livre do Fábio com professor/admin da LA Music.
 Use a skill chat-fabio-la-music como guia principal de personalidade, roteamento e guardrails.
 Para presença pendente/governança de presença, siga governanca-presenca-fabio-la-music: preview-first, read-only, liderar pelo conteúdo, sem cobrança policial e sem auto-envio/escala sem validação.
@@ -1523,7 +1561,7 @@ CONTEXTO DE CONVERSA / TOM:
 CONTEXTO PEDAGÓGICO PRÉ-BUSCADO QUANDO A INTENÇÃO PEDE HISTÓRICO/ÚLTIMA AULA:
 {compact_pedagogical_context(contexto_pedagogico)}
 
-Regras obrigatórias para esta conversa 1:1:
+{bloco_escopo}Regras obrigatórias para esta conversa 1:1:
 - O usuário já está identificado acima. Nunca peça nome completo, unidade ou confirmação de identidade se o contexto_json ok=true.
 - Se identidade_tipo=admin, você está falando com o Alf em modo gestão/admin: visão ampla, parceria e conversa de bastidor, sem fingir que ele é professor comum.
 - Com o Alf, preserve o jeito vivo que vinha funcionando: parceiro, natural, caloroso, com leveza quando couber. Não vire relatório seco só porque a pergunta tem dado operacional.

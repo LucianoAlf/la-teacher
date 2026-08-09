@@ -6,6 +6,32 @@ O repo é a fonte de leitura; **a VPS é onde executa**. Ao editar aqui, subir c
 | Arquivo | O que é | Onde roda |
 |---|---|---|
 | `fabio_auditoria.py` | Auditoria: diagnostica, **conserta o que dá**, reporta o resto | `fabio-auditoria.timer` → 7h e 21h (BRT) |
+| `hermes-platform-toolsets.yaml.txt` | Fragmento do `~/.hermes/config.yaml`: **a fronteira entre professor e admin** | gateway do Hermes |
+
+## A fronteira professor × admin é o CANAL (09/08/2026)
+
+O gateway **não sabe quem está perguntando**: `run_hermes_api` manda só
+`{model, messages, stream}`. Então toda ferramenta ligada no `api_server` está
+ligada para qualquer professor — e por isso a fronteira não pode ser uma
+instrução dentro do prompt.
+
+Quem sabe a identidade é o **bridge**, que resolveu o telefone contra o banco
+(`fabio_identidade_whatsapp`) antes de existir prompt. `generate_answer()` usa
+esse dado — que o modelo não consegue influenciar — para escolher o canal:
+
+| Identidade | Canal | O que alcança |
+|---|---|---|
+| `professor` | `api_server` (8652) | `memory, skill_manage, skill_view, skills_list, todo, vision_analyze` — e nada mais |
+| `admin` | `cli` oneshot | tudo, inclusive o `lareport` (SQL). ~28s a ~140s por resposta |
+
+**Não existe fallback do professor para o oneshot.** O caminho `cli` concede
+*mais* que o da API (terminal, file, SQL): cair pra lá quando a API falha seria
+escalar privilégio exatamente no momento do erro. Falhar devolve a mensagem
+para a fila, que é o comportamento certo. `FABIO_HERMES_MODE` e
+`FABIO_HERMES_API_FALLBACK_ONESHOT` deixaram de valer para o professor **de
+propósito** — eram alavancas para o caminho privilegiado.
+
+O porquê medido está no cabeçalho do `hermes-platform-toolsets.yaml.txt`.
 
 ## Auditoria — filosofia
 
