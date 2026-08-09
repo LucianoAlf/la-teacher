@@ -52,5 +52,10 @@ coverage/
 # renders do estudio de video (binarios grandes)
 out/
 
+# assets pesados de design (ficam na maquina; logomarcas SIM sao versionadas)
+docs/font-school-prompt/
+docs/telas-exemplos-design/
+docs/telas-exemplos-design.zip
+
 # Mockups do companion de brainstorm (superpowers)
 .superpowers/
