@@ -61,7 +61,7 @@ coleta e cobrança com escada.
 | Fronteira do texto | Coordenação e Fábio leem **cru**. **Nunca** chega em aluno/responsável. Trava no **banco** |
 | Onde grava | **`aluno_feedback_professor`** — a tabela que o score já lê |
 | Salvamento | **A cada toque.** Não existe botão "Salvar" |
-| Governança | Fábio lembra na segunda da última semana, de novo na quinta, e no dia 1º a coordenação vê quem não fechou |
+| Governança | Fábio lembra no 1º dia da janela, reforça três dias depois, e no dia 1º **entrega ao grupo da coordenação** a lista de quem não fechou |
 | Escopo da entrega | Coleta **e** governança do Fábio na mesma entrega |
 
 ---
@@ -77,15 +77,18 @@ Três camadas, cada uma com uma responsabilidade:
         │                                                              │
         └──► transcrever-observacao (edge) ──► texto editável               │
                                                                         ▼
-  cron da última semana ──► fila do Fábio (066) ──► WhatsApp do professor
-                                                └─► coordenação no dia 1º
+  timer systemd ──► fabio_notification_worker.py ──► reserva ─► envia ─► conclui
+   (fim do mês)     pergunta ao banco quem cobrar        (fabio_notificacoes)
+                                                        ├─► WhatsApp do professor
+                                                        └─► grupo da coordenação (dia 1º)
 ```
 
 O que já existe e é **reusado, não recriado**: o gravador
 (`src/features/registro/useRecorder.ts`), a carteira canônica
 (`app_minha_carteira`), os helpers de auth (`fn_professor_do_usuario()`,
-`fn_e_coordenacao_la_teacher()`), a fila de notificação do Fábio (066) e o
-padrão de escalonamento da cobrança de presença.
+`fn_e_coordenacao_la_teacher()`), a fila `fabio_notificacoes` com o par
+reserva/conclusão da 066, o worker de notificação com suas units systemd, e o
+`enviar_grupo()` que já fala com o grupo da coordenação no escalonamento.
 
 ---
 
@@ -276,30 +279,82 @@ some sozinho ao fechar 100%.
 
 ## A governança
 
-Rotina `pg_cron` diária que, na régua de `fn_janela_feedback_aberta`:
+Três disparos, todos **ancorados no fim do mês** — nunca em dia da semana:
 
-| Momento | Ação |
-|---|---|
-| A segunda-feira dentro da janela | Enfileira lembrete pra **todo professor com carteira** |
-| A quinta-feira dentro da janela | Reenfileira **só pra quem está incompleto** |
-| Dia 1º do mês seguinte | Entrega à coordenação a lista de quem não fechou |
+| Momento | Quem recebe | Ação |
+|---|---|---|
+| Último dia − 6 (1º dia da janela) | Todo professor com carteira | Lembrete com o percentual e o porquê |
+| Último dia − 3 | Só quem está incompleto | Reforço com quantos faltam |
+| Dia 1º do mês seguinte | **Coordenação** | A lista de quem não fechou o mês que acabou |
 
-Qualquer janela de 7 dias contém exatamente uma segunda e uma quinta, então os
-dois disparos são não-ambíguos em todo mês — inclusive fevereiro. O cron roda
-todo dia e decide pela régua; não existe data fixa no calendário.
+**Por que não é "a segunda e a quinta da janela".** Toda janela de 7 dias tem
+exatamente uma de cada — mas a **ordem inverte**. Em agosto/2026 a janela é
+25/08 (ter) a 31/08 (seg): a quinta cai no dia 27 e a segunda no dia 31, então
+o reforço chegaria quatro dias **antes** do lembrete, e o lembrete no último
+dia do mês. Quebra em todo mês que não termina em domingo. Ancorado no fim do
+mês, ordem e espaçamento são os mesmos sempre, e sobram três dias para o
+professor agir depois do reforço.
 
-O lembrete do Fábio leva o **percentual** e o **porquê** — a pedido do Alf:
-*"você já respondeu X dos seus alunos; é importante pro mapa de sinais, pra
-gente acompanhar a saúde do seu aluno e evitar evasão; tem gente chegando na
+O lembrete leva o **percentual** e o **porquê** — a pedido do Alf: *"você já
+respondeu X dos seus alunos; é importante pro mapa de sinais, pra gente
+acompanhar a saúde do seu aluno e evitar evasão; tem gente chegando na
 renovação."*
 
-Reusa a fila de notificação da 066 (cron → `net.http_post` → edge function), que
-é o padrão da casa. **Não nasce mecanismo novo de envio.**
+### Quem leva a mensagem
 
-Idempotência: um lembrete por professor por dia na `fabio_notificacoes` —
-índice único em (professor, tipo, dia) com `on conflict do nothing`. Índice
-único e `on conflict` são **um contrato só**: quem mexe em um mexe no outro,
-senão a trava de duplicata volta a ignorar o canal (defeito já visto no
+**O worker, não o cron.** A `fabio_notificacoes` não tem estado de entrada: o
+`status` aceita `processando`, `enviada`, `falhou` e `pulada_*` — não existe
+`pendente`. Uma linha que nasce `processando` com lease de 10 minutos e fica
+horas esperando alguém buscar **não é uma fila, é uma mentira**: parece em voo
+e não está. Por isso a sequência é a mesma da 066 — **RESERVA** (`processando`
++ lease) → **envia** → **CONCLUI** (`enviada` com recibo, ou `falhou` com o
+erro) — e quem executa os três passos é o `fabio_notification_worker.py`, no
+mesmo desenho de `briefing`, `pendencia` e `escalonamento`: unit systemd
+própria com `--force`, o horário mora no timer.
+
+**Não existe job `pg_cron` nesta entrega.** O banco expõe *quem deve ser
+cobrado hoje* (função de leitura) e *reserve esta linha pra mim* (função de
+reserva). Quem decide a hora é o timer; quem manda é o worker.
+
+### A entrega à coordenação
+
+Destino: o **grupo COORDENACAO PEDAGOGICA** no WhatsApp — o mesmo que já recebe
+o escalonamento da cobrança de presença (`FABIO_GRUPO_COORDENACAO_JID`). Não se
+inventa canal: a coordenação já lê governança de professor ali.
+
+A mensagem é **uma só**, agregando todo mundo — não uma por professor — e tem
+que ser **encaminhável**, no formato que o Alf escolheu para o escalonamento: o
+coordenador copia o bloco de um professor e manda pra ele. Por isso vai a
+relação nominal (professor, unidade, quantos de quantos), não um resumo.
+Resumo não diz a ninguém o que fazer.
+
+Conteúdo: a competência é o **mês que acabou**; entram só os professores com
+carteira que **não fecharam**; a chamada de abertura diz quantos fecharam de
+quantos, para a coordenação ter a régua antes da lista.
+
+Na tabela, essa linha é diferente das outras duas: `destinatario_tipo =
+'coordenacao'`, `professor_id` nulo e o JID do grupo em `destinatario_whatsapp`
+— o que exige **estender** (nunca substituir) os dois CHECKs de destinatário,
+mesma tática de vocabulário estendido usada em 018 e 036.
+
+**Fora desta fatia, dito na cara:** a lista da coordenação **não** vira tela
+neste spec. O painel da coordenação está em desenho, e RPC de leitura sem tela
+que a chame é exatamente o defeito que esta seção existe para corrigir — função
+pronta, chamador nenhum. Quando o painel existir, ele lê a mesma função.
+
+### Idempotência
+
+Duas travas, porque as linhas têm chaves diferentes:
+
+- **Professor**: índice único parcial em `(professor_id, tipo, dia_referencia)`
+  para `feedback_lembrete` e `feedback_reforco`.
+- **Coordenação**: índice único parcial em `(tipo, dia_referencia)` para
+  `feedback_coordenacao` — `professor_id` é nulo nessa linha, e em índice único
+  do Postgres **nulos não colidem**: reaproveitar a chave do professor deixaria
+  o grupo levar a mesma lista a cada rodada do timer.
+
+Índice único e `on conflict` são **um contrato só**: quem mexe em um mexe no
+outro, senão a trava de duplicata volta a ignorar o canal (defeito já visto no
 briefing matinal).
 
 ---
@@ -340,8 +395,16 @@ que ficar vermelho:
 6. `fn_janela_feedback_aberta` abre a janela cedo demais (últimos 10 dias).
 7. Dedupe removido: aluno com dois cursos conta duas vezes na barrinha.
 8. `teve_aula_no_mes` gravado sempre `true`.
-9. Cron reenfileira na quinta quem já fechou.
+9. O reforço volta a cobrar quem já fechou.
 10. `revoke`/`grant` das RPCs: `anon` consegue executar.
+11. Os disparos voltam a ser ancorados em dia da semana — o teste varre os 12
+    meses do ano e pega o mês em que o reforço cai antes do lembrete.
+12. A linha da coordenação nasce com `destinatario_tipo = 'professor'` — a
+    lista de quem não fechou vai para o professor em vez do grupo.
+13. A dedupe da coordenação reusa a chave do professor: como `professor_id` é
+    nulo ali, o grupo leva a mesma lista a cada rodada do timer.
+14. A reserva conclui sem conferir o `lease_token` — mensagem entregue fica
+    marcada por quem não reservou.
 
 **Teste de fuso obrigatório:** um passo que roda com a data fixada às 22h BRT e
 prova que a competência resolvida ainda é o mês corrente.
