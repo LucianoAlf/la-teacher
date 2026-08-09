@@ -141,19 +141,32 @@ o aluno não veio), não dia de calendário. É a mesma lição da 072 — núme
 parece acusação e é artefato. Um cartão "sumiu há 22 dias" publicado agora
 mandaria a coordenação ligar pra escola inteira.
 
-## ⚠ INCIDENTE 09/08: sobrescrevi a edge function do LA Report
+## ✅ INCIDENTE 09/08 ENCERRADO: a edge function do LA Report que eu sobrescrevi
 
 Um subagente meu publicou `transcrever-audio` no projeto compartilhado e
 **sobrescreveu a função homônima do LA Report** — a que transcreve áudio do
 WhatsApp via UAZAPI e grava em `crm_mensagens.transcricao`, usada no chat de
 pré-atendimento (`ChatPanel.tsx:502`). Ela existia desde 13/02, na versão 33.
 
-- **Restauração:** despachada pro Codex do LA Report (deploy a partir do repo
-  deles, com `--no-verify-jwt`, preservando o estado anterior).
-- **Nosso lado:** a function foi renomeada pra `transcrever-observacao` e ganhou
-  validação real de token (padrão `coordenacao-recado`: revalida no
-  `/auth/v1/user`, com `verify_jwt: true`). **Deploy pendente** — só depois que o
-  pré-atendimento estiver confirmado de volta, pra não cruzar dois deploys.
+- ✅ **Restauração CONFIRMADA:** o Codex do LA Report republicou. `transcrever-audio`
+  está na **v34**, `ACTIVE`, com o corpo deles (UAZAPI `/message/download` →
+  `crm_mensagens.transcricao`) e entrypoint `/2026/LA-performance-report/…`.
+  O pré-atendimento voltou.
+- ✅ **Nosso lado NO AR (09/08, noite):** `transcrever-observacao` **v1**,
+  `verify_jwt: true`. Estava pendente esperando a restauração acima, e nesse
+  meio-tempo o cliente já apontava pro nome novo (`api.ts:1421`) — ou seja, a
+  gravação por voz da observação estava **quebrada**, não só "não publicada".
+  - Portões antes de publicar: `git grep` do nome nos 3 clones (só o LA Report
+    tem `transcrever-audio`/`transcrever-mensagem-evasao`, nenhum tem o nome
+    novo) + `list_edge_functions` no projeto **compartilhado**, que é o passo
+    que faltou da primeira vez.
+  - Prova depois: **114 → 115 funções, exatamente 1 nova, 0 alteradas, 0
+    removidas** (diff das listas antes/depois), e a do LA Report parada na v34.
+    Sem token → **401**; `Bearer` inventado → **401**.
+  - ⚠️ A primeira versão dessa checagem deu "NENHUMA alterada" a partir de
+    **conjunto vazio** — a raiz do JSON é `{"functions": […]}` e eu li `data`.
+    Comparação que não acha nada nunca acusa diferença: `assert` na lista antes
+    de comparar.
 - **Causa raiz:** o `CLAUDE.md` já mandava fazer `git grep` do nome nos outros
   clones. O subagente nasce sem o `CLAUDE.md`, e eu não repeti a regra no
   dispatch. Registrado na memória.
