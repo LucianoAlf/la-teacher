@@ -40,6 +40,36 @@ begin
     case when v_erro like '%aluno_feedback_cor_valida%' then 'sim' else 'NAO — ' || v_erro end);
 end $$;
 
+-- As quatro constraints da migration seguem o mesmo molde — faltavam as
+-- provas de duas delas (achado da revisão de qualidade da Task 1).
+do $$
+declare v_erro text := 'nao levantou'; v_aluno int; v_unid uuid; v_prof int;
+begin
+  select v.aluno_id, v.unidade_id, v.professor_id into v_aluno, v_unid, v_prof
+    from public.vw_jornada_professor_atual v limit 1;
+  begin
+    insert into public.aluno_feedback_professor
+      (aluno_id, professor_id, unidade_id, competencia, feedback, evolucao)
+    values (v_aluno, v_prof, v_unid, public.fn_competencia_feedback(), 'verde', 'estagnado');
+  exception when others then v_erro := sqlerrm; end;
+  insert into _res values ('check recusa evolucao invalida', 'sim',
+    case when v_erro like '%aluno_feedback_evolucao_valida%' then 'sim' else 'NAO — ' || v_erro end);
+end $$;
+
+do $$
+declare v_erro text := 'nao levantou'; v_aluno int; v_unid uuid; v_prof int;
+begin
+  select v.aluno_id, v.unidade_id, v.professor_id into v_aluno, v_unid, v_prof
+    from public.vw_jornada_professor_atual v limit 1;
+  begin
+    insert into public.aluno_feedback_professor
+      (aluno_id, professor_id, unidade_id, competencia, feedback, animo)
+    values (v_aluno, v_prof, v_unid, public.fn_competencia_feedback(), 'verde', 'irritado');
+  exception when others then v_erro := sqlerrm; end;
+  insert into _res values ('check recusa animo invalido', 'sim',
+    case when v_erro like '%aluno_feedback_animo_valido%' then 'sim' else 'NAO — ' || v_erro end);
+end $$;
+
 -- ─── A janela abre nos últimos 7 dias e não antes ───────────────────────────
 insert into _res values ('janela FECHADA no dia 24 de agosto', 'false',
   public.fn_janela_feedback_aberta(date '2026-08-24')::text);
@@ -93,6 +123,30 @@ insert into _res values (
   case when pg_get_functiondef('public.fn_hoje_brt()'::regprocedure) ilike '%America/Sao_Paulo%'
    and pg_get_functiondef('public.fn_hoje_brt()'::regprocedure) not ilike '%current_date%'
        then 'sim' else 'NAO' end);
+
+-- ─── As réguas de data ficam fechadas pro anônimo ───────────────────────────
+-- Achado da revisão: só `fn_janela_feedback_aberta` tinha `revoke ... from
+-- anon`, e nenhuma das três tinha prova. `create or replace function`
+-- preserva privilégio — sem este passo, um mutante que reabrisse qualquer
+-- uma pro anon passaria batido (é a mesma classe de defeito que a 018b
+-- corrigiu: EXECUTE devolvido pra `anon` depois de um `create or replace`).
+insert into _res select 'anon NAO executa fn_hoje_brt', 'sim',
+  case when has_function_privilege('anon', 'public.fn_hoje_brt()', 'execute')
+       then 'NAO — anon executa' else 'sim' end;
+
+insert into _res select 'anon NAO executa fn_competencia_feedback', 'sim',
+  case when has_function_privilege('anon', 'public.fn_competencia_feedback(date)', 'execute')
+       then 'NAO — anon executa' else 'sim' end;
+
+insert into _res select 'anon NAO executa fn_janela_feedback_aberta', 'sim',
+  case when has_function_privilege('anon', 'public.fn_janela_feedback_aberta(date)', 'execute')
+       then 'NAO — anon executa' else 'sim' end;
+
+insert into _res select 'authenticated executa as tres reguas de data', 'sim',
+  case when has_function_privilege('authenticated', 'public.fn_hoje_brt()', 'execute')
+   and  has_function_privilege('authenticated', 'public.fn_competencia_feedback(date)', 'execute')
+   and  has_function_privilege('authenticated', 'public.fn_janela_feedback_aberta(date)', 'execute')
+       then 'sim' else 'NAO' end;
 
 -- ─── Veredito ───────────────────────────────────────────────────────────────
 -- Alias `resumo` com `falhas` numérico: é o contrato que

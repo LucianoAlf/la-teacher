@@ -3,6 +3,11 @@
 // V2 é o motivo do arquivo existir: a régua da janela em UTC. Ela sobrevive a
 // qualquer teste que use `current_date` dos dois lados — foi assim que o 018
 // ficou vermelho por três horas por dia sem ninguém entender.
+//
+// V6/V7/V8/V9/V10 vieram da revisão de qualidade da Task 1: `evolucao` e
+// `animo` tinham constraint sem prova, e só `fn_janela_feedback_aberta` tinha
+// teste de permissão — as outras duas réguas de data ficaram tão abertas pro
+// `anon` quanto ela ficaria sem o `revoke` dela.
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
@@ -42,6 +47,36 @@ const MUTANTES = [
     pega: 'passo "check recusa cor invalida"',
     de: `       check (feedback in ('verde','amarelo','vermelho'));`,
     para: `       check (true);`,
+  },
+  {
+    nome: 'V6 — o check de evolucao aceita qualquer coisa',
+    pega: 'passo "check recusa evolucao invalida"',
+    de: `       check (evolucao is null or evolucao in ('evoluindo','parado','regredindo'));`,
+    para: `       check (true);`,
+  },
+  {
+    nome: 'V7 — o check de animo aceita qualquer coisa',
+    pega: 'passo "check recusa animo invalido"',
+    de: `       check (animo is null or animo in ('animado','neutro','desanimado'));`,
+    para: `       check (true);`,
+  },
+  {
+    nome: 'V8 — fn_hoje_brt fica aberta pro anon [revoke perde o alvo PUBLIC+anon]',
+    pega: 'passo "anon NAO executa fn_hoje_brt"',
+    de: `revoke all on function public.fn_hoje_brt() from public, anon;`,
+    para: `grant execute on function public.fn_hoje_brt() to anon;`,
+  },
+  {
+    nome: 'V9 — fn_competencia_feedback fica aberta pro anon [revoke perde o alvo PUBLIC+anon]',
+    pega: 'passo "anon NAO executa fn_competencia_feedback"',
+    de: `revoke all on function public.fn_competencia_feedback(date) from public, anon;`,
+    para: `grant execute on function public.fn_competencia_feedback(date) to anon;`,
+  },
+  {
+    nome: 'V10 — fn_janela_feedback_aberta fica aberta pro anon [o achado do revisor]',
+    pega: 'passo "anon NAO executa fn_janela_feedback_aberta"',
+    de: `revoke all on function public.fn_janela_feedback_aberta(date) from public, anon;`,
+    para: `grant execute on function public.fn_janela_feedback_aberta(date) to anon;`,
   },
 ]
 

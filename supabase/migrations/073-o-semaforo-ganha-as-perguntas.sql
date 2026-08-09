@@ -72,7 +72,30 @@ returns boolean language sql stable parallel safe as $$
     from (select coalesce(p_dia, public.fn_hoje_brt()) as d) as with_dia
 $$;
 
+-- As três, não só a última — e o revoke tem que mirar PUBLIC *e* `anon`
+-- juntos, não só `anon`. MEDIDO em duas rodadas (não suposto, via
+-- has_function_privilege dentro de BEGIN/ROLLBACK, com uma função descartável):
+--   1. Uma função nova sem NENHUM grant explícito já nasce executável tanto
+--      por `anon` quanto por `authenticated` neste projeto — duas fontes
+--      diferentes: o Postgres concede EXECUTE a PUBLIC por padrão na
+--      criação (e `anon` herda como membro de PUBLIC), E o Supabase tem
+--      default privileges próprios que concedem EXECUTE direto a
+--      `anon`/`authenticated` (é a mesma frase que já estava no cabeçalho da
+--      018b: "com os default privileges do Supabase para anon/authenticated").
+--   2. `revoke ... from anon` sozinho não bastou (só apagava a concessão
+--      direta, deixando a herança de PUBLIC de pé), e `revoke ... from
+--      public` sozinho TAMBÉM não bastou (só apagava a herança de PUBLIC,
+--      deixando a concessão direta do default privilege de pé) — só revogar
+--      dos DOIS ao mesmo tempo fechou a porta de verdade. As duas primeiras
+--      versões deste arquivo tentaram cada uma isoladamente e o teste de
+--      permissão provou as duas erradas.
+-- Mesma classe de buraco que a 018b fechou (`revoke ... from public, anon,
+-- authenticated`) depois de um `create or replace function` devolver EXECUTE
+-- pra `anon` em produção.
+revoke all on function public.fn_hoje_brt() from public, anon;
+revoke all on function public.fn_competencia_feedback(date) from public, anon;
+revoke all on function public.fn_janela_feedback_aberta(date) from public, anon;
+
 grant execute on function public.fn_hoje_brt() to authenticated;
 grant execute on function public.fn_competencia_feedback(date) to authenticated;
 grant execute on function public.fn_janela_feedback_aberta(date) to authenticated;
-revoke all on function public.fn_janela_feedback_aberta(date) from anon;
