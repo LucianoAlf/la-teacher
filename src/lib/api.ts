@@ -1364,15 +1364,11 @@ export interface FeedbackMesa extends FeedbackProgresso {
 
 /** A mesa do mês corrente do professor logado. */
 export async function feedbackMesa(): Promise<FeedbackMesa> {
-  // FOLLOW-UP: remover o cast quando db.ts for regenerado
-  const { data, error } = await supabase.rpc(
-    'app_professor_feedback_mesa' as never,
-    {
-      p_competencia: null,
-    } as never,
-  )
+  const { data: res, error } = await rpcSolta('app_professor_feedback_mesa', {
+    p_competencia: null,
+  })
   if (error) throw error
-  return data as unknown as FeedbackMesa
+  return res as unknown as FeedbackMesa
 }
 
 /**
@@ -1387,32 +1383,24 @@ export async function feedbackSalvar(entrada: {
   animo?: Animo | null
   observacao?: string | null
 }): Promise<FeedbackProgresso> {
-  // FOLLOW-UP: remover o cast quando db.ts for regenerado
-  const { data, error } = await supabase.rpc(
-    'app_professor_feedback_salvar' as never,
-    {
-      p_aluno_id: entrada.alunoId,
-      p_feedback: entrada.feedback,
-      p_pratica_em_casa: entrada.praticaEmCasa ?? null,
-      p_evolucao: entrada.evolucao ?? null,
-      p_animo: entrada.animo ?? null,
-      p_observacao: entrada.observacao ?? null,
-      p_competencia: null,
-    } as never,
-  )
+  const { data: res, error } = await rpcSolta('app_professor_feedback_salvar', {
+    p_aluno_id: entrada.alunoId,
+    p_feedback: entrada.feedback,
+    p_pratica_em_casa: entrada.praticaEmCasa ?? null,
+    p_evolucao: entrada.evolucao ?? null,
+    p_animo: entrada.animo ?? null,
+    p_observacao: entrada.observacao ?? null,
+    p_competencia: null,
+  })
   if (error) throw error
-  return data as unknown as FeedbackProgresso
+  return res as unknown as FeedbackProgresso
 }
 
 /** Só os números — alimenta o card da Home sem carregar a mesa inteira. */
 export async function feedbackProgresso(): Promise<FeedbackProgresso> {
-  // FOLLOW-UP: remover o cast quando db.ts for regenerado
-  const { data, error } = await supabase.rpc(
-    'app_professor_feedback_progresso' as never,
-    {
-      p_competencia: null,
-    } as never,
-  )
+  const { data: res, error } = await rpcSolta('app_professor_feedback_progresso', {
+    p_competencia: null,
+  })
   if (error) throw error
-  return data as unknown as FeedbackProgresso
+  return res as unknown as FeedbackProgresso
 }
