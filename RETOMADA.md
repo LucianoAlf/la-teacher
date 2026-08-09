@@ -5,11 +5,55 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 08/08/2026, noite (BRT).** Tudo no remoto — confira com
+> **Última atualização: 09/08/2026, tarde (BRT).** Tudo no remoto — confira com
 > `git log --oneline -5`.
 > Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 ---
+
+## ⛔ SEMÁFORO DO PROFESSOR: 7 tasks feitas, revisão final NÃO aprovou
+
+As migrations **073, 074 e 075 estão aplicadas em produção** e a tela está no
+repo (mesa, card na Home, entrada em Alunos, microfone). Mas a revisão do branch
+inteiro achou **dois bloqueadores que nenhuma revisão por task podia ver** —
+as sete compararam implementação contra o PLANO, e o plano tinha perdido a spec.
+
+**B1 — a fila da 075 é depósito sem coletor.** A 075 insere em
+`fabio_notificacoes` com `status='processando'` + lease, esperando que alguém
+reivindique depois. **Ninguém varre essa tabela.** O `fabio_notification_worker.py`
+tem 3 tipos fixos (`briefing_matinal`, `pendencia_registro`,
+`pendencia_escalonada`), decide pelo relógio e chama `fabio_claim_notificacao`,
+que **cria** a linha já reivindicada. O `on conflict` dessa função é restrito a
+`tipo in ('briefing_matinal','pendencia_registro')` — um `feedback_lembrete`
+não casa, então quem for plugar o envio toma **23505** contra o índice novo da
+075. E o cabeçalho da própria 066 já dizia: *"não há caixa onde o painel
+deposite um recado pra alguém levar depois"* — o padrão da casa é
+RESERVA → envia → CONCLUI na mesma chamada. A 075 faz só a primeira.
+
+**B2 — a coordenação não recebe nada.** A spec diz *"Dia 1º: entrega à
+coordenação a lista de quem não fechou"*. O código insere
+`destinatario_tipo='professor'` com um texto **para o professor**. A coordenação
+não aparece em lugar nenhum da 075. O erro nasceu no plano e por isso atravessou
+as sete revisões.
+
+**Importantes, antes de 43 professores abrirem:**
+- **Dois números da mesma carteira**: `Alunos.tsx` mostra o array cru de
+  `app_minha_carteira` (grão matrícula, sem filtrar arquivado); a mesa colapsa
+  por aluno e tira arquivado. **26 dos 43 professores veem contagens
+  diferentes**, diferença de até 6. O card leva de uma tela pra outra.
+- **O ✓ verde mente**: `setEstado` acontece antes da RPC e o `catch` não desfaz.
+  Rede ruim = 52 ✓ verdes, barrinha em 0/52, nada salvo. E o registro de aula
+  tem fila offline; este não tem.
+- **O microfone falha em todo iPhone**: o cliente manda nome fixo
+  `observacao.webm`, mas o `useRecorder` grava `audio/mp4` no iOS — e o helper
+  `extensaoDoMime()` já existe no repo e não foi usado. O Whisper decide pela
+  extensão.
+
+**Maior carteira real: 52 alunos** (professor 33), e são **43** professores com
+carteira — não 38/44 como o plano supunha.
+
+**Duas decisões humanas pendentes, sem as quais nada disso roda:** publicar a
+`transcrever-observacao` e agendar o cron da cobrança.
 
 ## ▶ PRÓXIMO PASSO: RADAR DO ALUNO (bloco 2 do painel — decidido 08/08, noite)
 
@@ -118,7 +162,8 @@ pré-atendimento (`ChatPanel.tsx:502`). Ela existia desde 13/02, na versão 33.
 
 O Fábio entregava a professor comum a lista dos professores atrasados no
 feedback mensal. A primeira correção foi um bloco no prompt (`ESCOPO_PROFESSOR`):
-mediu 6/6, mas **prompt é probabilístico — a porta continuava aberta**.
+mediu **13/13 recusas** (detalhe abaixo), mas **prompt é probabilístico — a
+porta continuava aberta**.
 
 **O que a medição mostrou, e é maior que o vazamento:** `run_hermes_api` manda
 só `{model, messages, stream}` — o gateway **não sabe quem está perguntando**.
@@ -179,11 +224,49 @@ evento.
 4. **`fabio_presence_mcp` continua sem escopo** (`professor_id` arbitrário), mas
    agora é inalcançável pelo professor (`no_mcp`) e **nunca foi invocado**. Usa
    **service_role**, não `fabio_agent` — então revogar grant não fecharia ele.
-5. **Admin em 137,8s** contra timeout de 180s (`FABIO_CHAT_HERMES_TIMEOUT`).
-   Pergunta admin mais pesada estoura. Subir o timeout do caminho admin.
-6. **`sol_acesso_restrito` e `mila_acesso_restrito` se chamam "restrito" e veem
+5. **`sol_acesso_restrito` e `mila_acesso_restrito` se chamam "restrito" e veem
    375 objetos** — o nome mente. Só `lia_acesso_restrito` (103) é de fato
    estreito. Não é do Fábio, mas é do mesmo banco.
+### DE ONDE VEIO — o incidente, e o que a mitigação de prompt mediu
+
+Achado testando ao vivo depois da Task 7 (regra do CLAUDE.md). Perguntado por
+um **professor comum** (id 25, Matheus), o Fábio respondia quem estava atrasado
+no feedback mensal — **nome, mês, unidade e nº de alunos** de colegas. Ramon
+(31) e Peterson (33) são reais: não era alucinação. **É anterior à 075** — a
+migration só me fez olhar.
+
+- **Causa raiz:** `~/.hermes/config.yaml` → `mcp_servers.lareport` é um
+  `postgres-mcp --access-mode=unrestricted` com o role `fabio_agent`, que tem
+  `SELECT` em **374 objetos** e **`rolbypassrls = t`**. SQL arbitrário na escola
+  inteira, sem nenhum filtro por quem perguntou. O role só existe nesse MCP (os
+  workers usam service role), então os grants dele governam exatamente uma
+  superfície: o SQL ad-hoc do agente.
+- **Não havia regra em lugar nenhum** — nem `SOUL.md`, nem `PERMISSOES.md`, nem
+  nas 6 skills. O freio era o humor do modelo: **2 em 5** respostas vazavam
+  nome+número pra mesma pergunta, com `--sem-historico`.
+- **Mitigado (commit `0b1d561`, no ar):** bloco `ESCOPO_PROFESSOR` condicional
+  no `build_prompt` (só `identidade_tipo=professor`; admin intocado) + bullets
+  na skill `chat-fabio-la-music`. Medido depois: **13/13 recusas** — 6/6 na
+  pergunta original, 3/3 em variantes de contorno, 4/4 perguntando por colega
+  **pelo nome** (o vetor que a outra sessão achou). Carteira, feedback próprio,
+  prontuário e check-in seguem respondendo: não virou muro.
+- ~~**A fronteira continua ABERTA.**~~ **RESOLVIDO na mesma noite** — ver a
+  seção acima. Duas coisas que estavam escritas aqui eram falsas e vale saber
+  por quê: **(1)** "toolset por identidade exige mexer no Hermes" —
+  `platform_toolsets.api_server` já era suportado e testado upstream, era chave
+  de config; **(2)** "`lareport_execute_sql` 86x, é capacidade viva" — 71
+  daquelas linhas eram registro do MCP, não chamada. O custo estimado da opção
+  mais simples estava inflado por `grep | wc -l`.
+- **Buraco irmão:** `fabio_presence_mcp.py:34` expõe
+  `fabio_buscar_presencas_pendentes_professor(professor_id)` com `professor_id`
+  **arbitrário**, sem checar quem chamou. Hoje inalcançável pelo professor
+  (`no_mcp`) e nunca invocado. Correção ao que estava escrito: ele usa
+  **service_role**, não `fabio_agent` — revogar grant nunca teria fechado.
+- ⚠️ **A edição da skill não tem espelho no repo** (só o bridge tem, em
+  `vps/fabio/`) — vive só na VPS. E o `.skills_prompt_snapshot.json` carrega
+  descrições, não o corpo: quem segura de fato é o bloco do `build_prompt`.
+  Continua valendo, e agora o `config.yaml` também tem espelho
+  (`vps/fabio/hermes-platform-toolsets.yaml.txt`) — a skill não.
 
 ## ▶ DECIDIDO 08/08 (noite): O SEMÁFORO NASCE NO APP DO PROFESSOR
 
