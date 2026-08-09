@@ -1416,11 +1416,13 @@ export async function feedbackProgresso(): Promise<FeedbackProgresso> {
  * pré-atendimento) no mesmo projeto Supabase compartilhado, e foi
  * sobrescrito por engano em 09/08. Ver INCIDENTE em RETOMADA.md.
  *
- * O nome do arquivo SEGUE O MIME DA GRAVAÇÃO. Estava cravado
- * `observacao.webm`, e o iOS/Safari grava `audio/mp4` — o Whisper escolhe o
- * decoder pela extensão, então todo iPhone mandava um m4a disfarçado de webm
- * e recebia erro. A `transcrever-observacao` também deriva o nome por conta
- * própria; esta linha é a primeira das duas camadas, não a única.
+ * O nome do arquivo SEGUE O MIME DA GRAVAÇÃO — mas quem de fato decide o
+ * decoder é o **Content-Type da parte multipart**, que vem do `blob.type`, não
+ * a extensão. Medido em 09/08/2026 contra a função em produção: mp4 nomeado
+ * `.m4a` sem Content-Type dá 502; mp4 com `audio/mp4` nomeado `.webm` passa.
+ * (O comentário anterior aqui dizia o contrário, sem nunca ter sido testado.)
+ * O nome coerente vale como higiene; a garantia mora na
+ * `transcrever-observacao`, que identifica o contêiner pelos BYTES e reembrulha.
  */
 export async function transcreverAudio(blob: Blob): Promise<string> {
   const form = new FormData()

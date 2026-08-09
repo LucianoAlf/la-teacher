@@ -14,7 +14,16 @@ import { transcreverAudio } from '../../lib/api'
  * o MediaRecorder fecha o chunk final e só então `onstop` grava `blob` e move
  * `estado` pra 'parado'). Por isso a transcrição é disparada por um efeito que
  * observa essa transição, não pelo clique em si.
+ *
+ * O TEXTO TAMBÉM SALVA SOZINHO. Era só `onBlur`, e blur é frágil pra valer
+ * como promessa: fechar o card (o chevron desmonta este componente — React não
+ * dispara blur no desmonte), trocar de aba ou largar o celular com o teclado
+ * aberto deixavam o texto só na tela. Os três caminhos agora gravam: pausa de
+ * ~900 ms na digitação, blur, e desmonte. `ultimoRef` guarda o que já foi
+ * mandado pro card — sem ele, blur logo depois do debounce mandaria a mesma
+ * observação duas vezes, e cada envio é uma chamada de rede.
  */
+const ESPERA_MS = 900
 export function CampoObservacao({
   valor,
   aoConfirmar,
@@ -31,6 +40,35 @@ export function CampoObservacao({
   // efeito re-rodaria a cada tecla digitada).
   const textoRef = useRef(texto)
   textoRef.current = texto
+
+  // O que já foi entregue ao card. Começa no que veio do banco.
+  const ultimoRef = useRef(valor)
+  const aoConfirmarRef = useRef(aoConfirmar)
+  aoConfirmarRef.current = aoConfirmar
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function confirmar(t: string) {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = null
+    if (t === ultimoRef.current) return
+    ultimoRef.current = t
+    aoConfirmarRef.current(t)
+  }
+
+  function digitou(t: string) {
+    setTexto(t)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => confirmar(textoRef.current), ESPERA_MS)
+  }
+
+  // Desmonte (o chevron fechando o card, a mesa recarregando): entrega o que
+  // ainda estava no debounce. Deps vazias de propósito — só o desmonte.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      if (textoRef.current !== ultimoRef.current) aoConfirmarRef.current(textoRef.current)
+    }
+  }, [])
 
   // Guarda de reentrância: com <React.StrictMode> (src/main.tsx) o React
   // dispara o efeito duas vezes em dev — sem isso, uma gravação virava DUAS
@@ -57,7 +95,8 @@ export function CampoObservacao({
         }
         const novo = textoRef.current ? `${textoRef.current} ${falado}` : falado
         setTexto(novo)
-        aoConfirmar(novo)
+        textoRef.current = novo
+        confirmar(novo)
       })
       .catch(() => setAviso('Não consegui transcrever. Pode escrever aí.'))
       .finally(() => {
@@ -81,8 +120,8 @@ export function CampoObservacao({
         <textarea
           rows={2}
           value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          onBlur={() => aoConfirmar(texto)}
+          onChange={(e) => digitou(e.target.value)}
+          onBlur={() => confirmar(texto)}
           placeholder="Algo que vale a coordenação saber — um elogio, um ponto de melhoria, uma mudança que você notou."
           className="w-full resize-none rounded-lg border border-border-subtle bg-bg-inset px-3 py-2 pr-10 text-[13px] text-text-primary placeholder:text-text-muted"
         />

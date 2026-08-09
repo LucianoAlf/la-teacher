@@ -67,6 +67,18 @@ export function MesaFeedback({ show }: { show: (mensagem: string) => void }) {
         </div>
       </div>
 
+      {/* Não existe botão "Salvar" nesta tela, e ausência não se explica
+          sozinha: sem esta linha o professor responde 38 alunos procurando
+          onde confirmar — ou pior, sai achando que perdeu tudo. Fica no fluxo
+          (não no sticky) porque é instrução de primeira vez: rola pra cima e
+          sai da frente. Quem confirma aluno por aluno é o ✓ de cada card. */}
+      {mesa.alunos.length > 0 ? (
+        <p className="mb-4 flex items-center gap-2 text-[11.5px] text-text-muted">
+          <i className="fa-solid fa-cloud-arrow-up text-brand-text" aria-hidden />
+          Cada resposta salva sozinha — não tem botão de salvar.
+        </p>
+      ) : null}
+
       {mesa.alunos.length === 0 ? (
         <EmptyState
           icon="fa-solid fa-user-group"

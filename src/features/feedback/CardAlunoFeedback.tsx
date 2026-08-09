@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Card } from '../../components/ui'
 import {
   feedbackSalvar, CORACOES, PRATICA, EVOLUCAO, ANIMO,
@@ -6,12 +6,29 @@ import {
 } from '../../lib/api'
 import { CampoObservacao } from './CampoObservacao'
 
+/** A cor do coração escolhido — usada aberto (ícone grande) e fechado (resumo). */
+const COR_CORACAO: Record<string, string> = {
+  verde: 'text-success-text',
+  amarelo: 'text-warning-text',
+  vermelho: 'text-danger-text',
+}
+
 /**
  * A linha de um aluno na mesa.
  *
  * Abre no toque do coração — independente da cor — e mostra as três perguntas
  * mais o convite de observação. Cada toque SALVA: não existe botão "Salvar".
  * Com 38 alunos e cinco campos, um botão no fim é convite a perder trabalho.
+ *
+ * ABRE E FECHA. Um card aberto tem ~5 campos e passa de 300px; um professor
+ * com 40 alunos rolaria uma tela de 12 mil pixels se todos ficassem abertos —
+ * e quem já respondeu no começo do mês abriria a mesa nesse estado. Por isso
+ * o card NASCE FECHADO e o chevron manda: fechado mostra o essencial (nome,
+ * o coração que ele escolheu, o ✓) e abre de novo pra corrigir.
+ *
+ * Fechado, quem AINDA não tem coração continua mostrando os três — a mesa
+ * inteira continua a um toque de distância, sem precisar abrir card por card.
+ * Quem já tem vira uma linha de resumo.
  *
  * O ✓ só aparece quando o aluno está COMPLETO (coração + as três perguntas).
  * Um card com coração e perguntas vazias fica visivelmente começado — é o que
@@ -57,6 +74,7 @@ export function CardAlunoFeedback({
   const [salvando, setSalvando] = useState(false)
   const filaRef = useRef<Promise<void>>(Promise.resolve())
   const emVooRef = useRef(0)
+  const detalheId = useId()
 
   // Sai de `confirmado`: o ✓ é recibo do servidor, não eco do toque.
   const completo =
@@ -107,10 +125,20 @@ export function CardAlunoFeedback({
     enviar(novo)
   }
 
+  const coracao = CORACOES.find((c) => c.valor === estado.feedback)
+
   return (
     <Card className="mb-2 p-3.5">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        {/* O bloco do nome também abre e fecha: alvo grande no celular, do
+            tamanho do card, em vez de exigir mira no chevron. */}
+        <button
+          type="button"
+          onClick={() => setAberto((v) => !v)}
+          aria-expanded={aberto}
+          aria-controls={detalheId}
+          className="min-w-0 flex-1 text-left"
+        >
           <p className="truncate text-[15px] font-bold text-text-primary">{estado.nome}</p>
           <p className="text-[11.5px] text-text-muted">
             {estado.cursos ?? 'Sem curso'}
@@ -118,7 +146,7 @@ export function CardAlunoFeedback({
               ? ` · você não vê há ${estado.dias_sem_aula} ${estado.dias_sem_aula === 1 ? 'dia' : 'dias'}`
               : null}
           </p>
-        </div>
+        </button>
         {salvando ? (
           <i className="fa-solid fa-circle-notch fa-spin text-text-muted" role="status" aria-label="salvando" />
         ) : falhou ? (
@@ -135,9 +163,42 @@ export function CardAlunoFeedback({
         ) : completo ? (
           <i className="fa-solid fa-circle-check text-success-text" role="img" aria-label="respondido" />
         ) : null}
+
+        <button
+          type="button"
+          onClick={() => setAberto((v) => !v)}
+          aria-expanded={aberto}
+          aria-controls={detalheId}
+          aria-label={aberto ? `Fechar ${estado.nome}` : `Abrir ${estado.nome}`}
+          className="-m-1 p-1 text-text-muted"
+        >
+          <i
+            className={`fa-solid fa-chevron-down text-xs transition-transform ${aberto ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
+        </button>
       </div>
 
+      {/* FECHADO e já com coração: uma linha de resumo no lugar dos três
+          corações e das três perguntas. Sem isto, "fechado" viraria só "some
+          com o que respondi" — o professor precisa reconhecer o card sem abrir. */}
+      {!aberto && coracao ? (
+        <button
+          type="button"
+          onClick={() => setAberto(true)}
+          aria-label={`Abrir ${estado.nome}`}
+          className="mt-2 flex w-full items-center gap-2 text-left"
+        >
+          <i className={`fa-solid fa-heart text-[13px] ${COR_CORACAO[coracao.valor]}`} aria-hidden />
+          <span className="text-[12.5px] text-text-secondary">{coracao.rotulo}</span>
+          {!completo ? (
+            <span className="text-[11.5px] text-text-muted">· faltam as perguntas</span>
+          ) : null}
+        </button>
+      ) : null}
+
       {/* Os três corações. Tocar em qualquer um abre o resto. */}
+      {aberto || !coracao ? (
       <div className="mt-3 flex items-center gap-2">
         {CORACOES.map((c) => (
           <button
@@ -172,9 +233,10 @@ export function CardAlunoFeedback({
           </button>
         ))}
       </div>
+      ) : null}
 
-      {aberto || estado.feedback ? (
-        <div className="mt-3 space-y-3 border-t border-border-subtle pt-3">
+      {aberto ? (
+        <div id={detalheId} className="mt-3 space-y-3 border-t border-border-subtle pt-3">
           <Pergunta
             rotulo="Prática em casa?"
             opcoes={PRATICA}
