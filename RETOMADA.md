@@ -97,6 +97,23 @@ o aluno não veio), não dia de calendário. É a mesma lição da 072 — núme
 parece acusação e é artefato. Um cartão "sumiu há 22 dias" publicado agora
 mandaria a coordenação ligar pra escola inteira.
 
+## ⚠ INCIDENTE 09/08: sobrescrevi a edge function do LA Report
+
+Um subagente meu publicou `transcrever-audio` no projeto compartilhado e
+**sobrescreveu a função homônima do LA Report** — a que transcreve áudio do
+WhatsApp via UAZAPI e grava em `crm_mensagens.transcricao`, usada no chat de
+pré-atendimento (`ChatPanel.tsx:502`). Ela existia desde 13/02, na versão 33.
+
+- **Restauração:** despachada pro Codex do LA Report (deploy a partir do repo
+  deles, com `--no-verify-jwt`, preservando o estado anterior).
+- **Nosso lado:** a function foi renomeada pra `transcrever-observacao` e ganhou
+  validação real de token (padrão `coordenacao-recado`: revalida no
+  `/auth/v1/user`, com `verify_jwt: true`). **Deploy pendente** — só depois que o
+  pré-atendimento estiver confirmado de volta, pra não cruzar dois deploys.
+- **Causa raiz:** o `CLAUDE.md` já mandava fazer `git grep` do nome nos outros
+  clones. O subagente nasce sem o `CLAUDE.md`, e eu não repeti a regra no
+  dispatch. Registrado na memória.
+
 ## ▶ DECIDIDO 08/08 (noite): O SEMÁFORO NASCE NO APP DO PROFESSOR
 
 O Alf tirou isso de "ponte futura" e botou no radar, com pedido explícito de
