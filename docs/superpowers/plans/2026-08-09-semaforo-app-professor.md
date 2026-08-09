@@ -2288,17 +2288,1039 @@ não é coordenação.
 
 ---
 
+### Task 8: Migration 076 — o carteiro (e a coordenação recebe)
+
+**Por que esta task existe.** A revisão final do branch não aprovou a entrega
+por dois defeitos que as revisões por task não podiam ver — cada uma comparou a
+implementação contra o **plano**, e o plano tinha perdido a spec:
+
+1. **A 075 é um depósito sem coletor.** Ela insere linhas em
+   `fabio_notificacoes` com `status='processando'` e lease de 10 minutos, e
+   ninguém varre essa tabela. O worker tem três tipos fixos e chama
+   `fabio_claim_notificacao`, que **cria** a linha já reivindicada e cujo
+   `on conflict` só cobre `briefing_matinal`/`pendencia_registro` — um
+   `feedback_lembrete` estouraria 23505 contra o índice da própria 075. O
+   cabeçalho da 066 já dizia a regra: *"não há caixa onde o painel deposite um
+   recado para alguém levar depois"*.
+2. **A coordenação não recebe nada.** A spec promete a lista no dia 1º; a 075
+   grava `destinatario_tipo = 'professor'` com mensagem pro professor. Metade
+   da governança não existia. **O Alf decidiu em 09/08: tem que ter.**
+
+**Files:**
+- Create: `supabase/migrations/076-o-carteiro-da-cobranca.sql`
+- Create: `supabase/migrations/076-o-carteiro-da-cobranca.test.sql`
+- Create: `scripts/mutantes-076.mjs`
+- Modify: `package.json` (scripts `teste:076` e `mutantes:076`)
+
+**Interfaces:**
+- Consome: `public.fn_hoje_brt()` e `public.fn_competencia_feedback(date)` (073);
+  o vocabulário `feedback_lembrete`/`feedback_reforco`/`feedback_coordenacao` já
+  estendido no CHECK de `tipo` pela 075; `public.fn_fabio_pode_notificar(int,
+  text, timestamptz)`; `public.vw_jornada_professor_atual` (colunas medidas:
+  `professor_id`, `aluno_id`, `unidade_nome`).
+- Produz, para a Task 9:
+  - `fn_feedback_cobranca_do_dia(p_dia date default null) → jsonb`
+    `{dia, fase, competencia, professores:[{professor_id, nome, total, ok, faltam, unidades[]}]}`
+    com `fase ∈ {lembrete, reforco, coordenacao, nenhuma}`.
+  - `fn_reservar_cobranca_feedback(p_professor_id int, p_tipo text, p_corpo text, p_dia date default null) → jsonb`
+    `{reservado:true, notificacao_id, lease_token, telefone}` ou `{reservado:false, motivo}`.
+  - `fn_reservar_cobranca_feedback_coordenacao(p_corpo text, p_whatsapp text, p_dia date default null) → jsonb`
+    mesma forma, sem `telefone`.
+  - Conclusão reusa as existentes `fabio_marcar_notificacao_enviada(uuid, uuid, text)`
+    e `fabio_marcar_notificacao_falhou(uuid, text, uuid, int)` — **medido**: as
+    duas só exigem `status='processando'` e lease vivo, não olham `professor_id`,
+    então servem para a linha do grupo.
+
+**Fatos medidos no banco em 09/08 — não adaptar de memória:**
+- `fabio_notificacoes_destinatario_tipo_check` aceita **só** `professor` e
+  `comercial`. `coordenacao` não cabe hoje.
+- `chk_notificacao_destinatario` tem três ramos e exige `professor_id not null`
+  quando o tipo é `professor`. Precisa de um quarto ramo, **estendido, nunca
+  substituído** — mesma tática de 018 e 036 com o CHECK de `tipo`.
+- `fabio_notificacoes_feedback_dia_unico` (075) é
+  `(professor_id, tipo, dia_referencia) where tipo like 'feedback_%'`. Em índice
+  único do Postgres **nulos não colidem**: a linha da coordenação, com
+  `professor_id` nulo, nunca dedupa ali. Duas chaves, dois índices.
+- `fn_fabio_pode_notificar` **levanta exceção** com `p_professor_id null` — a
+  linha do grupo não passa por ela, e não deve mesmo: preferência de silêncio é
+  do professor, não da coordenação.
+
+- [ ] **Step 1: Escrever a migration**
+
+Crie `supabase/migrations/076-o-carteiro-da-cobranca.sql`:
+
+```sql
+-- 076 — o carteiro da cobrança (e a coordenação recebe de verdade)
+--
+-- A 075 enfileirava e ninguém buscava. Aqui a fila vira o que a casa já usa em
+-- briefing, pendência e devolutiva: RESERVA ('processando' + lease) → envia →
+-- CONCLUI. Quem executa os três passos é o fabio_notification_worker.py; o
+-- banco só responde "quem cobrar hoje" e "reserve esta linha pra mim".
+--
+-- POR QUE NÃO FICA UM pg_cron ENFILEIRANDO
+-- `status` não tem estado de entrada: aceita 'processando', 'enviada', 'falhou'
+-- e 'pulada_*' — não existe 'pendente'. Linha que nasce 'processando' com lease
+-- de 10 minutos e espera horas por um coletor não é fila, é mentira: parece em
+-- voo e não está. Por isso a fn_enfileirar_cobranca_feedback CAI aqui. Ela
+-- também convidava ao erro no próprio comentário ("ainda não agendado no
+-- cron") — agendar aquilo encheria a tabela em silêncio.
+--
+-- POR QUE A COORDENAÇÃO PRECISA DE UM QUARTO RAMO NO CHECK
+-- A lista do dia 1º vai pro GRUPO da coordenação no WhatsApp, o mesmo que já
+-- recebe o escalonamento da presença. Grupo não é professor nem lead comercial:
+-- é `destinatario_tipo='coordenacao'`, `professor_id` nulo e o JID em
+-- `destinatario_whatsapp`. O CHECK é ESTENDIDO, nunca substituído — os três
+-- ramos que já existiam continuam palavra por palavra.
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 1. O destinatário aprende 'coordenacao'
+-- ───────────────────────────────────────────────────────────────────────────
+alter table public.fabio_notificacoes
+  drop constraint if exists fabio_notificacoes_destinatario_tipo_check;
+alter table public.fabio_notificacoes
+  add constraint fabio_notificacoes_destinatario_tipo_check
+  check (destinatario_tipo = any (array['professor','comercial','coordenacao']));
+
+alter table public.fabio_notificacoes
+  drop constraint if exists chk_notificacao_destinatario;
+alter table public.fabio_notificacoes
+  add constraint chk_notificacao_destinatario
+  check (
+       (status = 'pulada_sem_destinatario' and destinatario_tipo = 'comercial'
+        and professor_id is null and destinatario_whatsapp is null)
+    or (destinatario_tipo = 'professor'   and professor_id is not null)
+    or (destinatario_tipo = 'comercial'   and destinatario_whatsapp is not null)
+    or (destinatario_tipo = 'coordenacao' and professor_id is null
+        and destinatario_whatsapp is not null)
+  );
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 2. Duas chaves, dois índices
+-- ───────────────────────────────────────────────────────────────────────────
+drop index if exists public.fabio_notificacoes_feedback_dia_unico;
+
+create unique index if not exists fabio_notificacoes_feedback_prof_dia_unico
+  on public.fabio_notificacoes (professor_id, tipo, dia_referencia)
+  where tipo = any (array['feedback_lembrete','feedback_reforco']);
+
+create unique index if not exists fabio_notificacoes_feedback_coord_dia_unico
+  on public.fabio_notificacoes (tipo, dia_referencia)
+  where tipo = 'feedback_coordenacao';
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 3. QUEM COBRAR HOJE — leitura pura, sem escrever nada
+-- ───────────────────────────────────────────────────────────────────────────
+create or replace function public.fn_feedback_cobranca_do_dia(
+  p_dia date default null
+) returns jsonb
+language plpgsql stable security definer set search_path to 'public'
+as $$
+declare
+  v_dia    date := coalesce(p_dia, public.fn_hoje_brt());
+  v_ultimo date := (date_trunc('month', v_dia) + interval '1 month - 1 day')::date;
+  v_fase   text;
+  v_comp   date;
+  v_profs  jsonb;
+  v_eleg   int;
+begin
+  -- Ancorado no FIM DO MÊS, nunca em dia da semana: em agosto/2026 a janela é
+  -- 25/08 (ter) a 31/08 (seg), então "a quinta" cai no 27 e "a segunda" no 31 —
+  -- o reforço chegaria quatro dias antes do lembrete.
+  if extract(day from v_dia) = 1 then
+    v_fase := 'coordenacao';
+    v_comp := (date_trunc('month', v_dia) - interval '1 month')::date;
+  elsif v_dia = v_ultimo - 6 then
+    v_fase := 'lembrete';
+    v_comp := public.fn_competencia_feedback(v_dia);
+  elsif v_dia = v_ultimo - 3 then
+    v_fase := 'reforco';
+    v_comp := public.fn_competencia_feedback(v_dia);
+  else
+    return jsonb_build_object('dia', v_dia, 'fase', 'nenhuma', 'competencia', null,
+                              'elegiveis', 0, 'professores', '[]'::jsonb);
+  end if;
+
+  with alvo as (
+    select p.id   as professor_id,
+           p.nome as professor_nome,
+           count(distinct v.aluno_id) as total,
+           count(distinct f.aluno_id) filter (
+             where f.feedback is not null and f.pratica_em_casa is not null
+               and f.evolucao is not null and f.animo is not null) as ok,
+           array_agg(distinct v.unidade_nome)
+             filter (where v.unidade_nome is not null) as unidades
+      from public.professores p
+      join public.vw_jornada_professor_atual v on v.professor_id = p.id
+      join public.alunos a on a.id = v.aluno_id and a.arquivado_em is null
+      left join public.aluno_feedback_professor f
+             on f.professor_id = p.id and f.aluno_id = v.aluno_id
+            and f.competencia  = v_comp
+     -- `usuario_id is not null` é o mesmo recorte do resto do worker: cobrar
+     -- quem não consegue abrir a tela é o jeito mais rápido de ensinar o
+     -- professor a ignorar o Fábio.
+     where p.ativo and p.usuario_id is not null
+     group by p.id, p.nome
+    having count(distinct v.aluno_id) > 0
+  )
+  -- `elegiveis` conta TODO professor com carteira; `professores` traz só quem
+  -- será cobrado. O FILTER separa os dois na mesma varredura — sem ele, a
+  -- mensagem da coordenação teria que chamar a função duas vezes pra saber a
+  -- régua, e a segunda chamada devolveria a lista filtrada de novo.
+  select count(*)::int,
+         coalesce(
+           jsonb_agg(jsonb_build_object(
+             'professor_id', professor_id,
+             'nome',         professor_nome,
+             'total',        total,
+             'ok',           ok,
+             'faltam',       total - ok,
+             'unidades',     to_jsonb(coalesce(unidades, array[]::text[]))
+           ) order by professor_nome)
+           -- lembrete vai pra todo mundo; reforço e coordenação só pra quem
+           -- não fechou.
+           filter (where v_fase = 'lembrete' or ok < total),
+         '[]'::jsonb)
+    into v_eleg, v_profs
+    from alvo;
+
+  return jsonb_build_object('dia', v_dia, 'fase', v_fase, 'competencia', v_comp,
+                            'elegiveis', v_eleg, 'professores', v_profs);
+end $$;
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 4. RESERVA — professor
+-- ───────────────────────────────────────────────────────────────────────────
+create or replace function public.fn_reservar_cobranca_feedback(
+  p_professor_id int,
+  p_tipo         text,
+  p_corpo        text,
+  p_dia          date default null
+) returns jsonb
+language plpgsql volatile security definer set search_path to 'public'
+as $$
+declare
+  v_dia       date        := coalesce(p_dia, public.fn_hoje_brt());
+  -- `dia_referencia` é GERADA a partir de criado_em. Escrever criado_em como a
+  -- meia-noite BRT de v_dia ancora a dedupe no dia SIMULADO — em produção v_dia
+  -- já é hoje, então não muda nada.
+  v_criado_em timestamptz := (v_dia::timestamp) at time zone 'America/Sao_Paulo';
+  v_id        uuid;
+  v_token     uuid;
+  v_ativo     boolean;
+  v_telefone  text;
+begin
+  if p_tipo <> all (array['feedback_lembrete','feedback_reforco']) then
+    raise exception 'tipo_invalido';
+  end if;
+  if p_corpo is null or length(btrim(p_corpo)) < 3 then
+    raise exception 'corpo_vazio';
+  end if;
+
+  select p.ativo,
+         nullif(regexp_replace(coalesce(p.telefone_whatsapp,''), '\D', '', 'g'), '')
+    into v_ativo, v_telefone
+    from public.professores p
+   where p.id = p_professor_id;
+
+  if v_ativo is null then
+    raise exception 'professor_inexistente';
+  end if;
+  if not v_ativo then
+    return jsonb_build_object('reservado', false, 'motivo', 'professor_inativo');
+  end if;
+  if v_telefone is null then
+    return jsonb_build_object('reservado', false, 'motivo', 'sem_whatsapp');
+  end if;
+  -- Férias é a única coisa que barra governança — silêncio e domingo não.
+  if not public.fn_fabio_pode_notificar(p_professor_id, 'governanca', now()) then
+    return jsonb_build_object('reservado', false, 'motivo', 'professor_em_pausa');
+  end if;
+
+  v_token := gen_random_uuid();
+
+  insert into public.fabio_notificacoes
+    (professor_id, tipo, categoria, canal, titulo, corpo, destinatario_tipo,
+     status, tentativas, lease_token, lease_expira_em, criado_em)
+  values
+    (p_professor_id, p_tipo, 'governanca', 'whatsapp',
+     'Feedback dos alunos', btrim(p_corpo), 'professor',
+     'processando', 1, v_token, now() + interval '10 minutes', v_criado_em)
+  on conflict (professor_id, tipo, dia_referencia)
+    where tipo = any (array['feedback_lembrete','feedback_reforco'])
+  do nothing
+  returning id into v_id;
+
+  if v_id is null then
+    return jsonb_build_object('reservado', false, 'motivo', 'ja_cobrado_hoje');
+  end if;
+
+  return jsonb_build_object('reservado', true, 'notificacao_id', v_id,
+                            'lease_token', v_token, 'telefone', v_telefone);
+end $$;
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 5. RESERVA — coordenação (uma linha por dia, pro grupo)
+-- ───────────────────────────────────────────────────────────────────────────
+create or replace function public.fn_reservar_cobranca_feedback_coordenacao(
+  p_corpo    text,
+  p_whatsapp text,
+  p_dia      date default null
+) returns jsonb
+language plpgsql volatile security definer set search_path to 'public'
+as $$
+declare
+  v_dia       date        := coalesce(p_dia, public.fn_hoje_brt());
+  v_criado_em timestamptz := (v_dia::timestamp) at time zone 'America/Sao_Paulo';
+  v_id        uuid;
+  v_token     uuid;
+begin
+  if p_corpo is null or length(btrim(p_corpo)) < 3 then
+    raise exception 'corpo_vazio';
+  end if;
+  if p_whatsapp is null or length(btrim(p_whatsapp)) < 5 then
+    raise exception 'destinatario_vazio';
+  end if;
+
+  v_token := gen_random_uuid();
+
+  -- professor_id fica NULO de propósito: quem recebe é o grupo. É o quarto ramo
+  -- do chk_notificacao_destinatario, criado acima.
+  insert into public.fabio_notificacoes
+    (tipo, categoria, canal, titulo, corpo, destinatario_tipo,
+     destinatario_whatsapp, status, tentativas, lease_token, lease_expira_em,
+     criado_em)
+  values
+    ('feedback_coordenacao', 'governanca', 'whatsapp',
+     'Feedback do mês — quem não fechou', btrim(p_corpo), 'coordenacao',
+     btrim(p_whatsapp), 'processando', 1, v_token,
+     now() + interval '10 minutes', v_criado_em)
+  on conflict (tipo, dia_referencia)
+    where tipo = 'feedback_coordenacao'
+  do nothing
+  returning id into v_id;
+
+  if v_id is null then
+    return jsonb_build_object('reservado', false, 'motivo', 'ja_entregue_hoje');
+  end if;
+
+  return jsonb_build_object('reservado', true, 'notificacao_id', v_id,
+                            'lease_token', v_token);
+end $$;
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 6. O depósito sem coletor sai de cena
+-- ───────────────────────────────────────────────────────────────────────────
+drop function if exists public.fn_enfileirar_cobranca_feedback(date);
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 7. Nenhuma das três é do navegador.
+-- `revoke ... from anon` sozinho NÃO fecha função nova: o pg_default_acl de
+-- `public` concede a anon e authenticated, e o Postgres concede ao PUBLIC.
+-- ───────────────────────────────────────────────────────────────────────────
+revoke all on function public.fn_feedback_cobranca_do_dia(date)
+  from public, anon, authenticated;
+revoke all on function public.fn_reservar_cobranca_feedback(int, text, text, date)
+  from public, anon, authenticated;
+revoke all on function public.fn_reservar_cobranca_feedback_coordenacao(text, text, date)
+  from public, anon, authenticated;
+
+comment on function public.fn_feedback_cobranca_do_dia(date) is
+  'Leitura pura: diz a fase do dia (lembrete/reforco/coordenacao/nenhuma) e '
+  'quem cobrar, ancorado no fim do mes. Nao escreve nada. So service_role.';
+comment on function public.fn_reservar_cobranca_feedback(int, text, text, date) is
+  'Reserva a cobranca do feedback de UM professor (processando + lease) antes '
+  'do envio. Respeita ferias via fn_fabio_pode_notificar. So service_role.';
+comment on function public.fn_reservar_cobranca_feedback_coordenacao(text, text, date) is
+  'Reserva a entrega do dia 1o pro GRUPO da coordenacao: professor_id nulo, '
+  'destinatario_tipo coordenacao, JID em destinatario_whatsapp. So service_role.';
+```
+
+- [ ] **Step 2: Escrever o teste**
+
+Crie `supabase/migrations/076-o-carteiro-da-cobranca.test.sql`. O veredito
+**tem** que sair como `resumo` com `falhas` **numérico** — o
+`scripts/rodar-teste-sql.mjs:148` recusa qualquer outra forma, e os 54 testes
+da casa usam essa.
+
+```sql
+-- Teste da 076. Roda dentro de BEGIN/ROLLBACK do rodar-teste-sql.mjs.
+create temporary table _res(caso text, ok boolean, detalhe text) on commit drop;
+
+do $$
+declare
+  v_prof   int;
+  v_prof2  int;
+  v_antes  jsonb;
+  v_r      jsonb;
+  v_r2     jsonb;
+  v_mes    date;
+  v_ultimo date;
+  v_fase   text;
+  v_lemb   date;
+  v_ref    date;
+  v_i      int;
+begin
+  -- ── A régua, nos 12 meses do ano ────────────────────────────────────────
+  -- O defeito que isto pega: âncora em dia da semana faz o reforço chegar
+  -- ANTES do lembrete em todo mês que não termina em domingo.
+  for v_i in 1..12 loop
+    v_mes    := make_date(2026, v_i, 1);
+    v_ultimo := (date_trunc('month', v_mes) + interval '1 month - 1 day')::date;
+    v_lemb   := v_ultimo - 6;
+    v_ref    := v_ultimo - 3;
+
+    insert into _res values (
+      format('regua %s: lembrete antes do reforco', to_char(v_mes,'MM')),
+      v_lemb < v_ref,
+      format('lembrete %s, reforco %s', v_lemb, v_ref));
+
+    insert into _res values (
+      format('regua %s: fase do lembrete', to_char(v_mes,'MM')),
+      (public.fn_feedback_cobranca_do_dia(v_lemb) ->> 'fase') = 'lembrete',
+      public.fn_feedback_cobranca_do_dia(v_lemb) ->> 'fase');
+
+    insert into _res values (
+      format('regua %s: fase do reforco', to_char(v_mes,'MM')),
+      (public.fn_feedback_cobranca_do_dia(v_ref) ->> 'fase') = 'reforco',
+      public.fn_feedback_cobranca_do_dia(v_ref) ->> 'fase');
+
+    insert into _res values (
+      format('regua %s: dia 1 e coordenacao do mes anterior', to_char(v_mes,'MM')),
+      (public.fn_feedback_cobranca_do_dia(v_mes) ->> 'fase') = 'coordenacao'
+        and (public.fn_feedback_cobranca_do_dia(v_mes) ->> 'competencia')::date
+            = (v_mes - interval '1 month')::date,
+      public.fn_feedback_cobranca_do_dia(v_mes) ->> 'competencia');
+
+    -- Um dia fora das três âncoras não dispara nada.
+    insert into _res values (
+      format('regua %s: dia neutro nao dispara', to_char(v_mes,'MM')),
+      (public.fn_feedback_cobranca_do_dia(v_ultimo - 10) ->> 'fase') = 'nenhuma',
+      public.fn_feedback_cobranca_do_dia(v_ultimo - 10) ->> 'fase');
+  end loop;
+
+  -- ── O depósito sem coletor não existe mais ──────────────────────────────
+  insert into _res values (
+    'fn_enfileirar_cobranca_feedback foi removida',
+    not exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+                 where n.nspname='public' and p.proname='fn_enfileirar_cobranca_feedback'),
+    'ainda existe');
+
+  -- ── O quarto ramo do CHECK, sem perder os três antigos ──────────────────
+  insert into _res values (
+    'destinatario_tipo aceita coordenacao',
+    (select pg_get_constraintdef(oid) like '%coordenacao%'
+       from pg_constraint
+      where conrelid='public.fabio_notificacoes'::regclass
+        and conname='fabio_notificacoes_destinatario_tipo_check'),
+    'check nao estendido');
+
+  insert into _res values (
+    'os tres ramos antigos continuam no chk_notificacao_destinatario',
+    (select pg_get_constraintdef(oid) like '%pulada_sem_destinatario%'
+        and pg_get_constraintdef(oid) like '%comercial%'
+        and pg_get_constraintdef(oid) like '%professor%'
+       from pg_constraint
+      where conrelid='public.fabio_notificacoes'::regclass
+        and conname='chk_notificacao_destinatario'),
+    'ramo antigo perdido');
+
+  -- ── Reserva do professor ────────────────────────────────────────────────
+  select id into v_prof from public.professores
+   where ativo and usuario_id is not null
+     and nullif(regexp_replace(coalesce(telefone_whatsapp,''),'\D','','g'),'') is not null
+   order by id limit 1;
+
+  if v_prof is null then
+    insert into _res values ('reserva do professor', false,
+      'nenhum professor ativo com whatsapp — teste nao pode rodar');
+  else
+    v_r := public.fn_reservar_cobranca_feedback(
+             v_prof, 'feedback_lembrete', 'corpo de teste', date '2026-08-25');
+    insert into _res values ('reserva grava processando + lease',
+      (v_r->>'reservado')::boolean
+        and exists (select 1 from public.fabio_notificacoes
+                     where id = (v_r->>'notificacao_id')::uuid
+                       and status='processando' and lease_token is not null
+                       and destinatario_tipo='professor'
+                       and dia_referencia = date '2026-08-25'),
+      v_r::text);
+
+    -- Segunda chamada no MESMO dia não cria linha nova.
+    v_r2 := public.fn_reservar_cobranca_feedback(
+              v_prof, 'feedback_lembrete', 'corpo de teste', date '2026-08-25');
+    insert into _res values ('dedupe do professor no mesmo dia',
+      not (v_r2->>'reservado')::boolean and v_r2->>'motivo' = 'ja_cobrado_hoje',
+      v_r2::text);
+
+    -- Conclusão exige o lease certo.
+    insert into _res values ('concluir com token errado nao fecha',
+      not public.fabio_marcar_notificacao_enviada(
+            (v_r->>'notificacao_id')::uuid, gen_random_uuid(), 'recibo'),
+      'fechou com token errado');
+    insert into _res values ('concluir com o lease certo fecha',
+      public.fabio_marcar_notificacao_enviada(
+        (v_r->>'notificacao_id')::uuid, (v_r->>'lease_token')::uuid, 'recibo'),
+      'nao fechou com o token certo');
+
+    -- Tipo fora do vocabulário é erro, não linha silenciosa.
+    begin
+      perform public.fn_reservar_cobranca_feedback(
+                v_prof, 'feedback_coordenacao', 'corpo', date '2026-08-25');
+      insert into _res values ('tipo invalido barrado', false, 'aceitou tipo errado');
+    exception when others then
+      insert into _res values ('tipo invalido barrado', sqlerrm like '%tipo_invalido%', sqlerrm);
+    end;
+  end if;
+
+  -- ── "X de Y fecharam" só é verdade se `elegiveis` contar quem fechou ────
+  -- Mede ANTES, planta um professor que fechou o mês inteiro, mede DEPOIS.
+  -- Comparar contra número fixo dependeria de a tabela estar vazia; assim a
+  -- prova vale mesmo depois que a coleta real começar.
+  v_antes := public.fn_feedback_cobranca_do_dia(date '2026-09-01');
+
+  select v.professor_id into v_prof2
+    from public.vw_jornada_professor_atual v
+    join public.professores p on p.id = v.professor_id
+    join public.alunos a on a.id = v.aluno_id and a.arquivado_em is null
+   where p.ativo and p.usuario_id is not null
+   group by v.professor_id
+   order by count(distinct v.aluno_id) asc, v.professor_id
+   limit 1;
+
+  if v_prof2 is null then
+    insert into _res values ('quem fechou sai da lista', false,
+      'nenhum professor com carteira — teste nao pode rodar');
+  else
+    -- A carteira tem grão de matrícula/disciplina: o mesmo aluno aparece duas
+    -- vezes quando faz dois cursos com o mesmo professor. Sem o `distinct`, o
+    -- insert estoura na chave única.
+    insert into public.aluno_feedback_professor
+      (professor_id, aluno_id, competencia, feedback, pratica_em_casa, evolucao, animo)
+    select distinct v.professor_id, v.aluno_id, date '2026-08-01',
+           'verde', 'sim', 'evoluindo', 'animado'
+      from public.vw_jornada_professor_atual v
+      join public.alunos a on a.id = v.aluno_id and a.arquivado_em is null
+     where v.professor_id = v_prof2
+    on conflict do nothing;
+
+    v_r := public.fn_feedback_cobranca_do_dia(date '2026-09-01');
+
+    insert into _res values ('quem fechou sai da lista da coordenacao',
+      not exists (select 1 from jsonb_array_elements(v_r->'professores') e
+                   where (e->>'professor_id')::int = v_prof2)
+      and jsonb_array_length(v_r->'professores')
+          = jsonb_array_length(v_antes->'professores') - 1,
+      format('antes=%s depois=%s',
+             jsonb_array_length(v_antes->'professores'),
+             jsonb_array_length(v_r->'professores')));
+
+    insert into _res values ('mas continua contando em elegiveis',
+      (v_r->>'elegiveis')::int = (v_antes->>'elegiveis')::int
+        and (v_r->>'elegiveis')::int > jsonb_array_length(v_r->'professores'),
+      format('elegiveis antes=%s depois=%s lista=%s',
+             v_antes->>'elegiveis', v_r->>'elegiveis',
+             jsonb_array_length(v_r->'professores')));
+
+    -- E no LEMBRETE ele volta: a primeira cobrança vai pra todo mundo.
+    insert into _res values ('lembrete cobra ate quem ja fechou',
+      exists (select 1
+                from jsonb_array_elements(
+                       public.fn_feedback_cobranca_do_dia(date '2026-08-25')->'professores') e
+               where (e->>'professor_id')::int = v_prof2),
+      'sumiu do lembrete');
+  end if;
+
+  -- ── Reserva da coordenação ──────────────────────────────────────────────
+  v_r := public.fn_reservar_cobranca_feedback_coordenacao(
+           'lista de teste', '120363304349910605@g.us', date '2026-09-01');
+  insert into _res values ('coordenacao grava no grupo, sem professor',
+    (v_r->>'reservado')::boolean
+      and exists (select 1 from public.fabio_notificacoes
+                   where id = (v_r->>'notificacao_id')::uuid
+                     and destinatario_tipo = 'coordenacao'
+                     and professor_id is null
+                     and destinatario_whatsapp = '120363304349910605@g.us'
+                     and status = 'processando'),
+    v_r::text);
+
+  v_r2 := public.fn_reservar_cobranca_feedback_coordenacao(
+            'lista de teste', '120363304349910605@g.us', date '2026-09-01');
+  insert into _res values ('dedupe da coordenacao no mesmo dia',
+    not (v_r2->>'reservado')::boolean and v_r2->>'motivo' = 'ja_entregue_hoje',
+    v_r2::text);
+
+  -- ── Portas fechadas ─────────────────────────────────────────────────────
+  insert into _res values ('anon nao executa as tres',
+    not has_function_privilege('anon','public.fn_feedback_cobranca_do_dia(date)','execute')
+    and not has_function_privilege('anon','public.fn_reservar_cobranca_feedback(int,text,text,date)','execute')
+    and not has_function_privilege('anon','public.fn_reservar_cobranca_feedback_coordenacao(text,text,date)','execute'),
+    'anon executa alguma');
+  insert into _res values ('authenticated nao executa as tres',
+    not has_function_privilege('authenticated','public.fn_feedback_cobranca_do_dia(date)','execute')
+    and not has_function_privilege('authenticated','public.fn_reservar_cobranca_feedback(int,text,text,date)','execute')
+    and not has_function_privilege('authenticated','public.fn_reservar_cobranca_feedback_coordenacao(text,text,date)','execute'),
+    'authenticated executa alguma');
+end $$;
+
+select json_build_object(
+         'falhas', (select count(*) from _res where not ok),
+         'detalhe', coalesce((select json_agg(json_build_object('caso', caso, 'detalhe', detalhe))
+                                from _res where not ok), '[]'::json)
+       ) as resumo;
+```
+
+- [ ] **Step 3: Rodar o teste — tem que ficar verde**
+
+```bash
+npm run teste:076
+```
+
+Antes, acrescente ao `package.json`:
+`"teste:076": "node scripts/rodar-teste-sql.mjs supabase/migrations/076-o-carteiro-da-cobranca.sql supabase/migrations/076-o-carteiro-da-cobranca.test.sql"`
+e `"mutantes:076": "node scripts/mutantes-076.mjs"`.
+
+- [ ] **Step 4: Escrever os mutantes**
+
+Crie `scripts/mutantes-076.mjs` no molde de `scripts/mutantes-075.mjs` (copie a
+estrutura de lá — âncora que não aparece exatamente 1 vez é **FALHA**). Seis
+mutantes, cada um reintroduzindo um defeito real:
+
+1. **Âncora em dia da semana** — troca `v_dia = v_ultimo - 6` por
+   `extract(dow from v_dia) = 1` e `v_dia = v_ultimo - 3` por
+   `extract(dow from v_dia) = 4`. Morre na varredura dos 12 meses.
+2. **Coordenação vira professor** — em
+   `fn_reservar_cobranca_feedback_coordenacao`, troca `'coordenacao'` por
+   `'professor'` no `destinatario_tipo`. Morre no caso da coordenação.
+3. **Dedupe da coordenação reusa a chave do professor** — troca
+   `on conflict (tipo, dia_referencia)` por
+   `on conflict (professor_id, tipo, dia_referencia)` e o índice
+   correspondente. Morre no dedupe da coordenação.
+   ⚠️ O mutante precisa **`drop index if exists
+   public.fabio_notificacoes_feedback_coord_dia_unico;`** antes de recriar:
+   `create index if not exists` casa por **NOME**, não por definição — sem o
+   drop o mutante vira no-op silencioso assim que o índice real existir em
+   produção. Foi o que aconteceu com o V5 da 075.
+4. **Conclusão sem lease** — troca a checagem de token de
+   `fabio_marcar_notificacao_enviada` por `true`. Morre no "token errado não
+   fecha".
+5. **Reforço e coordenação cobram quem já fechou** — troca
+   `filter (where v_fase = 'lembrete' or ok < total)` por `filter (where true)`.
+   Morre no "quem fechou sai da lista da coordenacao".
+6. **`elegiveis` conta só quem falta** — troca `count(*)::int` por
+   `count(*) filter (where v_fase = 'lembrete' or ok < total)::int`. Morre no
+   "mas continua contando em elegiveis" — é o defeito que faria a coordenação
+   ler "0 de 12 professores fecharam" num mês em que 31 fecharam.
+7. **`anon` volta a executar** — acrescenta
+   `grant execute on function public.fn_reservar_cobranca_feedback(int,text,text,date) to anon;`
+   depois dos revokes. (`create or replace` **preserva** privilégio: sem o
+   `grant` explícito o mutante sobrevive.)
+
+- [ ] **Step 5: Rodar os mutantes**
+
+```bash
+npm run mutantes:076
+```
+Esperado: `7/7 mortos`, zero âncoras podres.
+
+- [ ] **Step 6: Aplicar em produção**
+
+```bash
+node scripts/aplicar-sql.mjs supabase/migrations/076-o-carteiro-da-cobranca.sql
+```
+
+Depois, confira ao vivo que as três funções existem, que a antiga sumiu e que
+os dois índices estão lá:
+
+```bash
+node scripts/aplicar-sql.mjs --sql "select proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname like '%cobranca_feedback%' or proname='fn_feedback_cobranca_do_dia' order by 1"
+```
+
+Se o `aplicar-sql.mjs` não aceitar `--sql`, use o MCP do Supabase para a
+conferência — o que importa é **medir depois de aplicar**, não confiar no
+retorno do apply.
+
+- [ ] **Step 7: Rodar a suíte inteira**
+
+```bash
+npm run teste:tudo
+```
+Esperado: verde. **Atenção ao `teste:075`**: ele reaplica a 075 dentro da
+própria transação, então continua verde mesmo com a função dropada em produção
+— é teste de um trecho que a 076 substituiu. Se ficar vermelho por causa do
+índice renomeado, ajuste o teste da 075 para conferir o índice pelo nome novo e
+deixe registrado no commit **o que** foi trocado e por quê. Não afrouxe
+asserção nenhuma para ficar verde.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add supabase/migrations/076-o-carteiro-da-cobranca.sql supabase/migrations/076-o-carteiro-da-cobranca.test.sql scripts/mutantes-076.mjs package.json supabase/migrations/075-o-fabio-cobra-o-semaforo.test.sql && git commit -m "feat(076): a cobranca ganha carteiro e a coordenacao recebe a lista" && git push origin main
+```
+
+---
+
+### Task 9: O worker leva — e a coordenação recebe no dia 1º
+
+**Files:**
+- Modify: `vps/fabio/fabio_notification_worker.py`
+- Create: `vps/fabio/fabio-feedback.systemd.txt`
+- Modify: `vps/fabio/README.md` (a linha do novo evento)
+
+**Interfaces:**
+- Consome as três funções da Task 8, mais as já existentes
+  `fabio_marcar_notificacao_enviada` / `fabio_marcar_notificacao_falhou`.
+- Reusa `enviar_grupo(texto)` e `GRUPO_COORDENACAO_JID`, que já existem no
+  arquivo e já falam com o grupo da coordenação no escalonamento.
+
+**⚠️ O GATILHO NASCE DESLIGADO.** O código vai pra VPS; a unit `.timer`
+**não** é instalada nem habilitada nesta task. Ligar o timer é o momento em que
+43 professores passam a receber WhatsApp — é decisão do Alf, não minha. Deixe
+o comando de ligar escrito no relatório, sem executá-lo.
+
+- [ ] **Step 1: Ler o arquivo antes de escrever**
+
+Leia `vps/fabio/fabio_notification_worker.py` inteiro. O que você vai imitar:
+`format_escalonamento` (hierarquia de WhatsApp e formato encaminhável),
+`enviar_grupo`, e o par claim/`mark_sent` com `lease_token` verificado — o
+comentário do `mark_sent` conta um bug real de 03/08 em que a mensagem foi
+entregue e a linha ficou presa em `processando`.
+
+- [ ] **Step 2: Acrescentar o evento e as mensagens**
+
+Depois de `DEFAULT_ESCALONAMENTO_TIME`, acrescente:
+
+```python
+DEFAULT_FEEDBACK_TIME = os.getenv("FABIO_NOTIFY_FEEDBACK_TIME", "09:30")
+```
+
+No dicionário `EVENTS`, acrescente a entrada (o `tipo` aqui é só rótulo de
+horário: a fase real vem do banco):
+
+```python
+    "feedback": EventSpec("feedback_lembrete", "governanca", DEFAULT_FEEDBACK_TIME),
+```
+
+E, depois de `format_escalonamento`, o bloco novo:
+
+```python
+MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+            "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+
+
+def _competencia_label(iso: str) -> str:
+    """2026-08-01 -> 'agosto/2026'."""
+    try:
+        d = datetime.strptime(str(iso)[:10], "%Y-%m-%d").date()
+    except Exception:
+        return str(iso)
+    return f"{MESES_PT[d.month - 1]}/{d.year}"
+
+
+def feedback_cobranca_do_dia(dia: Optional[str] = None) -> Dict[str, Any]:
+    return rpc("fn_feedback_cobranca_do_dia", {"p_dia": dia}) or {}
+
+
+def format_feedback_professor(prof: Dict[str, Any], item: Dict[str, Any], fase: str) -> str:
+    """O lembrete carrega o PERCENTUAL e o PORQUÊ (pedido do Alf).
+
+    O reforço não repete o porquê: quem chegou até ele já leu uma vez, e
+    repetir o discurso inteiro é o jeito rápido de virar ruído.
+    """
+    nome = first_name(prof)
+    ok = int(item.get("ok") or 0)
+    total = int(item.get("total") or 0)
+    faltam = int(item.get("faltam") or max(total - ok, 0))
+
+    if fase == "lembrete":
+        return "\n".join([
+            f"*{nome}, é semana do feedback dos alunos.*",
+            "",
+            f"Você já respondeu *{ok} de {total}*.",
+            "",
+            "É com isso que a coordenação enxerga o aluno antes da evasão — "
+            "e tem gente chegando na renovação.",
+            "",
+            "Abre o app em *Alunos* e fecha o mês. Leva poucos minutos.",
+        ])
+
+    plural = "aluno" if faltam == 1 else "alunos"
+    return "\n".join([
+        f"*{nome}, faltam {faltam} {plural} no seu feedback do mês.*",
+        "",
+        f"Você fechou {ok} de {total}.",
+        "",
+        "Dá pra terminar em poucos minutos pelo app, em *Alunos*.",
+    ])
+
+
+def format_feedback_coordenacao(competencia: str, professores: list,
+                                fecharam: int, elegiveis: int) -> Optional[str]:
+    """A lista do dia 1º. Mesma regra do escalonamento: tem que ser
+    ENCAMINHÁVEL — o coordenador copia o bloco de um professor e manda pra ele.
+    Por isso vai nome, unidade e quantos de quantos, não um resumo.
+    """
+    if not professores:
+        return None
+
+    REGUA = "━━━━━━━━━━━━━━"
+    out = [f"*Feedback dos alunos — {_competencia_label(competencia)}*",
+           f"_{fecharam} de {elegiveis} professores fecharam o mês_"]
+
+    for p in professores:
+        nome = p.get("nome") or f"professor {p.get('professor_id')}"
+        unidades = p.get("unidades") or []
+        ok = int(p.get("ok") or 0)
+        total = int(p.get("total") or 0)
+        faltam = int(p.get("faltam") or max(total - ok, 0))
+        out.append(REGUA)
+        out.append(f"*{nome}*" + (f" · {unidades[0]}" if len(unidades) == 1 else ""))
+        out.append(f"_faltaram {faltam} de {total} alunos_")
+
+    out.append(REGUA)
+    out.append("Quem está na lista não fechou o semáforo dos alunos no mês. "
+               "Dá pra copiar o bloco e mandar direto pro professor.")
+    return "\n".join(out)
+
+
+def run_feedback(channel: str, dry_run: bool,
+                 professor_id: Optional[int] = None,
+                 dia: Optional[str] = None) -> list[Dict[str, Any]]:
+    """RESERVA → envia → CONCLUI, o mesmo desenho da 066.
+
+    Nada é enfileirado para outro processo buscar depois: a fabio_notificacoes
+    não tem estado de entrada, então linha reservada e não enviada no mesmo
+    ciclo é linha que MENTE que está em voo.
+    """
+    resultados: list[Dict[str, Any]] = []
+    data = feedback_cobranca_do_dia(dia)
+    fase = (data.get("fase") or "nenhuma")
+    if fase == "nenhuma":
+        return [{"event": "feedback", "status": "fora_da_regua", "dia": data.get("dia")}]
+
+    professores = data.get("professores") or []
+    competencia = data.get("competencia")
+
+    # ── Dia 1º: uma mensagem só, pro grupo da coordenação ──────────────────
+    if fase == "coordenacao":
+        # `elegiveis` é o total de professores com carteira; a lista traz só
+        # quem NÃO fechou, então quem fechou é a diferença.
+        elegiveis = int(data.get("elegiveis") or 0)
+        fecharam = max(elegiveis - len(professores), 0)
+        corpo = format_feedback_coordenacao(competencia, professores, fecharam, elegiveis)
+        if not corpo:
+            return [{"event": "feedback", "fase": fase, "status": "todos_fecharam"}]
+        if dry_run:
+            return [{"event": "feedback", "fase": fase, "status": "dry_run_ready",
+                     "professores": len(professores), "content_preview": corpo}]
+        reserva = rpc("fn_reservar_cobranca_feedback_coordenacao", {
+            "p_corpo": corpo, "p_whatsapp": GRUPO_COORDENACAO_JID, "p_dia": dia,
+        }) or {}
+        if not reserva.get("reservado"):
+            return [{"event": "feedback", "fase": fase, "status": "ja_entregue",
+                     "motivo": reserva.get("motivo")}]
+        nid, token = reserva.get("notificacao_id"), reserva.get("lease_token")
+        try:
+            enviar_grupo(corpo)
+            if not mark_sent(nid, token):
+                log("feedback_coordenacao_entregue_mas_nao_fechada", notificacao_id=str(nid))
+            return [{"event": "feedback", "fase": fase, "status": "sent",
+                     "professores": len(professores)}]
+        except Exception as exc:
+            mark_failed(nid, str(exc), token)
+            return [{"event": "feedback", "fase": fase, "status": "failed",
+                     "error": str(exc)[:500]}]
+
+    # ── Janela do mês: um por professor ────────────────────────────────────
+    if professor_id is not None:
+        professores = [p for p in professores
+                       if int(p.get("professor_id") or 0) == int(professor_id)]
+    por_id = {int(p["id"]): p for p in active_professors()}
+
+    for item in professores:
+        pid = int(item.get("professor_id") or 0)
+        resultado: Dict[str, Any] = {"event": "feedback", "fase": fase,
+                                     "professor_id": pid, "status": "init"}
+        prof = por_id.get(pid)
+        if not prof:
+            resultado["status"] = "professor_sem_acesso_skip"
+            resultados.append(resultado)
+            continue
+        corpo = format_feedback_professor(prof, item, fase)
+        if dry_run:
+            resultado["status"] = "dry_run_ready"
+            resultado["content_preview"] = corpo
+            resultados.append(resultado)
+            continue
+
+        reserva = rpc("fn_reservar_cobranca_feedback", {
+            "p_professor_id": pid,
+            "p_tipo": f"feedback_{fase}",
+            "p_corpo": corpo,
+            "p_dia": dia,
+        }) or {}
+        if not reserva.get("reservado"):
+            resultado["status"] = "nao_reservado"
+            resultado["motivo"] = reserva.get("motivo")
+            resultados.append(resultado)
+            continue
+
+        nid, token = reserva.get("notificacao_id"), reserva.get("lease_token")
+        try:
+            deliver(pid, channel, corpo)
+            if not mark_sent(nid, token):
+                log("feedback_entregue_mas_nao_fechada",
+                    notificacao_id=str(nid), professor_id=pid)
+                resultado["aviso"] = "entregue_mas_nao_fechada"
+            resultado["status"] = "sent"
+        except Exception as exc:
+            mark_failed(nid, str(exc), token)
+            resultado["status"] = "failed"
+            resultado["error"] = str(exc)[:500]
+        resultados.append(resultado)
+
+    return resultados
+```
+
+`elegiveis` vem do `jsonb` da Task 8 e conta **todo** professor com carteira;
+`professores` traz só quem será cobrado. Nunca chame a RPC duas vezes para
+descobrir a régua — a segunda chamada devolve a mesma lista filtrada.
+
+- [ ] **Step 3: Ligar o evento no `main()`**
+
+Acrescente `"feedback"` ao `choices` do `--event` e, junto do bloco do
+`escalonamento` (que também sai do laço de professores), o tratamento novo:
+
+```python
+    if "feedback" in due_events:
+        due_events = [e for e in due_events if e != "feedback"]
+        try:
+            feedback_results = run_feedback(args.channel, args.dry_run,
+                                            args.professor_id, args.date)
+        except Exception as exc:
+            feedback_results = [{"event": "feedback", "status": "error",
+                                 "error": str(exc)[:500]}]
+        for r in feedback_results:
+            log("event_result", **r)
+        results.extend(feedback_results)
+```
+
+⚠️ **`args.date` alimenta `p_dia`.** Hoje `target_date` recebe
+`args.date or now.date().isoformat()` e é usado no briefing. Passe
+`args.date` **cru** (pode ser `None`) para o `run_feedback`: com `None` o banco
+resolve `fn_hoje_brt()`, que é a data BRT correta. Passar `target_date` faria a
+data nascer do relógio do processo — e é exatamente assim que o 018 quebrou
+entre 21h e meia-noite.
+
+⚠️ **`"feedback"` NÃO entra no `selected` padrão.** A linha
+`selected = ["briefing", "pendencia", "devolutiva"] if args.event == "all"`
+fica como está: o evento só roda quando pedido explicitamente pela unit, igual
+ao escalonamento.
+
+- [ ] **Step 4: Provar em dry-run, sem mandar nada**
+
+```bash
+scp -i ~/.ssh/id_ed25519_lahq_fabio_claude_code vps/fabio/fabio_notification_worker.py fabio@89.116.73.186:~/fabio-chat-bridge/
+```
+
+```bash
+ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 'cd ~/fabio-chat-bridge && set -a && . ~/.hermes/.env && set +a && python3 fabio_notification_worker.py --event feedback --force --dry-run --date 2026-08-25 --json'
+```
+Esperado: `fase: lembrete`, uma entrada por professor com carteira, e o texto de
+cada mensagem em `content_preview`. **Leia o texto**, não só o status.
+
+```bash
+ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 'cd ~/fabio-chat-bridge && set -a && . ~/.hermes/.env && set +a && python3 fabio_notification_worker.py --event feedback --force --dry-run --date 2026-09-01 --json'
+```
+Esperado: `fase: coordenacao`, **uma** entrada só, com a lista encaminhável.
+Confira que aparece nome, unidade e "faltaram X de Y" — e que não vaza
+`observacao` de ninguém.
+
+```bash
+ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 'cd ~/fabio-chat-bridge && set -a && . ~/.hermes/.env && set +a && python3 fabio_notification_worker.py --event feedback --force --dry-run --date 2026-08-15 --json'
+```
+Esperado: `fora_da_regua`. É a prova de que dia neutro não dispara nada.
+
+- [ ] **Step 5: Escrever a unit — e NÃO habilitar**
+
+Crie `vps/fabio/fabio-feedback.systemd.txt` no molde dos outros arquivos da
+pasta:
+
+```
+# ~/.config/systemd/user/fabio-feedback.service
+[Unit]
+Description=Fábio — cobra o feedback mensal dos alunos e entrega a lista à coordenação
+Documentation=https://github.com/LucianoAlf/la-teacher
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+EnvironmentFile=/home/fabio/.hermes/.env
+ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event feedback --channel whatsapp --force
+
+# ~/.config/systemd/user/fabio-feedback.timer
+[Unit]
+Description=Timer do feedback mensal as 09:30 BRT (12:30 UTC)
+
+[Timer]
+OnCalendar=*-*-* 12:30:00
+AccuracySec=1m
+Persistent=true
+Unit=fabio-feedback.service
+
+[Install]
+WantedBy=timers.target
+
+# LIGAR (decisão do Alf — NÃO rodar sem a palavra dele):
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now fabio-feedback.timer
+```
+
+O worker decide a fase pela régua do banco e sai por `fora_da_regua` em 27 dos
+30 dias — por isso o timer é diário e não precisa de calendário esperto.
+
+- [ ] **Step 6: Perguntar pro Fábio antes de dizer que está pronto**
+
+Regra da casa: mexeu no Fábio, conversa com ele.
+
+```bash
+ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 'cd ~/fabio-chat-bridge && set -a && . ~/.hermes/.env && set +a && python3 falar_com_fabio.py "quantos alunos eu ainda preciso responder no feedback deste mes?" --sem-historico'
+```
+
+E a pergunta comum, pra provar que o evento novo não deixou o Fábio ruidoso:
+
+```bash
+ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 'cd ~/fabio-chat-bridge && set -a && . ~/.hermes/.env && set +a && python3 falar_com_fabio.py "quais sao minhas aulas de amanha?" --sem-historico'
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add vps/fabio/fabio_notification_worker.py vps/fabio/fabio-feedback.systemd.txt vps/fabio/README.md && git commit -m "feat(fabio): o worker leva a cobranca do feedback e entrega a lista a coordenacao" && git push origin main
+```
+
+---
+
 ## Self-review
 
 **Cobertura da spec:** as colunas e os checks estão na Task 1; as três RPCs, o
 dedupe, o "respondido" e a fronteira na Task 2; os contratos do cliente na
 Task 3; a mesa, os dois blocos, o salvar-a-cada-toque e a entrada permanente em
 Alunos na Task 4; o microfone com transcrição editável e o não-persistir na
-Task 5; o card da Home na Task 6; a escada do Fábio e o cron na Task 7. As dez
-provas obrigatórias da spec viraram mutantes: V1/V4 (carteira alheia e salvar em
-nome de outro) e V11 (RLS) na 074; V5 (arquivado) e V3 (respondido) na 074; V1
-(janela) na 073; V1 (dedupe) e V6 (`teve_aula_no_mes`) na 074; V1 (reforço em
-quem fechou) na 075; V9/V10 (`anon`) na 074.
+Task 5; o card da Home na Task 6; a escada do Fábio na Task 7; **o carteiro e a
+entrega à coordenação nas Tasks 8 e 9**. As provas obrigatórias da spec viraram
+mutantes: V1/V4 (carteira alheia e salvar em nome de outro) e V11 (RLS) na 074;
+V5 (arquivado) e V3 (respondido) na 074; V1 (janela) na 073; V1 (dedupe) e V6
+(`teve_aula_no_mes`) na 074; V9/V10 (`anon`) na 074; V11 (âncora em dia da
+semana), V12 (coordenação virando professor), V13 (dedupe da coordenação) e V14
+(conclusão sem lease) na 076.
+
+**O que as Tasks 8 e 9 consertam, e por que passou batido até a revisão final.**
+As sete revisões por task compararam a implementação contra **o plano** — e o
+plano tinha perdido duas frases da spec: que alguém precisa **levar** a
+mensagem, e que a coordenação **recebe** a lista no dia 1º. Revisão contra o
+plano nunca ia achar: o plano estava sendo cumprido. Achou a revisão do branch
+inteiro, que leu a spec. Fica a régua: **o que a spec promete tem que ter uma
+task com o verbo da spec** — "entrega à coordenação" não vira "insere na fila".
 
 **Onde o plano é mais frágil, e o implementador precisa ler antes de escrever:**
 a forma real de `public.fabio_notificacoes` (Task 7, Step 1) e a API real de
