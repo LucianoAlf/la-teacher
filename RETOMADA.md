@@ -5,13 +5,37 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 09/08/2026, tarde (BRT).** Tudo no remoto — confira com
+> **Última atualização: 09/08/2026, noite (BRT).** Tudo no remoto — confira com
 > `git log --oneline -5`.
 > Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 ---
 
-## ⛔ SEMÁFORO DO PROFESSOR: 7 tasks feitas, revisão final NÃO aprovou
+## 🧭 POR ONDE COMEÇAR (duas frentes abertas, 09/08 à noite)
+
+Este arquivo tem seções de datas diferentes e mais de uma diz "próximo passo".
+A ordem verdadeira, hoje, é esta:
+
+| # | Frente | Onde parou | Seção |
+|---|---|---|---|
+| **1** | **Semáforo do professor** | Banco pronto (073–076 aplicadas), tela no repo, `transcrever-observacao` publicada. **Falta o worker saber cobrar feedback** — não existe o tipo `feedback` no `fabio_notification_worker.py`, nem timer | logo abaixo |
+| 2 | **Radar do aluno** (bloco 2 do painel da coordenação) | Fontes medidas, desenho aprovado em direção, spec **não escrita** | "▶ PRÓXIMO PASSO: RADAR DO ALUNO" |
+
+**Fechado em 09/08 e que NÃO deve ser reaberto:** a fronteira do Fábio (o
+professor não alcança dado de colega nem SQL — virou canal, não prompt), o
+`skill_manage` fora do canal do professor, o incidente da edge function do LA
+Report, e os dois "achados abertos" que eram decisão técnica minha
+(DEFAULT PRIVILEGES e a porta 8644 — os dois avaliados e encerrados).
+
+---
+
+## ▶ FRENTE 1 — SEMÁFORO DO PROFESSOR (os 2 bloqueadores caíram; falta o carteiro)
+
+> O título antigo era *"revisão final NÃO aprovou"*. Continua valendo como
+> história — o relato dos dois bloqueadores está logo abaixo, palavra por
+> palavra, porque a lição de *como* eles passaram por 7 revisões é o que
+> importa. **Mas os dois já foram resolvidos pela 076**; o estado medido está
+> no fim desta seção.
 
 As migrations **073, 074 e 075 estão aplicadas em produção** e a tela está no
 repo (mesa, card na Home, entrada em Alunos, microfone). Mas a revisão do branch
@@ -52,10 +76,36 @@ as sete revisões.
 **Maior carteira real: 52 alunos** (professor 33), e são **43** professores com
 carteira — não 38/44 como o plano supunha.
 
-**Duas decisões humanas pendentes, sem as quais nada disso roda:** publicar a
-`transcrever-observacao` e agendar o cron da cobrança.
+### ✅ ESTADO REAL, medido em 09/08 à noite (o que mudou depois do texto acima)
 
-## ▶ PRÓXIMO PASSO: RADAR DO ALUNO (bloco 2 do painel — decidido 08/08, noite)
+Os dois bloqueadores **foram resolvidos** — não reabrir:
+
+- **B1 e B2 → migration 076** (`076-o-carteiro-da-cobranca.sql`), e ela está
+  **aplicada em produção**. Conferido consultando o banco, não o `git log`:
+  `fn_feedback_cobranca_do_dia`, `fn_reservar_cobranca_feedback` e
+  `fn_reservar_cobranca_feedback_coordenacao` existem; a
+  `fn_enfileirar_cobranca_feedback` (a que enfileirava sem coletor) **foi
+  derrubada**; e o CHECK já é
+  `['professor','comercial','coordenacao']`.
+- **`transcrever-observacao` PUBLICADA** (v1, `verify_jwt: true`) em 09/08.
+  Era uma das "duas decisões humanas" e não é mais. O Codex do LA Report já
+  tinha restaurado a `transcrever-audio` na v34, então os deploys não se
+  cruzaram. Detalhe no bloco do incidente, mais abaixo.
+
+**O que sobrou de verdade — e é o clássico "banco pronto, ninguém entrega":**
+o `fabio_notification_worker.py` **não sabe cobrar feedback**. Os tipos dele
+são `briefing_matinal`, `pendencia_registro` e `pendencia_escalonada` — não
+existe `feedback`. E **não há timer nem cron** pra isso (conferido em
+`systemctl --user list-timers` e em `cron.job`). Ou seja: a 076 fez o banco
+responder *"quem cobrar hoje"* e *"reserve esta linha"*, mas ninguém pergunta.
+**Esse é o próximo passo desta frente**, e não "agendar o cron" — o cabeçalho
+da própria 076 explica por que um cron enfileirando seria errado.
+
+## ▶ FRENTE 2 — RADAR DO ALUNO (bloco 2 do painel — decidido 08/08, noite)
+
+> Era o "PRÓXIMO PASSO" em 08/08. Em 09/08 o semáforo voltou pra frente da fila
+> (ver "POR ONDE COMEÇAR" no topo). Isto aqui segue **decidido em direção e sem
+> spec escrita** — nada aqui foi invalidado, só não é o primeiro da fila.
 
 O Alf escolheu o Radar e deu o tom: *"painel estratégico de gestão pedagógica —
 se coloca no lugar dos coordenadores"*. Antes de tela: **brainstorm + spec**
@@ -218,7 +268,13 @@ em 5 semanas. Mesma armadilha pegou o presence MCP: as "3 chamadas" eram 3
 registros; ele **nunca foi invocado**. Contar ocorrência de string ≠ contar
 evento.
 
-### Achados abertos, em ordem de risco (nenhum bloqueia o que está no ar)
+### Achados — todos fechados (decisão técnica é minha, não do Alf)
+
+> Combinado em 09/08, depois de eu errar: **o Alf não é técnico e não recebe
+> decisão técnica.** "DEFAULT PRIVILEGES" e "porta em 0.0.0.0" não são escolhas
+> dele — são minhas. O que sobe pra ele é o que muda o negócio: o que o
+> professor vê, o que a coordenação vê, o que ele perde de alcance. O resto eu
+> decido, faço, e conto o que ficou.
 
 1. ✅ **`skill_manage` FORA do canal do professor** — resolvido em 09/08, à noite.
    Eu tinha proposto inlinar o SKILL.md no prompt; **o Alf derrubou a ideia** e
@@ -245,13 +301,26 @@ evento.
      ele só enumera toolsets *configuráveis*, então `skills_leitura` some da
      lista e parece que o professor perdeu `skill_view`. Quase reportei que
      tinha quebrado o Fábio.
-2. **DEFAULT PRIVILEGES faz o vazamento se regenerar**: toda tabela nova criada
-   pelo `postgres` já nasce com `fabio_agent=r`
-   (`{...,fabio_agent=r/postgres,...}`). Revogar os 374 hoje é enxugar gelo — e
-   **revogar agora desfaria a capacidade admin que o Alf pediu pra manter**, já
-   que o role virou exclusivo do canal dele. É decisão dele, não minha.
-3. **A porta 8644 (webhook) escuta em `0.0.0.0`**, não em localhost — a 8652 é
-   só local. Tem `secret` e `rate_limit`, mas está exposta na internet.
+2. ✅ **DEFAULT PRIVILEGES — DECIDIDO: fica como está.** Toda tabela nova criada
+   pelo `postgres` nasce com `fabio_agent=r`. Isso **não é defeito na
+   arquitetura de hoje**: depois do `no_mcp`, o `fabio_agent` só é alcançável
+   pelo canal admin do Alf, e um role de ferramenta administrativa que
+   acompanha o banco é o comportamento desejado. Revogar quebraria justamente
+   a capacidade que ele escolheu manter. Não é decisão do Alf — é técnica, e
+   está tomada.
+   ⚠️ **O que reabre isso:** devolver qualquer MCP de banco ao
+   `platform_toolsets.api_server`. O role atrás dele enxerga o schema inteiro,
+   **inclusive tabelas que ainda não existem**. Se um dia isso for preciso,
+   role novo com grant estreito, não o `fabio_agent`.
+3. ✅ **A porta 8644 NÃO é problema — eu marquei errado.** Ela escuta em
+   `0.0.0.0` porque **precisa**: é a rota `registro-aula`, chamada de fora
+   (POSTs reais, o último em 08/08). E é protegida: HMAC obrigatório por rota,
+   validado no boot, e o adapter recusa o modo sem-auth quando o host não é
+   loopback. Medido em 09/08 no caminho certo (`/webhooks/registro-aula`, não
+   `/registro-aula`): sem assinatura → **401**, HMAC errada → **401**, com
+   `Invalid signature` no log e zero trabalho gerado.
+   Lição: "porta em 0.0.0.0" não é achado — achado é *precisa estar aberta?* e
+   *está protegida?*. Eu reportei risco sem responder nenhuma das duas.
 4. **`fabio_presence_mcp` continua sem escopo** (`professor_id` arbitrário), mas
    agora é inalcançável pelo professor (`no_mcp`) e **nunca foi invocado**. Usa
    **service_role**, não `fabio_agent` — então revogar grant não fecharia ele.
@@ -372,7 +441,7 @@ coordenadores gostam muito disso**.
 **deixar o número calculável** desde o dia 1: respondidos / carteira, por
 professor, por competência.
 
-## ▶ PASSO ANTERIOR (concluído nesta sessão)
+## ▶ PASSO ANTERIOR (concluído em 08/08 — não é "esta sessão")
 
 **UI v2 do painel da coordenação** — pedido do Alf em 08/08, à noite, olhando o
 painel no ar e o de Professores do LA Report lado a lado: *"esse formato
