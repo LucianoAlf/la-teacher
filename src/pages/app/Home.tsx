@@ -12,6 +12,7 @@ import { useSessoes } from '../../features/agenda/useSessoes'
 import { buscarPendencias, buscarPendentesHoje, type Pendencias } from '../../features/agenda/pendencias'
 import { horaSessao, tituloSessao } from '../../features/agenda/sessao'
 import { useFilaOfflineCount } from '../../features/registro/filaOffline'
+import { CardFeedbackHome } from '../../features/feedback'
 import { AppFrame } from './AppFrame'
 import { AppNav } from './AppNav'
 
@@ -34,6 +35,9 @@ export default function HomePage() {
       <AppHeader />
 
       <div className="flex-1 overflow-y-auto px-4 pb-[calc(96px_+_env(safe-area-inset-bottom))] pt-2">
+        {/* Feedback do mês — só sobe na última semana, some sozinho quando fecha 100% */}
+        <CardFeedbackHome />
+
         {/* Chamada de hoje ainda não enviada — não deixa passar despercebido */}
         <AlertaChamadaHoje onAbrir={abrirChamada} />
 
