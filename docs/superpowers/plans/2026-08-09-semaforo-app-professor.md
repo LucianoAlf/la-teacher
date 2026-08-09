@@ -45,6 +45,14 @@ TypeScript + Tailwind (tokens do LA Teacher), Deno (edge function), Node
   raio ou sombra do LA Report vem junto.
 - **Rótulo de campo do DS:** `text-[11px] font-bold uppercase tracking-[.5px]`.
   **Título de card:** `text-[13px] font-bold uppercase tracking-[.5px]`.
+- **Os tokens semânticos são em INGLÊS.** Conferido em `tailwind.config.ts`:
+  `success` · `danger` · `warning` · `info` · `brand`, cada um com as variantes
+  `-text` e `-soft`, mais `on-brand`; fundo é `bg-app` / `bg-surface` /
+  `bg-inset`. **Não existem** `sucesso-text`, `atencao-text`, `perigo-text`,
+  `brand-contrast` nem `bg-base` — os nomes em português são os `tom` das
+  PROPS de componentes (`<PainelNumero tom="perigo">`), não classes. Classe
+  inexistente não quebra o build: some em silêncio, e o semáforo renderiza sem
+  cor. Na dúvida, `grep` no `tailwind.config.ts` antes de escrever.
 - **Página não estiliza** — compõe. Estilo mora no componente.
 - **`observacao` nunca é selecionada** em RPC, view ou edge function que alimente
   devolutiva, relatório do responsável ou qualquer coisa visível à família.
@@ -1766,7 +1774,7 @@ export function CampoObservacao({
               transcrevendo
                 ? 'fa-solid fa-circle-notch fa-spin'
                 : gravador.recording
-                  ? 'fa-solid fa-stop text-perigo-text'
+                  ? 'fa-solid fa-stop text-danger-text'
                   : 'fa-solid fa-microphone'
             }
             aria-hidden
