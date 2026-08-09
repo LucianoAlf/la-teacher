@@ -96,7 +96,9 @@
     "teste:072": "node scripts/rodar-teste-sql.mjs supabase/migrations/072-a-pendencia-aprende-o-emusys.sql supabase/migrations/072-a-pendencia-aprende-o-emusys.test.sql",
     "mutantes:072": "node scripts/mutantes-072.mjs",
     "teste:073": "node scripts/rodar-teste-sql.mjs supabase/migrations/073-o-semaforo-ganha-as-perguntas.sql supabase/migrations/073-o-semaforo-ganha-as-perguntas.test.sql",
-    "mutantes:073": "node scripts/mutantes-073.mjs"
+    "mutantes:073": "node scripts/mutantes-073.mjs",
+    "teste:074": "node scripts/rodar-teste-sql.mjs supabase/migrations/074-a-mesa-do-professor.sql supabase/migrations/074-a-mesa-do-professor.test.sql",
+    "mutantes:074": "node scripts/mutantes-074.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
