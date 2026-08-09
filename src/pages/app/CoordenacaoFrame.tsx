@@ -150,6 +150,12 @@ export function CoordenacaoFrame({
             <NavLink
               key={item.para}
               to={item.para}
+              // `end` = casa a rota EXATA. Sem isso o NavLink acende por
+              // PREFIXO, e `/app/coordenacao` é prefixo de
+              // `/app/coordenacao/feedback`: os dois itens ficavam grifados ao
+              // mesmo tempo, e a sidebar deixava de responder "onde eu estou".
+              // Apontado pelo Alf com a tela na mão em 09/08/2026.
+              end
               title={colapsada ? item.rotulo : undefined}
               className={({ isActive }) =>
                 `mb-1 flex items-center gap-3 rounded-sm px-3 py-2.5 text-[13.5px] ${

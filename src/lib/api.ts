@@ -1285,11 +1285,32 @@ export interface CoordenacaoFeedbackMes {
     professores: number
     professores_ok: number
   }
-  /** Total real de quem precisa de olho — pode ser maior que `alunos.length`. */
+  /** Quantos precisam de olho no recorte — independe do filtro de coração. */
   precisam_de_olho: number
+  /** Total que casa com a regra vigente da lista. Pode passar de `alunos.length`. */
+  total_lista: number
   truncado: boolean
   alunos: CoordenacaoFeedbackAluno[]
-  filtros: { unidades: { unidade_id: string; nome: string; alunos: number }[] }
+  filtros: {
+    unidades: { unidade_id: string; nome: string; alunos: number }[]
+    professores: { professor_id: number; nome: string; alunos: number }[]
+    coracoes: { valor: CoracaoFiltro; alunos: number }[]
+  }
+}
+
+/** `sem_resposta` é um estado como os outros — é o mais comum, e o que se cobra. */
+export type CoracaoFiltro = Coracao | 'sem_resposta'
+
+export interface FiltroSemaforo {
+  unidadeId: string | null
+  coracao: CoracaoFiltro | null
+  professorId: number | null
+}
+
+export const SEM_FILTRO_SEMAFORO: FiltroSemaforo = {
+  unidadeId: null,
+  coracao: null,
+  professorId: null,
 }
 
 /**
@@ -1299,17 +1320,24 @@ export interface CoordenacaoFeedbackMes {
  * coração com observação escrita. Verde calado fica de fora de propósito:
  * lista que devolve a escola inteira é a mesma parede de texto que ninguém lê.
  *
- * `truncado` nunca é decorativo: quando vier `true`, `precisam_de_olho` diz o
- * tamanho real. Corte que não se anuncia lê como "é só isso".
+ * Com um CORAÇÃO escolhido a regra muda de propósito (079): a lista passa a ser
+ * o grupo inteiro daquele coração, verde calado incluído. Filtrar por "saudável"
+ * e receber só os saudáveis que escreveram algo seria um rótulo que promete
+ * menos do que o clique faz.
+ *
+ * `truncado` nunca é decorativo: quando vier `true`, `total_lista` diz o tamanho
+ * real. Corte que não se anuncia lê como "é só isso".
  */
 export async function coordenacaoFeedbackMes(
-  unidadeId: string | null = null,
+  filtro: FiltroSemaforo = SEM_FILTRO_SEMAFORO,
   competencia: string | null = null,
 ): Promise<CoordenacaoFeedbackMes> {
   const { data, error } = await rpcSolta('app_coordenacao_feedback_mes', {
     p_competencia: competencia,
-    p_unidade_id: unidadeId,
+    p_unidade_id: filtro.unidadeId,
     p_limite: 200,
+    p_coracao: filtro.coracao,
+    p_professor_id: filtro.professorId,
   })
   if (error) throw error
   return data as unknown as CoordenacaoFeedbackMes
