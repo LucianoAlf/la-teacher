@@ -150,8 +150,13 @@ end $$;
 
 -- ─── "Respondido" é coração + as TRÊS perguntas ─────────────────────────────
 do $$
-declare v_aluno int; v_prog jsonb; v_antes int;
+declare
+  v_aluno int; v_prog jsonb; v_antes int; v_prof int; v_comp date;
+  v_origem_antes text; v_respondido_antes timestamptz;
 begin
+  select professor_id into v_prof from _ctx;
+  v_comp := public.fn_competencia_feedback();
+
   select (a->>'aluno_id')::int into v_aluno
     from _mesa, lateral jsonb_array_elements(j->'alunos') a limit 1;
   select (j->>'respondidos')::int into v_antes from _mesa;
@@ -160,10 +165,44 @@ begin
   insert into _res values ('so o coracao NAO conta como respondido',
     v_antes::text, v_prog->>'respondidos');
 
+  -- `now()` fica CONGELADO no início da transação — comparar respondido_em
+  -- contra o valor que a 1a chamada gravou nunca divergiria, nem sob um
+  -- mutante que passasse a reescrever (o `excluded.respondido_em` da 2a
+  -- chamada seria o MESMO `now()` congelado). E `origem` é literal fixo na
+  -- função — comparar contra 'la_teacher' depois da 2a chamada também nunca
+  -- divergiria, com ou sem o bug. Planta sentinelas manuais (bem longe de
+  -- qualquer valor que a função escreveria sozinha) pra provar de verdade
+  -- que a 2a escrita NÃO toca em origem/respondido_em.
+  update public.aluno_feedback_professor
+     set origem        = 'sentinela_nao_deveria_mudar',
+         respondido_em = now() - interval '30 days'
+   where aluno_id = v_aluno and professor_id = v_prof and competencia = v_comp;
+
+  select origem, respondido_em into v_origem_antes, v_respondido_antes
+    from public.aluno_feedback_professor
+   where aluno_id = v_aluno and professor_id = v_prof and competencia = v_comp;
+
   v_prog := public.app_professor_feedback_salvar(
     v_aluno, 'amarelo', 'as_vezes', 'parado', 'neutro', 'observacao de teste');
   insert into _res values ('coracao + as 3 perguntas conta como respondido',
     (v_antes + 1)::text, v_prog->>'respondidos');
+
+  -- A 2a escrita é update (a linha já existe): origem/respondido_em não
+  -- entram no SET da migration, então a sentinela plantada acima tem que
+  -- sobreviver — se um mutante mover os dois pro SET, `excluded.origem`
+  -- vira 'la_teacher' de novo e `excluded.respondido_em` vira o `now()`
+  -- congelado (bem diferente dos "30 dias atrás" plantados), e as duas
+  -- linhas abaixo divergem.
+  insert into _res
+  select 'a 2a escrita NAO reescreve origem', v_origem_antes, f.origem
+    from public.aluno_feedback_professor f
+   where f.aluno_id = v_aluno and f.professor_id = v_prof and f.competencia = v_comp;
+
+  insert into _res
+  select 'a 2a escrita NAO reescreve respondido_em',
+         v_respondido_antes::text, f.respondido_em::text
+    from public.aluno_feedback_professor f
+   where f.aluno_id = v_aluno and f.professor_id = v_prof and f.competencia = v_comp;
 end $$;
 
 -- ─── Arquivado sai da mesa (arquivado dentro da transação) ──────────────────

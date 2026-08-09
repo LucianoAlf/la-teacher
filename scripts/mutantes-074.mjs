@@ -6,6 +6,15 @@
 // futuro em 1.191/1.224) e "respondido" exigindo as três perguntas, não só o
 // coração. V9/V10 são a mesma armadilha da 073: `revoke` precisa mirar
 // `public, anon` juntos, senão o PUBLIC do Postgres deixa a porta aberta.
+//
+// V12 veio da revisão: `origem`/`respondido_em` estavam certos no código
+// (fora do SET do `on conflict`) e sem nenhuma prova. O teste que teria que
+// provar isso não podia comparar contra o valor "natural" da 1ª chamada —
+// `now()` fica congelado no início da transação (confirmado ao vivo: duas
+// chamadas com 1,5s de `pg_sleep` no meio devolveram o MESMO timestamp) e
+// `origem` é literal fixo na função, então os dois nunca teriam como divergir
+// nem sob o bug. O `.test.sql` planta sentinelas manuais antes da 2ª escrita
+// pra tornar o mutante falseável de verdade.
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
@@ -120,6 +129,16 @@ const MUTANTES = [
   for all to authenticated
   using      (auth.role() = 'authenticated')
   with check (auth.role() = 'authenticated');`,
+  },
+  {
+    nome: 'V12 — o update reescreve origem e respondido_em [achado da revisao]',
+    pega: 'passos "a 2a escrita NAO reescreve origem" e "...NAO reescreve respondido_em"',
+    de: `         teve_aula_no_mes = excluded.teve_aula_no_mes,
+         atualizado_em    = now();`,
+    para: `         teve_aula_no_mes = excluded.teve_aula_no_mes,
+         origem           = excluded.origem,
+         respondido_em    = excluded.respondido_em,
+         atualizado_em    = now();`,
   },
 ]
 
