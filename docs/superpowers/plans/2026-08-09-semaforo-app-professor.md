@@ -30,6 +30,16 @@ TypeScript + Tailwind (tokens do LA Teacher), Deno (edge function), Node
   `add constraint`, e `add column if not exists`.
 - **`create or replace function` PRESERVA privilégios** — mutante de permissão
   precisa `grant` de propósito, senão sobrevive.
+- **`revoke ... from anon` sozinho NÃO fecha a porta de uma função NOVA.**
+  Medido neste projeto: `pg_default_acl` de `public` concede EXECUTE a `anon` e
+  a `authenticated`, e o Postgres concede a `PUBLIC` — uma função nova nasce com
+  `{=X/postgres, anon=X, authenticated=X, …}`. Revogar só de `anon` deixa o
+  PUBLIC, e `has_function_privilege('anon', …)` continua `true`. **Use sempre
+  `revoke all on function … from public, anon;`** (acrescentando `authenticated`
+  quando a função não é do app). As migrations 065–072 usam a forma abreviada e
+  hoje negam `anon` — mas só porque suas funções já existiam e o
+  `create or replace` preservou o privilégio já apertado. É armadilha para
+  função nova, e as da 074 e da 075 são todas novas.
 - **Design System:** só componentes e tokens existentes (`docs/frontend-tokens.md`
   e `src/components/ui/`). Não recriar botão, card, rótulo ou badge. Nenhuma cor,
   raio ou sombra do LA Report vem junto.
@@ -655,9 +665,12 @@ create policy feedback_coordenacao_le on public.aluno_feedback_professor
 grant execute on function public.app_professor_feedback_mesa(date)      to authenticated;
 grant execute on function public.app_professor_feedback_progresso(date) to authenticated;
 grant execute on function public.app_professor_feedback_salvar(integer, text, text, text, text, text, date) to authenticated;
-revoke all on function public.app_professor_feedback_mesa(date)      from anon;
-revoke all on function public.app_professor_feedback_progresso(date) from anon;
-revoke all on function public.app_professor_feedback_salvar(integer, text, text, text, text, text, date) from anon;
+-- `from public, anon`, não só `from anon`: função nova nasce com EXECUTE para
+-- PUBLIC (Postgres) e para anon/authenticated (default_acl do Supabase).
+-- Revogar só de `anon` deixa o PUBLIC e a porta continua aberta.
+revoke all on function public.app_professor_feedback_mesa(date)      from public, anon;
+revoke all on function public.app_professor_feedback_progresso(date) from public, anon;
+revoke all on function public.app_professor_feedback_salvar(integer, text, text, text, text, text, date) from public, anon;
 ```
 
 - [ ] **Step 2: Escrever o teste**
@@ -966,13 +979,13 @@ const MUTANTES = [
   {
     nome: 'V9 — a mesa fica aberta pro anon',
     pega: 'passo "anon NAO executa a mesa"',
-    de: `revoke all on function public.app_professor_feedback_mesa(date)      from anon;`,
+    de: `revoke all on function public.app_professor_feedback_mesa(date)      from public, anon;`,
     para: `grant execute on function public.app_professor_feedback_mesa(date) to anon;`,
   },
   {
     nome: 'V10 — o salvar fica aberto pro anon',
     pega: 'passo "anon NAO executa o salvar"',
-    de: `revoke all on function public.app_professor_feedback_salvar(integer, text, text, text, text, text, date) from anon;`,
+    de: `revoke all on function public.app_professor_feedback_salvar(integer, text, text, text, text, text, date) from public, anon;`,
     para: `grant execute on function public.app_professor_feedback_salvar(integer, text, text, text, text, text, date) to anon;`,
   },
   {
@@ -1002,6 +1015,29 @@ Esperado: `11/11 mutantes mortos`, zero âncoras podres.
 ```bash
 git add supabase/migrations/074-a-mesa-do-professor.sql supabase/migrations/074-a-mesa-do-professor.test.sql scripts/mutantes-074.mjs package.json && git commit -m "feat(074): a mesa do professor e a RLS por dono" && git push origin main
 ```
+
+- [ ] **Step 7: Aplicar em produção**
+
+O harness só roda em `BEGIN`/`ROLLBACK` — nada do que você testou existe no banco
+ainda. As tasks de UI que vêm depois precisam das RPCs vivas, então a 074 é
+aplicada aqui, **depois** de teste e mutantes verdes.
+
+Aplique o conteúdo de `supabase/migrations/074-a-mesa-do-professor.sql` no projeto
+`ouqwbbermlzqqvtqwlul` com a ferramenta MCP `apply_migration` (carregue o schema
+com ToolSearch: `select:mcp__4c04bb52-f946-4fe8-85f6-b01d200f8c20__apply_migration`),
+com o nome `074-a-mesa-do-professor`.
+
+Depois **prove ao vivo** que a porta fechou — este é o ponto em que a forma
+abreviada do `revoke` engana:
+
+```sql
+select has_function_privilege('anon','public.app_professor_feedback_mesa(date)','execute') as anon_mesa,
+       has_function_privilege('anon','public.app_professor_feedback_salvar(integer, text, text, text, text, text, date)','execute') as anon_salvar,
+       (select proacl::text from pg_proc where oid = 'public.app_professor_feedback_mesa(date)'::regprocedure) as acl_mesa;
+```
+Esperado: `anon_mesa` e `anon_salvar` em `false`, e o `acl_mesa` **sem** a entrada
+`=X/postgres` (que é o PUBLIC). Se `anon` vier `true`, o `revoke` não pegou —
+conserte antes de seguir.
 
 ---
 
@@ -1983,7 +2019,7 @@ begin
   return jsonb_build_object('fase', v_fase, 'competencia', v_comp, 'enfileirados', v_n);
 end $$;
 
-revoke all on function public.fn_enfileirar_cobranca_feedback(date) from anon, authenticated;
+revoke all on function public.fn_enfileirar_cobranca_feedback(date) from public, anon, authenticated;
 
 -- Índice único que sustenta o `on conflict do nothing`. Índice e ON CONFLICT
 -- são UM contrato: quem mexe num mexe no outro.
@@ -1992,7 +2028,22 @@ create unique index if not exists fabio_notificacoes_feedback_dia_unico
   where tipo like 'feedback_%';
 ```
 
-- [ ] **Step 2: Agendar no cron**
+- [ ] **Step 2: Aplicar em produção e só então agendar no cron**
+
+O `cron.schedule` chama `public.fn_enfileirar_cobranca_feedback`, que só existe no
+banco depois que a migration for aplicada — agendar antes cria um job que falha
+toda madrugada em silêncio.
+
+Aplique `supabase/migrations/075-o-fabio-cobra-o-semaforo.sql` no projeto
+`ouqwbbermlzqqvtqwlul` com a ferramenta MCP `apply_migration` (nome:
+`075-o-fabio-cobra-o-semaforo`) **depois** de teste e mutantes verdes. Confirme
+com:
+
+```sql
+select has_function_privilege('anon','public.fn_enfileirar_cobranca_feedback(date)','execute') as anon,
+       has_function_privilege('authenticated','public.fn_enfileirar_cobranca_feedback(date)','execute') as autenticado;
+```
+Esperado: os dois `false`. Só então:
 
 ```sql
 select cron.schedule(
@@ -2142,7 +2193,7 @@ const MUTANTES = [
   {
     nome: 'V6 — a cobranca fica aberta pro authenticated',
     pega: 'passo "authenticated NAO executa a cobranca"',
-    de: `revoke all on function public.fn_enfileirar_cobranca_feedback(date) from anon, authenticated;`,
+    de: `revoke all on function public.fn_enfileirar_cobranca_feedback(date) from public, anon, authenticated;`,
     para: `grant execute on function public.fn_enfileirar_cobranca_feedback(date) to authenticated;`,
   },
 ]
