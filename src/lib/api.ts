@@ -1303,3 +1303,116 @@ export async function meuPerfilCoordenacao(): Promise<MeuPerfilCoordenacao> {
   if (error) throw error
   return data as unknown as MeuPerfilCoordenacao
 }
+
+// ---------------------------------------------------------------------------
+// Semáforo do aluno — feedback do professor (coração + 3 perguntas)
+// ---------------------------------------------------------------------------
+
+/** As três cores do coração. O vocabulário é o da coluna `feedback`. */
+export type Coracao = 'verde' | 'amarelo' | 'vermelho'
+export type Pratica = 'sim' | 'as_vezes' | 'nao'
+export type Evolucao = 'evoluindo' | 'parado' | 'regredindo'
+export type Animo = 'animado' | 'neutro' | 'desanimado'
+
+/** Rótulos das opções — a tela não inventa texto. */
+export const CORACOES: { valor: Coracao; rotulo: string }[] = [
+  { valor: 'verde', rotulo: 'Saudável' },
+  { valor: 'amarelo', rotulo: 'Atenção' },
+  { valor: 'vermelho', rotulo: 'Crítico' },
+]
+export const PRATICA: { valor: Pratica; rotulo: string }[] = [
+  { valor: 'sim', rotulo: 'sim' },
+  { valor: 'as_vezes', rotulo: 'às vezes' },
+  { valor: 'nao', rotulo: 'não' },
+]
+export const EVOLUCAO: { valor: Evolucao; rotulo: string }[] = [
+  { valor: 'evoluindo', rotulo: 'evoluindo' },
+  { valor: 'parado', rotulo: 'parado' },
+  { valor: 'regredindo', rotulo: 'regredindo' },
+]
+export const ANIMO: { valor: Animo; rotulo: string }[] = [
+  { valor: 'animado', rotulo: 'animado' },
+  { valor: 'neutro', rotulo: 'neutro' },
+  { valor: 'desanimado', rotulo: 'desanimado' },
+]
+
+export interface FeedbackAluno {
+  aluno_id: number
+  nome: string
+  cursos: string | null
+  teve_aula_no_mes: boolean
+  dias_sem_aula: number | null
+  feedback: Coracao | null
+  pratica_em_casa: Pratica | null
+  evolucao: Evolucao | null
+  animo: Animo | null
+  observacao: string | null
+  /** Coração E as três perguntas. É o que a barrinha conta. */
+  completo: boolean
+}
+
+export interface FeedbackProgresso {
+  competencia: string
+  total: number
+  respondidos: number
+  janela_aberta: boolean
+}
+
+export interface FeedbackMesa extends FeedbackProgresso {
+  alunos: FeedbackAluno[]
+}
+
+/** A mesa do mês corrente do professor logado. */
+export async function feedbackMesa(): Promise<FeedbackMesa> {
+  // FOLLOW-UP: remover o cast quando db.ts for regenerado
+  const { data, error } = await supabase.rpc(
+    'app_professor_feedback_mesa' as never,
+    {
+      p_competencia: null,
+    } as never,
+  )
+  if (error) throw error
+  return data as unknown as FeedbackMesa
+}
+
+/**
+ * Salva UM aluno. É o que cada toque chama — não existe botão "Salvar".
+ * Devolve o progresso pra barrinha não precisar de segunda chamada.
+ */
+export async function feedbackSalvar(entrada: {
+  alunoId: number
+  feedback: Coracao
+  praticaEmCasa?: Pratica | null
+  evolucao?: Evolucao | null
+  animo?: Animo | null
+  observacao?: string | null
+}): Promise<FeedbackProgresso> {
+  // FOLLOW-UP: remover o cast quando db.ts for regenerado
+  const { data, error } = await supabase.rpc(
+    'app_professor_feedback_salvar' as never,
+    {
+      p_aluno_id: entrada.alunoId,
+      p_feedback: entrada.feedback,
+      p_pratica_em_casa: entrada.praticaEmCasa ?? null,
+      p_evolucao: entrada.evolucao ?? null,
+      p_animo: entrada.animo ?? null,
+      p_observacao: entrada.observacao ?? null,
+      p_competencia: null,
+    } as never,
+  )
+  if (error) throw error
+  return data as unknown as FeedbackProgresso
+}
+
+/** Só os números — alimenta o card da Home sem carregar a mesa inteira. */
+export async function feedbackProgresso(): Promise<FeedbackProgresso> {
+  // FOLLOW-UP: remover o cast quando db.ts for regenerado
+  const { data, error } = await supabase.rpc(
+    'app_professor_feedback_progresso' as never,
+    {
+      p_competencia: null,
+    } as never,
+  )
+  if (error) throw error
+  return data as unknown as FeedbackProgresso
+}
