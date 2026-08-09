@@ -1951,8 +1951,15 @@ outros, use os reais e ajuste o teste junto.
 -- A escada é a mesma da cobrança de presença (066): lembrete, reforço, e a
 -- coordenação no fim.
 --
--- Qualquer janela de 7 dias tem exatamente uma segunda e uma quinta, então os
--- dois disparos são não-ambíguos em todo mês, inclusive fevereiro.
+-- OS DISPAROS SÃO ANCORADOS NO FIM DO MÊS, NÃO EM DIA DA SEMANA.
+-- A primeira versão deste plano usava "a segunda da janela" e "a quinta da
+-- janela". É verdade que toda janela de 7 dias tem exatamente uma de cada — mas
+-- a ORDEM inverte. Em agosto/2026 a janela é 25/08 (ter) a 31/08 (seg): a
+-- quinta cai no dia 27 e a segunda no dia 31, então o "reforço" chegaria quatro
+-- dias ANTES do lembrete, e o lembrete no último dia do mês. Quebra em todo mês
+-- que não termina em domingo. Ancorado no fim do mês, a ordem e o espaçamento
+-- são os mesmos sempre: lembrete no 1º dia da janela, reforço três dias depois,
+-- sobrando três dias para o professor agir.
 
 create or replace function public.fn_enfileirar_cobranca_feedback(
   p_dia date default null
@@ -1960,19 +1967,19 @@ create or replace function public.fn_enfileirar_cobranca_feedback(
 language plpgsql security definer set search_path to 'public'
 as $$
 declare
-  v_dia   date := coalesce(p_dia, public.fn_hoje_brt());
-  v_comp  date := public.fn_competencia_feedback(v_dia);
-  v_dow   int  := extract(isodow from v_dia);
-  v_fase  text;
-  v_n     int  := 0;
+  v_dia    date := coalesce(p_dia, public.fn_hoje_brt());
+  v_comp   date := public.fn_competencia_feedback(v_dia);
+  v_ultimo date := (date_trunc('month', v_dia) + interval '1 month - 1 day')::date;
+  v_fase   text;
+  v_n      int  := 0;
 begin
   -- Dia 1º: a competência que interessa é a do mês que ACABOU.
   if extract(day from v_dia) = 1 then
     v_fase := 'coordenacao';
     v_comp := (date_trunc('month', v_dia) - interval '1 month')::date;
-  elsif public.fn_janela_feedback_aberta(v_dia) and v_dow = 1 then
+  elsif v_dia = v_ultimo - 6 then   -- primeiro dia da janela
     v_fase := 'lembrete';
-  elsif public.fn_janela_feedback_aberta(v_dia) and v_dow = 4 then
+  elsif v_dia = v_ultimo - 3 then   -- três dias depois, sempre depois
     v_fase := 'reforco';
   else
     return jsonb_build_object('fase', 'nenhuma', 'enfileirados', 0);
@@ -2077,20 +2084,52 @@ Crie `supabase/migrations/075-o-fabio-cobra-o-semaforo.test.sql`:
 
 create temp table _res(passo text, esperado text, obtido text) on commit drop;
 
--- Uma segunda, uma quinta e um dia comum DENTRO da janela de agosto/2026
--- (25 a 31). 31/08 é segunda; 27/08 é quinta; 26/08 é quarta.
-insert into _res values ('segunda da janela dispara lembrete', 'lembrete',
-  public.fn_enfileirar_cobranca_feedback(date '2026-08-31')->>'fase');
-insert into _res values ('quinta da janela dispara reforco', 'reforco',
-  public.fn_enfileirar_cobranca_feedback(date '2026-08-27')->>'fase');
-insert into _res values ('quarta da janela NAO dispara', 'nenhuma',
+-- Agosto/2026 termina em 31, então a janela é 25 a 31: lembrete no 25,
+-- reforço no 28. Fevereiro/2026 termina em 28: lembrete no 22, reforço no 25.
+insert into _res values ('primeiro dia da janela dispara lembrete', 'lembrete',
+  public.fn_enfileirar_cobranca_feedback(date '2026-08-25')->>'fase');
+insert into _res values ('tres dias depois dispara reforco', 'reforco',
+  public.fn_enfileirar_cobranca_feedback(date '2026-08-28')->>'fase');
+insert into _res values ('dia do meio da janela NAO dispara', 'nenhuma',
   public.fn_enfileirar_cobranca_feedback(date '2026-08-26')->>'fase');
-insert into _res values ('segunda FORA da janela NAO dispara', 'nenhuma',
+insert into _res values ('ultimo dia do mes NAO dispara', 'nenhuma',
+  public.fn_enfileirar_cobranca_feedback(date '2026-08-31')->>'fase');
+insert into _res values ('dia FORA da janela NAO dispara', 'nenhuma',
   public.fn_enfileirar_cobranca_feedback(date '2026-08-17')->>'fase');
 insert into _res values ('dia 1 dispara coordenacao', 'coordenacao',
   public.fn_enfileirar_cobranca_feedback(date '2026-09-01')->>'fase');
 insert into _res values ('dia 1 olha a competencia que ACABOU', '2026-08-01',
   public.fn_enfileirar_cobranca_feedback(date '2026-09-01')->>'competencia');
+
+-- ─── O DEFEITO QUE MOTIVOU A ÂNCORA: o lembrete vem ANTES do reforço ────────
+-- Com a régua velha (segunda/quinta da janela), em agosto o reforço caía no dia
+-- 27 e o lembrete no 31 — o professor era cobrado antes de ser avisado. Este
+-- passo varre 2026 inteiro e exige a ordem em TODO mês.
+insert into _res
+select 'em todo mes de 2026 o lembrete vem antes do reforco', 'sim',
+  case when count(*) filter (where dia_lembrete >= dia_reforco) = 0 then 'sim'
+       else 'NAO — ' || count(*) filter (where dia_lembrete >= dia_reforco) || ' mes(es)' end
+from (
+  select m,
+         min(d) filter (where public.fn_enfileirar_cobranca_feedback(d::date)->>'fase' = 'lembrete') as dia_lembrete,
+         min(d) filter (where public.fn_enfileirar_cobranca_feedback(d::date)->>'fase' = 'reforco')  as dia_reforco
+    from generate_series(date '2026-01-01', date '2026-12-01', interval '1 month') m,
+         lateral generate_series(m::date, (m + interval '1 month - 1 day')::date, interval '1 day') d
+   group by m
+) por_mes;
+
+insert into _res
+select 'todo mes de 2026 tem exatamente 1 lembrete e 1 reforco', 'sim',
+  case when count(*) filter (where n_lembrete <> 1 or n_reforco <> 1) = 0 then 'sim'
+       else 'NAO — ' || count(*) filter (where n_lembrete <> 1 or n_reforco <> 1) || ' mes(es)' end
+from (
+  select m,
+         count(*) filter (where public.fn_enfileirar_cobranca_feedback(d::date)->>'fase' = 'lembrete') as n_lembrete,
+         count(*) filter (where public.fn_enfileirar_cobranca_feedback(d::date)->>'fase' = 'reforco')  as n_reforco
+    from generate_series(date '2026-01-01', date '2026-12-01', interval '1 month') m,
+         lateral generate_series(m::date, (m + interval '1 month - 1 day')::date, interval '1 day') d
+   group by m
+) por_mes;
 
 -- ─── O lembrete alcança gente ───────────────────────────────────────────────
 insert into _res
@@ -2100,9 +2139,9 @@ from (select v.professor_id from public.vw_jornada_professor_atual v
        group by v.professor_id limit 1) x;
 
 insert into _res values ('lembrete enfileira pelo menos um professor', 'sim',
-  case when (public.fn_enfileirar_cobranca_feedback(date '2026-08-31')->>'enfileirados')::int > 0
+  case when (public.fn_enfileirar_cobranca_feedback(date '2026-08-25')->>'enfileirados')::int > 0
             or exists (select 1 from public.fabio_notificacoes
-                        where tipo = 'feedback_lembrete' and dia_referencia = date '2026-08-31')
+                        where tipo = 'feedback_lembrete' and dia_referencia = date '2026-08-25')
        then 'sim' else 'NAO' end);
 
 -- ─── Idempotência: rodar duas vezes não duplica ─────────────────────────────
@@ -2110,10 +2149,10 @@ do $$
 declare v_antes int; v_depois int;
 begin
   select count(*) into v_antes from public.fabio_notificacoes
-   where tipo = 'feedback_lembrete' and dia_referencia = date '2026-08-31';
-  perform public.fn_enfileirar_cobranca_feedback(date '2026-08-31');
+   where tipo = 'feedback_lembrete' and dia_referencia = date '2026-08-25';
+  perform public.fn_enfileirar_cobranca_feedback(date '2026-08-25');
   select count(*) into v_depois from public.fabio_notificacoes
-   where tipo = 'feedback_lembrete' and dia_referencia = date '2026-08-31';
+   where tipo = 'feedback_lembrete' and dia_referencia = date '2026-08-25';
   insert into _res values ('rodar de novo no mesmo dia NAO duplica',
     v_antes::text, v_depois::text);
 end $$;
@@ -2177,15 +2216,22 @@ const MUTANTES = [
   {
     nome: 'V3 — dispara em qualquer dia da janela, nao so seg e qui',
     pega: 'passo "quarta da janela NAO dispara"',
-    de: `  elsif public.fn_janela_feedback_aberta(v_dia) and v_dow = 1 then`,
-    para: `  elsif public.fn_janela_feedback_aberta(v_dia) then`,
+    de: `  elsif v_dia = v_ultimo - 6 then   -- primeiro dia da janela`,
+    para: `  elsif public.fn_janela_feedback_aberta(v_dia) then   -- primeiro dia da janela`,
   },
   {
-    nome: 'V4 — dispara fora da janela',
-    pega: 'passo "segunda FORA da janela NAO dispara"',
-    de: `  elsif public.fn_janela_feedback_aberta(v_dia) and v_dow = 4 then
+    // O defeito real que motivou a âncora no fim do mês: com a régua de dia da
+    // semana, em agosto/2026 o reforço cai no dia 27 e o lembrete no 31 — o
+    // professor é cobrado antes de ser avisado.
+    nome: 'V4 — volta a regua de dia da semana e INVERTE a ordem',
+    pega: 'passo "em todo mes de 2026 o lembrete vem antes do reforco"',
+    de: `  elsif v_dia = v_ultimo - 6 then   -- primeiro dia da janela
+    v_fase := 'lembrete';
+  elsif v_dia = v_ultimo - 3 then   -- três dias depois, sempre depois
     v_fase := 'reforco';`,
-    para: `  elsif v_dow = 4 then
+    para: `  elsif public.fn_janela_feedback_aberta(v_dia) and extract(isodow from v_dia) = 1 then
+    v_fase := 'lembrete';
+  elsif public.fn_janela_feedback_aberta(v_dia) and extract(isodow from v_dia) = 4 then
     v_fase := 'reforco';`,
   },
   {
