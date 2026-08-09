@@ -526,10 +526,16 @@ def feedback_cobranca_do_dia(dia: Optional[str] = None) -> Dict[str, Any]:
 
 
 def format_feedback_professor(prof: Dict[str, Any], item: Dict[str, Any], fase: str) -> str:
-    """O lembrete carrega o PERCENTUAL e o PORQUÊ (pedido do Alf).
+    """O lembrete carrega QUANTOS FALTAM — a razão X de Y, pedido do Alf — e o
+    PORQUÊ. (Docstring corrigida no fix round 1, MINOR 8: dizia PERCENTUAL,
+    mas a mensagem sempre renderizou razão, nunca "%" — o texto estava certo,
+    a palavra na docstring que mentia.)
 
     O reforço não repete o porquê: quem chegou até ele já leu uma vez, e
     repetir o discurso inteiro é o jeito rápido de virar ruído.
+
+    Assume fase in ("lembrete", "reforco") — run_feedback já filtrou
+    qualquer outra fase antes de chegar aqui (fix round 1, MINOR 14).
     """
     nome = first_name(prof)
     ok = int(item.get("ok") or 0)
@@ -537,10 +543,17 @@ def format_feedback_professor(prof: Dict[str, Any], item: Dict[str, Any], fase: 
     faltam = int(item.get("faltam") or max(total - ok, 0))
 
     if fase == "lembrete":
+        # ok==0 é o caso do primeiro dia: "você já respondeu 0" lê como
+        # cobrança sarcástica, e no lançamento é a mensagem que TODOS os
+        # professores recebem (fix round 1, MINOR 6) — abre em vez de cobrar.
+        aluno_total = "aluno" if total == 1 else "alunos"
+        abertura = (f"São *{total} {aluno_total}* pra responder este mês."
+                   if ok == 0 else
+                   f"Você já respondeu *{ok} de {total}*.")
         return "\n".join([
             f"*{nome}, é semana do feedback dos alunos.*",
             "",
-            f"Você já respondeu *{ok} de {total}*.",
+            abertura,
             "",
             "É com isso que a coordenação enxerga o aluno antes da evasão — "
             "e tem gente chegando na renovação.",
@@ -549,8 +562,9 @@ def format_feedback_professor(prof: Dict[str, Any], item: Dict[str, Any], fase: 
         ])
 
     plural = "aluno" if faltam == 1 else "alunos"
+    verbo = "falta" if faltam == 1 else "faltam"
     return "\n".join([
-        f"*{nome}, faltam {faltam} {plural} no seu feedback do mês.*",
+        f"*{nome}, {verbo} {faltam} {plural} no seu feedback do mês.*",
         "",
         f"Você fechou {ok} de {total}.",
         "",
@@ -560,29 +574,48 @@ def format_feedback_professor(prof: Dict[str, Any], item: Dict[str, Any], fase: 
 
 def format_feedback_coordenacao(competencia: str, professores: list,
                                 fecharam: int, elegiveis: int) -> Optional[str]:
-    """A lista do dia 1º. Mesma regra do escalonamento: tem que ser
-    ENCAMINHÁVEL — o coordenador copia o bloco de um professor e manda pra ele.
-    Por isso vai nome, unidade e quantos de quantos, não um resumo.
+    """A lista do dia 1º. Cada bloco tem que ser ENCAMINHÁVEL SOZINHO — o
+    coordenador copia só aquele bloco e manda pro professor, sem escrever
+    nada a mais. Até o fix round 1 (IMPORTANT 5) o bloco só tinha nome,
+    unidade e um número: enviado ao próprio professor, virava só o nome dele
+    e uma contagem, sem mês nem instrução — quem lia tinha que escrever a
+    cobrança de verdade. `format_escalonamento` nunca teve esse problema
+    porque os blocos dele já carregam a aula concreta.
     """
     if not professores:
         return None
 
+    mes = _competencia_label(competencia)
     REGUA = "━━━━━━━━━━━━━━"
-    out = [f"*Feedback dos alunos — {_competencia_label(competencia)}*",
+    out = [f"*Feedback dos alunos — {mes}*",
            f"_{fecharam} de {elegiveis} professores fecharam o mês_"]
 
     for p in professores:
         nome = p.get("nome") or f"professor {p.get('professor_id')}"
+        primeiro = first_name(p)
+        # Junta TODAS as unidades (fix round 1, MINOR 9) — antes só a
+        # unidade ÚNICA aparecia (`len(unidades) == 1`), e professor com 2+
+        # unidades saía sem nenhuma no bloco.
         unidades = p.get("unidades") or []
         ok = int(p.get("ok") or 0)
         total = int(p.get("total") or 0)
         faltam = int(p.get("faltam") or max(total - ok, 0))
+        plural = "aluno" if faltam == 1 else "alunos"
+        verbo = "faltou" if faltam == 1 else "faltaram"
         out.append(REGUA)
-        out.append(f"*{nome}*" + (f" · {unidades[0]}" if len(unidades) == 1 else ""))
-        out.append(f"_faltaram {faltam} de {total} alunos_")
+        out.append(f"*{nome}*" + (f" · {' · '.join(unidades)}" if unidades else ""))
+        out.append(f"_{verbo} {faltam} de {total} alunos_")
+        # A linha que falta antes do fix: quem recebe o bloco encaminhado
+        # precisa do mês, do número e do que fazer, sem precisar ler o
+        # cabeçalho do topo (que não viaja se só este bloco for copiado).
+        out.append(f"{primeiro}, faltou o seu feedback de {mes} — {faltam} {plural}. "
+                   "Dá pra fechar em poucos minutos no app, em *Alunos*.")
 
     out.append(REGUA)
-    out.append("Quem está na lista não fechou o semáforo dos alunos no mês. "
+    # "feedback", não "semáforo" (fix round 1, MINOR 10) — o app só usa a
+    # palavra "feedback"; "semáforo" é vocabulário interno que o professor
+    # nunca viu.
+    out.append("Quem está na lista não fechou o feedback dos alunos no mês. "
                "Dá pra copiar o bloco e mandar direto pro professor.")
     return "\n".join(out)
 
@@ -595,18 +628,44 @@ def run_feedback(channel: str, dry_run: bool,
     Nada é enfileirado para outro processo buscar depois: a fabio_notificacoes
     não tem estado de entrada, então linha reservada e não enviada no mesmo
     ciclo é linha que MENTE que está em voo.
+
+    Cada professor do laço abaixo tem seu try/except PRÓPRIO (fix round 1,
+    IMPORTANT 4): antes, o rpc de reserva vivia fora de qualquer try, então
+    a falha de UM professor derrubava a função inteira — main() trocava a
+    lista de resultados inteira por um único {"status":"error"}, os
+    professores já processados antes dele desapareciam do relatório, e os de
+    depois nunca eram tentados. Sem retry aqui de propósito: o re-claim já
+    vive no banco (076) e o timer agora passa três vezes por dia — ver
+    fabio-feedback.systemd.txt.
     """
     resultados: list[Dict[str, Any]] = []
     data = feedback_cobranca_do_dia(dia)
     fase = (data.get("fase") or "nenhuma")
     if fase == "nenhuma":
         return [{"event": "feedback", "status": "fora_da_regua", "dia": data.get("dia")}]
+    if fase not in ("lembrete", "reforco", "coordenacao"):
+        # Defesa contra o banco devolver uma fase que este worker ainda não
+        # conhece: falha explícita e barata aqui, em vez de compor
+        # "feedback_<fase desconhecida>" e deixar a RPC de reserva rejeitar
+        # com tipo_invalido pra CADA professor do laço (fix round 1, MINOR 14).
+        return [{"event": "feedback", "status": "fase_desconhecida", "fase": fase}]
 
     professores = data.get("professores") or []
     competencia = data.get("competencia")
 
     # ── Dia 1º: uma mensagem só, pro grupo da coordenação ──────────────────
     if fase == "coordenacao":
+        # --professor-id NÃO filtra a lista da coordenação — ela é UMA
+        # mensagem pro GRUPO, não por professor; filtrar ainda mandaria a
+        # lista INTEIRA pro grupo (fix round 1, IMPORTANT 2). Este repo já
+        # registrou o mesmo acidente de classe: fabio-pendencia.systemd.txt
+        # prende o escalonamento a --professor-id 25 porque, sem ele, o
+        # primeiro disparo levaria 75 professores-unidade pro grupo de uma
+        # vez. Recusa alto em vez de filtrar; quem quiser ver o texto usa
+        # --dry-run, que já funciona sem tocar no grupo.
+        if professor_id is not None:
+            return [{"event": "feedback", "fase": fase,
+                     "status": "coordenacao_ignora_professor_id"}]
         # `elegiveis` é o total de professores com carteira; a lista traz só
         # quem NÃO fechou, então quem fechou é a diferença.
         elegiveis = int(data.get("elegiveis") or 0)
@@ -625,13 +684,22 @@ def run_feedback(channel: str, dry_run: bool,
                      "motivo": reserva.get("motivo")}]
         nid, token = reserva.get("notificacao_id"), reserva.get("lease_token")
         try:
-            enviar_grupo(corpo)
+            enviar_grupo(corpo, evento="feedback_coordenacao")
+            resultado_coord: Dict[str, Any] = {"event": "feedback", "fase": fase,
+                                               "status": "sent", "professores": len(professores)}
             if not mark_sent(nid, token):
                 log("feedback_coordenacao_entregue_mas_nao_fechada", notificacao_id=str(nid))
-            return [{"event": "feedback", "fase": fase, "status": "sent",
-                     "professores": len(professores)}]
+                # Mesma chave "aviso" do ramo por professor (fix round 1,
+                # MINOR 11) — sem isso o JSON dizia "sent" limpo enquanto o
+                # journal gritava que a conclusão não fechou.
+                resultado_coord["aviso"] = "entregue_mas_nao_fechada"
+            return [resultado_coord]
         except Exception as exc:
-            mark_failed(nid, str(exc), token)
+            try:
+                mark_failed(nid, str(exc), token)
+            except Exception as exc2:
+                log("feedback_coordenacao_mark_failed_falhou", notificacao_id=str(nid),
+                    error=str(exc2)[:300])
             return [{"event": "feedback", "fase": fase, "status": "failed",
                      "error": str(exc)[:500]}]
 
@@ -639,6 +707,13 @@ def run_feedback(channel: str, dry_run: bool,
     if professor_id is not None:
         professores = [p for p in professores
                        if int(p.get("professor_id") or 0) == int(professor_id)]
+    if not professores:
+        # Sem isso, lista vazia (todo mundo já respondeu, ou o
+        # --professor-id pedido não está na régua hoje) devolvia `[]` — e o
+        # payload final ficava indistinguível de um bug que não achou nada
+        # pra processar (fix round 1, MINOR 12). Coordenação já tinha
+        # `todos_fecharam`; escalonamento já tinha `sem_pendencia_escalonada`.
+        return [{"event": "feedback", "fase": fase, "status": "nenhum_professor_a_cobrar"}]
     por_id = {int(p["id"]): p for p in active_professors()}
 
     for item in professores:
@@ -657,20 +732,34 @@ def run_feedback(channel: str, dry_run: bool,
             resultados.append(resultado)
             continue
 
-        reserva = rpc("fn_reservar_cobranca_feedback", {
-            "p_professor_id": pid,
-            "p_tipo": f"feedback_{fase}",
-            "p_corpo": corpo,
-            "p_dia": dia,
-        }) or {}
-        if not reserva.get("reservado"):
-            resultado["status"] = "nao_reservado"
-            resultado["motivo"] = reserva.get("motivo")
-            resultados.append(resultado)
-            continue
-
-        nid, token = reserva.get("notificacao_id"), reserva.get("lease_token")
+        # Tudo daqui pra baixo é DESTE professor: reserva, telefone, entrega
+        # e conclusão inteiros num try só, pra que a falha de um não derrube
+        # o laço e apague quem já foi processado (fix round 1, IMPORTANT 4 —
+        # o rpc de reserva vivia fora de qualquer try).
+        nid, token = None, None
         try:
+            reserva = rpc("fn_reservar_cobranca_feedback", {
+                "p_professor_id": pid,
+                "p_tipo": f"feedback_{fase}",
+                "p_corpo": corpo,
+                "p_dia": dia,
+            }) or {}
+            if not reserva.get("reservado"):
+                resultado["status"] = "nao_reservado"
+                resultado["motivo"] = reserva.get("motivo")
+                resultados.append(resultado)
+                continue
+
+            nid, token = reserva.get("notificacao_id"), reserva.get("lease_token")
+            # A reserva já devolveu o telefone resolvido; conferir de novo
+            # ANTES de entregar em vez de deixar deliver()->send_whatsapp_text
+            # refazer o GET (fix round 1, MINOR 13). Não fecha a corrida
+            # inteira — entre este check e o envio de fato o telefone ainda
+            # pode ser limpo — mas cobre o caso degenerado sem mudar a
+            # assinatura de deliver(), que é compartilhada com os outros
+            # eventos (briefing, pendência, devolutiva).
+            if channel == "whatsapp" and not reserva.get("telefone"):
+                raise RuntimeError("telefone_ausente_na_reserva")
             deliver(pid, channel, corpo)
             if not mark_sent(nid, token):
                 log("feedback_entregue_mas_nao_fechada",
@@ -678,19 +767,31 @@ def run_feedback(channel: str, dry_run: bool,
                 resultado["aviso"] = "entregue_mas_nao_fechada"
             resultado["status"] = "sent"
         except Exception as exc:
-            mark_failed(nid, str(exc), token)
             resultado["status"] = "failed"
             resultado["error"] = str(exc)[:500]
+            if nid is not None:
+                try:
+                    mark_failed(nid, str(exc), token)
+                except Exception as exc2:
+                    log("feedback_mark_failed_falhou", professor_id=pid,
+                        notificacao_id=str(nid), error=str(exc2)[:300])
         resultados.append(resultado)
 
     return resultados
 
 
-def enviar_grupo(texto: str) -> Dict[str, Any]:
+def enviar_grupo(texto: str, evento: str = "escalonamento") -> Dict[str, Any]:
     """Envia pro grupo da coordenacao pela UAZAPI.
 
     O caminho normal do worker resolve telefone de PROFESSOR; grupo e um JID e
     nao passa por canonical_phone. Por isso posta direto, com o mesmo token.
+
+    `evento` so entra no LOG. Escalonamento e feedback_coordenacao dividem
+    esta funcao (mesmo grupo, mesmo token); sem o parametro, o log gravava
+    sempre "escalonamento_enviado" e qualquer contagem por esse nome no
+    journal incluia os dois eventos em silencio (fix round 1, IMPORTANT 3 —
+    esta casa ja registrou um incidente de contar OCORRENCIA de string em vez
+    de EVENTO, e quase decidiu arquitetura errada por causa disso).
     """
     r = requests.post(
         f"{bridge.UAZAPI_URL}/send/text",
@@ -700,7 +801,7 @@ def enviar_grupo(texto: str) -> Dict[str, Any]:
     )
     if r.status_code >= 400:
         raise RuntimeError(f"uazapi grupo {r.status_code}: {r.text[:300]}")
-    log("escalonamento_enviado", grupo=GRUPO_COORDENACAO_JID[:18] + "...")
+    log(f"{evento}_enviado", grupo=GRUPO_COORDENACAO_JID[:18] + "...")
     return {"ok": True}
 
 

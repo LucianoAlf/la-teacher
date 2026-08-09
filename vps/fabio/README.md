@@ -78,7 +78,7 @@ Regra permanente: **envio real só com OK explícito do Alf.**
 | `fabio-auditoria.timer` | 7h e 21h BRT | esta auditoria |
 | `fabio-briefing-matheus.timer` | 8h BRT | briefing matinal (piloto prof. 25) |
 | `fabio-notification-worker.timer` | — | worker genérico (disabled) |
-| `fabio-feedback.timer` | 9h30 BRT (criado, **não habilitado**) | cobra o feedback mensal do professor (lembrete/reforço) e entrega a lista de quem não fechou ao grupo da coordenação no dia 1º — ver `fabio-feedback.systemd.txt` |
+| `fabio-feedback.timer` | 9h30/12h30/15h30 BRT — 3 passes de recuperação, 1 cobrança (criado, **não habilitado**) | cobra o feedback mensal do professor (lembrete/reforço) e entrega a lista de quem não fechou ao grupo da coordenação no dia 1º — ver `fabio-feedback.systemd.txt` |
 
 ⚠️ **A VPS roda em UTC.** Os units usam `America/Sao_Paulo` no `OnCalendar`, então o
 systemd converte sozinho — mas ao ler `list-timers`, os horários aparecem em UTC.

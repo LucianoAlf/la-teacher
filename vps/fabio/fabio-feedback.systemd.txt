@@ -1,4 +1,66 @@
+# Cobranca do feedback mensal do aluno (semaforo do professor) — unit
+# systemd do usuario `fabio`
+#
+# POR QUE ISTO EXISTE
+# A migration 076 fez o banco responder "quem cobrar hoje" e "reserve esta
+# linha pra mim" (fn_feedback_cobranca_do_dia + fn_reservar_cobranca_feedback
+# + fn_reservar_cobranca_feedback_coordenacao). Sem um TIMER chamando isso e
+# so o mesmo "codigo pronto, ninguem entrega" que ja aconteceu com a
+# pendencia de registro — ver fabio-pendencia.systemd.txt.
+#
+# QUANDO DISPARA — TRES passes por dia, nao um
+#   09:30 / 12:30 / 15:30 BRT (12:30 / 15:30 / 18:30 UTC)
+#
+# POR QUE TRES E NAO UM (fix round 1, IMPORTANT 1)
+# Com UM pass diario, um 502 da UAZAPI no dia 1º marca a linha 'falhou' e so
+# volta a ser reclamavel na PROXIMA corrida do worker — que so acontece no
+# dia seguinte, quando a fase ja mudou pra 'nenhuma'. Um erro transitorio
+# custava o mes inteiro de entrega a coordenacao. O banco (076) ja faz o
+# re-claim: linha 'falhou', ou 'processando' com lease expirado, pode ser
+# reservada de novo no MESMO dia (dia_referencia nao muda so por isso). As
+# passagens 2 e 3 sao SO recuperacao — quando a 1a deu certo elas batem
+# 'ja_cobrado_hoje' (professor) ou 'ja_entregue_hoje' (coordenacao) e nao
+# mandam nada de novo. Elas nao existem pra mandar tres mensagens.
+#
+# CUSTO DE RODAR TRES VEZES: quase nada. O worker sai por `fora_da_regua` em
+# ~27 dos 30 dias do mes (so lembrete/reforco/coordenacao tem fase) — nesses
+# dias e um SELECT e nada mais, nas tres passagens.
+#
+# POR QUE --force
+# O timer e a UNICA fonte de horario aqui: FABIO_NOTIFY_FEEDBACK_TIME (a
+# janela propria do worker, default 09:30) fica INERTE com --force. Sem
+# --force as OnCalendar teriam que concordar com essa janela E entre si, e
+# qualquer divergencia faz o worker pular em silencio ("nothing_due") — a
+# mesma armadilha que deixou a pendencia de registro invisivel por meses.
+#
+# Persistent=true E SEGURO aqui: se a VPS cair e voltar depois da meia-noite,
+# o disparo atrasado chama o worker sem --date, que manda p_dia=null pra
+# fn_feedback_cobranca_do_dia — e a funcao resolve o dia por fn_hoje_brt() NO
+# MOMENTO DA CHAMADA, nao pela hora que o systemd tinha guardado. Nao tem
+# como o catch-up cobrar um dia que ja passou.
+#
+# ALCANCE HOJE: liga pra 6 professores, nao 43. A carteira de feedback (a
+# RPC) so conta quem tem `usuario_id` setado (acesso ao app liberado), e so
+# 6 professores tem isso nesta semana de piloto. Os 43 do RETOMADA.md sao a
+# carteira de REGISTRO DE AULA — regua diferente, tabela diferente.
+#
+# HORARIO DA VPS: UTC. O Brasil nao tem mais horario de verao, entao BRT =
+# UTC-3 fixo e o OnCalendar em UTC (como esta escrito abaixo) nao precisa de
+# ajuste sazonal.
+#
+# NAO DUPLICA: o dedupe vive no BANCO (076), nao neste arquivo — dois indices
+# unicos parciais em fabio_notificacoes (professor+tipo+dia_referencia, e
+# coordenacao+dia_referencia), com re-claim por ON CONFLICT DO UPDATE so
+# quando a linha anterior esta 'falhou' ou tem lease morto. Nunca reclama
+# linha 'enviada', nem 'processando' com lease ainda vivo.
+#
+# ⚠️ NAO INSTALADO NEM HABILITADO NESTA TASK. O comando de ligar fica
+# comentado no fim deste arquivo, depois do [Install] — nao rodar sem a
+# palavra do Alf (ver bloco LIGAR).
+
+# ============================================================================
 # ~/.config/systemd/user/fabio-feedback.service
+# ============================================================================
 [Unit]
 Description=Fábio — cobra o feedback mensal dos alunos e entrega a lista à coordenação
 Documentation=https://github.com/LucianoAlf/la-teacher
@@ -9,12 +71,19 @@ WorkingDirectory=/home/fabio/fabio-chat-bridge
 EnvironmentFile=/home/fabio/.hermes/.env
 ExecStart=/usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event feedback --channel whatsapp --force
 
+# ============================================================================
 # ~/.config/systemd/user/fabio-feedback.timer
+# ============================================================================
 [Unit]
-Description=Timer do feedback mensal as 09:30 BRT (12:30 UTC)
+Description=Timer do feedback mensal — 3 passes/dia (recuperação, não 3 mensagens)
 
 [Timer]
+# 09:30 / 12:30 / 15:30 BRT. Três linhas em vez da forma com vírgula — mais
+# fácil de ler, e o systemd acumula as três do mesmo jeito (não é "a última
+# vale": as três disparam).
 OnCalendar=*-*-* 12:30:00
+OnCalendar=*-*-* 15:30:00
+OnCalendar=*-*-* 18:30:00
 AccuracySec=1m
 Persistent=true
 Unit=fabio-feedback.service
