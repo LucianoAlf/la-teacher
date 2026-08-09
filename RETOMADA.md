@@ -37,10 +37,59 @@ Report, e os dois "achados abertos" que eram decisão técnica minha
 > importa. **Mas os dois já foram resolvidos pela 076**; o estado medido está
 > no fim desta seção.
 
-As migrations **073, 074 e 075 estão aplicadas em produção** e a tela está no
-repo (mesa, card na Home, entrada em Alunos, microfone). Mas a revisão do branch
-inteiro achou **dois bloqueadores que nenhuma revisão por task podia ver** —
-as sete compararam implementação contra o PLANO, e o plano tinha perdido a spec.
+**DECISÃO DO ALF, 09/08:** sobre o B2 — *"Precisamos incluir isso na spec e no
+plano de implementação, porque tem que ter, senão a sua governança fica pela
+metade."* A coordenação **entra**. Não é escopo deferido.
+
+Spec e plano reabertos em `c6b8c95`:
+- **Task 8 — migration `076-o-carteiro-da-cobranca.sql`** (mata B1 e B2 no
+  banco): `fn_feedback_cobranca_do_dia` (leitura pura, diz a fase e quem cobrar),
+  `fn_reservar_cobranca_feedback` (professor) e
+  `fn_reservar_cobranca_feedback_coordenacao` (grupo); quarto ramo no
+  `chk_notificacao_destinatario` para `destinatario_tipo='coordenacao'`
+  (`professor_id` nulo + JID em `destinatario_whatsapp`); dois índices de dedupe
+  — **o da coordenação NÃO pode incluir `professor_id`**, que é nulo ali e em
+  índice único do Postgres nulos não colidem; e a
+  `fn_enfileirar_cobranca_feedback` **cai** (era o depósito sem coletor).
+  Commit `9ae8da0`, aplicada em produção, verificada ao vivo.
+- **Task 9 — o worker leva**: evento `feedback` no
+  `fabio_notification_worker.py`, no mesmo desenho do `escalonamento` (unit
+  systemd própria + `--force`). **O gatilho nasce DESLIGADO** — ligar o timer é
+  o momento em que 43 professores passam a receber WhatsApp, e é palavra do Alf.
+
+**Decisão de arquitetura que ficou:** **não existe `pg_cron` nesta entrega.** O
+banco só responde *quem cobrar hoje* e *reserve esta linha pra mim*; quem decide
+a hora é o timer e quem manda é o worker. Enfileirar pra alguém buscar depois
+briga com a própria tabela — `status` não tem estado de entrada.
+
+**Régua ancorada no FIM DO MÊS, nunca em dia da semana** (isto também estava
+errado na spec): lembrete em `último−6`, reforço em `último−3`, coordenação no
+dia 1º. Em agosto/2026 a janela é 25/08 (ter) a 31/08 (seg), então "a quinta"
+cai no 27 e "a segunda" no 31 — o reforço chegaria **antes** do lembrete.
+
+### O que a revisão da Task 8 pegou (rodada de correção em andamento)
+
+- **Mutante V4 morria de erro de sintaxe, não da asserção.** Duas causas
+  independentes: `String.replace` trata `$$` no texto de substituição como
+  escape para um `$` literal (o corpo `$$…$$` vira `$…$`, delimitador inválido),
+  e o Postgres recusa renomear parâmetro nomeado. A cerca do `lease_token`
+  estava **sem medição** e o mutante imprimia "morto".
+- **Asserção NULL contava como PASS.** Subquery escalar sobre `pg_constraint`:
+  se a constraint sumir, retorna NULL, `not NULL` é NULL, e a linha não entra
+  no `count(*) where not ok`. A garantia da tabela compartilhada passava
+  justamente quando a constraint não existia.
+- **`on conflict do nothing` sem recuperação** — decisão minha, corrigida para a
+  forma da 018: worker que morre entre reservar e enviar deixava a linha presa
+  em `processando` e a cobrança do mês não acontecia. A 066 podia usar
+  `do nothing` porque é disparo humano, refazível; aqui são 3 dias por mês.
+
+**A régua que fica:** *o que a spec promete tem que ter uma task com o **verbo**
+da spec.* "Entrega à coordenação" não vira "insere na fila". Revisão contra o
+plano nunca acharia — o plano estava sendo cumprido.
+
+---
+
+### O diagnóstico original (histórico)
 
 **B1 — a fila da 075 é depósito sem coletor.** A 075 insere em
 `fabio_notificacoes` com `status='processando'` + lease, esperando que alguém
@@ -75,6 +124,12 @@ as sete revisões.
 
 **Maior carteira real: 52 alunos** (professor 33), e são **43** professores com
 carteira — não 38/44 como o plano supunha.
+
+**Das duas decisões humanas pendentes, uma caiu:** a `transcrever-observacao`
+foi publicada (v1, commit `140807e`, outra sessão) e o incidente da edge
+function do LA Report está fechado. **Resta uma:** ligar o timer da cobrança —
+`systemctl --user enable --now fabio-feedback.timer` na VPS. É o instante em
+que 43 professores passam a receber WhatsApp.
 
 ### ✅ ESTADO REAL, medido em 09/08 à noite (o que mudou depois do texto acima)
 
