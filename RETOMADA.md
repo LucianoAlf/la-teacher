@@ -11,6 +11,48 @@
 
 ---
 
+## ✅ 09/08 NOITE — o Fábio perguntava "amanhã" e respondia "hoje" (CONSERTADO)
+
+Achado conversando, não lendo código: `"como esta minha agenda de amanha?"` →
+**"Matheus, não encontrei aulas na sua agenda de hoje."** Era domingo (0 aulas);
+na segunda ele tinha **5**. Quem se planeja com isso chega achando que não tem
+aula — e "não encontrei aulas" é **negativa afirmada**, o pior formato pra estar
+errado.
+
+A causa não foi o parser errar o dia: **parser não existia.** No `try_fast_response`,
+`asks_today` aceitava `"minhas aulas"` e `"minha agenda"` — frases que não falam
+de dia nenhum — como prova de que a pergunta era sobre hoje. Todo dia pedido caía
+em hoje, e ainda saía rotulado "de hoje".
+
+O `fabio_contexto_professor` **sempre soube servir outro dia** (`p_data`, e devolve
+o dia servido em `hoje.data`). A capacidade existia; o atalho é que não usava.
+
+**Contrato agora: ou o atalho sabe QUAL dia foi pedido, ou ele se cala** e a
+pergunta segue pro Hermes. Resolve hoje/amanhã/depois de amanhã/ontem/anteontem,
+dia da semana, "dia 12", dd/mm. Se cala em: período ("da semana", "do mês"), dois
+dias na mesma frase, dia da semana igual ao de hoje (ambíguo), data impossível.
+
+Três travas que o caso pediu:
+- o rótulo carrega a data resolvida (`"terça (11/08)"`) — leitura errada fica
+  **visível** pro professor em vez de silenciosa;
+- se o RPC devolver dia ≠ pedido, o atalho se cala e loga `fast_path_dia_divergente`;
+- `"quantos alunos eu tenho"` sem dia voltou a ser **carteira** (20), não contagem
+  da agenda de hoje — número certo pra pergunta errada.
+
+Conferido contra o banco, não contra a minha leitura: 09/08=0 ✓, 10/08=5 ✓,
+11/08=6 ✓, 12/08=0 ✓. Teste `vps/fabio/teste_agenda_dia_pedido.py` (16 asserções)
+com **4 mutantes mortos** — inclusive o bug original reintroduzido. Commit `168aff8`,
+no ar (md5 repo = VPS, serviço `active`).
+
+⚠️ **Buraco que fica aberto (não é este bug, é vizinho):** o `build_prompt` chama
+`professor_context(professor_id)` **sem data** — o Hermes só recebe a agenda de
+HOJE. Então o caminho normal também é cego pra outro dia: perguntado sobre "dia 12"
+ele respondeu, com honestidade, *"ainda não tenho a agenda do dia 12 aqui"*. O
+atalho agora cobre os dias que sabe ler; o que cai pro Hermes cai cego. Passar o dia
+resolvido pro prompt é o próximo passo natural dessa frente.
+
+---
+
 ## ✅ 09/08 NOITE — a observação do professor ganhou leitor
 
 Ordem do Alf, depois de eu propor deixar pra depois: *"Nada! Os professores já
