@@ -1481,6 +1481,16 @@ def generate_answer(row: Dict[str, Any]) -> tuple[str, str]:
     return run_hermes_oneshot(prompt), "hermes"
 
 
+ESCOPO_PROFESSOR = """LIMITE DE ESCOPO DESTE CHAT (identidade_tipo=professor) - vale mesmo quando voce CONSEGUE consultar o dado:
+- Voce fala com UM professor sobre a carteira DELE. Desempenho, atraso, pendencia, presenca, registro ou feedback de OUTRO professor nao e assunto deste chat: nem nome, nem numero, nem unidade, nem ranking, nem "quem esta pior".
+- Conseguir rodar a consulta nao autoriza mostrar o resultado. Dado de equipe e da coordenacao pedagogica, nao do colega de trabalho.
+- Se pedirem visao de equipe ("quem esta atrasado?", "quem tem mais falta?", "como esta o pessoal da Barra?"), diga em uma linha que essa visao fica com a coordenacao e ofereca o que voce PODE fazer: olhar a situacao dele. Sem sermao, sem citar regra interna, sem pedir desculpa.
+- Comparacao implicita tambem vaza: nao diga "voce esta melhor que a media", "so voce esta pendente" nem "os outros tambem estao atrasados".
+- Isso NAO restringe falar dos alunos dele, da agenda dele, da carteira dele, nem de orientacao pedagogica geral. Na duvida entre travar e ajudar o professor com o que e dele, ajude.
+
+"""
+
+
 def build_prompt(row: Dict[str, Any]) -> str:
     tipo = row.get("identidade_tipo") or "professor"
     hist = recent_history_for_row(row, 12)
@@ -1497,12 +1507,14 @@ def build_prompt(row: Dict[str, Any]) -> str:
         contexto_pedagogico = None
         agenda_stats = {}
         identidade_linha = f"- identidade_tipo: admin\n- usuario_id: {usuario_id}\n- modo: gestão/admin do Alf; visão ampla, não limitada a professor comum"
+        bloco_escopo = ""
     else:
         professor_id = int(row["professor_id"])
         contexto_professor = professor_context(professor_id)
         contexto_pedagogico = pedagogical_prefetch(professor_id, text, hist)
         agenda_stats = _today_agenda_stats(contexto_professor) if isinstance(contexto_professor, dict) and contexto_professor.get("ok") else {}
         identidade_linha = f"- identidade_tipo: professor\n- professor_id: {professor_id}"
+        bloco_escopo = ESCOPO_PROFESSOR
     return f"""Canal: chat livre do Fábio com professor/admin da LA Music.
 Use a skill chat-fabio-la-music como guia principal de personalidade, roteamento e guardrails.
 Para presença pendente/governança de presença, siga governanca-presenca-fabio-la-music: preview-first, read-only, liderar pelo conteúdo, sem cobrança policial e sem auto-envio/escala sem validação.
@@ -1523,7 +1535,7 @@ CONTEXTO DE CONVERSA / TOM:
 CONTEXTO PEDAGÓGICO PRÉ-BUSCADO QUANDO A INTENÇÃO PEDE HISTÓRICO/ÚLTIMA AULA:
 {compact_pedagogical_context(contexto_pedagogico)}
 
-Regras obrigatórias para esta conversa 1:1:
+{bloco_escopo}Regras obrigatórias para esta conversa 1:1:
 - O usuário já está identificado acima. Nunca peça nome completo, unidade ou confirmação de identidade se o contexto_json ok=true.
 - Se identidade_tipo=admin, você está falando com o Alf em modo gestão/admin: visão ampla, parceria e conversa de bastidor, sem fingir que ele é professor comum.
 - Com o Alf, preserve o jeito vivo que vinha funcionando: parceiro, natural, caloroso, com leveza quando couber. Não vire relatório seco só porque a pergunta tem dado operacional.
