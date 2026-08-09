@@ -62,14 +62,19 @@ export default function CoordenacaoPage() {
                 `--s-6` da escala. Com 14px os blocos liam como um bloco só —
                 apontado pelo Alf com a tela na mão. */}
             <div className="mb-6 grid grid-cols-2 gap-2.5 md:grid-cols-4">
-              {/* "Aulas" no rótulo porque a unidade mudou na 070: antes isso
-                  contava pares aluno-aula e dava 847 onde o trabalho real da
-                  equipe eram 624 aulas. Número grande sem unidade é o que
-                  deixou a fila com "50 em aberto / 49 alunos" sem sentido. */}
+              {/* A 072 separou a pendência em dois: SEM NADA (alarme) e NO
+                  EMUSYS (transição — o professor trabalhou, no sistema velho).
+                  Misturar os dois foi o que quase fez a coordenação cobrar o
+                  Isaque por 29 aulas quando 25 estavam lançadas lá. */}
               <PainelNumero
-                rotulo="Aulas sem lançamento · 7 dias"
-                valor={r?.sem_lancamento}
+                rotulo="Sem registro nenhum · 7 dias"
+                valor={r?.sem_nada}
                 tom="perigo"
+                carregando={carregando}
+              />
+              <PainelNumero
+                rotulo="Lançadas só no Emusys"
+                valor={r?.no_emusys}
                 carregando={carregando}
               />
               <PainelNumero
@@ -79,14 +84,9 @@ export default function CoordenacaoPage() {
                 carregando={carregando}
               />
               <PainelNumero
-                rotulo="Aulas só de ontem"
+                rotulo="Sem registro, só de ontem"
                 valor={r?.ontem}
                 tom="atencao"
-                carregando={carregando}
-              />
-              <PainelNumero
-                rotulo="Na fila"
-                valor={dados ? fila.length : undefined}
                 carregando={carregando}
               />
             </div>

@@ -56,7 +56,9 @@ export function LinhaProfessor({
   aviso: (m: string) => void
 }) {
   const [aberto, setAberto] = useState(false)
-  const urgente = p.pior_atraso >= ATRASO_URGENTE
+  // O tom sai do COBRÁVEL: quem está com tudo no Emusys não é urgência, é
+  // migração. `pior_atraso` é null nesse caso (072).
+  const urgente = (p.pior_atraso ?? 0) >= ATRASO_URGENTE
   const tom = urgente ? 'danger' : 'warn'
 
   const legenda = [p.unidades, resumirCursos(p.cursos)].filter(Boolean).join(' · ')
@@ -89,37 +91,48 @@ export function LinhaProfessor({
           </span>
         </button>
 
-        {/* Todo selo desta linha mede o MESMO recorte: a pendência da janela.
-            O de alunos diz "afetados" por escrito porque foi lido como
-            carteira — o Alf viu "22 alunos" no Gabriel Antony (36 na carteira)
-            e achou o número errado. Número certo com rótulo ambíguo É defeito. */}
+        {/* Três estados da 072, cada um com a sua cor: SEM NADA é alarme,
+            NO EMUSYS é transição (info, nunca vermelho — cobrar isso seria
+            acusar quem trabalhou), e o atraso é o do cobrável. O selo de
+            alunos saiu: não dizia o que fazer, e é o expandir que lista quem. */}
         <div className="flex flex-none items-center gap-1.5">
           <Badge
             variant={tom}
             icon="fa-solid fa-clipboard-list"
-            title="Aulas dos últimos 7 dias ainda sem lançamento"
+            title="Aulas dos últimos 7 dias sem registro em lugar nenhum — nem aqui, nem no Emusys"
           >
-            {p.aulas} {p.aulas === 1 ? 'aula em aberto' : 'aulas em aberto'}
+            {p.sem_nada} sem registro
           </Badge>
-          {/* Alunos é CONTEXTO, não estado — por isso sem cor. Só se destaca
-              de "aulas" quando há turma, que é quando informa alguma coisa. */}
-          <Badge
-            variant="neutro"
-            icon="fa-solid fa-user-group"
-            title="Alunos com aula sem lançamento na janela — não é a carteira do professor"
-          >
-            {p.alunos} {p.alunos === 1 ? 'aluno afetado' : 'alunos afetados'}
-          </Badge>
-          <Badge
-            variant={tom}
-            icon="fa-regular fa-clock"
-            title="Há quantos dias a aula mais antiga espera lançamento"
-          >
-            {p.pior_atraso} {p.pior_atraso === 1 ? 'dia parado' : 'dias parado'}
-          </Badge>
+          {p.no_emusys > 0 && (
+            <Badge
+              variant="info"
+              icon="fa-solid fa-right-left"
+              title="Aulas com anotação digitada no Emusys — o trabalho existe, falta migrar"
+            >
+              {p.no_emusys} no Emusys
+            </Badge>
+          )}
+          {p.sem_nada > 0 && p.pior_atraso !== null && (
+            <Badge
+              variant={tom}
+              icon="fa-regular fa-clock"
+              title="Há quantos dias a aula mais antiga SEM REGISTRO espera"
+            >
+              {p.pior_atraso} {p.pior_atraso === 1 ? 'dia parado' : 'dias parado'}
+            </Badge>
+          )}
         </div>
 
-        <BotaoRecado professor={p} aviso={aviso} />
+        {/* Cobrar quem está com tudo no Emusys é a acusação indevida que
+            motivou a 072 — quando não há cobrável, o botão nem existe. */}
+        {p.sem_nada > 0 ? (
+          <BotaoRecado professor={p} aviso={aviso} />
+        ) : (
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-success-text">
+            <i className="fa-solid fa-check" aria-hidden />
+            tudo no Emusys
+          </span>
+        )}
       </div>
 
       {aberto && (

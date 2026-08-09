@@ -36,7 +36,11 @@ export function FilaEmAberto({
   carregando: boolean
   aviso: (m: string) => void
 }) {
-  const plantao = linhas.filter((p) => p.pior_atraso >= ATRASO_URGENTE).slice(0, TETO_PLANTAO)
+  // Plantão é só o COBRÁVEL: pior_atraso null = tudo no Emusys, e isso não
+  // toca o celular de ninguém (072).
+  const plantao = linhas
+    .filter((p) => (p.pior_atraso ?? 0) >= ATRASO_URGENTE)
+    .slice(0, TETO_PLANTAO)
 
   if (carregando) {
     return (

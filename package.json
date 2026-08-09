@@ -92,7 +92,9 @@
     "teste:070": "node scripts/rodar-teste-sql.mjs supabase/migrations/070-o-painel-conta-aula-nao-par-aluno-aula.sql supabase/migrations/070-o-painel-conta-aula-nao-par-aluno-aula.test.sql",
     "mutantes:070": "node scripts/mutantes-070.mjs",
     "teste:071": "node scripts/rodar-teste-sql.mjs supabase/migrations/071-o-painel-filtra-por-unidade-e-curso.sql supabase/migrations/071-o-painel-filtra-por-unidade-e-curso.test.sql",
-    "mutantes:071": "node scripts/mutantes-071.mjs"
+    "mutantes:071": "node scripts/mutantes-071.mjs",
+    "teste:072": "node scripts/rodar-teste-sql.mjs supabase/migrations/072-a-pendencia-aprende-o-emusys.sql supabase/migrations/072-a-pendencia-aprende-o-emusys.test.sql",
+    "mutantes:072": "node scripts/mutantes-072.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",

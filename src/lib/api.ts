@@ -1119,18 +1119,22 @@ export interface CoordenacaoLinha {
   unidades: string
   /** Também lista: "Teclado, Piano, Contrabaixo". Dá cara pro professor na fila. */
   cursos: string | null
-  /**
-   * AULAS sem lançamento — a unidade de trabalho do professor (070).
-   *
-   * Era `em_aberto` e contava PARES aluno-aula, que é a linha da
-   * `vw_presenca_pendencia`. Com 1,36 aluno por aula na média, esse número saía
-   * quase igual ao de alunos em toda a fila e os dois juntos não informavam
-   * nada. O campo mudou de nome junto com o significado, de propósito.
-   */
+  /** Total na pendência (= sem_nada + no_emusys). */
   aulas: number
-  /** Quantos alunos são afetados. Só diverge de `aulas` quando há turma. */
+  /**
+   * A ÚNICA parte cobrável: aulas sem registro em lugar NENHUM (072).
+   *
+   * A transição existe: 17% da pendência tinha ANOTAÇÃO digitada no Emusys
+   * (o Isaque: 25 de 29). Cobrar isso seria acusar quem fez o trabalho — e é
+   * por sem_nada que a fila ordena e que a cobrança conta.
+   */
+  sem_nada: number
+  /** Aulas com anotação digitada no Emusys — pendência de MIGRAÇÃO, não de trabalho. */
+  no_emusys: number
+  /** Alunos das aulas SEM NADA. */
   alunos: number
-  pior_atraso: number
+  /** Atraso da aula mais antiga SEM NADA. Null quando está tudo no Emusys. */
+  pior_atraso: number | null
 }
 
 /** Uma opção de filtro, com quantas aulas ela representa. */
@@ -1148,9 +1152,12 @@ export interface OpcaoCurso extends OpcaoFiltro {
 
 export interface CoordenacaoEmAberto {
   resumo: {
-    /** Em AULAS, a mesma unidade da fila — senão a coluna não soma o topo. */
-    sem_lancamento: number
+    /** Aulas sem registro em lugar NENHUM — o número de alarme. */
+    sem_nada: number
+    /** Aulas lançadas só no Emusys (anotação digitada) — transição, não falta. */
+    no_emusys: number
     professores: number
+    /** Só o cobrável de ontem. */
     ontem: number
     professores_ativos: number
   }
@@ -1177,6 +1184,8 @@ export interface CoordenacaoAula {
   alunos: number
   /** "Beatriz, Arthur, Caio" — primeiros nomes, pra caber na linha. */
   alunos_nomes: string | null
+  /** Tem anotação digitada no Emusys — trabalho feito lá, falta só migrar. */
+  no_emusys: boolean
 }
 
 export interface CoordenacaoDiaAberto {

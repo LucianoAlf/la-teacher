@@ -85,6 +85,15 @@ export function AulasEmAberto({
                 {aula.turma_nome ? (
                   <span className="text-text-secondary"> · {aula.turma_nome}</span>
                 ) : null}
+                {/* O selo da linha diz "N no Emusys"; é aqui que se vê QUAIS —
+                    a coordenação precisa saber o que é falta e o que é
+                    migração antes de qualquer conversa. */}
+                {aula.no_emusys ? (
+                  <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-info-text">
+                    <i className="fa-solid fa-right-left text-[9px]" aria-hidden />
+                    no Emusys
+                  </span>
+                ) : null}
               </span>
               {/* Quem está esperando. Turma mostra os nomes: "aula de 5" sem
                   nome nenhum é o tipo de linha que a coordenação não consegue

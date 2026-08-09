@@ -76,6 +76,34 @@ a conta contra ela mesma nunca discorda dela. Quem discordou foi o Alf, olhando
 a tela. O par de passos "conta AULAS" + "NAO e mais o total de linhas" da 070
 existe pra que da próxima vez seja o teste.
 
+### ✅ 072 NO AR — a pendência aprende o Emusys (o achado da noite)
+
+O Alf, olhando o painel: *"a gente não pode colocar como em aberto, porque de
+repente está na tabela onde chega o conteúdo de aula do Emusys"*. Medido:
+
+| | |
+|---|---|
+| Pendência (janela 7d, 21h) | 744 aulas |
+| Com **anotação digitada** no Emusys | **125 (17%)** |
+| Caso extremo | **Isaque Mendes: 25 de 29** |
+
+A anotação é conteúdo real (média 255 chars, "Objetivo… Conteúdo…"). A presença
+do sync continua NÃO limpando pendência (régua da 012 de pé — os verdes fake);
+`professor_presenca` está preenchido em 744/744, é default, não distingue nada.
+**Só a anotação digitada distingue trabalho.**
+
+O modelo virou TRÊS estados: registrada (forte) / **no Emusys** (anotação —
+informa, não acusa) / **sem nada** (o único cobrável). A fila ordena por
+sem_nada (o Isaque caiu de topo pra 36º), o atraso é o da aula mais antiga SEM
+NADA, a cobrança do WhatsApp conta só sem_nada, e quem está com tudo no Emusys
+nem tem botão Cobrar — vira selo "tudo no Emusys". 21 passos, 10/10 mutantes,
+aplicada e conferida ao vivo (Isaque: "4 sem registro · 25 no Emusys", expandir
+com 25 aulas marcadas).
+
+⚠️ **teste:018 reprovando** (passos 37B/39B, de lease) desde ~21h — esta sessão
+não tocou nisso; é o território da sessão /loop da devolutiva. Chip de
+investigação criado; NÃO consertar às cegas por cima de trabalho alheio.
+
 ### ⚠️ BLOCO 2 ("o que os professores registraram") — MEDIDO EM 08/08, À NOITE
 
 Antes de desenhar, fui olhar se há o que mostrar. **Não há — ainda.**

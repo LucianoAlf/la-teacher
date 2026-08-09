@@ -109,14 +109,15 @@ function Selo({
  * sem tamanho vira aviso genérico — o professor precisa saber se são duas aulas
  * ou cinquenta antes de decidir quando sentar.
  *
- * E o número precisa ser o do TRABALHO DELE. Até a 070 isso dizia "50
- * lançamentos em aberto" pra quem tinha 21 aulas pra lançar: a fonte contava
- * pares aluno-aula, não aulas. Cobrança com tamanho inflado é pior do que
- * cobrança sem tamanho — é ela que decide quando o professor senta, e um número
- * que ele sabe que está errado ensina a ignorar o Fábio.
+ * E o número é SÓ o cobrável. A régua já errou duas vezes: a 070 consertou o
+ * count de pares aluno-aula ("50" pra quem tinha 21), e a 072 tirou da conta as
+ * aulas com anotação no Emusys — cobrar "29" de quem lançou 25 no sistema velho
+ * é acusar quem trabalhou. Número que o professor SABE que está errado ensina a
+ * ignorar o Fábio.
  */
 function textoDaCobranca(p: CoordenacaoLinha) {
-  const quantas = p.aulas === 1 ? '*1 aula sem lançamento*' : `*${p.aulas} aulas sem lançamento*`
+  const quantas =
+    p.sem_nada === 1 ? '*1 aula sem registro*' : `*${p.sem_nada} aulas sem registro*`
   const desde =
     p.pior_atraso === 1 ? 'a mais antiga é de ontem' : `a mais antiga tem ${p.pior_atraso} dias`
   return (

@@ -2,6 +2,11 @@
 --
 -- SUPERA A 070 nas duas funções (assinatura nova; ver "por que DROP" abaixo).
 --
+-- SUPERADA POR: 072 — esta versão trata TODA pendência como "em aberto", mas
+-- 17% dela tinha anotação digitada no Emusys (o Isaque: 25 de 29). O painel
+-- mandava cobrar quem fez o trabalho no sistema velho. Os filtros e facetas
+-- daqui continuam valendo lá.
+--
 -- ── A ARMADILHA DO FILTRO DE CURSO ──────────────────────────────────────────
 --
 -- Na janela de 7 dias a `vw_presenca_pendencia` tem **34 nomes de curso**, mas
