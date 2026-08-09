@@ -1631,7 +1631,12 @@ def run_hermes_oneshot(prompt: str) -> str:
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        timeout=int(os.getenv("FABIO_CHAT_HERMES_TIMEOUT", "180")),
+        # 600s, nao 180: desde 09/08 este caminho e EXCLUSIVO do admin, que
+        # roda com todos os MCPs e de fato consulta o banco. Uma pergunta de
+        # governanca medida levou 137,8s -- 180 deixava pouca folga, e o custo
+        # de estourar aqui e a resposta do Alf nao chegar. O professor nao
+        # passa por aqui, entao ninguem mais espera esse tempo.
+        timeout=int(os.getenv("FABIO_CHAT_HERMES_TIMEOUT", "600")),
     )
     if proc.returncode != 0:
         raise RuntimeError(f"hermes oneshot rc={proc.returncode}: {proc.stderr[-1000:]}")
