@@ -92,18 +92,58 @@ export function contarPorUnidade(alunos: CarteiraAluno[]): UnidadeContagem[] {
     .sort((a, b) => a.unidade.localeCompare(b.unidade, 'pt'))
 }
 
+/**
+ * Uma linha por aluno DENTRO de um curso, escolhendo a matrícula vigente.
+ *
+ * A carteira traz uma linha por matrícula, e quem renova o contrato tem duas
+ * no mesmo curso: a concluída e a nova. Medido em 09/08/2026 na escola
+ * inteira: **54 linhas a mais, em 26 professores** — e apenas **1** aluno
+ * está de fato em dois cursos diferentes com o mesmo professor. Ou seja, a
+ * repetição é quase toda renovação, não multidisciplina.
+ *
+ * Sem isto o professor via a Amanda duas vezes seguidas em Canto, mesmo dia e
+ * mesma hora, uma dizendo "40/40 concluída" e a outra "Aula 2/40" — e a linha
+ * do contrato velho ainda vinha sem `emusys_aluno_id`, então ganhava o selo
+ * "cadastro incompleto" num aluno cujo cadastro está completo.
+ *
+ * Qual linha fica:
+ *
+ * 1. **A de identidade completa** (`qualidade === 'ok'`). É o que mata o selo
+ *    falso: o contrato encerrado é justamente o que costuma vir sem id.
+ * 2. Empate → **a matrícula mais adiantada** (`nr_aulas_passadas`). Quando as
+ *    duas estão íntegras, a que está perto do fim é a que o professor precisa
+ *    ver: é o momento da renovação.
+ *
+ * Não é decisão de qual contrato o Emusys considera vigente — é qual linha
+ * ajuda quem vai dar aula amanhã. A carteira segue sendo a fonte.
+ */
+function matriculaVigente(a: CarteiraAluno, b: CarteiraAluno): CarteiraAluno {
+  const okA = (a.qualidade ?? 'ok') === 'ok'
+  const okB = (b.qualidade ?? 'ok') === 'ok'
+  if (okA !== okB) return okA ? a : b
+  return (b.nr_aulas_passadas ?? -1) > (a.nr_aulas_passadas ?? -1) ? b : a
+}
+
 /** Agrupa a carteira por curso (grupos e alunos em ordem alfabética pt-BR). */
 export function agruparPorCurso(alunos: CarteiraAluno[]): GrupoCurso[] {
-  const map = new Map<string, CarteiraAluno[]>()
+  const map = new Map<string, Map<string, CarteiraAluno>>()
   for (const a of alunos) {
     const c = a.curso ?? 'Sem curso'
-    if (!map.has(c)) map.set(c, [])
-    map.get(c)!.push(a)
+    if (!map.has(c)) map.set(c, new Map())
+    const porAluno = map.get(c)!
+    // Sem `aluno_id` não dá pra afirmar que duas linhas são a mesma pessoa —
+    // a chave cai no índice da própria linha pra que nada seja colapsado por
+    // engano. Some da lista é pior do que aparecer duas vezes.
+    const chave = a.aluno_id != null ? `id:${a.aluno_id}` : `linha:${porAluno.size}`
+    const atual = porAluno.get(chave)
+    porAluno.set(chave, atual ? matriculaVigente(atual, a) : a)
   }
   return [...map.entries()]
-    .map(([curso, lista]) => ({
+    .map(([curso, porAluno]) => ({
       curso,
-      alunos: [...lista].sort((x, y) => x.aluno_nome.localeCompare(y.aluno_nome, 'pt')),
+      alunos: [...porAluno.values()].sort((x, y) =>
+        x.aluno_nome.localeCompare(y.aluno_nome, 'pt'),
+      ),
     }))
     .sort((a, b) => a.curso.localeCompare(b.curso, 'pt'))
 }
