@@ -1409,11 +1409,16 @@ export async function feedbackProgresso(): Promise<FeedbackProgresso> {
  * Transcreve um áudio curto (observação falada) e devolve o texto pro
  * professor revisar. Nada é guardado no caminho: o dado só nasce quando ele
  * salvar o texto (via feedbackSalvar), igual a se tivesse digitado.
+ *
+ * O slug é `transcrever-observacao` — NÃO `transcrever-audio`. Esse nome já
+ * era usado pelo LA Report (transcrição de áudio do WhatsApp pro
+ * pré-atendimento) no mesmo projeto Supabase compartilhado, e foi
+ * sobrescrito por engano em 09/08. Ver INCIDENTE em RETOMADA.md.
  */
 export async function transcreverAudio(blob: Blob): Promise<string> {
   const form = new FormData()
   form.append('audio', blob, 'observacao.webm')
-  const { data, error } = await supabase.functions.invoke('transcrever-audio', {
+  const { data, error } = await supabase.functions.invoke('transcrever-observacao', {
     body: form,
   })
   if (error) throw error

@@ -75,7 +75,7 @@ Três camadas, cada uma com uma responsabilidade:
   (mesa + card)          app_professor_feedback_mesa()          (a tabela que o score já lê)
                          app_professor_feedback_progresso()
         │                                                              │
-        └──► transcrever-audio (edge) ──► texto editável               │
+        └──► transcrever-observacao (edge) ──► texto editável               │
                                                                         ▼
   cron da última semana ──► fila do Fábio (066) ──► WhatsApp do professor
                                                 └─► coordenação no dia 1º
@@ -233,7 +233,7 @@ o `current_date` do servidor já é amanhã — foi o que derrubou o teste 018.
 
 ---
 
-## A edge function `transcrever-audio`
+## A edge function `transcrever-observacao`
 
 `POST` com o áudio do gravador; devolve `{ "texto": "..." }`.
 

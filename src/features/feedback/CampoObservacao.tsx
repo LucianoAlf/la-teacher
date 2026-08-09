@@ -32,8 +32,18 @@ export function CampoObservacao({
   const textoRef = useRef(texto)
   textoRef.current = texto
 
+  // Guarda de reentrância: com <React.StrictMode> (src/main.tsx) o React
+  // dispara o efeito duas vezes em dev — sem isso, uma gravação virava DUAS
+  // chamadas a transcreverAudio() (custo dobrado) e a segunda resolução lia
+  // o texto que a primeira acabara de anexar, duplicando o texto no campo.
+  // O ref lembra qual blob já está em processamento; um blob novo (próxima
+  // gravação) sempre tem identidade nova, então nunca fica preso.
+  const blobEmProcessoRef = useRef<Blob | null>(null)
+
   useEffect(() => {
     if (gravador.estado !== 'parado' || !gravador.blob) return
+    if (blobEmProcessoRef.current === gravador.blob) return
+    blobEmProcessoRef.current = gravador.blob
     const blob = gravador.blob
 
     setTranscrevendo(true)
@@ -52,6 +62,7 @@ export function CampoObservacao({
       .catch(() => setAviso('Não consegui transcrever. Pode escrever aí.'))
       .finally(() => {
         setTranscrevendo(false)
+        blobEmProcessoRef.current = null
         gravador.reset() // volta pra 'idle' — libera o botão pra uma nova gravação
       })
   }, [gravador.estado, gravador.blob, gravador.reset])

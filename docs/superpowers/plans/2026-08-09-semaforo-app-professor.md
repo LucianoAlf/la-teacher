@@ -105,7 +105,7 @@ TypeScript + Tailwind (tokens do LA Teacher), Deno (edge function), Node
 | `src/routes.tsx` (modificar) | Rota `/app/feedback` |
 | `src/pages/app/Home.tsx` (modificar) | Monta o `CardFeedbackHome` |
 | `src/pages/app/Alunos.tsx` (modificar) | Entrada permanente para a mesa |
-| `supabase/functions/transcrever-audio/index.ts` | Áudio → texto, sem persistir |
+| `supabase/functions/transcrever-observacao/index.ts` | Áudio → texto, sem persistir |
 
 ---
 
@@ -1597,7 +1597,7 @@ git add src/features/feedback src/pages/app/Feedback.tsx src/routes.tsx src/page
 ### Task 5: Microfone na observação (edge function + campo)
 
 **Files:**
-- Create: `supabase/functions/transcrever-audio/index.ts`
+- Create: `supabase/functions/transcrever-observacao/index.ts`
 - Create: `src/features/feedback/CampoObservacao.tsx`
 - Modify: `src/features/feedback/CardAlunoFeedback.tsx` (troca o `<textarea>`)
 - Modify: `src/lib/api.ts` (wrapper `transcreverAudio`)
@@ -1609,7 +1609,7 @@ git add src/features/feedback src/pages/app/Feedback.tsx src/routes.tsx src/page
 
 - [ ] **Step 1: Escrever a edge function**
 
-Crie `supabase/functions/transcrever-audio/index.ts`:
+Crie `supabase/functions/transcrever-observacao/index.ts`:
 
 ```ts
 // Áudio → texto, e nada mais.
@@ -1675,7 +1675,7 @@ Deno.serve(async (req) => {
 - [ ] **Step 2: Publicar a edge function e conferir o segredo**
 
 ```bash
-npx supabase functions deploy transcrever-audio --project-ref ouqwbbermlzqqvtqwlul
+npx supabase functions deploy transcrever-observacao --project-ref ouqwbbermlzqqvtqwlul
 ```
 
 Confira que `OPENAI_API_KEY` está nos segredos do projeto:
@@ -1695,7 +1695,7 @@ decisão do Alf.
 export async function transcreverAudio(blob: Blob): Promise<string> {
   const form = new FormData()
   form.append('audio', blob, 'observacao.webm')
-  const { data, error } = await supabase.functions.invoke('transcrever-audio', {
+  const { data, error } = await supabase.functions.invoke('transcrever-observacao', {
     body: form,
   })
   if (error) throw error
@@ -1816,7 +1816,7 @@ página e confirme que o texto continua lá.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add supabase/functions/transcrever-audio src/features/feedback/CampoObservacao.tsx src/features/feedback/CardAlunoFeedback.tsx src/lib/api.ts && git commit -m "feat(feedback): microfone na observacao com transcricao editavel" && git push origin main
+git add supabase/functions/transcrever-observacao src/features/feedback/CampoObservacao.tsx src/features/feedback/CardAlunoFeedback.tsx src/lib/api.ts && git commit -m "feat(feedback): microfone na observacao com transcricao editavel" && git push origin main
 ```
 
 ---
