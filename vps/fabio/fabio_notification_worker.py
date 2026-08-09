@@ -373,6 +373,26 @@ def _dia_label(iso: str) -> str:
     return f"{DIAS_PT[d.weekday()]}, {d.strftime('%d/%m')}"
 
 
+def _dias_em_atraso(aula: Dict[str, Any]) -> int:
+    """Dias de atraso de UMA aula, do jeito que a RPC devolve.
+
+    A chave canonica e `dias_em_atraso` — conferida em 09/08/2026 nos
+    `jsonb_object_keys` da `fabio_pendencias_professor`. Os nomes antigos
+    (`dias_atraso`, `atraso_dias`) ficam como rede porque ja estiveram
+    espalhados pelo codigo, mas nenhum dos dois existe no payload de hoje.
+
+    Devolve 0 quando nao acha nenhuma — e esse 0 e a razao pela qual o defeito
+    passou despercebido: ele nao levanta erro, so faz toda aula parecer de
+    hoje. Se um dia a RPC renomear a chave de novo, o sintoma sera silencioso
+    de novo; e por isso que a chave certa vem PRIMEIRO e esta documentada aqui.
+    """
+    for chave in ("dias_em_atraso", "dias_atraso", "atraso_dias"):
+        valor = aula.get(chave)
+        if valor is not None:
+            return int(valor)
+    return 0
+
+
 def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[str]:
     """Cobrança do professor.
 
@@ -383,26 +403,36 @@ def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[st
     O fecho manda abrir o APP de propósito: o registro por áudio no WhatsApp
     ainda não está ligado, e mandar áudio pro Fabio aqui não registra nada.
     """
-    total = int(data.get("total_aulas") or 0)
-    if total <= 0:
+    if int(data.get("total_aulas") or 0) <= 0:
         return None
     nome = first_name(prof)
-    pior = int(data.get("pior_atraso_dias") or 0)
     aulas = data.get("aulas") or []
-
-    plural = "aula" if total == 1 else "aulas"
-    quando = "de ontem" if pior <= 1 else f"dos últimos {pior} dias"
-    lines = [f"*{nome}, ficaram {total} {plural} {quando} sem registro.*"]
 
     # O que passou de ESCALONAMENTO_DIAS nao e mais cobranca do professor: subiu
     # pra coordenacao. Continuar cobrando aqui seria cobrar duas vezes a mesma
     # coisa, em dois lugares, sem ninguem assumir.
-    aulas = [a for a in aulas
-             if int(a.get("dias_atraso") or a.get("atraso_dias") or 0) <= ESCALONAMENTO_DIAS]
+    #
+    # ⚠️ Este filtro NUNCA filtrou. Ele lia `dias_atraso`/`atraso_dias` e a
+    # chave que a `fabio_pendencias_professor` devolve e `dias_em_atraso` —
+    # nenhuma das duas existia, `int(None or None or 0)` dava 0, e 0 <= 3
+    # sempre. Resultado medido em 09/08/2026: o Rafael era cobrado por aulas
+    # de 29/07 (11 dias) que o escalonamento das 9h ja tinha mandado pra
+    # coordenacao no mesmo dia. Exatamente a cobranca em dobro que o
+    # paragrafo acima diz evitar.
+    aulas = [a for a in aulas if _dias_em_atraso(a) <= ESCALONAMENTO_DIAS]
     if not aulas:
         return None
+
+    # Titulo e janela saem do conjunto JA FILTRADO. Antes o cabecalho era
+    # montado com o total bruto, entao ele podia anunciar um numero maior do
+    # que a lista logo abaixo sustentava — a mesma armadilha da 070, em que a
+    # cobranca dizia "50 lancamentos" pra quem tinha 21 aulas.
     total = len(aulas)
+    pior = max((_dias_em_atraso(a) for a in aulas), default=0)
     plural = "aula" if total == 1 else "aulas"
+    verbo = "ficou" if total == 1 else "ficaram"
+    quando = "de ontem" if pior <= 1 else f"dos últimos {pior} dias"
+    lines = [f"*{nome}, {verbo} {total} {plural} {quando} sem registro.*"]
 
     por_dia: Dict[str, list] = {}
     for aula in aulas:
