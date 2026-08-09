@@ -5,7 +5,7 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 08/08/2026, noite (BRT).** Tudo no remoto — confira com
+> **Última atualização: 09/08/2026, tarde (BRT).** Tudo no remoto — confira com
 > `git log --oneline -5`.
 > Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
@@ -113,6 +113,43 @@ pré-atendimento (`ChatPanel.tsx:502`). Ela existia desde 13/02, na versão 33.
 - **Causa raiz:** o `CLAUDE.md` já mandava fazer `git grep` do nome nos outros
   clones. O subagente nasce sem o `CLAUDE.md`, e eu não repeti a regra no
   dispatch. Registrado na memória.
+
+## ⚠ INCIDENTE 09/08: o Fábio entregava dado de colega pra professor comum
+
+Achado testando ao vivo depois da Task 7 (regra do CLAUDE.md). Perguntado por
+um **professor comum** (id 25, Matheus), o Fábio respondia quem estava atrasado
+no feedback mensal — **nome, mês, unidade e nº de alunos** de colegas. Ramon
+(31) e Peterson (33) são reais: não era alucinação. **É anterior à 075** — a
+migration só me fez olhar.
+
+- **Causa raiz:** `~/.hermes/config.yaml` → `mcp_servers.lareport` é um
+  `postgres-mcp --access-mode=unrestricted` com o role `fabio_agent`, que tem
+  `SELECT` em **374 objetos** e **`rolbypassrls = t`**. SQL arbitrário na escola
+  inteira, sem nenhum filtro por quem perguntou. O role só existe nesse MCP (os
+  workers usam service role), então os grants dele governam exatamente uma
+  superfície: o SQL ad-hoc do agente.
+- **Não havia regra em lugar nenhum** — nem `SOUL.md`, nem `PERMISSOES.md`, nem
+  nas 6 skills. O freio era o humor do modelo: **2 em 5** respostas vazavam
+  nome+número pra mesma pergunta, com `--sem-historico`.
+- **Mitigado (commit `0b1d561`, no ar):** bloco `ESCOPO_PROFESSOR` condicional
+  no `build_prompt` (só `identidade_tipo=professor`; admin intocado) + bullets
+  na skill `chat-fabio-la-music`. Medido depois: **13/13 recusas** — 6/6 na
+  pergunta original, 3/3 em variantes de contorno, 4/4 perguntando por colega
+  **pelo nome** (o vetor que a outra sessão achou). Carteira, feedback próprio,
+  prontuário e check-in seguem respondendo: não virou muro.
+- **A fronteira continua ABERTA.** Isso é mitigação medida, não barreira: o SQL
+  cru ainda alcança tudo. Fechar exige decisão — (a) RPCs com escopo + revogar
+  grant do `fabio_agent` (padrão que a casa já usa, ver
+  `consultar-prontuario-aluno/SKILL.md:140`), ou (b) toolset por identidade
+  (hoje o gateway fixa `enabled_toolsets` por plataforma, não por request). As
+  duas custam alcance do modo admin — `lareport_execute_sql` aparece 86x nos
+  logs. Chip `task_4ac0942a` em sessão dedicada.
+- **Buraco irmão, aberto:** `fabio_presence_mcp.py:34` expõe
+  `fabio_buscar_presencas_pendentes_professor(professor_id)` com `professor_id`
+  **arbitrário**, sem checar quem chamou.
+- ⚠️ A edição da skill **não tem espelho no repo** (só o bridge tem, em
+  `vps/fabio/`) — vive só na VPS. E o `.skills_prompt_snapshot.json` carrega
+  descrições, não o corpo: quem segura de fato é o bloco do `build_prompt`.
 
 ## ▶ DECIDIDO 08/08 (noite): O SEMÁFORO NASCE NO APP DO PROFESSOR
 
