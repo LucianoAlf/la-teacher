@@ -14,6 +14,7 @@ import IntroPage from './pages/app/Intro'
 import HomePage from './pages/app/Home'
 import AgendaPage from './pages/app/Agenda'
 import AlunosPage from './pages/app/Alunos'
+import FeedbackPage from './pages/app/Feedback'
 import GravarAulaPage from './features/registro/GravarAula'
 import ProcessandoPage from './features/registro/Processando'
 import ConfirmarPage from './features/registro/Confirmar'
@@ -85,6 +86,7 @@ export const router = createBrowserRouter(
             { path: '/app', element: <HomePage /> },
             { path: '/app/agenda', element: <AgendaPage /> },
             { path: '/app/alunos', element: <AlunosPage /> },
+            { path: '/app/feedback', element: <FeedbackPage /> },
             { path: '/app/aluno/:alunoId', element: <AlunoDetalhePage /> },
             { path: '/app/turma/:turmaNome', element: <TurmaHistoricoPage /> },
             { path: '/app/chamada/:aulaId', element: <ChamadaPage /> },

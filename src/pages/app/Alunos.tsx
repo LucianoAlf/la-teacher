@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button, Card, EmptyState, Skeleton, Toast, useToast } from '../../components/ui'
 import { cx } from '../../lib/cx'
 import { useCarteira } from '../../features/alunos/useCarteira'
@@ -69,6 +69,17 @@ export default function AlunosPage() {
             onSelecionar={setUnidade}
           />
         )}
+
+        {/* Entrada permanente pra mesa do semáforo — cada toque salva sozinho. */}
+        <Link to="/app/feedback" className="mb-4 block">
+          <Card className="flex items-center gap-3 p-3.5">
+            <i className="fa-solid fa-heart-pulse text-brand-text" aria-hidden />
+            <span className="flex-1 text-[13px] font-bold uppercase tracking-[.5px] text-text-secondary">
+              Feedback do mês
+            </span>
+            <i className="fa-solid fa-chevron-right text-xs text-text-muted" aria-hidden />
+          </Card>
+        </Link>
 
         <ConteudoCarteira
           fase={estado.fase}
