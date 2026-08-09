@@ -29,6 +29,11 @@ build/
 *.sln
 *.sw?
 
+# python (workers do Fabio em vps/) — artefato compilado nao se versiona:
+# reaparece como modificado toda vez que um worker roda e suja todo diff
+__pycache__/
+*.py[cod]
+
 # logs
 logs
 *.log
