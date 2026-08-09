@@ -36,6 +36,33 @@ anotações pro formato canônico e alimentar o histórico do aluno (o app do
 professor já puxa histórico; o Fábio consome). A 072 provou que a anotação é
 legível; o trilho é a normalização.
 
+### O MAPA COMPLETO (Alf, 08/08 madrugada): Health Score v2, 14 sinais
+
+Ele mostrou o módulo Sucesso do Aluno do LA Report (Fabiola + Jéssica; a agente
+Lia coleta o semáforo do professor por link WhatsApp; mesa com Health/Risco/
+Fase/Presença/Pagamento) e o doc "Health Score v2 — 14 sinais". O que NÃO pode
+se perder:
+
+- **Regra de ouro deles: peso não se chuta** — o score manual antigo provou
+  (os "Atenção" evadiam MAIS que os "Crítico"). Quem aprende peso é o modelo.
+  → O Radar **NUNCA fabrica score composto**: mostra dimensões e aponta a
+  conversa humana. Restrição de spec.
+- **"Cada um no seu quadrado"** (anti-over-engineering por dono, não por corte):
+  Sucesso do Aluno fica com conversas ADM (1), NPS (3), inadimplência (7),
+  responsável (13), perfil de matrícula (12). A COORDENAÇÃO fica com o
+  pedagógico: semáforo do professor (2), jornada/estagnação (5), absenteísmo
+  (6), **dias desde a última aula (9 — o sinal mais forte do modelo deles:
+  ativo ~6d, evadido ~34d)**, anamnese × expectativa (10), pratica em casa (4),
+  sinal contínuo do Fábio (14). Ciclo contratual (11) é o "quando" dos dois.
+- **Proatividade usa o trilho que JÁ existe** (fila do Fábio + edge, provados
+  na 066): sinal → painel / Fábio no professor / grupo. Não nasce sistema novo.
+- **Fatia 1 proposta ao Alf**: 3 cartões — "Ligar essa semana" (risco ×
+  renovação), "Coração vermelho" (106 críticos do semáforo, com a observação
+  do professor), "Sumiu da escola" (dias sem aula). Inadimplência FORA do
+  Radar da coordenação.
+- Ponte futura anotada: a coleta do semáforo (hoje link avulso da Lia que
+  expira) pode virar nativa no app do professor / Fábio. É fatia, não agora.
+
 ## ▶ PASSO ANTERIOR (concluído nesta sessão)
 
 **UI v2 do painel da coordenação** — pedido do Alf em 08/08, à noite, olhando o
