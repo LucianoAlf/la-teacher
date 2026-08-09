@@ -592,7 +592,12 @@ def format_feedback_coordenacao(competencia: str, professores: list,
 
     for p in professores:
         nome = p.get("nome") or f"professor {p.get('professor_id')}"
-        primeiro = first_name(p)
+        # Mesmo fallback do `nome` acima, passado pro helper (fix round 2)
+        # em vez do default "professor" sem id: sem isso, um professor com
+        # `nome` vazio virava um bloco com cabeçalho "*professor 42*" mas
+        # fecho "professor, faltou o seu feedback..." — a frase acionável
+        # perdia justamente o número que identifica quem é.
+        primeiro = first_name(p, fallback=f"professor {p.get('professor_id')}")
         # Junta TODAS as unidades (fix round 1, MINOR 9) — antes só a
         # unidade ÚNICA aparecia (`len(unidades) == 1`), e professor com 2+
         # unidades saía sem nenhuma no bloco.
@@ -676,14 +681,23 @@ def run_feedback(channel: str, dry_run: bool,
         if dry_run:
             return [{"event": "feedback", "fase": fase, "status": "dry_run_ready",
                      "professores": len(professores), "content_preview": corpo}]
-        reserva = rpc("fn_reservar_cobranca_feedback_coordenacao", {
-            "p_corpo": corpo, "p_whatsapp": GRUPO_COORDENACAO_JID, "p_dia": dia,
-        }) or {}
-        if not reserva.get("reservado"):
-            return [{"event": "feedback", "fase": fase, "status": "ja_entregue",
-                     "motivo": reserva.get("motivo")}]
-        nid, token = reserva.get("notificacao_id"), reserva.get("lease_token")
+        # Reserva agora DENTRO do mesmo try do envio (fix round 2, residual
+        # do IMPORTANT 4 da rodada anterior): eu tinha protegido só o envio e
+        # a conclusão, deixando a chamada de reserva exposta — um erro dela
+        # escapava de run_feedback inteiro e main() reportava o handler
+        # genérico {"status":"error"}, sem a chave `fase` nem o vocabulário
+        # de status deste ramo. `nid`/`token` nascem None e só viram algo se
+        # a reserva de fato devolver uma linha — mesmo padrão do laço por
+        # professor logo abaixo.
+        nid, token = None, None
         try:
+            reserva = rpc("fn_reservar_cobranca_feedback_coordenacao", {
+                "p_corpo": corpo, "p_whatsapp": GRUPO_COORDENACAO_JID, "p_dia": dia,
+            }) or {}
+            if not reserva.get("reservado"):
+                return [{"event": "feedback", "fase": fase, "status": "ja_entregue",
+                         "motivo": reserva.get("motivo")}]
+            nid, token = reserva.get("notificacao_id"), reserva.get("lease_token")
             enviar_grupo(corpo, evento="feedback_coordenacao")
             resultado_coord: Dict[str, Any] = {"event": "feedback", "fase": fase,
                                                "status": "sent", "professores": len(professores)}
@@ -695,11 +709,12 @@ def run_feedback(channel: str, dry_run: bool,
                 resultado_coord["aviso"] = "entregue_mas_nao_fechada"
             return [resultado_coord]
         except Exception as exc:
-            try:
-                mark_failed(nid, str(exc), token)
-            except Exception as exc2:
-                log("feedback_coordenacao_mark_failed_falhou", notificacao_id=str(nid),
-                    error=str(exc2)[:300])
+            if nid is not None:
+                try:
+                    mark_failed(nid, str(exc), token)
+                except Exception as exc2:
+                    log("feedback_coordenacao_mark_failed_falhou", notificacao_id=str(nid),
+                        error=str(exc2)[:300])
             return [{"event": "feedback", "fase": fase, "status": "failed",
                      "error": str(exc)[:500]}]
 
