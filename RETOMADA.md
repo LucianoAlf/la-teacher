@@ -11,7 +11,32 @@
 
 ---
 
-## ▶ PRÓXIMO PASSO
+## ▶ PRÓXIMO PASSO: RADAR DO ALUNO (bloco 2 do painel — decidido 08/08, noite)
+
+O Alf escolheu o Radar e deu o tom: *"painel estratégico de gestão pedagógica —
+se coloca no lugar dos coordenadores"*. Antes de tela: **brainstorm + spec**
+(regra da casa). As FONTES já foram medidas, todas vivas:
+
+| Sinal | Fonte | Medido 08/08 |
+|---|---|---|
+| Coração do aluno (❤️ que existe e ninguém usa) | `alunos.health_score` | saudável 684 · atenção 637 · **crítico 106** · sem 199; **1.181 atualizados em 30d** |
+| Risco de evasão | `vw_risco_evasao_atual` | baixo 969 · atenção 143 · **crítico 45** |
+| Renovação chegando | `vw_jornada_marcos` (`perto_renovacao`) | **102 alunos** |
+| Inadimplência | `aluno_jornada_matricula_disciplina.inadimplente_emusys` | 44 — **NUNCA aparece pro professor** (fronteira dura do Alf) |
+| Aviso prévio | `movimentacoes_admin.emusys_aviso_previo_id` | **0 hoje — confirmar se é o campo certo** antes de prometer o sinal |
+| Faltas seguidas | `aluno_presenca` fonte forte | régua a definir no spec |
+
+Desenho aprovado em direção (não em tela): seção "Radar do aluno" com CARTÕES
+DE SINAL — contagem + os casos mais urgentes + a AÇÃO que o sinal pede ("liga
+essa semana": risco crítico × renovação próxima é o cruzamento de ouro). Não é
+lista de alunos; é curadoria.
+
+**Trilho paralelo que ele também pediu:** o Emusys NÃO é legado — normalizar as
+anotações pro formato canônico e alimentar o histórico do aluno (o app do
+professor já puxa histórico; o Fábio consome). A 072 provou que a anotação é
+legível; o trilho é a normalização.
+
+## ▶ PASSO ANTERIOR (concluído nesta sessão)
 
 **UI v2 do painel da coordenação** — pedido do Alf em 08/08, à noite, olhando o
 painel no ar e o de Professores do LA Report lado a lado: *"esse formato
