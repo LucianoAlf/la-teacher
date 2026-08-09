@@ -68,7 +68,20 @@ const MUTANTES = [
     de: `create unique index if not exists fabio_notificacoes_feedback_dia_unico
   on public.fabio_notificacoes (professor_id, tipo, dia_referencia)
   where tipo like 'feedback_%';`,
-    para: `create index if not exists fabio_notificacoes_feedback_dia_unico
+    // O `drop index` na frente é OBRIGATÓRIO depois que a 075 foi aplicada em
+    // produção (Step 2): `create index if not exists` casa por NOME, não por
+    // definição. Sem o drop, o índice único JÁ existe de verdade quando o
+    // mutante roda; o `if not exists` vê o nome ocupado, não faz nada, e o
+    // UNIQUE original sobrevive dentro do próprio sandbox do mutante — que
+    // "morre por acidente": sobrevive parecendo regressão quando na verdade
+    // só perdeu o poder de provar (achado da revisão, 09/08/2026, depois do
+    // deploy). Isto é armadilha ESTRUTURAL de qualquer mutantes-*.mjs deste
+    // repo que tente enfraquecer um objeto criado com IF NOT EXISTS depois
+    // que ele foi para produção — não é peculiaridade da 075. O DROP é DDL
+    // transacional: o ROLLBACK do runner devolve o índice único de verdade
+    // no final, então produção nunca fica sem ele.
+    para: `drop index if exists public.fabio_notificacoes_feedback_dia_unico;
+create index if not exists fabio_notificacoes_feedback_dia_unico
   on public.fabio_notificacoes (professor_id, tipo, dia_referencia)
   where tipo like 'feedback_%';`,
   },
