@@ -20,7 +20,7 @@ Amanhã já tem aula. A gente tem que fechar esse buraco inteiro."*
 
 | # | Defeito | Estado |
 |---|---|---|
-| 1 | **Microfone falhava em TODO iPhone** — `observacao.webm` cravado nos dois lados; iOS grava `audio/mp4` e o Whisper decide pela extensão | corrigido no cliente e na edge function; `transcrever-observacao` **v2** no ar |
+| 1 | **Áudio da observação aceitava qualquer coisa que o cliente dissesse** (ver a correção logo abaixo — a explicação da "extensão" que eu vinha dando estava ERRADA) | função lê os BYTES e reembrulha; `transcrever-observacao` **v4** no ar, 6/6 casos verdes |
 | 2 | **✓ verde mentia** — `setEstado` antes da RPC, `catch` não desfazia | `confirmado` separado de `estado`; alerta clicável que reenvia e **vence** o ✓ |
 | 3 | **Dois números da mesma carteira** — 5 dos 6 professores com login viam contagens diferentes (Rafael 57 × 51) | chips contam aluno; a causa NÃO era arquivamento (a view já exclui: 0 em 1.221) — é aluno em mais de um curso |
 | 4 | **O Fábio não sabia o que é o Feedback do mês** e inventava "pesquisa sobre sua rotina" | seção nova na skill; provado conversando (6,3s, correto), sem ruído e com a fronteira de pé |
@@ -37,6 +37,40 @@ coisa atrasada deles"). Não sai mais:
 | Daiana | 3 / 5 | **1 / 2** |
 | Rodrigo | 1 / 5 | **nada** |
 
+### ❌ ONDE EU ESTAVA ERRADO (medido pilotando o app, não deduzido)
+
+**1. O microfone do iPhone provavelmente nunca esteve quebrado.** Eu vinha
+afirmando em duas sessões que *"o Whisper decide pela extensão do arquivo"*.
+Nunca medi. Mandando um AAC/MP4 real pra função em produção:
+
+| bytes | Content-Type | nome | resultado |
+|---|---|---|---|
+| mp4 | ausente | `.webm` | **502** |
+| mp4 | ausente | `.m4a` | **502** |
+| mp4 | `audio/mp4` | `.webm` | **200, transcreveu** |
+| mp4 | `audio/webm` (mentindo) | `.webm` | **502** |
+
+Quem manda é o **Content-Type da parte multipart**. O cliente já mandava
+`audio/mp4` no `blob.type`, então o iPhone caía na linha que dá 200. O
+conserto do nome foi higiene, não conserto de defeito vivo.
+
+**O que ERA defeito:** a função acreditava no que o cliente dizia. Blob sem
+`type` chega como `application/octet-stream` (então `if (arquivo.type)` nunca
+vê "vazio"), e um `type` pode mentir. Agora ela lê os **bytes** (magic number)
+e reembrulha. Os 4 casos que davam 502 dão 200. **v4 no ar.**
+
+**2. "Aluno em mais de um curso" estava errado.** São **54 linhas duplicadas
+em 26 professores**, e só **1** aluno na escola está em dois cursos com o
+mesmo professor. É **renovação de contrato**: a matrícula encerrada e a nova
+convivem. Pilotando, a Amanda aparecia duas vezes em Canto — "40/40 concluída"
+e "Aula 2/40" — e a linha velha, sem `emusys_aluno_id`, ganhava selo "cadastro
+incompleto" num cadastro completo. Corrigido em `agruparPorCurso`.
+
+**A lição das duas:** eu escrevi mecanismo plausível em vez de medir, e o
+plausível entrou no commit, no RETOMADA e no que eu disse pro Alf. Um teste
+que só confirma o resultado esperado não falsifica nada — o que achou os dois
+erros foi **abrir o app e olhar**.
+
 ### ⚠️ O que foi MEDIDO e desarma dois sustos
 
 - **Ligar o timer do feedback hoje não manda nada.** `fn_feedback_cobranca_do_dia`
@@ -48,20 +82,25 @@ coisa atrasada deles"). Não sai mais:
   `fabio-pendencia-manha/noite` **não** restringem mais ao professor 25; só a
   `Description=` do systemd é que ficou dizendo "piloto Matheus".
 
-### O que NÃO deu pra fazer, e por quê
+### ✅ PILOTADO AO VIVO como o Matheus (o Alf logou; eu não digito senha)
 
-**Screenshot do fluxo do professor.** Eu não posso digitar senha em campo
-nenhum — vale mesmo com a credencial na mão e autorizada. A sessão viva no
-navegador é a do **admin** (`lucianoalf.la@gmail.com`), e ela não alcança
-`/app/feedback`: o Alf não tem vínculo de professor, a rota redireciona.
+Percorrido no navegador, com dado de produção:
 
-O que deu pra provar sem login, com o Matheus de verdade, em transação
-descartada (`set_config('request.jwt.claim.sub', …)`, técnica dos testes da
-casa): mesa com 21 alunos → salvar coração vermelho + as 3 perguntas +
-observação → `completo: true`, progresso 1/21. **Resíduo zero** conferido
-depois (`aluno_feedback_professor` segue com 0 linhas).
+- **Home** — o card "Feedback do mês" NÃO aparece, correto: a janela só abre na
+  última semana.
+- **Alunos** — chips `Todas 21 · Campo Grande 15 · Recreio 6` (15+6=21, fecham),
+  Canto 15→14 depois do dedupe, Amanda uma vez só e sem o selo falso.
+- **Mesa** — 21 alunos, blocos "você deu aula" / "não viu", 0/21.
+- **Coração vermelho** → as 3 perguntas abriram → respondidas → **✓ verde e
+  barra 1/21**. Conferido no banco: `vermelho / nao / parado / desanimado`.
+- **Observação** digitada → gravou junto.
+- **Limpo depois:** a linha era invenção minha num aluno real, numa tabela que
+  a coordenação lê. `delete` feito, tabela de volta a **0 linhas**.
 
-Falta o Alf entrar como o Matheus pra eu fotografar a tela.
+**O que não deu pra fazer:** gravar áudio pela interface — o navegador do
+preview não tem microfone. Em vez disso testei o caminho de verdade: gerei uma
+fala, converti pro formato do iPhone (AAC/MP4) e mandei pela sessão do Matheus
+direto na função. Foi assim que os dois erros acima apareceram.
 
 ### Ainda aberto
 
