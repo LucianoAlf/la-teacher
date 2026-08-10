@@ -24,10 +24,24 @@ begin
    where u.auth_user_id is not null and coalesce(u.ativo, true)
    limit 1;
 
-  -- ── As dez chaves existem, com fábrica ──────────────────────────────────
-  insert into _res values ('as 10 chaves existem',
-    (select count(*) from public.radar_config) = 10,
-    format('%s chaves', (select count(*) from public.radar_config)));
+  -- ── As dez chaves ORIGINAIS existem, com fábrica ────────────────────────
+  -- Checa por NOME, não por count(*) total: a 088 (Task 10) inseriu mais 3
+  -- chaves (peso_faltas_consecutivas + 2 limiares) na mesma tabela, e a
+  -- 082 não tem por que saber quantas chaves EXTRAS existem — só que as
+  -- SUAS 10 continuam de pé. `count(*) = 10` travava pra sempre depois da
+  -- 088, e uma asserção travada mata qualquer mutante por ela, não pela
+  -- própria âncora do mutante (achado da revisão da Task 10, 10/08).
+  insert into _res values ('as 10 chaves originais existem',
+    (select count(*) from public.radar_config
+      where chave in ('peso_absenteismo','peso_feedback','peso_pratica',
+                       'peso_faltas_mes','faixa_critico','faixa_saudavel',
+                       'absenteismo_atencao_pct','absenteismo_critico_pct',
+                       'minimo_aulas_para_taxa','minimo_sinais_para_nota')) = 10,
+    format('%s de 10', (select count(*) from public.radar_config
+      where chave in ('peso_absenteismo','peso_feedback','peso_pratica',
+                       'peso_faltas_mes','faixa_critico','faixa_saudavel',
+                       'absenteismo_atencao_pct','absenteismo_critico_pct',
+                       'minimo_aulas_para_taxa','minimo_sinais_para_nota'))));
 
   insert into _res values ('toda chave tem valor de fabrica',
     not exists (select 1 from public.radar_config where fabrica is null), 'ok');

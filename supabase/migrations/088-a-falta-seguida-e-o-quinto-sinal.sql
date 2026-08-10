@@ -15,6 +15,18 @@
 -- FASE B (Fábio avisa o professor com 2 seguidas, grupo da coordenação com
 -- 3+) é decisão do Alf de deixar pra depois — isto aqui é só o sinal
 -- entrando na nota.
+--
+-- FRONTEIRA (§2.1 da spec), texto completo (a 088 reaplica app_coordenacao_
+-- radar da 087 por inteiro, então o cabeçalho tem que carregar o mesmo
+-- texto, não um resumo — achado da revisão, 10/08): as médias por professor
+-- carregam SÓ absenteísmo. Semáforo, prática, evolução e ânimo são opinião
+-- do professor sobre o aluno — agregá-los por professor dá a ele incentivo
+-- pra responder verde, e aí a fonte apodrece em silêncio. Cobra-se que ele
+-- responda; nunca se avalia o que ele respondeu. O 5º sinal (faltas
+-- consecutivas) NÃO é opinião de professor — é presença, mesma classe do
+-- absenteísmo — mas mesmo assim não entra em `medias.professores`: essa
+-- seção documenta desempenho do PROFESSOR em responder, não é onde a nota do
+-- aluno se mistura.
 
 create or replace view public.vw_radar_aluno_sinais as
 with coorte as (
@@ -134,6 +146,39 @@ insert into public.radar_config (chave, valor, fabrica, rotulo, grupo, ordem) va
   ('faltas_consecutivas_critico',  3,  3, 'Crítico a partir de (seguidas)', 'consecutivas', 13)
 on conflict (chave) do nothing;
 
+-- Restaurado da 085 (achado da revisão, 10/08 — `create or replace function`
+-- troca o corpo INTEIRO; reescrever sem colar o comentário original apaga a
+-- justificativa, não só o texto):
+--
+-- Função PURA: recebe os sinais e a config, devolve nota + decomposição. Não
+-- lê tabela. Assim o teste varia peso e sinal sem tocar em configuração nem em
+-- dado real, e o mesmo cálculo serve à tela e a qualquer worker futuro.
+--
+-- TRÊS AMARRAS QUE IMPEDEM A NOTA DE VIRAR OPINIÃO COM CARA DE NÚMERO:
+--
+-- 1. A NOTA SEMPRE ABRE. Devolve `decomposicao` com quanto cada sinal
+--    CONTRIBUIU — não só o peso. Peso é a regra; contribuição é o efeito, e é
+--    o efeito que explica por que a nota é 38. O LA Report já calcula a
+--    contribuição e não a mostra; o tooltip de lá diz "peso 10%", que responde
+--    a pergunta errada.
+--
+-- 2. SINAL SEM DADO SAI DA CONTA E O PESO SE REDISTRIBUI. Nunca conta como
+--    neutro nem como zero. O LA Report usa `ELSE 50 -- sem feedback = neutro`:
+--    com o semáforo em 0% respondido, 20% da nota de TODO MUNDO vira a mesma
+--    constante e a nota mexe menos que a realidade. Contar como zero seria
+--    pior — é o mesmo defeito do "não-marcado = falta" que a presença já teve.
+--
+-- 3. PISO DE COBERTURA. Com menos de `minimo_sinais_para_nota` sinais, a nota
+--    vem NULA. "NOTA 38 · apurada em 1 de 5" é perigoso porque quem lê fixa no
+--    38 e ignora a legenda. Medido em 10/08 (era de 4 sinais, antes da 088):
+--    subindo em ~20/08 seria 1 sinal vivo (absenteísmo com 3 aulas, abaixo do
+--    piso; semáforo só abre em 25/08); em ~01/09 são 3. A nota acende no
+--    começo de setembro, e isso é esperado — o denominador mudou pra 5 com o
+--    5º sinal, a mecânica do piso não.
+--
+-- A 088 acrescenta a 4ª pernada de guarda no 5º sinal (ver o comentário logo
+-- acima do bloco `faltas_consecutivas`), mas as três amarras acima continuam
+-- sendo o contrato inteiro da função — nenhuma foi afrouxada pelo sinal novo.
 create or replace function public.fn_radar_nota(p_sinais jsonb, p_config jsonb)
 returns jsonb
 language plpgsql
@@ -148,6 +193,8 @@ declare
   v_minimo     int := coalesce((p_config->>'minimo_sinais_para_nota')::int, 2);
   r            record;
 begin
+  -- Cada sinal vira (nome, score 0-100, peso, rótulo do valor). Score nulo =
+  -- sinal ausente: entra na decomposição como SEM DADO e fica fora do peso.
   for r in
     select * from (values
       ('absenteismo',
@@ -170,6 +217,12 @@ begin
             when 'sim' then 100 when 'as_vezes' then 50 when 'nao' then 0 end,
        coalesce((p_config->>'peso_pratica')::numeric, 0),
        p_sinais->>'pratica_em_casa'),
+      -- greatest() do Postgres IGNORA NULL (greatest(0,null) = 0, não null —
+      -- medido ao vivo). Por isso a guarda também precisa checar faltas_mes,
+      -- não só aulas_mes: sem o "is not null", faltas_mes ausente virava o
+      -- PIOR score possível em vez de sair da conta — o mesmo "não-marcado =
+      -- falta" que este arquivo existe pra evitar, entrando pela porta dos
+      -- fundos de uma função que o SQL padrão trataria como NULL-propagante.
       ('faltas_mes',
        case when (p_sinais->>'faltas_mes') is not null
                  and coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
@@ -182,8 +235,19 @@ begin
       -- Sinal ponderado, não atropelo: a urgência é o PESO, não um "if" por
       -- fora da redistribuição. Mesma guarda do C1: sem aula medida, sai da
       -- conta — 0 faltas seguidas por FALTA DE DADO != 0 por presença real.
+      --
+      -- E a guarda tem DUAS pernas, não uma (achado da revisão, 10/08): sem
+      -- isto, chamar fn_radar_nota com aulas_medidas>0 mas SEM a própria
+      -- chave faltas_consecutivas no jsonb (::int de null vira null, as duas
+      -- comparações >= dão null/false, cai no ELSE) marcava score=100,
+      -- sem_dado=false — "saudável" fantasma pra quem nunca foi medido nesse
+      -- sinal. Mesmo defeito que já foi Crítico na 085 (ausência de dado
+      -- virando nota boa em vez de SAIR da conta). A RPC (087) sempre manda a
+      -- chave, então isto nunca apareceu em produção — mas fn_radar_nota é
+      -- pública e pura; nada além da RPC garante que a chave sempre vem.
       ('faltas_consecutivas',
        case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0
+                 and (p_sinais->>'faltas_consecutivas') is not null
             then case
                    when (p_sinais->>'faltas_consecutivas')::int
                         >= coalesce((p_config->>'faltas_consecutivas_critico')::int, 3) then 0
@@ -193,7 +257,8 @@ begin
             end,
        coalesce((p_config->>'peso_faltas_consecutivas')::numeric, 0),
        case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0
-            then format('%s falta(s) seguida(s)', coalesce(p_sinais->>'faltas_consecutivas', '0')) end)
+                 and (p_sinais->>'faltas_consecutivas') is not null
+            then format('%s falta(s) seguida(s)', p_sinais->>'faltas_consecutivas') end)
     ) as t(sinal, score, peso, valor)
   loop
     if r.score is null then
@@ -209,6 +274,14 @@ begin
     end if;
   end loop;
 
+  -- Redistribuição: o peso efetivo é a fatia do sinal DENTRO do que sobrou.
+  -- A NOTA NASCE DA SOMA DAS CONTRIBUIÇÕES JÁ ARREDONDADAS — não é mais uma
+  -- conta paralela. Duas contas independentes (nota = round(bruto/vivo) de um
+  -- lado, contribuição = round(score*peso/vivo, 1) de outro) cruzam o ,5 em
+  -- direções diferentes: medido em produção, absenteísmo 100% + feedback
+  -- verde dava nota 38 pela fórmula separada enquanto a decomposição somava
+  -- 38,5 (arredonda pra 39) — a explicação discordava do número que
+  -- explicava. Agora as duas SEMPRE batem, porque são a mesma conta.
   if v_peso_vivo > 0 then
     v_dec := (
       select jsonb_agg(
@@ -226,6 +299,12 @@ begin
      where not (d->>'sem_dado')::boolean;
   end if;
 
+  -- O piso: com pouca cobertura a nota se cala — e a decomposição não pode
+  -- vazar os INGREDIENTES de um número que a tela não vai mostrar. Sem isto,
+  -- uma linha de peso 15 aparecia com "contribuiu: 100, peso_efetivo: 100"
+  -- (100% de uma régua que não existe) mesmo com a nota nula. score/valor/
+  -- peso/sem_dado continuam intactos: a tela ainda precisa poder dizer
+  -- "1 de 5 sinais apurados".
   if v_apurados < v_minimo then
     v_nota := null;
     v_dec := (
@@ -259,6 +338,25 @@ comment on function public.fn_radar_nota(jsonb, jsonb) is
 revoke all on function public.fn_radar_nota(jsonb, jsonb) from public;
 grant execute on function public.fn_radar_nota(jsonb, jsonb) to authenticated;
 
+-- Restaurado da 087 (mesma razão do fn_radar_nota acima — create or replace
+-- function troca o corpo inteiro, e reescrever sem colar o cabeçalho original
+-- apaga a justificativa junto com o texto):
+--
+-- Junta os três: sinais (081/088) + réguas (082) + nota (085/088). Molde da
+-- 077/079.
+--
+-- UM NÚMERO SÓ (lição da 080): resumo, `total_lista` e chips contam a mesma
+-- coisa, no mesmo grão. Na tela do semáforo isso apareceu como 1.155 no topo e
+-- 1.161 na lista, e a causa era grão diferente entre as duas contas.
+--
+-- CADA FACETA IGNORA O PRÓPRIO FILTRO E RESPEITA AS OUTRAS (regra da 071).
+-- Sem isso, escolher uma unidade encolhe a lista de unidades e não há como
+-- voltar pra "todas" sem F5.
+--
+-- FRONTEIRA (§2.1 da spec) — texto completo no cabeçalho do arquivo, no topo
+-- desta migration: as médias por professor carregam SÓ absenteísmo. O 5º
+-- sinal (faltas_consecutivas) não muda isso — ele entra em `linhas` e na
+-- nota, nunca em `medias.professores`.
 create or replace function public.app_coordenacao_radar(
   p_unidade_id   uuid    default null,
   p_professor_id integer default null,
@@ -300,6 +398,7 @@ begin
     select b.*, coalesce(b.nota ->> 'status', 'sem_nota') as status_calc
       from base b
   ),
+  -- Cada faceta é cega ao próprio filtro (071).
   fac_uni  as (select * from com_status
                 where (p_professor_id is null or professor_id = p_professor_id)
                   and (v_status is null or status_calc = v_status)),
@@ -336,6 +435,7 @@ begin
                                                 'absenteismo_media', round(avg(absenteismo_pct),1)) as j
                          from com_status where unidade_codigo is not null
                         group by unidade_id, unidade_codigo) u), '[]'::jsonb),
+        -- SÓ absenteísmo. Ver a fronteira no cabeçalho.
         'professores', coalesce((select jsonb_agg(p.j order by p.professor_nome) from (
                        select professor_id, professor_nome,
                               jsonb_build_object('professor_id', professor_id, 'professor', professor_nome,
@@ -353,8 +453,8 @@ begin
         'feedback', feedback, 'pratica_em_casa', pratica_em_casa,
         'evolucao', evolucao, 'animo', animo, 'observacao', observacao,
         'avisou_que_sai', avisou_que_sai, 'mes_saida', mes_saida)
-        order by (nota ->> 'nota') is null,
-                 (nota ->> 'nota')::numeric asc,
+        order by (nota ->> 'nota') is null,        -- quem tem nota primeiro
+                 (nota ->> 'nota')::numeric asc,   -- pior nota no topo
                  aluno_nome)
       from (select * from linha
              order by (nota ->> 'nota') is null, (nota ->> 'nota')::numeric asc, aluno_nome

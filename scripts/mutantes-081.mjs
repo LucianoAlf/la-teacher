@@ -11,11 +11,25 @@
 // que o passo estrutural sozinho não pegava — a coluna nunca é NULL de
 // verdade, então ele é gêmeo do V2), V8 é o I1 (current_date cru voltando no
 // lugar de fn_competencia_feedback).
+//
+// REPONTADO PARA A 088 (revisão da Task 10, 10/08): a 088 reaplica esta MESMA
+// view (create or replace) com o 5º sinal ACRESCENTADO no fim da lista de
+// colunas — a view viva tem 21 colunas, e `081-os-sinais-do-radar.sql`
+// sozinho só define 20. `create or replace view` recusa DROPAR coluna, então
+// mutar o arquivo 081 e tentar reaplicar contra a view viva falha com
+// "cannot drop columns from view" pra QUALQUER mutação, inclusive nenhuma —
+// os "mortos" que isso produzia não provavam nada (erro de schema, não a
+// asserção do teste). As 4 decisões que este arquivo documenta continuam
+// intactas, palavra por palavra, dentro do corpo da 088 — por isso ORIGINAL
+// aponta pra lá agora, e as 8 âncoras abaixo batem sem ajuste (conferido:
+// cada uma ocorre exatamente 1 vez no texto da 088). TESTE continua sendo o
+// da 081: nenhuma das assertions checa contagem/ordem de coluna, então
+// seguem válidas contra o formato novo.
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
 
-const ORIGINAL = 'supabase/migrations/081-os-sinais-do-radar.sql'
+const ORIGINAL = 'supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.sql'
 const TESTE = 'supabase/migrations/081-os-sinais-do-radar.test.sql'
 const TEMP = 'supabase/migrations/_mutante-081.sql'
 const fonte = readFileSync(ORIGINAL, 'utf8')

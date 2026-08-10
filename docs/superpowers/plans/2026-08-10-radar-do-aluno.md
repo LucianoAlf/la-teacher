@@ -38,7 +38,9 @@ Valem para **todas** as tarefas. Copiadas da spec, com os valores exatos.
    coluna, nem média, nem ranking, nem ordenação.
 8. **Sinal sem dado sai da conta e o peso se redistribui** — nunca conta como
    neutro nem como zero.
-9. **Todo número aparece com sua base:** `6 de 10`, `apurada em 3 de 4 sinais`.
+9. **Todo número aparece com sua base:** `6 de 10`, `apurada em 3 de 5 sinais`
+   (5 sinais desde a Task 10/migration 088; a spec original desta lista falava
+   em 4).
 10. **Guard de toda RPC de tela:** `fn_e_coordenacao_la_teacher()` → senão
     `raise exception 'apenas_admin'`.
 11. **Um número só:** resumo, lista e chip de filtro contam a mesma coisa no
@@ -1840,7 +1842,8 @@ npm run build
 
 Ao vivo: abrir um aluno com nota e conferir que a soma das contribuições bate
 com a nota exibida; abrir um sem nota e conferir que o modal explica o
-silêncio (`apurada em 1 de 4 · insuficiente`).
+silêncio (`apurada em 1 de 5 · insuficiente` — 5 sinais desde a Task 10/
+migration 088, não mais 4).
 
 - [ ] **Step 4: Commit**
 
@@ -1864,9 +1867,14 @@ git commit -m "feat(radar): o modal do aluno, com a nota aberta e a base declara
 
 - [ ] **Step 1: Criar a tela**
 
-Quatro grupos (`pesos`, `faixas`, `absenteismo`, `base`), cada item com input
+Cinco grupos (`pesos`, `faixas`, `absenteismo`, `base`, `consecutivas` — o
+último veio da Task 10/migration 088, fora do escopo original desta task,
+acrescido em 10/08 com os 2 limiares de faltas seguidas), cada item com input
 numérico, o **valor de fábrica visível ao lado** e um selo discreto quando
-`mexido` for verdadeiro.
+`mexido` for verdadeiro. Se esta tela for implementada lendo só os quatro
+grupos originais, os limiares de `consecutivas` ficam escondidos — a tela
+precisa iterar os grupos que `app_radar_config()` devolver, não uma lista
+fixa de quatro.
 
 **Copy proibida nesta tela:** "recomendado", "padrão do sistema", "sugerido".
 O default é ponto de partida, não verdade — escrever isso ao lado do número

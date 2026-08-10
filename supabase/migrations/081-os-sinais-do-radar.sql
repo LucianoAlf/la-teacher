@@ -1,5 +1,15 @@
 -- 081 — os sinais do Radar do aluno
 --
+-- SUPERADA POR: 088-a-falta-seguida-e-o-quinto-sinal.sql
+--
+-- A 088 reaplica esta MESMA view (create or replace) acrescentando o 5º
+-- sinal (faltas_consecutivas) no fim da lista de colunas — create or replace
+-- view recusa DROPAR coluna, então a versão daqui embaixo (20 colunas) não
+-- reaplica mais contra a view viva (21 colunas). Isso não é bug: é o motivo
+-- de existir o marcador. `scripts/mutantes-081.mjs` foi repontado pra mutar
+-- o corpo da 088 (que ainda carrega intactas as 4 decisões que este arquivo
+-- documenta), não este arquivo.
+--
 -- Fundação do Radar: uma linha por aluno da coorte, com os quatro sinais da
 -- Fase 1 e a BASE de cada um. Quem lê o número tem que ver de quantas aulas
 -- ele saiu.

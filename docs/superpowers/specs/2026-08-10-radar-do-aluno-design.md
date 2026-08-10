@@ -281,6 +281,14 @@ professor que não passa dever de casa (8 registros).
 
 ## 5. A nota
 
+> **Nota de manutenção (10/08, revisão da Task 10):** esta seção foi escrita
+> quando o modelo tinha 4 sinais. A Task 10 (migration 088, fora da spec
+> original) acrescentou um 5º — **faltas consecutivas** — pela mesma decisão
+> do Alf (não travar a nota na participação do professor). Os números "de 4"
+> abaixo viraram "de 5"; os diagramas ASCII continuam mostrando só os 4 sinais
+> originais como ilustração — não foram redesenhados pra incluir o 5º (o
+> comportamento real está em `fn_radar_nota`, migration 088).
+
 **Pesos configuráveis já na Fase 1** (decisão do Alf, contra a minha
 recomendação inicial — registrado). Mas com três coisas que impedem a nota de
 virar opinião com cara de número:
@@ -290,7 +298,7 @@ quanto. É a diferença entre um ponteiro em que se acredita e uma nota que se
 audita.
 
 ```
-NOTA 38          apurada em 3 de 4 sinais
+NOTA 38          apurada em 3 de 5 sinais
 ├ absenteísmo     5 de 10      peso 40 → 53   contribuiu 21
 ├ feedback        vermelho     peso 25 → 33   contribuiu 11
 ├ prática         não          peso 20 → 27   contribuiu  6
@@ -300,17 +308,17 @@ NOTA 38          apurada em 3 de 4 sinais
 **5.2 Sinal sem dado sai da conta e o peso se redistribui** (decisão do Alf).
 Nunca conta como neutro nem como ruim — contar ausência de dado como coisa ruim
 é o mesmo defeito de "não-marcado = falta" que a gente acabou de tirar da
-presença. Ao lado da nota vai a **cobertura**: *"apurada em 3 de 4 sinais"*.
+presença. Ao lado da nota vai a **cobertura**: *"apurada em 3 de 5 sinais"*.
 Duas notas 70 não se confundem.
 
 **5.3 A nota carrega em quanta aula ela foi medida.** Nota calculada sobre 2
 aulas e sobre 10 não podem parecer a mesma coisa.
 
 **5.4 Piso de cobertura: `minimo_sinais_para_nota`, default 2** (configurável).
-Abaixo disso a coluna mostra `—` e *"apurada em 1 de 4 · insuficiente"*, não um
+Abaixo disso a coluna mostra `—` e *"apurada em 1 de 5 · insuficiente"*, não um
 número.
 
-Levantado na revisão externa e aceito: `NOTA 38 · apurada em 1 de 4` é
+Levantado na revisão externa e aceito: `NOTA 38 · apurada em 1 de 5` é
 perigoso, porque quem lê fixa no 38 e ignora a legenda. E numa estreia realista
 o problema é concreto:
 
@@ -408,7 +416,7 @@ Health Score 38 · Crítico
   prática       não             contribuiu  0 de 20
   faltas do mês 2               contribuiu 11 de 15
   ─────────────────────────────────────────────────
-  apurada em 4 de 4 sinais
+  apurada em 4 de 5 sinais
 ```
 
 **Correção 2 — sinal sem dado não vira meio.** O deles faz

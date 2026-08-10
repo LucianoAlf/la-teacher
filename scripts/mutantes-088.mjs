@@ -8,6 +8,12 @@
 //
 // Se um mutante sobreviver, quem está errado é o TESTE que não pegou, nunca
 // o mutante — o passo que falta se adiciona lá, não se afrouxa aqui.
+//
+// Rodada de correção (revisão code-reviewer, 10/08, I1): a guarda de
+// faltas_consecutivas ganhou uma SEGUNDA perna (`and (p_sinais->>
+// 'faltas_consecutivas') is not null` — sem ela, chave ausente virava
+// "saudável" fantasma, mesmo defeito já Crítico na 085). V1 e V4 tiveram a
+// âncora reajustada pro texto novo; a MUTAÇÃO em si não mudou.
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
@@ -19,9 +25,15 @@ const fonte = readFileSync(ORIGINAL, 'utf8')
 
 const MUTANTES = [
   {
-    nome: 'V1 — a guarda cai (sem aula medida conta como saudavel fantasma)',
-    pega: 'passo "sem aula medida, faltas_consecutivas fica sem_dado"',
-    de: `      ('faltas_consecutivas',\n       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0\n            then case`,
+    // Âncora repontada na rodada de correção (I1, revisão 10/08): a guarda
+    // ganhou uma segunda perna (`and (p_sinais->>'faltas_consecutivas') is
+    // not null`, C1/I1 da revisão) — o texto velho não bate mais 1x só. A
+    // mutação continua a mesma: derruba as DUAS pernas de uma vez (`true`),
+    // provando que sem_dado some tanto pra "sem aula medida" quanto pra
+    // "chave ausente".
+    nome: 'V1 — a guarda cai inteira (sem aula medida OU sem a chave conta como saudavel fantasma)',
+    pega: 'passo "sem aula medida, faltas_consecutivas fica sem_dado" (e o caso novo da chave ausente)',
+    de: `      ('faltas_consecutivas',\n       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0\n                 and (p_sinais->>'faltas_consecutivas') is not null\n            then case`,
     para: `      ('faltas_consecutivas',\n       case when true\n            then case`,
   },
   {
@@ -37,10 +49,12 @@ const MUTANTES = [
     para: `    'sinais_totais', 4,`,
   },
   {
+    // Âncora repontada na mesma rodada (I1): a guarda do rótulo `valor`
+    // também ganhou a segunda perna.
     nome: 'V4 — o peso configuravel vira hardcoded (deixa de ser sinal ponderado de verdade)',
     pega: 'passo "nota com 3 faltas seguidas e menor que com 0" (peso zerado nao move a nota)',
-    de: `       coalesce((p_config->>'peso_faltas_consecutivas')::numeric, 0),\n       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0\n            then format('%s falta(s) seguida(s)'`,
-    para: `       0,\n       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0\n            then format('%s falta(s) seguida(s)'`,
+    de: `       coalesce((p_config->>'peso_faltas_consecutivas')::numeric, 0),\n       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0\n                 and (p_sinais->>'faltas_consecutivas') is not null\n            then format('%s falta(s) seguida(s)'`,
+    para: `       0,\n       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0\n                 and (p_sinais->>'faltas_consecutivas') is not null\n            then format('%s falta(s) seguida(s)'`,
   },
   {
     nome: 'V5 — a view para de contar falta seguida (conta presenca)',
