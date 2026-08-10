@@ -11,6 +11,60 @@
 
 ---
 
+## ✅ 10/08 MADRUGADA — a parede das 9h caiu, e o Radar ganhou spec
+
+**O deploy entrou.** O `062bc96` tinha ficado sem build; o commit vazio `2fd58ed`
+destravou. Produção agora é `index-TsNOqwLF.js` e tem os filtros da 079, o
+`total_lista` da 080 e o `end` da sidebar — conferido no bundle servido, não no
+painel da Vercel.
+
+**Escalonamento (`146a593`, no ar na VPS).** Medido antes de mexer: a mensagem
+única tinha **20.951 caracteres e 1.032 linhas** (os 51 KB anotados eram o JSON,
+não o texto), e ela é entregue mesmo — `escalonamento_enviado`, 33 professores
+em 09/08. Agora são 4 mensagens: índice de **421 chars** + uma por unidade
+(CG 7.252 · Recreio 7.585 · Barra 3.496). Duas decisões que o dado forçou:
+
+- **o professor vai inteiro pra uma unidade** (a que tem mais aula parada), não
+  fatiado — 13 dos 36 dão aula em mais de uma, e como a RPC corta em
+  `p_max_aulas=12`, fatiar deixaria o rodapé "+N aulas" sem dono;
+- **o detalhe é racionado, não cortado** — bloco inteiro pros 8 mais atrasados
+  de cada unidade, uma linha pros demais. Ninguém some.
+
+37 asserções, **9/9 mutantes mortos**. Verificado em dry-run contra os 36 reais;
+nada foi ao grupo.
+
+**`Description=` das units:** corrigido nas três (manhã, noite, briefing) — não
+dizem mais "piloto Matheus, professor 25". ⚠️ O **nome** da unit do briefing
+segue `fabio-briefing-matheus.service` e ela atende 6 professores, não 1;
+renomear mexe em timer vivo e não valia a madrugada.
+
+### ▶ RADAR: spec escrita em `docs/superpowers/specs/2026-08-10-radar-do-aluno-design.md`
+
+Três medições derrubaram coisas que a direção aprovada dava como certas:
+
+1. **As duas réguas de "dias sem presença" nunca discordaram.** A
+   `vw_aluno_sucesso_lista` faz join na própria `vw_absenteismo_aluno`: mesma
+   coluna, **0 divergências**. O que diferia era a população (1.509 × 1.113). A
+   anotação de 08/08 estava errada nisso.
+2. **Desde 09/07 cada aula real vira 2 linhas** em `aluno_presenca` — 1.840 de
+   3.148 horários, e as 1.850 duplicatas diferem **100% no `aula_emusys_id`**
+   (id de EVENTO, não da aula). Contar linha crua dobra qualquer falta.
+3. **"Sumiu da escola" não sai na Fatia 1.** Sem duplicata, 126 alunos têm 2+
+   faltas seguidas e **nunca** foram marcados presentes na janela; 97 tiveram
+   aula na semana de 03/08 com **zero presenças**, enquanto a escola rodou a
+   **68%**. Estão concentrados em **CG** (10 das 12 primeiras linhas, 28–50% da
+   carteira do professor). É registro, não aluno.
+
+Fatia 1 vira: **"Ligar essa semana"** (crítico × renovação = **2** hoje),
+**"Avisou que sai e ainda está em aula"** (**33**, vive da linha ADM porque só
+17 acham par na base ativa) e **"Coração vermelho"** (semáforo + health_score
+lado a lado, nunca somados). As três perguntas do semáforo viram a *frase do
+porquê* dentro do cartão — é ali que elas ganham leitor.
+
+**PRÓXIMO PASSO:** o Alf revisa a spec. Depois dela, plano e execução.
+
+---
+
 ## ✅ 09/08 NOITE — o Fábio perguntava "amanhã" e respondia "hoje" (CONSERTADO)
 
 Achado conversando, não lendo código: `"como esta minha agenda de amanha?"` →
@@ -214,22 +268,24 @@ direto na função. Foi assim que os dois erros acima apareceram.
 - **Fila offline no feedback.** O registro de aula tem; o semáforo não. Hoje a
   falha é **honesta** (alerta + reenviar), mas o trabalho se perde se o
   professor fechar o app. Não é urgente pra amanhã — a janela só abre em 25/08.
-- **O escalonamento manda 36 professores numa mensagem só** pro grupo da
-  coordenação, todo dia às 9h BRT (12:00 UTC). Já era assim; ninguém lê uma
-  parede dessas. **Medido em 09/08 23h59**: `fn_pendencias_escalonadas()` →
-  36 professores, `limite_dias` 3, **51.327 caracteres de JSON**.
-  ⚠️ Cuidado ao remedir: a função devolve **UM jsonb**, não uma linha por
-  professor. `select count(*) from fn_pendencias_escalonadas()` dá **1** — eu
-  caí nisso na mesma noite. O número está em `jsonb_array_length(→'linhas')`.
-- **`Description=` das units de pendência mentem** ("piloto Matheus, professor
-  25") desde que a cobrança deixou de ser fixa nele. Confirmado em 09/08 via
-  `systemctl --user show ... -p Description`.
+- ~~**O escalonamento manda 36 professores numa mensagem só**~~ — **RESOLVIDO em
+  10/08** (`146a593`): virou índice + uma mensagem por unidade. Ver a seção do
+  topo.
+  ⚠️ Cuidado ao remedir: `fn_pendencias_escalonadas()` devolve **UM jsonb**, não
+  uma linha por professor. `select count(*) from fn_pendencias_escalonadas()` dá
+  **1** — eu caí nisso. O número está em `jsonb_array_length(→'linhas')`. E o
+  tamanho da MENSAGEM não é o do JSON: 20.951 chars contra 51.327.
+- ~~**`Description=` das units de pendência mentem**~~ — **RESOLVIDO em 10/08**
+  nas três units. Fica só o **nome** da unit do briefing
+  (`fabio-briefing-matheus.service`), que atende 6 professores e não 1.
 - **O LA Report não lê a observação.** Lá o semáforo entra só como o coração,
   valendo 20% do `health_score` (`calcular_health_score_aluno`); as três
   perguntas e o texto do professor só têm leitor no LA Teacher (077).
-- **A tela nova só foi vista no preview local.** As migrations 077–080 estão em
-  produção; o front depende do deploy do push na `main`. Conferir a URL de
-  produção antes de mostrar pra coordenação.
+- ~~**A tela nova só foi vista no preview local.**~~ — **NO AR em 10/08**:
+  bundle `index-TsNOqwLF.js` com os marcadores da 079/080 e o `end` da sidebar,
+  conferidos no bundle servido. ⚠️ Tem service worker registrado: quem já abriu
+  o app pode ver a versão velha até atualizar. Se um professor jurar que não vê
+  o "Feedback do mês", a primeira coisa é fechar e reabrir, não caçar bug.
 
 ---
 
@@ -241,9 +297,10 @@ A ordem verdadeira, hoje, é esta:
 | # | Frente | Onde parou | Seção |
 |---|---|---|---|
 | ~~1~~ | ~~Semáforo do professor~~ | **FECHADO em 09/08 à noite.** Banco (073–080), mesa do professor, tela da coordenação, cobrança no timer, e o Fábio lendo. O texto abaixo desta tabela é HISTÓRIA — não reabrir | ✅ |
-| **1** | **Radar do aluno** (bloco 2 do painel da coordenação) | Fontes medidas, desenho aprovado em direção, spec **não escrita**. É o próximo | "▶ PRÓXIMO PASSO: RADAR DO ALUNO" |
+| **1** | **Radar do aluno** (bloco 2 do painel da coordenação) | **Spec escrita em 10/08** (`docs/superpowers/specs/2026-08-10-radar-do-aluno-design.md`) — aguardando revisão do Alf. Depois dela: plano + execução | seção do topo |
 | 2 | **Fila offline no feedback** | O ✓ é honesto (alerta + reenviar), mas o toque se perde se o app fechar. Janela abre 25/08 | "Ainda aberto" |
-| 3 | **Parede de texto do escalonamento** | **MEDIDO 09/08 23h59: 36 professores, 51 KB de JSON**, numa mensagem só, todo dia 9h BRT | "Ainda aberto" |
+| ~~3~~ | ~~Parede de texto do escalonamento~~ | **FECHADO em 10/08** (`146a593`): índice + uma mensagem por unidade, 9/9 mutantes | seção do topo |
+| 3 | **Registro de presença em Campo Grande** | **NOVO, medido em 10/08:** 126 alunos com 2+ faltas seguidas e zero presença afirmada, concentrados em CG (28–50% da carteira de alguns professores). É o que segura o cartão "Sumiu da escola" do Radar | spec do Radar, §3 |
 
 **Fechado em 09/08 e que NÃO deve ser reaberto:** a fronteira do Fábio (o
 professor não alcança dado de colega nem SQL — virou canal, não prompt), o
