@@ -309,8 +309,35 @@ frase das três perguntas e a observação do professor entre aspas, e o
 **histórico de presença desduplicado** com os quatro estados por extenso e a
 janela declarada ("10 aulas, de 04/ago a 15/out").
 
-**6.3 Configuração de pesos** — dentro da coordenação, com histórico de
-alteração.
+**6.3 Configuração — a aba "Réguas"** (dentro da coordenação, uma tela só)
+
+Quatro grupos, todos com o **valor de fábrica visível ao lado do valor atual**,
+para se enxergar o que foi mexido sem consultar histórico:
+
+| Grupo | Campos | Fábrica |
+|---|---|---|
+| Pesos dos sinais | absenteísmo · feedback · prática · faltas do mês | 40 · 25 · 20 · 15 |
+| Faixas do status | crítico < · saudável ≥ | 40 · 70 |
+| Linhas do absenteísmo | `atencao_pct` · `critico_pct` | 25 · 50 |
+| Base mínima | `minimo_aulas_para_taxa` | 4 |
+
+**A régua nasce frouxa e aperta com o tempo** — intenção do Alf: *"posso querer
+descer nesse primeiro momento para 30%, e aumentar aos poucos, de acordo com
+que a equipe vai amadurecendo"*. Isso inverte o instinto de engenharia (começar
+apertado e afrouxar) e está certo: alerta que dispara em todo mundo no dia 1 é
+alerta que a equipe aprende a ignorar, e hábito perdido não volta.
+
+→ **Consequência de design:** o default de 25 é **ponto de partida, não
+verdade**. A tela precisa deixar isso óbvio — nada de "recomendado" ou
+"padrão do sistema" ao lado do número, que transformaria uma escolha de gestão
+em regra técnica.
+
+**O histórico de alteração vira o placar da transição.** Toda mudança grava
+quem, quando e o valor anterior. Com isso, o par (linha do alerta × média da
+escola) ao longo do tempo é o registro do amadurecimento: a linha descendo
+enquanto a média cai é a prova de que o lançamento melhorou. É o que transforma
+"a coisa tende a melhorar" em número — e é o placar da cobrança da Sol e da
+ferramenta de presença.
 
 **Selos na linha:** "avisou que sai" (33 alunos hoje, da `movimentacoes_admin`
 com `mes_saida` à frente) e "presenteísmo". São selos, não colunas — não entram
