@@ -49,10 +49,24 @@ const BUCKET = 'fabio-audios'
 const DRY = process.argv.includes('--dry')
 
 // Cada item é um áudio REAL dela, casado à aula-âncora (a de turma do horário —
-// é ela que o app abre e que a chamada usa). A aula da Beatriz (05/08 15h) NÃO
-// está aqui de propósito: foi a única que o Fábio gravou de verdade em 08/08,
-// e regravar em cima seria substituir o registro dela pelo meu.
+// é ela que o app abre e que a chamada usa).
+//
+// A Beatriz (05/08 15h) entrou numa 2ª passada (10/08, tarde), depois de
+// medir que o registro dela NÃO tinha passado pelo motor: em 08/08 o Fábio
+// ainda tinha o MCP de banco e gravou o áudio dela via `registrar_aula_fabio`
+// DIRETO — texto corrido ("AULA — 05/08 · Canto T..."), sem `fabio_registros_aula`,
+// sem `campos` estruturados (molde C), sem devolutiva. As outras 4 aulas deste
+// arquivo, sim, passaram pelo motor desde a 1ª passada. A aula-âncora dela é a
+// de TURMA (202385, 1 aluno — regra v3 do agrupamento: turma de 1 some da tela
+// e vira "individual", mas a CHAMADA e a fila continuam na âncora).
 const AUDIOS = [
+  {
+    rotulo: 'Beatriz — quarta 05/08 15h (reprocesso: já tinha texto bruto, fora do motor)',
+    aulaId: 202385,
+    unidadeId: '368d47f5-2d88-4475-bc14-ba084a9a348e',
+    url: 'https://lamusic.uazapi.com/files/9334058b2f9f8cc836dbbf7b251a4db83b89c23ab88947884631822ac8ef7551.mp3',
+    modoConfirmacao: 'substituir', // ela já tem anotacoes_fabio (texto bruto) — 'novo' seria recusado
+  },
   {
     rotulo: 'Pedro e Sofia — terça 04/08 18h',
     aulaId: 204670,
@@ -158,7 +172,8 @@ for (const a of AUDIOS) {
       status: 'pendente',
     }),
   })
-  console.log(`    → fila ${row.id} (${row.status}); o trigger chamou o Hermes\n`)
+  console.log(`    → fila ${row.id} (${row.status}); o trigger chamou o Hermes` +
+    (a.modoConfirmacao ? ` · confirmar com p_modo='${a.modoConfirmacao}'` : '') + '\n')
 }
 
 console.log('pronto.')
