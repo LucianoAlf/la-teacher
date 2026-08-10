@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { EmptyState, Skeleton } from '../../components/ui'
 import { FiltrosRadar } from '../../features/coordenacao/components/FiltrosRadar'
 import { LinhaRadar } from '../../features/coordenacao/components/LinhaRadar'
+import { ModalAlunoRadar } from '../../features/coordenacao/components/ModalAlunoRadar'
 import { PainelNumero } from '../../features/coordenacao/components/PainelNumero'
 import {
   coordenacaoRadar,
@@ -26,9 +28,7 @@ export default function CoordenacaoRadarPage() {
   const [dados, setDados] = useState<RadarResposta | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<FiltroRadar>(SEM_FILTRO_RADAR)
-  // Modal (Task 7) usa este estado; na Task 6 o clique só prepara a abertura.
-  const [_aberto, setAberto] = useState<RadarLinha | null>(null)
-  void _aberto
+  const [aberto, setAberto] = useState<RadarLinha | null>(null)
 
   const carregar = useCallback(() => {
     setErro(null)
@@ -164,9 +164,27 @@ export default function CoordenacaoRadarPage() {
               </>
             )}
 
+            <p className="mt-6 text-[11.5px] text-text-muted">
+              <Link
+                to="/app/coordenacao/reguas"
+                className="text-brand-text underline-offset-2 hover:underline"
+              >
+                Réguas
+              </Link>
+              {' · '}
+              pesos e faixas que alimentam a nota
+            </p>
           </>
         )}
       </div>
+
+      {aberto && dados ? (
+        <ModalAlunoRadar
+          linha={aberto}
+          medias={dados.medias}
+          aoFechar={() => setAberto(null)}
+        />
+      ) : null}
     </CoordenacaoFrame>
   )
 }
