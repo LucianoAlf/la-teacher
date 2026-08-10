@@ -215,9 +215,21 @@ direto na função. Foi assim que os dois erros acima apareceram.
   falha é **honesta** (alerta + reenviar), mas o trabalho se perde se o
   professor fechar o app. Não é urgente pra amanhã — a janela só abre em 25/08.
 - **O escalonamento manda 36 professores numa mensagem só** pro grupo da
-  coordenação, todo dia às 9h. Já era assim; ninguém lê uma parede dessas.
+  coordenação, todo dia às 9h BRT (12:00 UTC). Já era assim; ninguém lê uma
+  parede dessas. **Medido em 09/08 23h59**: `fn_pendencias_escalonadas()` →
+  36 professores, `limite_dias` 3, **51.327 caracteres de JSON**.
+  ⚠️ Cuidado ao remedir: a função devolve **UM jsonb**, não uma linha por
+  professor. `select count(*) from fn_pendencias_escalonadas()` dá **1** — eu
+  caí nisso na mesma noite. O número está em `jsonb_array_length(→'linhas')`.
 - **`Description=` das units de pendência mentem** ("piloto Matheus, professor
-  25") desde que a cobrança deixou de ser fixa nele.
+  25") desde que a cobrança deixou de ser fixa nele. Confirmado em 09/08 via
+  `systemctl --user show ... -p Description`.
+- **O LA Report não lê a observação.** Lá o semáforo entra só como o coração,
+  valendo 20% do `health_score` (`calcular_health_score_aluno`); as três
+  perguntas e o texto do professor só têm leitor no LA Teacher (077).
+- **A tela nova só foi vista no preview local.** As migrations 077–080 estão em
+  produção; o front depende do deploy do push na `main`. Conferir a URL de
+  produção antes de mostrar pra coordenação.
 
 ---
 
@@ -228,8 +240,10 @@ A ordem verdadeira, hoje, é esta:
 
 | # | Frente | Onde parou | Seção |
 |---|---|---|---|
-| **1** | **Semáforo do professor** | Banco pronto (073–076 aplicadas), tela no repo, `transcrever-observacao` publicada. **Falta o worker saber cobrar feedback** — não existe o tipo `feedback` no `fabio_notification_worker.py`, nem timer | logo abaixo |
-| 2 | **Radar do aluno** (bloco 2 do painel da coordenação) | Fontes medidas, desenho aprovado em direção, spec **não escrita** | "▶ PRÓXIMO PASSO: RADAR DO ALUNO" |
+| ~~1~~ | ~~Semáforo do professor~~ | **FECHADO em 09/08 à noite.** Banco (073–080), mesa do professor, tela da coordenação, cobrança no timer, e o Fábio lendo. O texto abaixo desta tabela é HISTÓRIA — não reabrir | ✅ |
+| **1** | **Radar do aluno** (bloco 2 do painel da coordenação) | Fontes medidas, desenho aprovado em direção, spec **não escrita**. É o próximo | "▶ PRÓXIMO PASSO: RADAR DO ALUNO" |
+| 2 | **Fila offline no feedback** | O ✓ é honesto (alerta + reenviar), mas o toque se perde se o app fechar. Janela abre 25/08 | "Ainda aberto" |
+| 3 | **Parede de texto do escalonamento** | **MEDIDO 09/08 23h59: 36 professores, 51 KB de JSON**, numa mensagem só, todo dia 9h BRT | "Ainda aberto" |
 
 **Fechado em 09/08 e que NÃO deve ser reaberto:** a fronteira do Fábio (o
 professor não alcança dado de colega nem SQL — virou canal, não prompt), o
