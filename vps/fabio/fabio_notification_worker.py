@@ -15,6 +15,7 @@ import json
 import os
 import re
 import sys
+import time as _time
 
 import requests
 from dataclasses import dataclass
@@ -31,6 +32,10 @@ DEFAULT_PENDENCIA_TIME = os.getenv("FABIO_NOTIFY_PENDENCIA_TIME", "18:30")
 # bola passa pra coordenacao. Desenho do Alfredo em
 # docs/2026-07-18-fabio-governanca-presenca-professor-alfredo.md.
 ESCALONAMENTO_DIAS = int(os.getenv("FABIO_ESCALONAMENTO_DIAS", "3"))
+# Quantos professores levam BLOCO INTEIRO em cada mensagem de unidade. Os
+# demais entram numa linha cada, no rodape — ninguem some, o detalhe e que e
+# racionado por gravidade. 0 desliga o racionamento (todo mundo com bloco).
+ESCALONAMENTO_BLOCOS_POR_UNIDADE = int(os.getenv("FABIO_ESCALONAMENTO_BLOCOS", "8"))
 # COORDENACAO PEDAGOGICA (Marcos Quintela, Juliane, Fabio). Puxado da UAZAPI.
 GRUPO_COORDENACAO_JID = os.getenv("FABIO_GRUPO_COORDENACAO_JID", "120363304349910605@g.us")
 DEFAULT_ESCALONAMENTO_TIME = os.getenv("FABIO_NOTIFY_ESCALONAMENTO_TIME", "09:00")
@@ -488,62 +493,208 @@ def pendencias_escalonadas(professor_id: Optional[int] = None) -> list:
     return linhas
 
 
-def format_escalonamento(rows: list) -> Optional[str]:
-    """Mensagem do grupo da coordenacao, no formato A (escolhido pelo Alf).
+REGUA_ESCALONAMENTO = "━━━━━━━━━━━━━━"
 
-    Tem que ser ENCAMINHAVEL: a coordenacao copia daqui e manda pro professor.
-    Por isso vai a relacao completa (dia, hora, curso, nome COMPLETO do aluno)
-    e nao um resumo — resumo nao diz a ninguem o que fazer.
+
+def _nome_professor(row: Dict[str, Any]) -> str:
+    return row.get("professor_nome") or f"professor {row.get('professor_id')}"
+
+
+def _unidade_de_cobranca(row: Dict[str, Any]) -> str:
+    """A unidade que fica com o professor quando a mensagem se divide.
+
+    13 dos 36 professores atrasados (medido em 09/08/2026) dao aula em mais de
+    uma unidade. Havia duas saidas: FATIAR as aulas do professor por unidade,
+    ou mandar o professor INTEIRO pra uma unidade so.
+
+    Fatiar quebra a contagem. A RPC ja corta as aulas em `p_max_aulas` (12), e
+    8 professores tem `total_aulas` maior que a lista que vem — depois de
+    fatiar nao da pra saber de qual unidade sao as aulas escondidas, e o
+    rodape "+N aulas atrasadas" viraria chute. Entao o professor vai inteiro,
+    pra unidade onde ele tem MAIS aula parada, e o cabecalho do bloco lista
+    todas as unidades dele. Quem encaminha manda a relacao completa; o
+    professor recebe uma cobranca, nao tres pela metade.
+    """
+    contagem: Dict[str, int] = {}
+    for a in row.get("aulas") or []:
+        u = a.get("unidade")
+        if u:
+            contagem[u] = contagem.get(u, 0) + 1
+    if contagem:
+        # Empate resolvido pelo nome da unidade: mesma entrada, mesma saida.
+        return sorted(contagem.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+    unidades = row.get("unidades") or []
+    return unidades[0] if unidades else "Sem unidade"
+
+
+def _gravidade(row: Dict[str, Any]) -> tuple:
+    """Ordem de leitura: mais aula parada primeiro, empate no pior atraso."""
+    return (-int(row.get("total_aulas") or 0),
+            -int(row.get("pior_atraso") or 0),
+            _nome_professor(row).lower())
+
+
+def _por_unidade(rows: list) -> Dict[str, list]:
+    """Agrupa por `_unidade_de_cobranca`, unidade maior primeiro.
+
+    Este agrupamento e a FONTE UNICA da divisao: o indice conta daqui e as
+    mensagens saem daqui. Contar "professores que tem aula na unidade" daria
+    50 pra 36 professores — dois numeros pra mesma pergunta, que foi
+    exatamente o defeito que a 080 consertou na tela do semaforo.
+    """
+    grupos: Dict[str, list] = {}
+    for r in rows:
+        grupos.setdefault(_unidade_de_cobranca(r), []).append(r)
+    ordem = sorted(grupos, key=lambda u: (-len(grupos[u]), u))
+    return {u: sorted(grupos[u], key=_gravidade) for u in ordem}
+
+
+def _bloco_professor(r: Dict[str, Any]) -> list:
+    """O bloco encaminhavel de UM professor — o formato A escolhido pelo Alf.
 
     Hierarquia com o que o WhatsApp respeita: *negrito* na hora (a ancora),
-    _italico_ no aluno (apoio, um nivel abaixo), regua fechando o bloco de
+    _italico_ no aluno (apoio, um nivel abaixo), regua abrindo o bloco de
     cada professor — que e onde a coordenacao vai cortar pra copiar. A linha
     em branco entre aulas impede que os horarios grudem quando a lista de
     alunos quebra em duas linhas no celular.
     """
+    unidades = r.get("unidades") or []
+    aulas = r.get("aulas") or []
+    total = int(r.get("total_aulas") or len(aulas))
+    uma_unidade = len(unidades) == 1
+
+    out: list = [REGUA_ESCALONAMENTO]
+    # Com mais de uma unidade o cabecalho lista TODAS: quem le precisa saber
+    # antes de encaminhar que aquele professor nao e so da unidade dele.
+    out.append(f"*{_nome_professor(r)}*"
+               + (f" · {', '.join(unidades)}" if unidades else ""))
+
+    por_dia: Dict[str, list] = {}
+    for a in aulas:
+        por_dia.setdefault((a.get("data_aula") or "")[:10], []).append(a)
+
+    for dia in sorted(por_dia.keys(), reverse=True):
+        out.append("")
+        out.append(f"*{_dia_label(dia)}*")
+        for a in sorted(por_dia[dia], key=lambda x: (x.get("hora") or "")):
+            hora = (a.get("hora") or "")[:5]
+            curso = _curso_limpo(a.get("curso"))
+            if not uma_unidade and a.get("unidade"):
+                curso += f" · {a['unidade']}"
+            alunos = ", ".join(a.get("alunos") or []) or "sem aluno na lista"
+            out.append("")
+            out.append(f"*{hora}* · {curso}" if hora else f"· {curso}")
+            out.append(f"_{alunos}_")
+
+    if total > len(aulas):
+        out.append("")
+        out.append(f"_+{total - len(aulas)} aulas atrasadas deste professor_")
+    return out
+
+
+def _plural(n: int, singular: str, plural: str) -> str:
+    return f"{n} {singular if n == 1 else plural}"
+
+
+def format_escalonamento(rows: list, unidade: Optional[str] = None,
+                         blocos: Optional[int] = None) -> Optional[str]:
+    """UMA mensagem do escalonamento — a de uma unidade, ou a lista inteira.
+
+    Continua no formato A: ENCAMINHAVEL. A coordenacao copia o bloco de um
+    professor e manda pra ele, entao vai a relacao completa (dia, hora, curso,
+    nome COMPLETO do aluno) e nao um resumo — resumo nao diz a ninguem o que
+    fazer.
+
+    O que mudou em 10/08/2026: a mensagem unica tinha 36 professores, 20.951
+    caracteres e 1.032 linhas, todo dia as 9h. Ninguem le uma parede dessas, e
+    governanca que ninguem le nao e governanca. Agora o detalhe e RACIONADO
+    por gravidade — bloco inteiro pros mais atrasados, uma linha pros demais.
+    Ninguem some da lista: o que muda e quanto detalhe cada um leva. Corte
+    silencioso seria pior que a parede, porque leria como "acabou".
+    """
     if not rows:
         return None
 
-    REGUA = "━━━━━━━━━━━━━━"
-    quantos = len(rows)
-    out: list = ["*Registro atrasado*"]
-    out.append("_1 professor_" if quantos == 1 else f"_{quantos} professores_")
+    limite = ESCALONAMENTO_BLOCOS_POR_UNIDADE if blocos is None else blocos
+    ordenados = sorted(rows, key=_gravidade)
+    total_aulas = sum(int(r.get("total_aulas") or 0) for r in ordenados)
 
-    for r in rows:
-        nome = r.get("professor_nome") or f"professor {r.get('professor_id')}"
-        unidades = r.get("unidades") or []
-        aulas = r.get("aulas") or []
-        total = int(r.get("total_aulas") or len(aulas))
-        uma_unidade = len(unidades) == 1
+    titulo = f"*Registro atrasado · {unidade}*" if unidade else "*Registro atrasado*"
+    out: list = [titulo,
+                 f"_{_plural(len(ordenados), 'professor', 'professores')}"
+                 f" · {_plural(total_aulas, 'aula', 'aulas')}_"]
 
-        out.append(REGUA)
-        out.append(f"*{nome}*" + (f" · {unidades[0]}" if uma_unidade else ""))
+    detalhados = ordenados if limite <= 0 else ordenados[:limite]
+    resto = [] if limite <= 0 else ordenados[limite:]
 
-        por_dia: Dict[str, list] = {}
-        for a in aulas:
-            por_dia.setdefault((a.get("data_aula") or "")[:10], []).append(a)
+    for r in detalhados:
+        out.extend(_bloco_professor(r))
 
-        for dia in sorted(por_dia.keys(), reverse=True):
-            out.append("")
-            out.append(f"*{_dia_label(dia)}*")
-            for a in sorted(por_dia[dia], key=lambda x: (x.get("hora") or "")):
-                hora = (a.get("hora") or "")[:5]
-                curso = _curso_limpo(a.get("curso"))
-                if not uma_unidade and a.get("unidade"):
-                    curso += f" · {a['unidade']}"
-                alunos = ", ".join(a.get("alunos") or []) or "sem aluno na lista"
-                out.append("")
-                out.append(f"*{hora}* · {curso}" if hora else f"· {curso}")
-                out.append(f"_{alunos}_")
+    if resto:
+        out.append(REGUA_ESCALONAMENTO)
+        out.append("*Também atrasados* _(menos aulas paradas)_")
+        for r in resto:
+            n = int(r.get("total_aulas") or 0)
+            d = int(r.get("pior_atraso") or 0)
+            out.append(f"· {_nome_professor(r)} — {_plural(n, 'aula', 'aulas')},"
+                       f" {_plural(d, 'dia', 'dias')}")
 
-        if total > len(aulas):
-            out.append("")
-            out.append(f"_+{total - len(aulas)} aulas atrasadas deste professor_")
-
-    out.append(REGUA)
+    out.append(REGUA_ESCALONAMENTO)
     out.append("Passei do prazo de cobrar no particular. Segue pra encaminhar — "
                "assim que registrar, some daqui.")
     return "\n".join(out)
+
+
+def format_escalonamento_indice(rows: list, top: int = 5) -> Optional[str]:
+    """O cartao de 5 segundos que abre a fila.
+
+    Nao substitui a relacao — abre ela. Quem le as 9h precisa saber, sem
+    rolar, se o problema piorou e quem esta pior. A contagem por unidade sai
+    do MESMO `_por_unidade` que monta as mensagens seguintes, senao o indice
+    promete um numero que a lista nao entrega.
+    """
+    if not rows:
+        return None
+    grupos = _por_unidade(rows)
+    total_aulas = sum(int(r.get("total_aulas") or 0) for r in rows)
+
+    out: list = ["*Registro atrasado*",
+                 f"_{_plural(len(rows), 'professor', 'professores')}"
+                 f" · {_plural(total_aulas, 'aula', 'aulas')}_",
+                 "",
+                 " · ".join(f"{u} {len(linhas)}" for u, linhas in grupos.items()),
+                 "",
+                 "*Quem está mais atrás*"]
+    for r in sorted(rows, key=_gravidade)[:top]:
+        n = int(r.get("total_aulas") or 0)
+        d = int(r.get("pior_atraso") or 0)
+        out.append(f"· {_nome_professor(r)} — {_plural(n, 'aula', 'aulas')},"
+                   f" {_plural(d, 'dia', 'dias')}")
+    out.append("")
+    out.append("Segue a lista por unidade. Cada bloco dá pra copiar e mandar "
+               "direto pro professor.")
+    return "\n".join(out)
+
+
+def montar_escalonamento(rows: list) -> list:
+    """A fila de mensagens das 9h: indice + uma por unidade.
+
+    Com uma unidade so o indice nao entra — ele existe pra dar rumo a uma fila,
+    e uma fila de um item nao precisa de capa.
+    """
+    if not rows:
+        return []
+    grupos = _por_unidade(rows)
+    mensagens: list = []
+    if len(grupos) > 1:
+        indice = format_escalonamento_indice(rows)
+        if indice:
+            mensagens.append(indice)
+    for unidade, linhas in grupos.items():
+        corpo = format_escalonamento(linhas, unidade=unidade)
+        if corpo:
+            mensagens.append(corpo)
+    return mensagens
 
 
 MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -1192,21 +1343,36 @@ def main() -> int:
     # por professor.
     if "escalonamento" in due_events:
         due_events = [e for e in due_events if e != "escalonamento"]
+        enviadas = 0
         try:
             linhas = pendencias_escalonadas(args.professor_id)
-            corpo = format_escalonamento(linhas)
-            if not corpo:
+            mensagens = montar_escalonamento(linhas)
+            professores = len({r.get("professor_id") for r in linhas})
+            if not mensagens:
                 results.append({"event": "escalonamento", "status": "sem_pendencia_escalonada"})
             elif args.dry_run:
                 results.append({"event": "escalonamento", "status": "dry_run_ready",
-                                "professores": len({r.get("professor_id") for r in linhas}),
-                                "content_preview": corpo})
+                                "professores": professores,
+                                "mensagens": len(mensagens),
+                                "content_preview": "\n\n>>> PRÓXIMA MENSAGEM >>>\n\n".join(mensagens)})
             else:
-                enviar_grupo(corpo)
+                for i, corpo in enumerate(mensagens):
+                    # O grupo recebe indice e unidades EM ORDEM. Enviar em
+                    # rajada deixa a ordem por conta do WhatsApp, e indice que
+                    # chega depois do corpo nao serve de indice.
+                    if i:
+                        _time.sleep(1.2)
+                    enviar_grupo(corpo)
+                    enviadas += 1
                 results.append({"event": "escalonamento", "status": "sent",
-                                "professores": len({r.get("professor_id") for r in linhas})})
+                                "professores": professores,
+                                "mensagens": enviadas})
         except Exception as exc:
-            results.append({"event": "escalonamento", "status": "error", "error": str(exc)[:500]})
+            # `enviadas` conta o que JA foi pro grupo: falhar na 3ª de 4 nao é
+            # o mesmo que não ter enviado nada, e o log tem que saber a
+            # diferença antes de alguém decidir reenviar.
+            results.append({"event": "escalonamento", "status": "error",
+                            "enviadas": enviadas, "error": str(exc)[:500]})
         log("event_result", **results[-1])
 
     if "feedback" in due_events:
