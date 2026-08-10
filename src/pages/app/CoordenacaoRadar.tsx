@@ -5,6 +5,7 @@ import { FiltrosRadar } from '../../features/coordenacao/components/FiltrosRadar
 import { LinhaRadar } from '../../features/coordenacao/components/LinhaRadar'
 import { ModalAlunoRadar } from '../../features/coordenacao/components/ModalAlunoRadar'
 import { PainelNumero } from '../../features/coordenacao/components/PainelNumero'
+import { pct } from '../../features/coordenacao/sinaisRadar'
 import {
   coordenacaoRadar,
   SEM_FILTRO_RADAR,
@@ -12,12 +13,8 @@ import {
   type RadarLinha,
   type RadarResposta,
 } from '../../lib/api'
+import { dataDoDia } from '../../lib/datas'
 import { CoordenacaoFrame } from './CoordenacaoFrame'
-
-function pct(n: number | null | undefined): string {
-  if (n == null) return '—'
-  return `${Math.round(n)}%`
-}
 
 /**
  * Mesa do Radar — "quem eu procuro esta semana, e por quê?".
@@ -62,9 +59,10 @@ export default function CoordenacaoRadarPage() {
           />
         ) : (
           <>
-            <p className="mb-4 text-[11.5px] text-text-muted">
-              Absenteísmo desde {dados?.resumo.base_desde ?? '…'} ·{' '}
-              {dados?.resumo.aulas_por_aluno ?? '—'} aula por aluno em média
+            <p className="mb-4 text-[11.5px] leading-snug text-text-muted">
+              Absenteísmo desde {dados ? dataDoDia(dados.resumo.base_desde) : '…'} ·{' '}
+              {dados?.resumo.aulas_por_aluno ?? '—'}{' '}
+              {dados?.resumo.aulas_por_aluno === 1 ? 'aula' : 'aulas'} por aluno em média
               {dados?.resumo.aulas_por_aluno != null && dados.resumo.aulas_por_aluno < 4
                 ? ' — ainda enchendo'
                 : ''}
@@ -152,6 +150,7 @@ export default function CoordenacaoRadarPage() {
                     linha={linha}
                     config={dados.config}
                     medias={dados.medias}
+                    baseDesde={dados.resumo.base_desde}
                     aoAbrir={setAberto}
                   />
                 ))}
@@ -182,6 +181,8 @@ export default function CoordenacaoRadarPage() {
         <ModalAlunoRadar
           linha={aberto}
           medias={dados.medias}
+          config={dados.config}
+          baseDesde={dados.resumo.base_desde}
           aoFechar={() => setAberto(null)}
         />
       ) : null}

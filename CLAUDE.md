@@ -23,6 +23,31 @@ Por que arquivo no repo e não banco nem memória: fica versionado junto do
 código, o Hugo e o Alfredo conseguem ler, e ninguém precisa de uma sessão minha
 aberta pra saber onde a coisa parou.
 
+## Toda tela é desktop E celular — as duas se conferem, sempre
+
+Combinado com o Alf em **10/08/2026**, depois de eu entregar o Radar tendo
+olhado só a janela larga: no celular a linha do aluno virava um empilhamento de
+rótulos e o rodapé do modal ficava **debaixo da TabBar**. Estava "pronto" e
+estava quebrado — porque metade do uso real acontece no celular.
+
+Antes de dizer que uma tela está pronta, ela é vista **medida** nos dois
+tamanhos, não imaginada:
+
+- **390 × 844** (celular de referência) e **1400 × 900** (desktop com sidebar).
+- No celular, checar o que só existe lá: **TabBar de 72px + `safe-area`** por
+  cima do conteúdo, modal/bottom-sheet que precisa passar por cima dela
+  (`z-50`, não `z-40` — empatado com a TabBar, quem vem depois no DOM ganha),
+  e o fato de que **não existe hover**: informação que só aparece em tooltip
+  não existe no celular.
+- Redimensionar a janela **durante** a conferência, não só abrir no tamanho
+  certo: foi redimensionando que apareceu a tarja preta do `h-svh` (a unidade
+  de viewport não acompanha o container; a moldura usa `h-full` sobre o `#root`,
+  que é quem tem a altura de verdade).
+
+Layout diferente por breakpoint é permitido e às vezes obrigatório — o que não
+é permitido é o mesmo layout apertado nos dois. `CoordenacaoFrame` × `AppFrame`
+já é esse princípio no esqueleto; vale para a linha e para o card também.
+
 ## O Fábio é meu
 
 Em **03/08/2026** o Alf passou o bastão: o Alfredo saiu para outras frentes e **eu sou o dono do Fábio** (Hermes + chat bridge). Não existe mais "eu aponto, o Alfredo aplica" — eu aplico.

@@ -6,9 +6,9 @@
 > que já foi decidido.
 >
 > **Última atualização: 10/08/2026, noite (BRT) — Cursor.** Radar Tasks 5–9
-> verificadas ao vivo; shell da coordenação corrigido (tarja preta ao
-> redimensionar). Merge em `main` em andamento nesta sessão. Quem mais lê: o
-> Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
+> verificadas ao vivo e **mergeadas em `main`** (`fcc4128`); depois disso, a
+> rodada de **mobile + desktop** do Radar (linha, card do aluno, vocabulário dos
+> sinais). Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
@@ -39,6 +39,34 @@
    `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`
    primeiro. Ver seção "Brainstorming feito, SPEC escrita", mais abaixo (dentro
    do histórico do incidente da Daiana, 10/08 tarde).
+
+---
+
+## ✅ 10/08 NOITE (Cursor) — o Radar no celular, e o card do aluno em português
+
+**Regra nova na metodologia** (está em `CLAUDE.md`, seção "Toda tela é desktop E
+celular"): tela só é dada como pronta depois de **vista medida em 390×844 e
+1400×900**, redimensionando durante a conferência. Esta rodada nasceu de eu ter
+entregado o Radar olhando só a janela larga.
+
+**O que estava errado, medido no navegador (sessão de coordenação, 5183):**
+
+| Defeito | Causa | Prova depois do conserto |
+|---|---|---|
+| Rodapé do card do aluno **debaixo da TabBar** no celular ("ver o mês inteiro" não existia lá) | modal em `z-40`, **o mesmo** da TabBar; empate decide por ordem no DOM | portal pro `<body>` + `z-50`; `elementFromPoint` no link devolve o próprio link, dialog encosta em `y=844` |
+| Linha do aluno quebrando em três faixas de rótulo no celular | as 7 colunas da spec em `flex-wrap` | layout de cartão até `lg`, mesa só em `lg+`; dois cards medem 122px iguais |
+| A mesa **vazava 235px** pra fora do `<main>` a 820px | sidebar aparece no `md` e come 228px; colunas em px não cabem | corte movido pro `lg` + colunas em `fr` com `min-w-0`; vazamento 0 em 390 / 820 / 1024 / 1298 |
+| Texto de banco na tela: `absenteismo`, `pratica`, `2 falta(s) seguida(s)`, `verde`, `Absenteísmo desde 2026-08-01` | a decomposição da nota vem com chave e valor formatados em SQL | `src/features/coordenacao/sinaisRadar.ts` (vocabulário único) + `dataDoDia()` em `lib/datas.ts` |
+| Sinal fora da conta mostrando número: "Faltas seguidas · fora da conta" **e** "0 faltas seguidas" | valor era montado sempre, ignorando `sem_dado` | `motivoSemDado()` — "ainda sem aula medida" pro que é medição, "professor ainda não respondeu" pro que é resposta |
+
+**O card virou a nota aberta de verdade:** número grande no selo da faixa, e cada
+sinal com **barra de contribuição** (quanto podia valer × quanto trouxe). Sinal
+sem dado **não** ganha barra — barra vazia lê como zero, e zero é o que ele não
+é (o peso dele foi redistribuído, migration 085). No celular é folha de baixo com
+rodapé fixo e `safe-area`; no desktop, diálogo centrado.
+
+Conferido nos **dois temas** (checklist 4 do `frontend-tokens.md`) e o grep de
+hex/cor arbitrária em `src/features/coordenacao` volta **vazio**.
 
 ---
 

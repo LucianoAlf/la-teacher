@@ -50,8 +50,11 @@ export function FiltrosRadar({
   ]
 
   return (
-    <div className="mb-6 flex flex-wrap items-center gap-2">
-      <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
+    // Celular: duas colunas de largura igual (o professor, que é o rótulo mais
+    // longo, ocupa a linha inteira). Antes era o mesmo `flex-wrap` do desktop e
+    // os três campos quebravam em larguras diferentes a cada recorte.
+    <div className="mb-6 grid grid-cols-2 items-center gap-2 md:flex md:flex-wrap">
+      <span className="col-span-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary md:col-auto">
         <i className="fa-solid fa-filter text-[10px] text-brand-text" aria-hidden />
         Filtrar
       </span>
@@ -80,6 +83,7 @@ export function FiltrosRadar({
         aoEscolher={(v) => aoMudar({ ...filtro, professorId: v === '' ? null : Number(v) })}
         rotuloAcessivel="Filtrar por professor"
         size="sm"
+        className="col-span-2 md:col-auto"
       />
     </div>
   )
