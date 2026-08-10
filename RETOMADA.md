@@ -29,6 +29,21 @@
 
 ---
 
+## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
+
+1. **Radar do aluno** — backend pronto, faltam as telas (Tasks 5-9), plano já
+   escrito. Trabalho de EXECUÇÃO, pode começar direto. Ver seção logo abaixo.
+2. **Fábio escreve no WhatsApp** — SPEC escrita, **ainda sem aprovação do
+   Alf e sem plano**. Não é pra codar ainda — é pra ele ler
+   `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`
+   primeiro. Ver seção "Brainstorming feito, SPEC escrita", mais abaixo (dentro
+   do histórico do incidente da Daiana, 10/08 tarde).
+
+Se for continuar sozinho sem o Alf por perto pra aprovar a spec do Fábio, a
+frente 1 (Radar) é a que rende — tem plano completo esperando execução.
+
+---
+
 ## ✅ 10/08 NOITE — Radar do aluno: backend completo (Tasks 1-4 + 10), telas (5-9) NÃO começaram
 
 **PRÓXIMO PASSO literal:** abrir `docs/superpowers/plans/2026-08-10-radar-do-aluno.md`
@@ -200,11 +215,24 @@ genérico; a fatia veio sem `presenca` — o áudio só descreve conteúdo).
 1`) — a 086 funcionando ao vivo pela primeira vez em produção. Pendência da
 Daiana: **0**.
 
-**PRÓXIMO PASSO desta frente: brainstorming + SPEC do Fábio** — o que ele pode
-escrever, com que confirmação, e plugar **o mesmo motor do app** no WhatsApp (é
-a casa dos professores). Inclui o "carimbo de feito" que o Alf pediu (resumo +
-devolutiva gerada de volta pra ele) e o pedido de liberação à coordenação
-depois dos 7 dias — hoje isso é ato humano.
+### ▶ Brainstorming feito, SPEC escrita (`5b6f5d6`)
+
+`docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`.
+Escopo: registro de aula por áudio + chamada avulsa, sempre com leitura-e-
+confirmação antes de gravar (o professor confirma ou corrige, nunca grava
+sozinho), miolo único com duas portas nas RPCs (`app_*` continua em
+`auth.uid()`, `fabio_*` nova recebe `professor_id` explícito resolvido pelo
+telefone). **Decisão que fica registrada pra quem revisar:** o LLM não ganha
+NENHUMA ferramenta de escrita nova — toda a orquestração (gatilho, qual aula,
+chamar a RPC) é código determinístico no bridge, mesma lógica que já protege o
+`CAPACIDADE_PROFESSOR` de virar promessa vazia (ver memória
+`allowlist-de-ferramenta-vence-aprovacao`). Fora do escopo, anotado no spec:
+pedido de liberação de prazo à coordenação e correção pós-confirmação.
+
+**PRÓXIMO PASSO desta frente:** o Alf lê a spec inteira e diz o que muda.
+Aprovada → invocar `superpowers:writing-plans` pra virar plano de execução (o
+mesmo formato que o Radar já usou, com SQL/TS/testes por task). Ainda não
+comecei a implementação — nenhuma migration nova, nenhum código do bridge.
 
 ---
 
@@ -524,9 +552,10 @@ A ordem verdadeira, hoje, é esta:
 |---|---|---|---|
 | ~~1~~ | ~~Semáforo do professor~~ | **FECHADO em 09/08 à noite.** Banco (073–080), mesa do professor, tela da coordenação, cobrança no timer, e o Fábio lendo. O texto abaixo desta tabela é HISTÓRIA — não reabrir | ✅ |
 | **1** | **Radar do aluno** (bloco 2 do painel da coordenação) | **Backend completo e no ar em 10/08 noite** (Tasks 1-4 + 10 do plano — sinais, config, nota de 5 sinais, RPC da tela). **Faltam as Tasks 5-9 (telas)** — plano já escrito com SQL/TS/testes completos, é só executar | seção "Radar do aluno: backend completo", topo deste arquivo |
-| 2 | **Fila offline no feedback** | O ✓ é honesto (alerta + reenviar), mas o toque se perde se o app fechar. Janela abre 25/08 | "Ainda aberto" |
-| ~~3~~ | ~~Parede de texto do escalonamento~~ | **FECHADO em 10/08** (`146a593`): índice + uma mensagem por unidade, 9/9 mutantes | seção do topo |
-| 3 | **Registro de presença em Campo Grande** | **NOVO, medido em 10/08:** 126 alunos com 2+ faltas seguidas e zero presença afirmada, concentrados em CG (28–50% da carteira de alguns professores). É o que segura o cartão "Sumiu da escola" do Radar | spec do Radar, §3 |
+| **2** | **Fábio escreve no WhatsApp** (motor do app, plugado no canal do professor) | **SPEC escrita em 10/08 noite** (`5b6f5d6`), aguardando o Alf ler. Ainda NENHUM código escrito — não começar implementação sem aprovação da spec | seção "Brainstorming feito, SPEC escrita", logo abaixo da seção do Radar |
+| 3 | **Fila offline no feedback** | O ✓ é honesto (alerta + reenviar), mas o toque se perde se o app fechar. Janela abre 25/08 | "Ainda aberto" |
+| ~~4~~ | ~~Parede de texto do escalonamento~~ | **FECHADO em 10/08** (`146a593`): índice + uma mensagem por unidade, 9/9 mutantes | seção do topo |
+| 4 | **Registro de presença em Campo Grande** | **NOVO, medido em 10/08:** 126 alunos com 2+ faltas seguidas e zero presença afirmada, concentrados em CG (28–50% da carteira de alguns professores). É o que segura o cartão "Sumiu da escola" do Radar | spec do Radar, §3 |
 
 **Fechado em 09/08 e que NÃO deve ser reaberto:** a fronteira do Fábio (o
 professor não alcança dado de colega nem SQL — virou canal, não prompt), o
