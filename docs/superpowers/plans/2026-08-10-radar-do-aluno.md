@@ -59,8 +59,8 @@ Se 081 estiver ocupado, renumerar toda a sequência deste plano (+1 em cada).
 |---|---|
 | `supabase/migrations/081-os-sinais-do-radar.sql` | `vw_radar_aluno_sinais` — uma linha por aluno da coorte, com os 4 sinais e suas bases |
 | `supabase/migrations/082-as-reguas-do-radar.sql` | `radar_config` + `radar_config_historico` + RPCs de leitura/escrita |
-| `supabase/migrations/083-a-nota-do-radar.sql` | `fn_radar_nota(jsonb, jsonb)` — pura, recebe sinais e config, devolve nota + decomposição |
-| `supabase/migrations/084-a-tela-do-radar.sql` | `app_coordenacao_radar(...)` — guard, filtros facetados, resumo com média e mediana |
+| `supabase/migrations/085-a-nota-do-radar.sql` | `fn_radar_nota(jsonb, jsonb)` — pura, recebe sinais e config, devolve nota + decomposição |
+| `supabase/migrations/086-a-tela-do-radar.sql` | `app_coordenacao_radar(...)` — guard, filtros facetados, resumo com média e mediana |
 | `src/lib/api.ts` | tipos + wrappers `coordenacaoRadar`, `radarConfig`, `salvarRadarConfig` |
 | `src/features/coordenacao/components/LinhaRadar.tsx` | uma linha da mesa, com os tooltips |
 | `src/features/coordenacao/components/ModalAlunoRadar.tsx` | o modal do aluno |
@@ -720,12 +720,12 @@ git commit -m "feat(radar): as réguas viram configuração, com fábrica visív
 
 ---
 
-### Task 3: A nota (migration 083)
+### Task 3: A nota (migration 085)
 
 **Files:**
-- Create: `supabase/migrations/083-a-nota-do-radar.sql`
-- Create: `supabase/migrations/083-a-nota-do-radar.test.sql`
-- Create: `scripts/mutantes-083.mjs`
+- Create: `supabase/migrations/085-a-nota-do-radar.sql`
+- Create: `supabase/migrations/085-a-nota-do-radar.test.sql`
+- Create: `scripts/mutantes-085.mjs`
 - Modify: `package.json`
 
 **Interfaces:**
@@ -749,10 +749,10 @@ qualquer worker futuro.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
-Criar `supabase/migrations/083-a-nota-do-radar.test.sql`:
+Criar `supabase/migrations/085-a-nota-do-radar.test.sql`:
 
 ```sql
--- Teste da 083. A nota é o coração do Radar e a parte mais fácil de mentir:
+-- Teste da 085. A nota é o coração do Radar e a parte mais fácil de mentir:
 -- ela precisa ABRIR (mostrar de onde veio), REDISTRIBUIR peso de sinal ausente
 -- e SE CALAR quando não tem base.
 create temporary table _res(caso text, ok boolean, detalhe text) on commit drop;
@@ -849,17 +849,17 @@ select json_build_object(
 - [ ] **Step 2: Rodar e confirmar que falha**
 
 ```bash
-npm run teste:083
+npm run teste:085
 ```
 
 Esperado: `function public.fn_radar_nota(jsonb, jsonb) does not exist`.
 
 - [ ] **Step 3: Escrever a migration**
 
-Criar `supabase/migrations/083-a-nota-do-radar.sql`:
+Criar `supabase/migrations/085-a-nota-do-radar.sql`:
 
 ```sql
--- 083 — a nota do Radar
+-- 085 — a nota do Radar
 --
 -- Função PURA: recebe os sinais e a config, devolve nota + decomposição. Não
 -- lê tabela. Assim o teste varia peso e sinal sem tocar em configuração nem em
@@ -994,7 +994,7 @@ grant execute on function public.fn_radar_nota(jsonb, jsonb) to authenticated;
 - [ ] **Step 4: Rodar e confirmar que passa**
 
 ```bash
-npm run teste:083
+npm run teste:085
 ```
 
 Esperado: `{"falhas": 0}`. Se o passo *"a soma das contribuicoes e a nota"*
@@ -1003,7 +1003,7 @@ corrigir a fórmula, **não** afrouxar a asserção.
 
 - [ ] **Step 5: Escrever os mutantes**
 
-`scripts/mutantes-083.mjs`, cinco mutantes:
+`scripts/mutantes-085.mjs`, cinco mutantes:
 
 | # | Âncora | Vira | Mata |
 |---|---|---|---|
@@ -1016,7 +1016,7 @@ corrigir a fórmula, **não** afrouxar a asserção.
 - [ ] **Step 6: Rodar os mutantes**
 
 ```bash
-npm run mutantes:083
+npm run mutantes:085
 ```
 
 Esperado: `5/5 mutantes mortos`.
@@ -1024,24 +1024,24 @@ Esperado: `5/5 mutantes mortos`.
 - [ ] **Step 7: Aplicar em produção**
 
 ```bash
-node scripts/rodar-teste-sql.mjs --aplicar supabase/migrations/083-a-nota-do-radar.sql
+node scripts/rodar-teste-sql.mjs --aplicar supabase/migrations/085-a-nota-do-radar.sql
 ```
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add supabase/migrations/083-a-nota-do-radar.sql supabase/migrations/083-a-nota-do-radar.test.sql scripts/mutantes-083.mjs package.json
+git add supabase/migrations/085-a-nota-do-radar.sql supabase/migrations/085-a-nota-do-radar.test.sql scripts/mutantes-085.mjs package.json
 git commit -m "feat(radar): a nota abre, redistribui peso de sinal ausente e se cala sem base"
 ```
 
 ---
 
-### Task 4: A RPC da tela (migration 084)
+### Task 4: A RPC da tela (migration 086)
 
 **Files:**
-- Create: `supabase/migrations/084-a-tela-do-radar.sql`
-- Create: `supabase/migrations/084-a-tela-do-radar.test.sql`
-- Create: `scripts/mutantes-084.mjs`
+- Create: `supabase/migrations/086-a-tela-do-radar.sql`
+- Create: `supabase/migrations/086-a-tela-do-radar.test.sql`
+- Create: `scripts/mutantes-086.mjs`
 - Modify: `package.json`
 
 **Interfaces:**
@@ -1063,10 +1063,10 @@ git commit -m "feat(radar): a nota abre, redistribui peso de sinal ausente e se 
 
 - [ ] **Step 1: Escrever o teste que falha**
 
-Criar `supabase/migrations/084-a-tela-do-radar.test.sql`:
+Criar `supabase/migrations/086-a-tela-do-radar.test.sql`:
 
 ```sql
--- Teste da 084. Aqui moram as duas regras que a casa já pagou pra aprender:
+-- Teste da 086. Aqui moram as duas regras que a casa já pagou pra aprender:
 -- UM NÚMERO SÓ (080) e FACETA CEGA AO PRÓPRIO FILTRO (071/079). E a fronteira
 -- nova: nenhum agregado de professor feito com o que o professor escreveu.
 create temporary table _res(caso text, ok boolean, detalhe text) on commit drop;
@@ -1183,17 +1183,17 @@ select json_build_object(
 - [ ] **Step 2: Rodar e confirmar que falha**
 
 ```bash
-npm run teste:084
+npm run teste:086
 ```
 
 - [ ] **Step 3: Escrever a migration**
 
-Criar `supabase/migrations/084-a-tela-do-radar.sql`:
+Criar `supabase/migrations/086-a-tela-do-radar.sql`:
 
 ```sql
--- 084 — a RPC da tela do Radar
+-- 086 — a RPC da tela do Radar
 --
--- Junta os três: sinais (081) + réguas (082) + nota (083). Molde da 077/079.
+-- Junta os três: sinais (081) + réguas (082) + nota (085). Molde da 077/079.
 --
 -- UM NÚMERO SÓ (lição da 080): resumo, `total_lista` e chips contam a mesma
 -- coisa, no mesmo grão. Na tela do semáforo isso apareceu como 1.155 no topo e
@@ -1333,12 +1333,12 @@ grant execute on function public.app_coordenacao_radar(uuid, integer, text, inte
 - [ ] **Step 4: Rodar e confirmar que passa**
 
 ```bash
-npm run teste:084
+npm run teste:086
 ```
 
 - [ ] **Step 5: Escrever os mutantes**
 
-`scripts/mutantes-084.mjs`, seis mutantes:
+`scripts/mutantes-086.mjs`, seis mutantes:
 
 | # | Âncora | Vira | Mata |
 |---|---|---|---|
@@ -1352,7 +1352,7 @@ npm run teste:084
 - [ ] **Step 6: Rodar os mutantes**
 
 ```bash
-npm run mutantes:084
+npm run mutantes:086
 ```
 
 Esperado: `6/6 mutantes mortos`.
@@ -1360,7 +1360,7 @@ Esperado: `6/6 mutantes mortos`.
 - [ ] **Step 7: Aplicar em produção e medir**
 
 ```bash
-node scripts/rodar-teste-sql.mjs --aplicar supabase/migrations/084-a-tela-do-radar.sql
+node scripts/rodar-teste-sql.mjs --aplicar supabase/migrations/086-a-tela-do-radar.sql
 ```
 
 Conferir com dado real (esperado hoje: ~158 alunos, quase todos `sem_nota`
@@ -1373,7 +1373,7 @@ select jsonb_pretty(public.app_coordenacao_radar() -> 'resumo');
 - [ ] **Step 8: Commit**
 
 ```bash
-git add supabase/migrations/084-a-tela-do-radar.sql supabase/migrations/084-a-tela-do-radar.test.sql scripts/mutantes-084.mjs package.json
+git add supabase/migrations/086-a-tela-do-radar.sql supabase/migrations/086-a-tela-do-radar.test.sql scripts/mutantes-086.mjs package.json
 git commit -m "feat(radar): a RPC da tela, com um número só e faceta cega ao próprio filtro"
 ```
 
@@ -1913,7 +1913,7 @@ git commit -m "feat(radar): a aba Réguas, com fábrica visível e histórico"
 **Por que é tarefa e não detalhe:** o semáforo é escrito pelo professor sobre o
 aluno. Se ele suspeitar que aquilo vira número sobre ele, passa a responder mais
 verde do que a realidade — e a fonte apodrece em silêncio, porque ninguém
-enxerga um semáforo mentindo. A regra existe no banco (a 084 não agrega
+enxerga um semáforo mentindo. A regra existe no banco (a 086 não agrega
 semáforo por professor, e o mutante V4 guarda isso), mas **regra que o professor
 não sabe que existe não muda comportamento.**
 
