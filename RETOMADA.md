@@ -61,11 +61,17 @@ alunos + RPCs `app_coordenacao_radar` / `app_radar_config` /
 
 | Task | Commit | O quê |
 |---|---|---|
-| 5 | `2c4a2b2` | tipos/wrappers em `api.ts` (+ `faltas_consecutivas` da 088) |
-| 6 | `80e6b4d` | mesa, tooltip, filtros, sidebar Radar, rota |
-| 7 | `4f039da` | modal do aluno |
-| 8 | `2ffd452` | aba Réguas (grupos dinâmicos, incl. `consecutivas`) |
-| 9 | `d5e3c5b` | copy "isto não é avaliação sua" na `MesaFeedback` |
+| 5 | `67d76e2` | tipos/wrappers em `api.ts` (+ `faltas_consecutivas` da 088) |
+| 6 | `6c9fb1d` | mesa, tooltip, filtros, sidebar Radar, rota |
+| 7 | `348ddfe` | modal do aluno |
+| 8 | `42c4d66` | aba Réguas (grupos dinâmicos, incl. `consecutivas`) |
+| 9 | `b6f7233` | copy "isto não é avaliação sua" na `MesaFeedback` |
+| docs | `ffeeded` | este checkpoint no RETOMADA |
+
+⚠️ **Checkout Cursor:** o workspace abriu um clone nested em
+`D:\la-teacher\la-teacher\` (aparece como `?? la-teacher/` no status do repo
+canônico). O trabalho válido está em `D:\la-teacher` nesta branch. Não
+commitar a pasta nested.
 
 ---
 
