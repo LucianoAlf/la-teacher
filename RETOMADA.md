@@ -68,10 +68,10 @@ alunos + RPCs `app_coordenacao_radar` / `app_radar_config` /
 | 9 | `b6f7233` | copy "isto não é avaliação sua" na `MesaFeedback` |
 | docs | `ffeeded` | este checkpoint no RETOMADA |
 
-⚠️ **Checkout Cursor:** o workspace abriu um clone nested em
-`D:\la-teacher\la-teacher\` (aparece como `?? la-teacher/` no status do repo
-canônico). O trabalho válido está em `D:\la-teacher` nesta branch. Não
-commitar a pasta nested.
+⚠️ **Clone nested:** o Cursor abriu `D:\la-teacher\la-teacher\` (clone dentro
+do repo). Trabalho válido = **`D:\la-teacher`** nesta branch. Pra limpar:
+1) File → Open Folder → `D:\la-teacher`  2) `powershell -File scripts/apagar-clone-nested.ps1`
+(enquanto o workspace estiver na nested, o Windows tranca `.git` e não dá pra apagar).
 
 ---
 
