@@ -1985,6 +1985,599 @@ selo quebrado. Volta quando setembro fechar, e a fonte já estará pronta:
 
 **Nada mais da spec ficou de fora.** Conferido seção a seção.
 
+---
+
+### Task 10: Faltas consecutivas — o 5º sinal (migration 088)
+
+**Adicionada em 10/08/2026, decisão do Alf, fora da spec original.** Rodar a
+Task 4 contra os 311 alunos reais mostrou 242 já com nota, mas só 13
+professores tinham respondido o semáforo — o piso de cobertura da 085 conta
+"2 sinais nomeados", e absenteísmo(janela) + faltas_mes(mês) nascem da mesma
+`vw_aluon_presenca_semantica_v1` e cobrem quase a mesma janela em agosto, então
+os dois acendem juntos com 1 aula medida, sem nenhuma entrada do professor.
+
+Decisão do Alf: não é pra travar a nota até o professor participar — é pra
+trocar percentual (ruidoso com 1-2 aulas) por um sinal mais robusto pra dado
+escasso: **contagem bruta de faltas seguidas**. É sinal PONDERADO (tem peso
+próprio, entra na mesma redistribuição da 085), não atropelo — "se já tem que
+acender vermelho" é o EFEITO do peso, não um `if` por fora da conta. Mapeamento
+que ele descreveu: até 1 falta seguida pontua como saudável (100), 2 seguidas
+pontua atenção (50), 3+ pontua crítico (0).
+
+**Fase B, decisão explícita de deixar pra depois** (não faz parte desta
+tarefa): Fábio avisar o professor proativamente com 2 faltas seguidas
+("fala com ele, manda um exercício"), e escalar pro grupo da coordenação com
+3+. Fica documentado aqui e não implementado — é natural extensão da tarefa
+pendente #58 ("generalizar o worker da devolutiva em máquina de avisos ao
+professor") já na lista de trabalho, fora deste plano.
+
+**Files:**
+- Modify (via `create or replace`, migration nova): `supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.sql`
+- Create: `supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.test.sql`
+- Create: `scripts/mutantes-088.mjs`
+- Modify: `package.json`
+
+**Interfaces:**
+- Consumes: `vw_aluno_presenca_semantica_v1` (mesma fonte da 081, não
+  escreve view nova de presença), `fn_e_coordenacao_la_teacher()`.
+- Produces: `vw_radar_aluno_sinais` ganha coluna `faltas_consecutivas` (int,
+  nunca nulo — 0 quando não há falta ativa OU quando não há aula medida; quem
+  distingue os dois casos é o guard em `fn_radar_nota`, via `aulas_medidas`).
+  `fn_radar_nota` passa a aceitar `faltas_consecutivas` em `p_sinais`, soma 3
+  novas chaves em `radar_config` (`peso_faltas_consecutivas`,
+  `faltas_consecutivas_atencao`, `faltas_consecutivas_critico`),
+  `sinais_totais` sobe de 4 pra 5. `app_coordenacao_radar` passa o sinal
+  adiante e expõe `faltas_consecutivas` em cada linha.
+
+**SQL testada linha a linha em produção (SELECT direto, sem aplicar) antes de
+entrar aqui** — a lição de C1/I1/I2 na 085 e do bug de agregado aninhado na
+087: `greatest(0,NULL)`, `#>` vs `#>>`, `aggregate function calls cannot be
+nested` já custaram 5 bugs nesta sessão por escrever SQL sem testar.
+
+- [ ] **Step 1: Escrever o teste que falha**
+
+Criar `supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.test.sql`:
+
+```sql
+-- Teste da 088. O 5º sinal entra na mesma redistribuição dos outros 4 — não é
+-- atropelo. E carrega a mesma guarda do C1 (085): sem aula medida, sai da conta.
+create temporary table _res(caso text, ok boolean, detalhe text) on commit drop;
+
+do $$
+declare
+  v_r0 jsonb;
+  v_r2 jsonb;
+  v_r3 jsonb;
+  v_semdado jsonb;
+  v_bate boolean;
+  v_cfg jsonb := '{"peso_absenteismo":40,"peso_feedback":25,"peso_pratica":20,
+                   "peso_faltas_mes":15,"peso_faltas_consecutivas":20,
+                   "faixa_critico":40,"faixa_saudavel":70,
+                   "faltas_consecutivas_atencao":2,"faltas_consecutivas_critico":3,
+                   "minimo_sinais_para_nota":2}'::jsonb;
+begin
+  v_r0 := public.fn_radar_nota(
+    '{"absenteismo_pct":0,"aulas_medidas":10,"faltas_consecutivas":0}'::jsonb, v_cfg);
+  insert into _res values ('sinais_totais e 5', (v_r0->>'sinais_totais')::int = 5,
+    v_r0->>'sinais_totais');
+
+  v_semdado := public.fn_radar_nota(
+    '{"aulas_medidas":0,"faltas_consecutivas":0}'::jsonb, v_cfg);
+  insert into _res values ('sem aula medida, faltas_consecutivas fica sem_dado',
+    (select (e->>'sem_dado')::boolean from jsonb_array_elements(v_semdado->'decomposicao') e
+      where e->>'sinal' = 'faltas_consecutivas'), v_semdado::text);
+
+  v_r2 := public.fn_radar_nota(
+    '{"absenteismo_pct":0,"aulas_medidas":10,"faltas_consecutivas":2}'::jsonb, v_cfg);
+  insert into _res values ('2 faltas seguidas pontua 50 (atencao)',
+    (select (e->>'score')::numeric from jsonb_array_elements(v_r2->'decomposicao') e
+      where e->>'sinal' = 'faltas_consecutivas') = 50,
+    (select e->>'score' from jsonb_array_elements(v_r2->'decomposicao') e
+      where e->>'sinal' = 'faltas_consecutivas'));
+
+  v_r3 := public.fn_radar_nota(
+    '{"absenteismo_pct":0,"aulas_medidas":10,"faltas_consecutivas":3}'::jsonb, v_cfg);
+  insert into _res values ('3 faltas seguidas pontua 0 (critico)',
+    (select (e->>'score')::numeric from jsonb_array_elements(v_r3->'decomposicao') e
+      where e->>'sinal' = 'faltas_consecutivas') = 0,
+    (select e->>'score' from jsonb_array_elements(v_r3->'decomposicao') e
+      where e->>'sinal' = 'faltas_consecutivas'));
+
+  insert into _res values ('1 falta seguida pontua 100 (saudavel)',
+    (select (e->>'score')::numeric
+       from jsonb_array_elements(public.fn_radar_nota(
+         '{"absenteismo_pct":0,"aulas_medidas":10,"faltas_consecutivas":1}'::jsonb, v_cfg
+       )->'decomposicao') e
+      where e->>'sinal' = 'faltas_consecutivas') = 100, 'ok');
+
+  insert into _res values ('nota com 3 faltas seguidas e menor que com 0',
+    (v_r3->>'nota')::numeric < (v_r0->>'nota')::numeric,
+    format('0=%s 3=%s', v_r0->>'nota', v_r3->>'nota'));
+
+  with aula2 as (
+    select p.aluno_id, p.data_aula, p.horario_aula,
+           bool_or(p.considera_presenca) as veio
+      from public.vw_aluno_presenca_semantica_v1 p
+     where p.considera_frequencia_denominador
+       and p.data_aula >= date '2026-08-01'
+     group by 1,2,3
+  ),
+  ordenada2 as (
+    select aluno_id, veio,
+           row_number() over (partition by aluno_id
+             order by data_aula desc, horario_aula desc nulls last) as rn
+      from aula2
+  ),
+  esperado as (
+    select o.aluno_id, count(*) as n
+      from ordenada2 o
+     where not o.veio
+       and not exists (select 1 from ordenada2 o2
+                        where o2.aluno_id = o.aluno_id and o2.rn < o.rn and o2.veio)
+     group by o.aluno_id
+  )
+  select bool_and(v.faltas_consecutivas = coalesce(e.n, 0))
+    into v_bate
+    from public.vw_radar_aluno_sinais v
+    left join esperado e on e.aluno_id = v.aluno_id;
+
+  insert into _res values ('a view tem faltas_consecutivas e bate com o calculo direto',
+    coalesce(v_bate, false), 'ok');
+end $$;
+
+select json_build_object(
+         'falhas', (select count(*) from _res where not ok),
+         'detalhe', coalesce((select json_agg(json_build_object(
+                                'passo', caso, 'esperado', 'ok', 'obtido', detalhe))
+                                from _res where not ok), '[]'::json)
+       ) as resumo;
+```
+
+- [ ] **Step 2: Rodar e confirmar que falha**
+
+```bash
+npm run teste:088
+```
+
+Espera falhar com erro de coluna/chave inexistente (`faltas_consecutivas` não
+existe ainda em lugar nenhum).
+
+- [ ] **Step 3: Escrever a migration**
+
+Criar `supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.sql`:
+
+```sql
+-- 088 — o 5º sinal: faltas consecutivas
+--
+-- Decisão do Alf (10/08/2026): duas faltas seguidas empurram pra atenção,
+-- três pra crítico — e o motivo é dado escasso. Com só 9 dias de corte
+-- (01/08), percentual sobre 1-2 aulas medidas é ruído; contagem BRUTA de
+-- falta seguida é sinal sólido mesmo com pouquíssimo histórico.
+--
+-- É SINAL PONDERADO, NÃO ATROPELO: entra na mesma redistribuição dos outros
+-- 4 (fn_radar_nota) — tem peso próprio, compete e se redistribui como os
+-- demais. Não é um "if crítico then critico" por fora da conta.
+--
+-- MESMA GUARDA DO C1 (085): sem aula medida, o sinal SAI da conta — não é
+-- "0 faltas seguidas = saudável fantasma".
+--
+-- FASE B (Fábio avisa o professor com 2 seguidas, grupo da coordenação com
+-- 3+) é decisão do Alf de deixar pra depois — isto aqui é só o sinal
+-- entrando na nota.
+
+create or replace view public.vw_radar_aluno_sinais as
+with coorte as (
+  select id as professor_id
+    from public.professores
+   where coalesce(ativo, true) and usuario_id is not null
+),
+aula as (
+  select v.aluno_id,
+         v.data_aula,
+         v.horario_aula,
+         bool_or(v.considera_presenca) as veio
+    from public.vw_aluno_presenca_semantica_v1 v
+   where v.considera_frequencia_denominador
+     and v.data_aula >= date '2026-08-01'
+   group by 1, 2, 3
+),
+ordenada as (
+  select aluno_id, data_aula, veio,
+         row_number() over (partition by aluno_id
+                            order by data_aula desc, horario_aula desc nulls last) as rn
+    from aula
+),
+janela as (
+  select aluno_id,
+         count(*)                          as aulas_medidas,
+         count(*) filter (where not veio)  as faltas_janela
+    from ordenada
+   where rn <= 10
+   group by 1
+),
+-- Faltas seguidas a partir da aula mais recente: conta enquanto não bater a
+-- primeira presença. Zero linhas = sem falta ativa (última foi presença, ou
+-- não há aula medida — quem distingue os dois é o guard em fn_radar_nota).
+consecutivas as (
+  select o.aluno_id, count(*) as faltas_consecutivas
+    from ordenada o
+   where not o.veio
+     and not exists (
+       select 1 from ordenada o2
+        where o2.aluno_id = o.aluno_id and o2.rn < o.rn and o2.veio)
+   group by o.aluno_id
+),
+mes as (
+  select aluno_id,
+         count(*)                          as aulas_mes,
+         count(*) filter (where not veio)  as faltas_mes
+    from aula
+   where data_aula >= public.fn_competencia_feedback()
+   group by 1
+),
+semaforo as (
+  select distinct on (f.aluno_id, f.professor_id)
+         f.aluno_id, f.professor_id, f.feedback, f.pratica_em_casa,
+         f.evolucao, f.animo, nullif(btrim(f.observacao), '') as observacao,
+         f.competencia
+    from public.aluno_feedback_professor f
+   where f.competencia = public.fn_competencia_feedback()
+   order by f.aluno_id, f.professor_id,
+            coalesce(f.atualizado_em, f.respondido_em) desc
+),
+aviso as (
+  select distinct ma.aluno_id, min(ma.mes_saida) as mes_saida
+    from public.movimentacoes_admin ma
+   where ma.tipo = 'aviso_previo'
+     and ma.mes_saida >= public.fn_competencia_feedback()
+     and ma.aluno_id is not null
+   group by ma.aluno_id
+)
+select s.id                                as aluno_id,
+       s.nome                              as aluno_nome,
+       s.unidade_id,
+       s.unidade_codigo,
+       s.professor_atual_id                as professor_id,
+       s.professor_nome,
+       s.curso_nome,
+       coalesce(j.aulas_medidas, 0)        as aulas_medidas,
+       coalesce(j.faltas_janela, 0)        as faltas_janela,
+       case when coalesce(j.aulas_medidas, 0) > 0
+            then round(100.0 * j.faltas_janela / j.aulas_medidas, 1)
+       end                                 as absenteismo_pct,
+       coalesce(fc.faltas_consecutivas, 0) as faltas_consecutivas,
+       coalesce(m.faltas_mes, 0)           as faltas_mes,
+       coalesce(m.aulas_mes, 0)            as aulas_mes,
+       sf.feedback,
+       sf.pratica_em_casa,
+       sf.evolucao,
+       sf.animo,
+       sf.observacao,
+       sf.competencia                      as feedback_competencia,
+       (av.aluno_id is not null)           as avisou_que_sai,
+       av.mes_saida
+  from public.vw_aluno_sucesso_lista s
+  join coorte c   on c.professor_id = s.professor_atual_id
+  left join janela j        on j.aluno_id = s.id
+  left join consecutivas fc on fc.aluno_id = s.id
+  left join mes m           on m.aluno_id = s.id
+  left join semaforo sf on sf.aluno_id = s.id and sf.professor_id = s.professor_atual_id
+  left join aviso av  on av.aluno_id = s.id;
+
+comment on view public.vw_radar_aluno_sinais is
+  'Sinais do Radar da coordenação, grão de ALUNO. Presença vem de '
+  'vw_aluno_presenca_semantica_v1 no grão de AULA (aluno,dia,hora), janela '
+  'desde 01/08/2026, só coorte de professor com login liberado. '
+  'absenteismo_pct é NULO sem base — nunca zero. faltas_consecutivas é a '
+  'sequência aberta a partir da aula mais recente (0 = sem falta ativa).';
+
+revoke all on table public.vw_radar_aluno_sinais from public, anon, authenticated;
+grant select on table public.vw_radar_aluno_sinais to service_role;
+
+insert into public.radar_config (chave, valor, fabrica, rotulo, grupo, ordem) values
+  ('peso_faltas_consecutivas',    20, 20, 'Faltas consecutivas',           'pesos',        11),
+  ('faltas_consecutivas_atencao',  2,  2, 'Atenção a partir de (seguidas)', 'consecutivas', 12),
+  ('faltas_consecutivas_critico',  3,  3, 'Crítico a partir de (seguidas)', 'consecutivas', 13)
+on conflict (chave) do nothing;
+
+create or replace function public.fn_radar_nota(p_sinais jsonb, p_config jsonb)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  v_dec        jsonb := '[]'::jsonb;
+  v_peso_vivo  numeric := 0;
+  v_apurados   int := 0;
+  v_nota       numeric;
+  v_status     text;
+  v_minimo     int := coalesce((p_config->>'minimo_sinais_para_nota')::int, 2);
+  r            record;
+begin
+  for r in
+    select * from (values
+      ('absenteismo',
+       case when (p_sinais->>'absenteismo_pct') is not null
+            then greatest(0, 100 - (p_sinais->>'absenteismo_pct')::numeric) end,
+       coalesce((p_config->>'peso_absenteismo')::numeric, 0),
+       case when (p_sinais->>'absenteismo_pct') is not null
+            then format('%s%% (%s de %s)', p_sinais->>'absenteismo_pct',
+                        coalesce((p_sinais->>'aulas_medidas')::int, 0)
+                          - round(coalesce((p_sinais->>'aulas_medidas')::numeric,0)
+                            * (1 - (p_sinais->>'absenteismo_pct')::numeric/100)),
+                        p_sinais->>'aulas_medidas') end),
+      ('feedback',
+       case p_sinais->>'feedback'
+            when 'verde' then 100 when 'amarelo' then 50 when 'vermelho' then 0 end,
+       coalesce((p_config->>'peso_feedback')::numeric, 0),
+       p_sinais->>'feedback'),
+      ('pratica',
+       case p_sinais->>'pratica_em_casa'
+            when 'sim' then 100 when 'as_vezes' then 50 when 'nao' then 0 end,
+       coalesce((p_config->>'peso_pratica')::numeric, 0),
+       p_sinais->>'pratica_em_casa'),
+      ('faltas_mes',
+       case when (p_sinais->>'faltas_mes') is not null
+                 and coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
+            then greatest(0, 100 - 100.0 * (p_sinais->>'faltas_mes')::numeric
+                                        / (p_sinais->>'aulas_mes')::numeric) end,
+       coalesce((p_config->>'peso_faltas_mes')::numeric, 0),
+       case when (p_sinais->>'faltas_mes') is not null
+                 and coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
+            then format('%s de %s no mês', p_sinais->>'faltas_mes', p_sinais->>'aulas_mes') end),
+      -- Sinal ponderado, não atropelo: a urgência é o PESO, não um "if" por
+      -- fora da redistribuição. Mesma guarda do C1: sem aula medida, sai da
+      -- conta — 0 faltas seguidas por FALTA DE DADO != 0 por presença real.
+      ('faltas_consecutivas',
+       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0
+            then case
+                   when (p_sinais->>'faltas_consecutivas')::int
+                        >= coalesce((p_config->>'faltas_consecutivas_critico')::int, 3) then 0
+                   when (p_sinais->>'faltas_consecutivas')::int
+                        >= coalesce((p_config->>'faltas_consecutivas_atencao')::int, 2) then 50
+                   else 100 end
+            end,
+       coalesce((p_config->>'peso_faltas_consecutivas')::numeric, 0),
+       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0
+            then format('%s falta(s) seguida(s)', coalesce(p_sinais->>'faltas_consecutivas', '0')) end)
+    ) as t(sinal, score, peso, valor)
+  loop
+    if r.score is null then
+      v_dec := v_dec || jsonb_build_object(
+        'sinal', r.sinal, 'valor', null, 'score', null,
+        'peso', r.peso, 'peso_efetivo', null, 'contribuiu', null, 'sem_dado', true);
+    else
+      v_apurados  := v_apurados + 1;
+      v_peso_vivo := v_peso_vivo + r.peso;
+      v_dec := v_dec || jsonb_build_object(
+        'sinal', r.sinal, 'valor', r.valor, 'score', r.score,
+        'peso', r.peso, 'sem_dado', false);
+    end if;
+  end loop;
+
+  if v_peso_vivo > 0 then
+    v_dec := (
+      select jsonb_agg(
+        case when (d->>'sem_dado')::boolean then d
+             else d || jsonb_build_object(
+               'peso_efetivo', round(100.0 * (d->>'peso')::numeric / v_peso_vivo, 1),
+               'contribuiu',   round((d->>'score')::numeric * (d->>'peso')::numeric
+                                     / v_peso_vivo, 1),
+               'de',           round(100.0 * (d->>'peso')::numeric / v_peso_vivo, 1))
+        end order by ord)
+        from jsonb_array_elements(v_dec) with ordinality as e(d, ord));
+
+    select round(sum((d->>'contribuiu')::numeric)) into v_nota
+      from jsonb_array_elements(v_dec) d
+     where not (d->>'sem_dado')::boolean;
+  end if;
+
+  if v_apurados < v_minimo then
+    v_nota := null;
+    v_dec := (
+      select jsonb_agg(
+               d || jsonb_build_object('contribuiu', null, 'peso_efetivo', null, 'de', null)
+               order by ord)
+        from jsonb_array_elements(v_dec) with ordinality as e(d, ord));
+  end if;
+
+  v_status := case
+    when v_nota is null then null
+    when v_nota < coalesce((p_config->>'faixa_critico')::numeric, 40)   then 'critico'
+    when v_nota >= coalesce((p_config->>'faixa_saudavel')::numeric, 70) then 'saudavel'
+    else 'atencao' end;
+
+  return jsonb_build_object(
+    'nota', v_nota,
+    'status', v_status,
+    'sinais_apurados', v_apurados,
+    'sinais_totais', 5,
+    'suficiente', v_apurados >= v_minimo,
+    'decomposicao', v_dec);
+end $$;
+
+comment on function public.fn_radar_nota(jsonb, jsonb) is
+  'Nota do Radar. PURA. 5 sinais: absenteismo, feedback, pratica, faltas_mes, '
+  'faltas_consecutivas. Sinal sem dado sai da conta e o peso se redistribui '
+  '(nunca neutro, nunca zero). Abaixo de minimo_sinais_para_nota a nota vem '
+  'NULA — mas a decomposicao vem, pra tela explicar.';
+
+revoke all on function public.fn_radar_nota(jsonb, jsonb) from public;
+grant execute on function public.fn_radar_nota(jsonb, jsonb) to authenticated;
+
+create or replace function public.app_coordenacao_radar(
+  p_unidade_id   uuid    default null,
+  p_professor_id integer default null,
+  p_status       text    default null,
+  p_limite       integer default 200)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_cfg    jsonb;
+  v_status text := nullif(btrim(coalesce(p_status, '')), '');
+  v_r      jsonb;
+begin
+  if not public.fn_e_coordenacao_la_teacher() then
+    raise exception 'apenas_admin';
+  end if;
+
+  if v_status is not null and v_status not in ('critico','atencao','saudavel','sem_nota') then
+    raise exception 'status_invalido';
+  end if;
+
+  select jsonb_object_agg(chave, valor) into v_cfg from public.radar_config;
+
+  with base as (
+    select s.*, public.fn_radar_nota(
+             jsonb_build_object(
+               'absenteismo_pct',     s.absenteismo_pct,
+               'aulas_medidas',       s.aulas_medidas,
+               'feedback',            s.feedback,
+               'pratica_em_casa',     s.pratica_em_casa,
+               'faltas_mes',          s.faltas_mes,
+               'aulas_mes',           s.aulas_mes,
+               'faltas_consecutivas', s.faltas_consecutivas), v_cfg) as nota
+      from public.vw_radar_aluno_sinais s
+  ),
+  com_status as (
+    select b.*, coalesce(b.nota ->> 'status', 'sem_nota') as status_calc
+      from base b
+  ),
+  fac_uni  as (select * from com_status
+                where (p_professor_id is null or professor_id = p_professor_id)
+                  and (v_status is null or status_calc = v_status)),
+  fac_prof as (select * from com_status
+                where (p_unidade_id is null or unidade_id = p_unidade_id)
+                  and (v_status is null or status_calc = v_status)),
+  fac_st   as (select * from com_status
+                where (p_unidade_id is null or unidade_id = p_unidade_id)
+                  and (p_professor_id is null or professor_id = p_professor_id)),
+  linha as (select * from com_status
+             where (p_unidade_id is null or unidade_id = p_unidade_id)
+               and (p_professor_id is null or professor_id = p_professor_id)
+               and (v_status is null or status_calc = v_status))
+  select jsonb_build_object(
+    'config', v_cfg,
+    'resumo', (select jsonb_build_object(
+        'alunos',              count(*),
+        'criticos',            count(*) filter (where status_calc = 'critico'),
+        'atencao',             count(*) filter (where status_calc = 'atencao'),
+        'saudaveis',           count(*) filter (where status_calc = 'saudavel'),
+        'sem_nota',            count(*) filter (where status_calc = 'sem_nota'),
+        'avisaram_que_saem',   count(*) filter (where avisou_que_sai),
+        'absenteismo_media',   round(avg(absenteismo_pct), 1),
+        'absenteismo_mediana', round(percentile_cont(0.5)
+                                 within group (order by absenteismo_pct)::numeric, 1),
+        'aulas_por_aluno',     round(avg(aulas_medidas), 1),
+        'com_base',            count(*) filter (where absenteismo_pct is not null),
+        'base_desde',          '2026-08-01') from linha),
+    'medias', jsonb_build_object(
+        'escola',   (select round(avg(absenteismo_pct),1) from com_status),
+        'unidades', coalesce((select jsonb_agg(u.j order by u.unidade_codigo) from (
+                       select unidade_id, unidade_codigo,
+                              jsonb_build_object('unidade_id', unidade_id, 'unidade', unidade_codigo,
+                                                'absenteismo_media', round(avg(absenteismo_pct),1)) as j
+                         from com_status where unidade_codigo is not null
+                        group by unidade_id, unidade_codigo) u), '[]'::jsonb),
+        'professores', coalesce((select jsonb_agg(p.j order by p.professor_nome) from (
+                       select professor_id, professor_nome,
+                              jsonb_build_object('professor_id', professor_id, 'professor', professor_nome,
+                                                'absenteismo_media', round(avg(absenteismo_pct),1)) as j
+                         from com_status where professor_id is not null
+                        group by professor_id, professor_nome) p), '[]'::jsonb)),
+    'linhas', coalesce((select jsonb_agg(jsonb_build_object(
+        'aluno_id', aluno_id, 'aluno', aluno_nome,
+        'curso', curso_nome, 'unidade', unidade_codigo,
+        'professor_id', professor_id, 'professor', professor_nome,
+        'nota', nota, 'status', status_calc,
+        'absenteismo_pct', absenteismo_pct, 'aulas_medidas', aulas_medidas,
+        'faltas_janela', faltas_janela, 'faltas_consecutivas', faltas_consecutivas,
+        'faltas_mes', faltas_mes, 'aulas_mes', aulas_mes,
+        'feedback', feedback, 'pratica_em_casa', pratica_em_casa,
+        'evolucao', evolucao, 'animo', animo, 'observacao', observacao,
+        'avisou_que_sai', avisou_que_sai, 'mes_saida', mes_saida)
+        order by (nota ->> 'nota') is null,
+                 (nota ->> 'nota')::numeric asc,
+                 aluno_nome)
+      from (select * from linha
+             order by (nota ->> 'nota') is null, (nota ->> 'nota')::numeric asc, aluno_nome
+             limit p_limite) x), '[]'::jsonb),
+    'total_lista', (select count(*) from linha),
+    'truncado',    (select count(*) from linha) > p_limite,
+    'filtros', jsonb_build_object(
+      'unidades', coalesce((select jsonb_agg(jsonb_build_object(
+            'unidade_id', unidade_id, 'unidade', unidade_codigo, 'alunos', n) order by unidade_codigo)
+          from (select unidade_id, unidade_codigo, count(*) n from fac_uni
+                 where unidade_codigo is not null group by 1,2) u), '[]'::jsonb),
+      'professores', coalesce((select jsonb_agg(jsonb_build_object(
+            'professor_id', professor_id, 'professor', professor_nome, 'alunos', n) order by professor_nome)
+          from (select professor_id, professor_nome, count(*) n from fac_prof
+                 where professor_id is not null group by 1,2) p), '[]'::jsonb),
+      'status', coalesce((select jsonb_agg(jsonb_build_object(
+            'status', status_calc, 'alunos', n) order by status_calc)
+          from (select status_calc, count(*) n from fac_st group by 1) s), '[]'::jsonb))
+  ) into v_r;
+
+  return v_r;
+end $$;
+
+revoke all on function public.app_coordenacao_radar(uuid, integer, text, integer) from public;
+grant execute on function public.app_coordenacao_radar(uuid, integer, text, integer) to authenticated;
+```
+
+- [ ] **Step 4: Rodar e confirmar que passa**
+
+```bash
+npm run teste:088
+```
+
+- [ ] **Step 5: Escrever os mutantes**
+
+`scripts/mutantes-088.mjs`, cinco mutantes:
+
+| # | Âncora | Vira | Mata |
+|---|---|---|---|
+| V1 | `      ('faltas_consecutivas',\n       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0\n            then case` | `      ('faltas_consecutivas',\n       case when true\n            then case` | guarda cai — sem aula medida conta como saudável fantasma |
+| V2 | `                        >= coalesce((p_config->>'faltas_consecutivas_critico')::int, 3) then 0` | `                        >= coalesce((p_config->>'faltas_consecutivas_critico')::int, 3) then 50` | fronteira do crítico some |
+| V3 | `    'sinais_totais', 5,` | `    'sinais_totais', 4,` | sinais_totais não sobe |
+| V4 | `       coalesce((p_config->>'peso_faltas_consecutivas')::numeric, 0),\n       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0\n            then format('%s falta(s) seguida(s)'` | `       0,\n       case when coalesce((p_sinais->>'aulas_medidas')::int, 0) > 0\n            then format('%s falta(s) seguida(s)'` | peso configurável vira hardcoded (deixa de ser sinal ponderado de verdade) |
+| V5 | `consecutivas as (\n  select o.aluno_id, count(*) as faltas_consecutivas\n    from ordenada o\n   where not o.veio` | `consecutivas as (\n  select o.aluno_id, count(*) as faltas_consecutivas\n    from ordenada o\n   where o.veio` | a view para de contar falta seguida (conta presença) |
+
+- [ ] **Step 6: Rodar os mutantes**
+
+```bash
+npm run mutantes:088
+```
+
+Esperado: `5/5 mutantes mortos`.
+
+- [ ] **Step 7: Aplicar em produção e medir**
+
+```bash
+node scripts/rodar-teste-sql.mjs --aplicar supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.sql
+```
+
+Conferir com dado real — quantos alunos têm 2+ faltas seguidas, e se a
+distribuição crítico/atenção/saudável muda com o 5º sinal ativo:
+
+```sql
+select jsonb_pretty(public.app_coordenacao_radar() -> 'resumo');
+select count(*) filter (where faltas_consecutivas >= 2) as com_falta_seguida
+  from public.vw_radar_aluno_sinais;
+```
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.sql supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.test.sql scripts/mutantes-088.mjs package.json
+git commit -m "feat(radar): faltas consecutivas vira o 5o sinal, ponderado, com a guarda do C1"
+```
+
+---
+
 ## Fechamento
 
 - [ ] **Rodar a bateria inteira**
