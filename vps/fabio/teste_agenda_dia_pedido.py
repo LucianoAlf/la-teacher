@@ -158,6 +158,44 @@ checar("6. se o dado voltar de outro dia, o atalho se cala", None,
 B.professor_context = fake_professor_context
 
 
+# ===== 7. o VIZINHO CEGO: o caminho do Hermes tambem precisa do dia ==========
+# O atalho cobre quatro frases. "quem eu tenho na terca?" e "me prepara pra
+# aula de terca" caem no Hermes -- e la o contexto sempre foi o de HOJE. O
+# Fabio respondia "ainda nao tenho a agenda do dia 12 aqui": honesto, mas e
+# cegueira, nao conhecimento. `_agenda_de_outro_dia` e o bloco que soma (nunca
+# substitui) o dia citado ao prompt.
+def outro(texto):
+    return B._agenda_de_outro_dia(25, texto)
+
+
+checar("7a. dia citado numa frase que o atalho NAO pega vem resolvido",
+       "2026-08-11", (outro("quem eu tenho na terca?") or {}).get("data"))
+# "prepara" e uma das palavras que o atalho BLOQUEIA -- e justamente por isso
+# esta frase e o caso do vizinho cego.
+checar("7b. e vem com as aulas daquele dia", 5,
+       (outro("me prepara pra aula de amanha") or {}).get("total_aulas"))
+# Dia sem aula tem que vir como LISTA VAZIA, nao como None: vazio e resposta
+# ("nao tem aula"), None e "nao sei". Confundir os dois foi o defeito original.
+checar("7c. dia sem aula vem vazio (resposta), nao nulo (ignorancia)", [],
+       (outro("quem eu tenho na terca?") or {}).get("aulas"))
+checar("7c2. e o bloco existe mesmo com o dia vazio", "2026-08-11",
+       (outro("quem eu tenho na terca?") or {}).get("data"))
+# Sem dia citado o bloco NAO entra: repetiria o contexto de hoje e engordaria
+# o prompt de toda conversa de rotina.
+checar("7d. sem dia citado, nao carrega bloco nenhum", None,
+       outro("como foi meu dia?"))
+checar("7e. 'hoje' explicito tambem nao carrega (ja esta na base)", None,
+       outro("quem eu tenho hoje?"))
+checar("7f. periodo ('da semana') continua fora", None,
+       outro("quem eu tenho na semana?"))
+
+# A mesma trava do atalho vale aqui: dado de outro dia nao viaja rotulado.
+B.professor_context = contexto_teimoso
+checar("7g. se o dado voltar de outro dia, o bloco nao vai", None,
+       outro("quem eu tenho na terca?"))
+B.professor_context = fake_professor_context
+
+
 # ===== resultado =====
 if falhas:
     print(f"FALHOU ({len(falhas)}):")

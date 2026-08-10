@@ -1739,6 +1739,62 @@ ESCOPO_PROFESSOR = """LIMITE DE ESCOPO DESTE CHAT (identidade_tipo=professor) - 
 """
 
 
+def _agenda_de_outro_dia(professor_id: int, text: str) -> Optional[Dict[str, Any]]:
+    """A agenda do dia CITADO na pergunta, quando esse dia não é hoje.
+
+    POR QUE EXISTE. O `contexto_json` que vai pro Hermes sempre foi o de HOJE
+    (`professor_context(professor_id)` sem data). O atalho rápido aprendeu a
+    respeitar o dia pedido em 09/08/2026, mas ele só cobre quatro frases
+    ("minhas aulas", "minha agenda", "quantos alunos", "quantas aulas") e se
+    cala em tudo que tem "prepara", "aluno", "conteudo". Ou seja: *"quem eu
+    tenho na terça?"* e *"me prepara pra aula de terça"* caíam no Hermes, e lá
+    o dia era sempre hoje. Ele respondia "ainda não tenho a agenda do dia 12
+    aqui" — honesto, mas é CEGUEIRA, não conhecimento, e o professor que se
+    planeja com isso chega achando que não tem aula.
+
+    SOMA, NÃO SUBSTITUI. O contexto de hoje continua sendo a base: é dele que
+    saem identidade, carteira, `agenda_stats` e o tom de "como foi seu dia".
+    Trocar a base pelo dia perguntado faria toda saudação falar de outro dia.
+    Este bloco entra ao lado, rotulado com a data.
+
+    Só entra com dia EXPLÍCITO. `_resolver_dia_pedido` devolve hoje/não-explícito
+    quando a frase não fala de dia nenhum — carregar um bloco extra nesse caso
+    seria repetir o que já está na base e engordar o prompt de toda conversa.
+
+    Reusa o resolvedor do atalho de propósito: dois parsers de data seriam duas
+    verdades, e a que diverge é sempre a que ninguém está olhando.
+    """
+    try:
+        dia = _resolver_dia_pedido(_norm_text(text))
+    except Exception:
+        return None
+    if not dia or not dia.get("explicito") or dia["iso"] == today_brt():
+        return None
+    try:
+        ctx = professor_context(professor_id, dia["iso"])
+    except Exception as e:
+        log("agenda_outro_dia_falhou", professor_id=professor_id, dia=dia["iso"], error=str(e)[:200])
+        return None
+    if not isinstance(ctx, dict) or not ctx.get("ok"):
+        return None
+    bloco = ctx.get("hoje") if isinstance(ctx.get("hoje"), dict) else {}
+    # Mesma trava do atalho: o RPC devolve em `hoje.data` o dia que SERVIU. Se
+    # não for o pedido, é melhor não mandar nada do que mandar a agenda de um
+    # dia rotulada como a de outro.
+    servido = bloco.get("data")
+    if servido and servido != dia["iso"]:
+        log("agenda_outro_dia_divergente", professor_id=professor_id,
+            pedido=dia["iso"], servido=servido)
+        return None
+    return {
+        "data": dia["iso"],
+        "dia": dia["label"],
+        "ja_passou": dia["passado"],
+        "aulas": bloco.get("aulas") or [],
+        "total_aulas": bloco.get("total_aulas") or len(bloco.get("aulas") or []),
+    }
+
+
 def build_prompt(row: Dict[str, Any]) -> str:
     tipo = row.get("identidade_tipo") or "professor"
     hist = recent_history_for_row(row, 12)
@@ -1754,6 +1810,7 @@ def build_prompt(row: Dict[str, Any]) -> str:
         contexto_professor = admin_context(usuario_id)
         contexto_pedagogico = None
         agenda_stats = {}
+        outro_dia = None
         identidade_linha = f"- identidade_tipo: admin\n- usuario_id: {usuario_id}\n- modo: gestão/admin do Alf; visão ampla, não limitada a professor comum"
         bloco_escopo = ""
     else:
@@ -1761,6 +1818,7 @@ def build_prompt(row: Dict[str, Any]) -> str:
         contexto_professor = professor_context(professor_id)
         contexto_pedagogico = pedagogical_prefetch(professor_id, text, hist)
         agenda_stats = _today_agenda_stats(contexto_professor) if isinstance(contexto_professor, dict) and contexto_professor.get("ok") else {}
+        outro_dia = _agenda_de_outro_dia(professor_id, text)
         identidade_linha = f"- identidade_tipo: professor\n- professor_id: {professor_id}"
         bloco_escopo = ESCOPO_PROFESSOR
     return f"""Canal: chat livre do Fábio com professor/admin da LA Music.
@@ -1773,6 +1831,12 @@ IDENTIDADE E CONTEXTO JÁ RESOLVIDOS PELO BRIDGE:
 - contexto_json: {compact_professor_context(contexto_professor)}
 - hora_local_sao_paulo: {hora_local_sp}
 - agenda_stats_json: {json.dumps(agenda_stats, ensure_ascii=False, separators=(",", ":"))[:4000]}
+- agenda_do_dia_citado_json: {json.dumps(outro_dia, ensure_ascii=False, separators=(",", ":"))[:4000] if outro_dia else "null"}
+
+SOBRE O DIA DA PERGUNTA:
+- O `contexto_json` é SEMPRE de hoje. Quando `agenda_do_dia_citado_json` vier preenchido, ele é a agenda do dia que o professor citou — use ELE pra falar daquele dia, e diga a data ("terça, 11/08") pra ele conferir se você entendeu certo.
+- `aulas: []` ali significa que NÃO HÁ AULA naquele dia. Não é "não sei": é uma resposta. Diga que não tem aula, não que você não tem a agenda.
+- Quando vier `null` e o professor tiver citado um dia, você realmente não sabe daquele dia: diga isso e ofereça olhar, sem chutar a partir da agenda de hoje.
 
 CONTEXTO DE CONVERSA / TOM:
 - Para cumprimentos/check-ins curtos (ex: "qual é Fábio", "coe Fábio", "tá aí?"), não responda com menu fixo. Use hora local, fase do dia e agenda para soar presente.
