@@ -196,9 +196,43 @@ Uma RPC só, no molde da 077: `app_coordenacao_radar(p_unidade_id, p_limite)`.
 - **Um número só:** o total do cartão e o comprimento da lista contam a mesma
   coisa, no mesmo grão. É a lição da 080 e ela vale aqui inteira.
 
-**Cliente:** `/app/coordenacao/radar`, quarto item da sidebar, reusando
-`PainelNumero` e o cartão do `LinhaSemaforo`. **Não** nasce componente novo de
-design: o que faltar se extrai do app do professor.
+**Cliente:** `/app/coordenacao/radar`, reusando `PainelNumero` e o cartão do
+`LinhaSemaforo`. **Não** nasce componente novo de design: o que faltar se extrai
+do app do professor.
+
+### Onde isso entra na navegação (decidido pelo Alf, 10/08)
+
+A sidebar da coordenação **continua com três itens** — o Radar não é o quarto:
+
+```
+Painel   ← professores devendo lançamento   (operação da equipe, diária)
+Radar    ← quem procurar esta semana        (aluno, semanal)
+Equipe   ← quem tem acesso ao app
+```
+
+**O Radar é a porta do aluno.** A tela de Feedback (`/app/coordenacao/feedback`,
+no ar desde 09/08) **não muda em nada** — ela só deixa de ser item de menu e
+passa a ser o "ver o mês inteiro" do cartão *Coração vermelho*. A rota continua
+existindo e continua acessível por link direto.
+
+**Por quê:** o cartão 3 do Radar é uma fatia da tela de Feedback — os vermelhos
+do mês. Lado a lado no menu, os dois itens respondem perguntas parecidas, e o
+coordenador teria que adivinhar em qual delas a dúvida de hoje mora. Quando duas
+portas respondem quase a mesma coisa, as pessoas escolhem errado e concluem que
+a ferramenta é confusa. Uma porta com profundidade > duas portas rasas.
+
+**Por que NÃO virou bloco 2 do Painel** (era a ideia original de 08/08): o
+Painel é sobre a operação da equipe; o Radar é sobre aluno. Empilhar os dois num
+scroll só é a mesma mistura que produziu a parede das 9h — dois públicos numa
+mensagem, ninguém lê.
+
+**Tarefas que essa decisão cria:**
+1. `CoordenacaoFrame.tsx`: trocar o item `feedback` por `radar` em `ITENS`,
+   `ABAS` e `ROTA`; o `abaAtiva` de `/app/coordenacao/feedback` passa a acender
+   o **Radar** (a tela é filha dele), não item nenhum.
+2. `CoordenacaoFeedback.tsx`: ganha `aoVoltar` para o Radar — hoje ela é destino
+   de menu, e destino de menu não tem saída.
+3. Cartão *Coração vermelho*: link "ver o mês inteiro" → `/app/coordenacao/feedback`.
 
 ## Testes
 

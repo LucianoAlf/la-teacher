@@ -61,7 +61,14 @@ Fatia 1 vira: **"Ligar essa semana"** (crítico × renovação = **2** hoje),
 lado a lado, nunca somados). As três perguntas do semáforo viram a *frase do
 porquê* dentro do cartão — é ali que elas ganham leitor.
 
-**PRÓXIMO PASSO:** o Alf revisa a spec. Depois dela, plano e execução.
+**Decidido pelo Alf em 10/08 (navegação):** o Radar é **página própria** e vira
+a **porta do aluno**. A sidebar segue com **três** itens — `Painel · Radar ·
+Equipe`. A tela de Feedback não muda em nada: só deixa de ser item de menu e
+passa a ser o "ver o mês inteiro" do cartão *Coração vermelho*. Não virou bloco
+2 do Painel (ideia original de 08/08) porque o Painel é da equipe e o Radar é do
+aluno — empilhar num scroll só é a mesma mistura da parede das 9h.
+
+**PRÓXIMO PASSO:** o Alf revisa a spec inteira. Depois dela, plano e execução.
 
 ---
 
