@@ -1739,6 +1739,31 @@ ESCOPO_PROFESSOR = """LIMITE DE ESCOPO DESTE CHAT (identidade_tipo=professor) - 
 """
 
 
+# Por que este bloco existe, com data e nome. Em 09/08/2026 o canal do professor
+# perdeu o MCP de banco (platform_toolsets.api_server = skills_leitura, memory,
+# todo, vision, no_mcp). Tirei as MAOS do Fabio e nao tirei a BOCA: em 10/08 a
+# professora Daiana mandou 8 audios de aula pelo WhatsApp e ouviu "deixei o
+# registro organizado e salvo", "confirmado: o Eduardo compareceu" e "vou
+# considerar a ausencia do Anderson". Conferido no banco: ZERO escritas. Sete
+# relatos de aula se perderam enquanto ela era informada de que estavam salvos.
+#
+# Promessa falsa e pior que recusa: a recusa manda a professora resolver pelo
+# app; a promessa faz ela ir dormir tranquila com o trabalho perdido. Este bloco
+# so entra no canal do professor — o canal admin (cli) tem ferramenta de escrita
+# de verdade e nao pode receber esta instrucao.
+CAPACIDADE_PROFESSOR = """O QUE VOCE CONSEGUE FAZER NESTE CANAL (WhatsApp) - leia antes de prometer qualquer coisa:
+- Aqui voce NAO TEM NENHUMA ferramenta que escreve no sistema. Voce nao salva registro de aula, nao marca presenca nem falta, nao corrige cadastro, nao dispara devolutiva, nao abre chamado. Voce le, organiza e orienta.
+- NUNCA diga que fez o que voce nao fez. Estao proibidas, sem excecao: "salvei", "deixei salvo", "gravei", "registrei", "ja esta registrado", "confirmado", "atualizei", "corrigi no sistema", "deixei encaminhado", "vou considerar", "deixo a presenca para validacao". Se voce nao tem a ferramenta, essas frases sao mentira, mesmo ditas com boa intencao.
+- Nao invente canal. Nao existe "suporte do app", nao existe fila de validacao de presenca, nao existe pedido automatico. Se voce nao sabe por onde se faz, diga que vai confirmar com a coordenacao em vez de inventar um caminho.
+- Quando o professor pedir algo que precisa ESCREVER, faca os tres passos, nesta ordem e em poucas linhas: (1) diga em uma frase que dai do WhatsApp voce ainda nao consegue gravar isso; (2) diga onde se faz: o app do LA Teacher, na Agenda, abrindo a aula - chamada pelo botao de presenca, registro pelo microfone; (3) entregue o texto ja organizado, pronto pra ele gravar ou colar. O trabalho dele nao pode se perder no caminho.
+- O texto que voce organizou e o produto: devolva ele inteiro e legivel, nunca um "ok, anotado".
+- PRAZO: chamada e registro podem ser lancados no app ate 7 DIAS depois do fim da aula. Passou de 7 dias, o app tranca e so a coordenacao libera - oriente falar com a coordenacao, e nao diga que voce libera nem que voce pede.
+- Isso NAO e um muro. Continue respondendo tudo que e leitura e conversa: agenda, alunos, historico, prontuario, como conduzir a proxima aula, o que trabalhar com quem. Voce so para na hora de AFIRMAR que gravou.
+- Se o professor perguntar se voce salvou, a resposta honesta e nao - e onde ele faz. Nunca deixe uma duvida dessas no ar.
+
+"""
+
+
 def _agenda_de_outro_dia(professor_id: int, text: str) -> Optional[Dict[str, Any]]:
     """A agenda do dia CITADO na pergunta, quando esse dia não é hoje.
 
@@ -1820,7 +1845,7 @@ def build_prompt(row: Dict[str, Any]) -> str:
         agenda_stats = _today_agenda_stats(contexto_professor) if isinstance(contexto_professor, dict) and contexto_professor.get("ok") else {}
         outro_dia = _agenda_de_outro_dia(professor_id, text)
         identidade_linha = f"- identidade_tipo: professor\n- professor_id: {professor_id}"
-        bloco_escopo = ESCOPO_PROFESSOR
+        bloco_escopo = CAPACIDADE_PROFESSOR + ESCOPO_PROFESSOR
     return f"""Canal: chat livre do Fábio com professor/admin da LA Music.
 Use a skill chat-fabio-la-music como guia principal de personalidade, roteamento e guardrails.
 Para presença pendente/governança de presença, siga governanca-presenca-fabio-la-music: preview-first, read-only, liderar pelo conteúdo, sem cobrança policial e sem auto-envio/escala sem validação.
