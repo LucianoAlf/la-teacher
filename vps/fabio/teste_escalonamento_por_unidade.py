@@ -90,6 +90,10 @@ LINHAS = [
     prof(47, "Hugo Serra", {"Recreio": 1}, pior=1),
 ]
 
+# A divisão só entra quando há parede: com a lista curta, uma mensagem basta.
+# A fixture de 11 professores passa do limite de propósito — é o caso "parede".
+W.ESCALONAMENTO_MENSAGEM_UNICA_MAX = 1500
+
 msgs = W.montar_escalonamento(LINHAS)
 juntas = "\n".join(msgs)
 
@@ -184,13 +188,52 @@ checar("8b. e nenhuma passa de 4.096 caracteres", True,
 
 # ===== 9. casos de borda =====
 checar("9a. sem pendência, nenhuma mensagem", [], W.montar_escalonamento([]))
+# Força o caso "parede" (max=0) pra exercitar a divisão: com UMA unidade, a
+# capa não entra — ela existe pra dar rumo a uma fila, e fila de um item não
+# precisa de capa. Sem o max=0 a lista caberia numa mensagem e este passo
+# estaria medindo a regra do passo 11, não esta.
+W.ESCALONAMENTO_MENSAGEM_UNICA_MAX = 0
 so_uma = [l for l in LINHAS if l["professor_id"] in (42, 43)]
 uma = W.montar_escalonamento(so_uma)
 checar("9b. com uma unidade só, não entra capa", 1, len(uma))
 checar("9c. e essa mensagem é a da unidade", True,
        uma[0].startswith("*Registro atrasado · Campo Grande*"))
+W.ESCALONAMENTO_MENSAGEM_UNICA_MAX = 1500
 checar("9d. desempate 2×2 é estável (mesma entrada, mesma saída)",
        W._unidade_de_cobranca(LINHAS[4]), W._unidade_de_cobranca(LINHAS[4]))
+
+# ===== 10. A COORTE: só escala quem o Fábio já cobra no particular ==========
+# Em 10/08/2026 a coordenação recebeu 36 professores num sistema que ela ainda
+# não conhece — sendo que a cobrança individual só ia pra 6. O escalonamento
+# não aplicava o mesmo recorte que o `active_professors` já aplicava.
+coorte = {20, 32, 3}
+dentro = W.filtrar_coorte(LINHAS, coorte)
+checar("10a. sobra só quem está no app", 3, len(dentro))
+checar("10b. e são exatamente os do app", {20, 32, 3},
+       {l["professor_id"] for l in dentro})
+checar("10c. quem não entrou no app não é denunciado", False,
+       any(l["professor_id"] == 19 for l in dentro))
+# Coorte vazia (ninguém liberado) tem que dar lista vazia, não lista cheia —
+# um `if not ids: return linhas` de "conveniência" mandaria a escola inteira.
+checar("10d. coorte vazia não libera a escola inteira", [],
+       W.filtrar_coorte(LINHAS, set()))
+# E o resto do pipeline continua funcionando com a lista recortada.
+checar("10e. a fila da coorte ainda monta mensagem", True,
+       len(W.montar_escalonamento(dentro)) >= 1)
+
+# ===== 11. Dividir é remédio de parede, não cerimônia =====
+# Com a coorte, o escalonamento real caiu de 36 professores pra 5 (2.058
+# chars). Mandar índice + 3 unidades pra uma lista que cabe numa tela é pedir
+# quatro notificações onde bastava uma.
+W.ESCALONAMENTO_MENSAGEM_UNICA_MAX = 8000   # a fixture inteira agora cabe
+uma_so = W.montar_escalonamento(LINHAS)
+checar("11a. lista que cabe vai numa mensagem só", 1, len(uma_so))
+checar("11b. e ela leva todo mundo", True,
+       all(l["professor_nome"] in uma_so[0] for l in LINHAS))
+checar("11c. sem título de unidade, porque não foi dividida", False,
+       uma_so[0].startswith("*Registro atrasado · "))
+W.ESCALONAMENTO_MENSAGEM_UNICA_MAX = 1500   # volta pro caso "parede"
+
 
 # ===== resultado =====
 if falhas:

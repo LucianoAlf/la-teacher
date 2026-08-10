@@ -79,6 +79,31 @@ MUTANTES = [
                 "        out.append(f\"_+{total - len(aulas)} aulas atrasadas deste professor_\")",
     },
     {
+        "nome": "V12 — divide sempre, mesmo quando cabe numa mensagem",
+        "pega": "11a — 4 notificações pra uma lista de 5 professores",
+        "de": "    if unico and len(unico) <= ESCALONAMENTO_MENSAGEM_UNICA_MAX:\n        return [unico]",
+        "para": "    if False:\n        return [unico]",
+    },
+    {
+        "nome": "V13 — nunca divide: a parede volta inteira",
+        "pega": "1a — 36 professores numa mensagem só de novo",
+        "de": "    if unico and len(unico) <= ESCALONAMENTO_MENSAGEM_UNICA_MAX:",
+        "para": "    if unico:",
+    },
+    {
+        "nome": "V10 — a coorte vazia libera a escola inteira",
+        "pega": "10d — o `if not ids: return linhas` de conveniência",
+        "de": "    return [l for l in linhas if int(l.get(\"professor_id\") or 0) in ids_no_app]",
+        "para": "    if not ids_no_app:\n        return linhas\n"
+                "    return [l for l in linhas if int(l.get(\"professor_id\") or 0) in ids_no_app]",
+    },
+    {
+        "nome": "V11 — o recorte da coorte cai e o grupo volta a receber todo mundo",
+        "pega": "10a/10b/10c — o defeito de 10/08 (36 professores pra coordenação)",
+        "de": "    return [l for l in linhas if int(l.get(\"professor_id\") or 0) in ids_no_app]",
+        "para": "    return linhas",
+    },
+    {
         "nome": "V9 — o bloco perde a hora em negrito (formato A quebrado)",
         "pega": "7a — a âncora visual de quem lê no celular",
         "de": '            out.append(f"*{hora}* · {curso}" if hora else f"· {curso}")',

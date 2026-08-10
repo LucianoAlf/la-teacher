@@ -36,6 +36,9 @@ ESCALONAMENTO_DIAS = int(os.getenv("FABIO_ESCALONAMENTO_DIAS", "3"))
 # demais entram numa linha cada, no rodape — ninguem some, o detalhe e que e
 # racionado por gravidade. 0 desliga o racionamento (todo mundo com bloco).
 ESCALONAMENTO_BLOCOS_POR_UNIDADE = int(os.getenv("FABIO_ESCALONAMENTO_BLOCOS", "8"))
+# Abaixo deste tamanho a lista cabe numa mensagem só e não se divide por
+# unidade — 4 notificações pra uma lista de 5 professores é cerimônia.
+ESCALONAMENTO_MENSAGEM_UNICA_MAX = int(os.getenv("FABIO_ESCALONAMENTO_UNICA_MAX", "6000"))
 # COORDENACAO PEDAGOGICA (Marcos Quintela, Juliane, Fabio). Puxado da UAZAPI.
 GRUPO_COORDENACAO_JID = os.getenv("FABIO_GRUPO_COORDENACAO_JID", "120363304349910605@g.us")
 DEFAULT_ESCALONAMENTO_TIME = os.getenv("FABIO_NOTIFY_ESCALONAMENTO_TIME", "09:00")
@@ -490,7 +493,35 @@ def pendencias_escalonadas(professor_id: Optional[int] = None) -> list:
     if professor_id is not None:
         linhas = [l for l in linhas
                   if int(l.get("professor_id") or 0) == int(professor_id)]
+    if ESCALONAMENTO_SO_COORTE and professor_id is None:
+        linhas = filtrar_coorte(linhas, {int(p["id"]) for p in active_professors()})
     return linhas
+
+
+ESCALONAMENTO_SO_COORTE = os.getenv(
+    "FABIO_ESCALONAMENTO_SO_COORTE", "true").lower() in {"1", "true", "yes", "sim"}
+
+
+def filtrar_coorte(linhas: list, ids_no_app: set) -> list:
+    """Só escala quem o Fábio já cobrou no particular.
+
+    O `active_professors` já recorta a cobrança individual em "ativo E com login
+    liberado" — 6 professores em 10/08/2026, de 44 ativos. O escalonamento pro
+    grupo NÃO aplicava esse recorte e varria a escola: em 10/08 a coordenação
+    recebeu **36 professores** de um sistema que ela ainda não conhece e pra qual
+    não tem painel.
+
+    Duas coisas quebravam aí. A primeira é coerência: o mesmo Fábio cobrava 6 no
+    particular e denunciava 36 pra coordenação — quem não recebeu aviso nenhum
+    aparecia na lista de inadimplentes. A segunda é adoção, e foi o Alf quem
+    apontou: pessoa trava com lista longa. Uma governança que estreia pedindo 36
+    cobranças recebe "não vou fazer" de resposta, e aí não é a lista que morre, é
+    o hábito.
+
+    Cresce sozinho — liberou professor no painel, ele entra na cobrança
+    individual E no escalonamento no mesmo dia. Ninguém edita nada.
+    """
+    return [l for l in linhas if int(l.get("professor_id") or 0) in ids_no_app]
 
 
 REGUA_ESCALONAMENTO = "━━━━━━━━━━━━━━"
@@ -684,6 +715,16 @@ def montar_escalonamento(rows: list) -> list:
     """
     if not rows:
         return []
+
+    # Dividir é remédio de parede, não cerimônia. Depois que o escalonamento
+    # passou a respeitar a coorte, ele caiu de 36 professores (20.951 chars)
+    # pra 5 (2.058) — e mandar índice + 3 unidades pra uma lista que cabe numa
+    # tela só é pedir quatro notificações onde bastava uma. Se o texto inteiro
+    # couber no limite, vai inteiro.
+    unico = format_escalonamento(rows)
+    if unico and len(unico) <= ESCALONAMENTO_MENSAGEM_UNICA_MAX:
+        return [unico]
+
     grupos = _por_unidade(rows)
     mensagens: list = []
     if len(grupos) > 1:
