@@ -5,10 +5,10 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 10/08/2026, noite (BRT).** Tudo no remoto — confira com
-> `git log --oneline -5`. Árvore de trabalho limpa (`git status -sb` = só
-> `## main...origin/main`, nada pendente).
-> Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
+> **Última atualização: 10/08/2026, noite (BRT) — Cursor.** Telas do Radar
+> (Tasks 5–9) commitadas na branch `feat/radar-telas` (ainda sem push). Confira
+> com `git log --oneline feat/radar-telas -6`. Quem mais lê: o Alf, o Hugo, o
+> Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
@@ -31,30 +31,47 @@
 
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
 
-1. **Radar do aluno** — backend pronto, faltam as telas (Tasks 5-9), plano já
-   escrito. Trabalho de EXECUÇÃO, pode começar direto. Ver seção logo abaixo.
+1. **Radar do aluno** — backend + telas (Tasks 5–9) na branch `feat/radar-telas`.
+   Ver seção logo abaixo. Falta: push/merge + verificação ao vivo com sessão de
+   coordenação + Fechamento do plano (menores já listados).
 2. **Fábio escreve no WhatsApp** — SPEC escrita, **ainda sem aprovação do
    Alf e sem plano**. Não é pra codar ainda — é pra ele ler
    `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`
    primeiro. Ver seção "Brainstorming feito, SPEC escrita", mais abaixo (dentro
    do histórico do incidente da Daiana, 10/08 tarde).
 
-Se for continuar sozinho sem o Alf por perto pra aprovar a spec do Fábio, a
-frente 1 (Radar) é a que rende — tem plano completo esperando execução.
+---
+
+## ✅ 10/08 NOITE (Cursor) — Radar do aluno: Tasks 5–9 (telas) na branch `feat/radar-telas`
+
+**PRÓXIMO PASSO literal:** (1) abrir o preview em `http://localhost:5183`,
+entrar com sessão de coordenação, varrer `/app/coordenacao/radar` (sidebar,
+KPIs, `—` sem nota, modal, link Réguas) e a mesa do professor (copy do escudo);
+(2) se ok, push da branch e merge em `main` (ou PR); (3) Fechamento do plano —
+menores já registrados na seção de backend abaixo (não bloqueiam).
+
+**Setup Cursor (medido nesta sessão):** `.env` + `.env.local` com
+`VITE_SUPABASE_*` e `SUPABASE_ACCESS_TOKEN`; `npm install`; SSH
+`fabio@89.116.73.186` com `id_ed25519_lahq_fabio_claude_code` → `OK_SSH`;
+MCP Supabase `execute_sql` no projeto `ouqwbbermlzqqvtqwlul` → view com 311
+alunos + RPCs `app_coordenacao_radar` / `app_radar_config` /
+`app_radar_config_salvar` / `fn_radar_nota` presentes. `npm run build` verde.
+
+**Commits na branch (ainda sem push):**
+
+| Task | Commit | O quê |
+|---|---|---|
+| 5 | `2c4a2b2` | tipos/wrappers em `api.ts` (+ `faltas_consecutivas` da 088) |
+| 6 | `80e6b4d` | mesa, tooltip, filtros, sidebar Radar, rota |
+| 7 | `4f039da` | modal do aluno |
+| 8 | `2ffd452` | aba Réguas (grupos dinâmicos, incl. `consecutivas`) |
+| 9 | `d5e3c5b` | copy "isto não é avaliação sua" na `MesaFeedback` |
 
 ---
 
-## ✅ 10/08 NOITE — Radar do aluno: backend completo (Tasks 1-4 + 10), telas (5-9) NÃO começaram
+## ✅ 10/08 NOITE — Radar do aluno: backend completo (Tasks 1-4 + 10)
 
-**PRÓXIMO PASSO literal:** abrir `docs/superpowers/plans/2026-08-10-radar-do-aluno.md`
-e executar as **Tasks 5, 6, 7, 8, 9** na ordem em que estão escritas — types/
-wrappers em `api.ts`, sidebar + mesa do Radar pra coordenação, modal do aluno,
-tela de Réguas (config de pesos), e a linha de copy "isto não é avaliação sua"
-na mesa do professor. O plano já tem SQL/TS/testes completos pra cada uma, no
-mesmo formato das Tasks 1-4/10 (que já saíram assim e funcionaram). Ledger de
-progresso desta feature: `.superpowers/sdd/2026-08-10-radar-do-aluno/progress.md`
-(git-ignored, só local — se este handoff for pra outra máquina/ferramenta, ele
-não vai junto; este texto aqui é o resumo que sobrevive).
+**Telas (5–9):** feitas na Cursor — ver seção acima.
 
 **Backend no ar, testado e revisado, commits em `main`:**
 
