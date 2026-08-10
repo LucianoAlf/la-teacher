@@ -114,7 +114,9 @@
     "teste:085": "node scripts/rodar-teste-sql.mjs supabase/migrations/085-a-nota-do-radar.sql supabase/migrations/085-a-nota-do-radar.test.sql",
     "mutantes:085": "node scripts/mutantes-085.mjs",
     "teste:086": "node scripts/rodar-teste-sql.mjs supabase/migrations/086-o-gemeo-para-de-divergir-na-escrita.sql supabase/migrations/086-o-gemeo-para-de-divergir-na-escrita.test.sql",
-    "mutantes:086": "node scripts/mutantes-086.mjs"
+    "mutantes:086": "node scripts/mutantes-086.mjs",
+    "teste:087": "node scripts/rodar-teste-sql.mjs supabase/migrations/087-a-tela-do-radar.sql supabase/migrations/087-a-tela-do-radar.test.sql",
+    "mutantes:087": "node scripts/mutantes-087.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
