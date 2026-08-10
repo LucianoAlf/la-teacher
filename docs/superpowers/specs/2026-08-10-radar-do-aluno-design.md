@@ -149,10 +149,83 @@ Aluno · Health Score · Faltas · Absenteísmo · Prática · Feedback · Statu
 |---|---|---|---|
 | **Health Score** | 0–100, nosso, com pesos configuráveis | calculado | ver §5 |
 | **Faltas** | quantidade no mês corrente | view semântica, grão de aula | o fato do mês |
-| **Absenteísmo (10 aulas)** | % de falta nas últimas 10 aulas medidas | idem, janela de §3.5 | **≥50% = alerta** |
+| **Absenteísmo (10 aulas)** | % de falta nas últimas 10 aulas medidas | idem, janela de §3.5 | **≥25% atenção · ≥50% crítico**, os dois configuráveis (§4.1) |
 | **Prática** | pratica em casa? | `aluno_feedback_professor.pratica_em_casa` | "não" = alerta |
 | **Feedback** | coração do mês + evolução + ânimo | `aluno_feedback_professor` | vermelho = alerta |
 | **Status** | Crítico · Atenção · Saudável | derivado da nota | faixas em §5 |
+
+### 4.1 As duas linhas do absenteísmo, e por que são duas
+
+O benchmark é do Alf: **acima de 25% liga o alerta** em escola de música. (A
+referência de 10–15% que circulou veio de um LLM sem benchmark real; a de 25%
+vem de quem conhece o setor.)
+
+**Duas linhas, ambas configuráveis:** `atencao_pct` (default **25**) e
+`critico_pct` (default **50** — a régua de "5 em 10"). A cor sai delas; **o
+número mostrado é sempre o real**, nunca só a cor.
+
+#### A linha de base real (01/08 em diante — a página virada)
+
+| Unidade | Alunos | Aulas/aluno | Média | **Mediana** | ≥25% | ≥50% |
+|---|---:|---:|---:|---:|---:|---:|
+| **Escola** | 857 | 1,2 | 31,3% | **0,0** | 349 | **345** |
+| Campo Grande | 390 | 1,2 | 38,8% | 0,0 | 180 | 179 |
+| Barra | 185 | 1,3 | 31,4% | 0,0 | 83 | 83 |
+| Recreio | 282 | 1,3 | 20,9% | 0,0 | 86 | 83 |
+
+**Hoje a taxa não é taxa — é cara ou coroa.** Dois sinais provam: a mediana é
+exatamente **0,0**, e ≥25% é quase igual a ≥50% (349 contra 345). Com 1,2 aula
+medida por aluno, a taxa só pode dar 0% ou 100%; não existe meio. Os "31,3% de
+média" são, na verdade, "31% dos alunos faltaram à única aula medida".
+
+→ **Piso de base: `minimo_aulas_para_taxa`, default 4** (configurável). Abaixo
+disso a coluna não mostra percentual — mostra **"enchendo: 2 de 4"**. O piso sai
+do próprio benchmark: com menos de 4 aulas, o menor degrau possível (25 pontos)
+já é do tamanho da linha de alerta, e qualquer % ali é ruído com cara de
+precisão.
+
+#### O que ficou para trás (background de governança, não régua)
+
+Medido na janela de junho em diante — a **era contaminada**, guardada como
+diagnóstico e explicitamente **fora** do cálculo do Radar:
+
+| | Alunos | Média | Mediana | ≥25% | ≥50% |
+|---|---:|---:|---:|---:|---:|
+| Escola | 968 | 38,4% | 37,5% | 710 (73,3%) | 316 (32,6%) |
+| Campo Grande | 414 | 46,1% | 50,0% | 344 (83,1%) | 211 (51,0%) |
+| Barra | 220 | 34,9% | 33,3% | 161 (73,2%) | 44 (20,0%) |
+| Recreio | 334 | 31,1% | 30,0% | 205 (61,4%) | 61 (18,3%) |
+
+Serve para uma coisa só: mostrar à coordenação **o tamanho do trabalho de
+registro**, não para acusar aluno. Em 25% as três unidades estão altas (fato de
+escola); em 50% só Campo Grande destoa (51,0% contra 20,0% e 18,3%) — e isso é
+trabalho de lançamento, com a Sol cobrando e a ferramenta de presença chegando.
+**Nada desta tabela entra no Health Score.**
+
+### 4.2 A KPI da média (pedido do Alf: *"tem que ter o KPI da média"*)
+
+O número do aluno sozinho mente por falta de escala: "Maria 60%" lê como
+problema da Maria mesmo quando a professora inteira está em 44%. A tela carrega
+a média em três níveis, e a linha do aluno traz as duas de referência ao lado:
+
+```
+ABSENTEÍSMO — desde 01/08          base: 1,2 aula por aluno  ⚠ enchendo
+  escola    média 31,3%   mediana 0,0%
+  Barra 31,4%   ·   Campo Grande 38,8%   ·   Recreio 20,9%
+
+Maria Silva    60%  ·  6 de 10
+                       professor 44%  ·  unidade 38,8%
+```
+
+**Média e mediana, as duas** (pedido do Alf). Elas discordando é informação: hoje
+a média é 31,3% e a mediana é 0,0% — a distância entre as duas denuncia que a
+base ainda é fina. Quando convergirem, a taxa virou taxa.
+
+A média do **professor** é a mais barata e a mais reveladora das três: transforma
+uma conversa sobre o aluno numa conversa sobre a turma quando é o caso.
+
+**O cabeçalho sempre declara a base** ("desde 01/08 · 1,2 aula por aluno").
+Enquanto ela for fina, o bloco diz *enchendo* em vez de fingir precisão.
 
 **Por que Faltas E Absenteísmo, os dois.** Respondem perguntas diferentes.
 Falta do mês é o fato que a família reconhece e a coordenação cobra; sozinho,
