@@ -112,7 +112,9 @@
     "teste:084": "node scripts/rodar-teste-sql.mjs supabase/migrations/084-a-janela-do-professor-vira-sete-dias.sql supabase/migrations/084-a-janela-do-professor-vira-sete-dias.test.sql",
     "mutantes:084": "node scripts/mutantes-084.mjs",
     "teste:085": "node scripts/rodar-teste-sql.mjs supabase/migrations/085-a-nota-do-radar.sql supabase/migrations/085-a-nota-do-radar.test.sql",
-    "mutantes:085": "node scripts/mutantes-085.mjs"
+    "mutantes:085": "node scripts/mutantes-085.mjs",
+    "teste:086": "node scripts/rodar-teste-sql.mjs supabase/migrations/086-o-gemeo-para-de-divergir-na-escrita.sql supabase/migrations/086-o-gemeo-para-de-divergir-na-escrita.test.sql",
+    "mutantes:086": "node scripts/mutantes-086.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
