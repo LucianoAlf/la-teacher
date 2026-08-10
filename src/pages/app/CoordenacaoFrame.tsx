@@ -109,10 +109,13 @@ export function CoordenacaoFrame({
   }, [])
 
   return (
-    <div className="flex h-svh overflow-hidden bg-bg-app">
+    // h-full (não h-svh): a moldura acompanha o #root, que já é a viewport.
+    // h-svh deixava tarja preta embaixo ao redimensionar a janela/painel —
+    // a unidade de viewport não acompanhava o container.
+    <div className="flex h-full min-h-0 w-full flex-1 items-stretch overflow-hidden bg-bg-app">
       {/* ── Sidebar: só md+ ─────────────────────────────────────────────── */}
       <aside
-        className={`relative hidden shrink-0 flex-col border-r border-border-subtle bg-bg-surface transition-[width] duration-150 md:flex ${
+        className={`relative hidden h-full min-h-0 shrink-0 flex-col border-r border-border-subtle bg-bg-surface transition-[width] duration-150 md:flex ${
           colapsada ? 'w-[72px]' : 'w-[228px]'
         }`}
       >
@@ -182,7 +185,7 @@ export function CoordenacaoFrame({
       {/* ── Coluna principal ─────────────────────────────────────────────
           `relative` porque a TabBar do DS se posiciona no rodapé do container
           posicionado mais próximo — igual ao AppFrame do professor. */}
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
         {/* Faixa flutuante: nome da PÁGINA à esquerda (o mesmo rótulo do item
             ativo na sidebar), data e perfil à direita. Sem fundo, sem borda. */}
         <div className="flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-6">

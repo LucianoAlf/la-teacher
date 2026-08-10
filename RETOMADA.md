@@ -5,10 +5,10 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 10/08/2026, noite (BRT) — Cursor.** Telas do Radar
-> (Tasks 5–9) commitadas na branch `feat/radar-telas` (ainda sem push). Confira
-> com `git log --oneline feat/radar-telas -6`. Quem mais lê: o Alf, o Hugo, o
-> Alfredo. Escrever pra eles, não pra mim.
+> **Última atualização: 10/08/2026, noite (BRT) — Cursor.** Radar Tasks 5–9
+> verificadas ao vivo; shell da coordenação corrigido (tarja preta ao
+> redimensionar). Merge em `main` em andamento nesta sessão. Quem mais lê: o
+> Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
@@ -31,9 +31,9 @@
 
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
 
-1. **Radar do aluno** — backend + telas (Tasks 5–9) na branch `feat/radar-telas`.
-   Ver seção logo abaixo. Falta: push/merge + verificação ao vivo com sessão de
-   coordenação + Fechamento do plano (menores já listados).
+1. **Radar do aluno** — backend no ar + telas verificadas. Ver seção logo
+   abaixo. Falta só o **Fechamento do plano** (menores já listados na seção de
+   backend — não bloqueiam).
 2. **Fábio escreve no WhatsApp** — SPEC escrita, **ainda sem aprovação do
    Alf e sem plano**. Não é pra codar ainda — é pra ele ler
    `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`
@@ -42,22 +42,29 @@
 
 ---
 
-## ✅ 10/08 NOITE (Cursor) — Radar do aluno: Tasks 5–9 (telas) na branch `feat/radar-telas`
+## ✅ 10/08 NOITE (Cursor) — Radar telas verificadas + shell sem tarja preta
 
-**PRÓXIMO PASSO literal:** (1) abrir o preview em `http://localhost:5183`,
-entrar com sessão de coordenação, varrer `/app/coordenacao/radar` (sidebar,
-KPIs, `—` sem nota, modal, link Réguas) e a mesa do professor (copy do escudo);
-(2) se ok, push da branch e merge em `main` (ou PR); (3) Fechamento do plano —
-menores já registrados na seção de backend abaixo (não bloqueiam).
+**PRÓXIMO PASSO literal:** Fechamento do plano do Radar — menores já
+registrados na seção de backend abaixo (não bloqueiam merge). Frente Fábio-
+no-WhatsApp continua esperando o Alf ler a SPEC (não codar).
 
-**Setup Cursor (medido nesta sessão):** `.env` + `.env.local` com
-`VITE_SUPABASE_*` e `SUPABASE_ACCESS_TOKEN`; `npm install`; SSH
-`fabio@89.116.73.186` com `id_ed25519_lahq_fabio_claude_code` → `OK_SSH`;
-MCP Supabase `execute_sql` no projeto `ouqwbbermlzqqvtqwlul` → view com 311
-alunos + RPCs `app_coordenacao_radar` / `app_radar_config` /
-`app_radar_config_salvar` / `fn_radar_nota` presentes. `npm run build` verde.
+**Verificação ao vivo (medido, sessão coordenação = Alf):** preview
+`http://localhost:5183` a partir de `D:\la-teacher`. Sidebar desktop Painel ·
+Radar · Equipe; KPIs Crítico 62 / Atenção 35 / Avisaram 4 / Absenteísmo 32%;
+311 alunos; `—` em Prática/Feedback sem nota; modal com decomposição (3/5
+sinais); Réguas com grupo `faltas_consecutivas`; mesa do professor com copy
+do escudo.
 
-**Commits na branch (ainda sem push):**
+**Bug de responsividade (tarja preta embaixo ao redimensionar):** causa =
+`h-svh` no shell não acompanhava o container do `#root`. Conserto: `#root`
+vira coluna flex; `CoordenacaoFrame` e `AppFrame` usam `h-full`/`flex-1`/
+`items-stretch`. Medido depois: `gap=0` em 1400×900 e 1000×560; aside preenche
+a moldura.
+
+**Clone nested:** apagado (`Test-Path D:\la-teacher\la-teacher` → False).
+Workspace canônico = `D:\la-teacher`.
+
+**Commits na branch `feat/radar-telas`:**
 
 | Task | Commit | O quê |
 |---|---|---|
@@ -66,12 +73,8 @@ alunos + RPCs `app_coordenacao_radar` / `app_radar_config` /
 | 7 | `348ddfe` | modal do aluno |
 | 8 | `42c4d66` | aba Réguas (grupos dinâmicos, incl. `consecutivas`) |
 | 9 | `b6f7233` | copy "isto não é avaliação sua" na `MesaFeedback` |
-| docs | `ffeeded` | este checkpoint no RETOMADA |
-
-⚠️ **Clone nested:** o Cursor abriu `D:\la-teacher\la-teacher\` (clone dentro
-do repo). Trabalho válido = **`D:\la-teacher`** nesta branch. Pra limpar:
-1) File → Open Folder → `D:\la-teacher`  2) `powershell -File scripts/apagar-clone-nested.ps1`
-(enquanto o workspace estiver na nested, o Windows tranca `.git` e não dá pra apagar).
+| docs | `ffeeded`+ | checkpoints RETOMADA / nested |
+| fix | (este) | shell `h-full` — some a tarja preta ao redimensionar |
 
 ---
 
