@@ -60,7 +60,7 @@ Se 081 estiver ocupado, renumerar toda a sequência deste plano (+1 em cada).
 | `supabase/migrations/081-os-sinais-do-radar.sql` | `vw_radar_aluno_sinais` — uma linha por aluno da coorte, com os 4 sinais e suas bases |
 | `supabase/migrations/082-as-reguas-do-radar.sql` | `radar_config` + `radar_config_historico` + RPCs de leitura/escrita |
 | `supabase/migrations/085-a-nota-do-radar.sql` | `fn_radar_nota(jsonb, jsonb)` — pura, recebe sinais e config, devolve nota + decomposição |
-| `supabase/migrations/086-a-tela-do-radar.sql` | `app_coordenacao_radar(...)` — guard, filtros facetados, resumo com média e mediana |
+| `supabase/migrations/087-a-tela-do-radar.sql` | `app_coordenacao_radar(...)` — guard, filtros facetados, resumo com média e mediana |
 | `src/lib/api.ts` | tipos + wrappers `coordenacaoRadar`, `radarConfig`, `salvarRadarConfig` |
 | `src/features/coordenacao/components/LinhaRadar.tsx` | uma linha da mesa, com os tooltips |
 | `src/features/coordenacao/components/ModalAlunoRadar.tsx` | o modal do aluno |
@@ -1059,12 +1059,12 @@ git commit -m "feat(radar): a nota abre, redistribui peso de sinal ausente e se 
 
 ---
 
-### Task 4: A RPC da tela (migration 086)
+### Task 4: A RPC da tela (migration 087)
 
 **Files:**
-- Create: `supabase/migrations/086-a-tela-do-radar.sql`
-- Create: `supabase/migrations/086-a-tela-do-radar.test.sql`
-- Create: `scripts/mutantes-086.mjs`
+- Create: `supabase/migrations/087-a-tela-do-radar.sql`
+- Create: `supabase/migrations/087-a-tela-do-radar.test.sql`
+- Create: `scripts/mutantes-087.mjs`
 - Modify: `package.json`
 
 **Interfaces:**
@@ -1086,10 +1086,10 @@ git commit -m "feat(radar): a nota abre, redistribui peso de sinal ausente e se 
 
 - [ ] **Step 1: Escrever o teste que falha**
 
-Criar `supabase/migrations/086-a-tela-do-radar.test.sql`:
+Criar `supabase/migrations/087-a-tela-do-radar.test.sql`:
 
 ```sql
--- Teste da 086. Aqui moram as duas regras que a casa já pagou pra aprender:
+-- Teste da 087. Aqui moram as duas regras que a casa já pagou pra aprender:
 -- UM NÚMERO SÓ (080) e FACETA CEGA AO PRÓPRIO FILTRO (071/079). E a fronteira
 -- nova: nenhum agregado de professor feito com o que o professor escreveu.
 create temporary table _res(caso text, ok boolean, detalhe text) on commit drop;
@@ -1206,15 +1206,15 @@ select json_build_object(
 - [ ] **Step 2: Rodar e confirmar que falha**
 
 ```bash
-npm run teste:086
+npm run teste:087
 ```
 
 - [ ] **Step 3: Escrever a migration**
 
-Criar `supabase/migrations/086-a-tela-do-radar.sql`:
+Criar `supabase/migrations/087-a-tela-do-radar.sql`:
 
 ```sql
--- 086 — a RPC da tela do Radar
+-- 087 — a RPC da tela do Radar
 --
 -- Junta os três: sinais (081) + réguas (082) + nota (085). Molde da 077/079.
 --
@@ -1356,12 +1356,12 @@ grant execute on function public.app_coordenacao_radar(uuid, integer, text, inte
 - [ ] **Step 4: Rodar e confirmar que passa**
 
 ```bash
-npm run teste:086
+npm run teste:087
 ```
 
 - [ ] **Step 5: Escrever os mutantes**
 
-`scripts/mutantes-086.mjs`, seis mutantes:
+`scripts/mutantes-087.mjs`, seis mutantes:
 
 | # | Âncora | Vira | Mata |
 |---|---|---|---|
@@ -1375,7 +1375,7 @@ npm run teste:086
 - [ ] **Step 6: Rodar os mutantes**
 
 ```bash
-npm run mutantes:086
+npm run mutantes:087
 ```
 
 Esperado: `6/6 mutantes mortos`.
@@ -1383,7 +1383,7 @@ Esperado: `6/6 mutantes mortos`.
 - [ ] **Step 7: Aplicar em produção e medir**
 
 ```bash
-node scripts/rodar-teste-sql.mjs --aplicar supabase/migrations/086-a-tela-do-radar.sql
+node scripts/rodar-teste-sql.mjs --aplicar supabase/migrations/087-a-tela-do-radar.sql
 ```
 
 Conferir com dado real (esperado hoje: ~158 alunos, quase todos `sem_nota`
@@ -1396,7 +1396,7 @@ select jsonb_pretty(public.app_coordenacao_radar() -> 'resumo');
 - [ ] **Step 8: Commit**
 
 ```bash
-git add supabase/migrations/086-a-tela-do-radar.sql supabase/migrations/086-a-tela-do-radar.test.sql scripts/mutantes-086.mjs package.json
+git add supabase/migrations/087-a-tela-do-radar.sql supabase/migrations/087-a-tela-do-radar.test.sql scripts/mutantes-087.mjs package.json
 git commit -m "feat(radar): a RPC da tela, com um número só e faceta cega ao próprio filtro"
 ```
 
@@ -1936,7 +1936,7 @@ git commit -m "feat(radar): a aba Réguas, com fábrica visível e histórico"
 **Por que é tarefa e não detalhe:** o semáforo é escrito pelo professor sobre o
 aluno. Se ele suspeitar que aquilo vira número sobre ele, passa a responder mais
 verde do que a realidade — e a fonte apodrece em silêncio, porque ninguém
-enxerga um semáforo mentindo. A regra existe no banco (a 086 não agrega
+enxerga um semáforo mentindo. A regra existe no banco (a 087 não agrega
 semáforo por professor, e o mutante V4 guarda isso), mas **regra que o professor
 não sabe que existe não muda comportamento.**
 
