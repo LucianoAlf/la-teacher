@@ -159,8 +159,11 @@ begin
 end $$;
 
 select json_build_object(
-         'falhas', (select count(*) from _res where not ok),
+         -- `not coalesce(ok,false)`: assercao que devolve NULL e FALHA, nunca
+         -- aprovacao. Com `not ok` puro, um NULL sai do count e o passo some.
+         'falhas', (select count(*) from _res where not coalesce(ok, false)),
          'detalhe', coalesce((select json_agg(json_build_object(
-                                'passo', caso, 'esperado', 'ok', 'obtido', detalhe))
-                                from _res where not ok), '[]'::json)
+                                'passo', caso, 'esperado', 'ok',
+                                'obtido', coalesce(detalhe,'<assercao devolveu NULL>')))
+                                from _res where not coalesce(ok, false)), '[]'::json)
        ) as resumo;

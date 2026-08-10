@@ -2,7 +2,15 @@ import type { ReactNode } from 'react'
 import type { SessaoAula } from '../../lib/api'
 import { AulaRow, Badge } from '../../components/ui'
 import { cx } from '../../lib/cx'
-import { aulaRegistrada, horaSessao, podeGravar, statusSessao, subtituloSessao, tituloSessao } from './sessao'
+import {
+  aulaRegistrada,
+  horaSessao,
+  JANELA_POS_AULA_DIAS,
+  podeGravar,
+  statusSessao,
+  subtituloSessao,
+  tituloSessao,
+} from './sessao'
 
 interface Props {
   sessao: SessaoAula
@@ -45,9 +53,17 @@ export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props
       </Badge>
     )
   } else if (status === 'perdida') {
+    // O selo dizia só "Encerrada" — cadeado mudo. A professora Daiana bateu
+    // nele em 08/08, não soube o que fazer e foi resolver pelo WhatsApp. Agora
+    // ele diz o prazo e quem destranca (a coordenação); a frase inteira está na
+    // tela de chamada, que é pra onde a linha leva.
     chamadaBadge = (
-      <Badge variant="info" icon="fa-solid fa-lock">
-        Encerrada
+      <Badge
+        variant="info"
+        icon="fa-solid fa-lock"
+        title={`O prazo de ${JANELA_POS_AULA_DIAS} dias pra lançar esta chamada fechou. Só a coordenação libera — fala com ela.`}
+      >
+        Prazo encerrado
       </Badge>
     )
   } else if (comecou) {

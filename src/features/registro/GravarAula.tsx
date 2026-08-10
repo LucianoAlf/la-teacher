@@ -3,7 +3,14 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { AudioPlayer, Badge, Button, Card, EmptyState, ScreenHeader, Skeleton } from '../../components/ui'
 import type { ErroGravacao, SessaoAula } from '../../lib/api'
 import { hojeBRT } from '../../lib/date'
-import { aulaRegistrada, horaSessao, podeGravar, subtituloSessao, tituloSessao } from '../agenda/sessao'
+import {
+  aulaRegistrada,
+  horaSessao,
+  JANELA_POS_AULA_DIAS,
+  podeGravar,
+  subtituloSessao,
+  tituloSessao,
+} from '../agenda/sessao'
 import { SessaoRow } from '../agenda/SessaoRow'
 import { useSessoes } from '../agenda/useSessoes'
 import { AppFrame } from '../../pages/app/AppFrame'
@@ -106,7 +113,7 @@ const MSG_GRAVACAO: Record<ErroGravacao, { icon: string; title: string; desc: st
   janela_de_gravacao_encerrada: {
     icon: 'fa-solid fa-lock',
     title: 'Janela encerrada',
-    desc: 'A gravação fecha 3 dias depois da aula. Depois disso, o registro é com a coordenação.',
+    desc: `A gravação fecha ${JANELA_POS_AULA_DIAS} dias depois da aula. Passado o prazo, só a coordenação libera — fala com ela que dá pra reabrir.`,
   },
 }
 

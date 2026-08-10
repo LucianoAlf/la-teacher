@@ -13,9 +13,21 @@ import { formatHoraBRT } from '../../lib/date'
  */
 
 const MIN = 60_000
-/** A chamada abre 15 min antes da aula e fecha 3 dias após o fim (regra do banco). */
+/** A chamada abre 15 min antes da aula e fecha JANELA_POS_AULA_DIAS após o fim. */
 const ANTECEDENCIA_CHAMADA_MS = 15 * MIN
-const JANELA_POS_AULA_MS = 3 * 24 * 60 * MIN
+/**
+ * ESPELHO de `fn_janela_registro_dias()` no banco (migration 084). O dono do
+ * número é o banco: `fn_registrar_presencas_core` e `app_enfileirar_audio`
+ * recusam fora dela, e `fn_pendencias_escalonadas` usa a mesma régua pra
+ * decidir o que sobe pra coordenação. Mudou lá, muda aqui — senão o app volta
+ * a oferecer botão que o servidor recusa (ou a esconder botão que funciona).
+ *
+ * Era 3. Virou 7 em 10/08, depois que a professora Daiana tentou lançar as
+ * aulas de 04 e 05/08 na noite de 08/08 e encontrou um cadeado — a janela
+ * tinha fechado poucas horas antes, e ela foi pro WhatsApp.
+ */
+export const JANELA_POS_AULA_DIAS = 7
+const JANELA_POS_AULA_MS = JANELA_POS_AULA_DIAS * 24 * 60 * MIN
 
 export type StatusSessao = 'chamada_feita' | 'agora' | 'pendente' | 'perdida' | 'futura' | 'faltaram'
 export type JanelaChamada = 'antes' | 'aberta' | 'encerrada'
@@ -155,14 +167,15 @@ export function statusSessao(s: SessaoAula, now: Date = new Date()): StatusSessa
 
 /**
  * Pode gravar a aula AGORA? Janela do CLIENTE espelhando o SERVIDOR — tanto
- * app_enfileirar_audio (gravação) quanto a RPC de chamada validam a janela de
- * 3 dias no banco. O guard de janela aqui alinha o mic com o servidor: não
- * mostra botão que o backend vai recusar (antes o mic aparecia em aula fora da
- * janela e só estourava 'janela_encerrada' na hora de enviar). Grava-se do
- * início da aula até 3 dias depois, exceto se todo mundo faltou (Alma: sem conteúdo).
+ * app_enfileirar_audio (gravação) quanto a RPC de chamada validam
+ * `fn_janela_registro_dias()` no banco. O guard de janela aqui alinha o mic com
+ * o servidor: não mostra botão que o backend vai recusar (antes o mic aparecia
+ * em aula fora da janela e só estourava 'janela_encerrada' na hora de enviar).
+ * Grava-se do início da aula até JANELA_POS_AULA_DIAS depois, exceto se todo
+ * mundo faltou (Alma: sem conteúdo).
  *  · 'futura'  → nada aconteceu ainda, nada pra registrar;
  *  · 'faltaram'→ ninguém veio, não há conteúdo;
- *  · 'perdida' → passou dos 3 dias, é assunto da coordenação.
+ *  · 'perdida' → passou do prazo, é assunto da coordenação.
  */
 export function podeGravar(s: SessaoAula, now: Date = new Date()): boolean {
   if (janelaChamada(s, now) === 'encerrada') return false

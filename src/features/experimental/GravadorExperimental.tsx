@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AudioPlayer, Button } from '../../components/ui'
+import { JANELA_POS_AULA_DIAS } from '../agenda/sessao'
 import { LIMITE_SEGUNDOS, useRecorder } from '../registro/useRecorder'
 import { statusAudioFila } from '../../lib/api'
 import { SOMENTE_LEITURA } from '../../lib/config'
@@ -20,7 +21,7 @@ const MSG_ERRO: Record<ErroExperimental | 'rede' | 'demorou' | 'nao_entendi', st
   aula_de_outro_professor: 'Essa aula não é da sua agenda.',
   aula_cancelada: 'Essa aula foi cancelada.',
   gravacao_ainda_nao_disponivel: 'A gravação abre 15 minutos antes da aula começar.',
-  janela_de_gravacao_encerrada: 'A janela de gravação fecha 3 dias depois da aula.',
+  janela_de_gravacao_encerrada: `A gravação fecha ${JANELA_POS_AULA_DIAS} dias depois da aula. Passado o prazo, só a coordenação libera — fala com ela.`,
   experimental_sem_aula_vinculada: 'Essa experimental ainda não tem aula na agenda.',
   experimental_faltou_nao_tem_registro: 'Essa experimental está marcada como falta.',
   experimental_cancelada: 'Essa experimental foi cancelada.',

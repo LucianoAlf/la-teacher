@@ -10,7 +10,7 @@ import { CardSessoesDoDia } from '../../features/agenda/CardSessoesDoDia'
 import { DateNav } from '../../features/agenda/DateNav'
 import { useSessoes } from '../../features/agenda/useSessoes'
 import { buscarPendencias, buscarPendentesHoje, type Pendencias } from '../../features/agenda/pendencias'
-import { horaSessao, tituloSessao } from '../../features/agenda/sessao'
+import { horaSessao, JANELA_POS_AULA_DIAS, tituloSessao } from '../../features/agenda/sessao'
 import { useFilaOfflineCount } from '../../features/registro/filaOffline'
 import { CardFeedbackHome } from '../../features/feedback'
 import { AppFrame } from './AppFrame'
@@ -269,7 +269,10 @@ function PendenciasCard({
       ))}
       <p className="mt-[9px] flex items-start gap-2 text-[12.5px] leading-relaxed text-text-secondary">
         <i className="fa-solid fa-clock mt-[3px] text-brand-text" aria-hidden="true" />
-        <span>A chamada fecha 3 dias depois da aula — depois disso, só a coordenação lança. ⏳</span>
+        <span>
+          A chamada fecha {JANELA_POS_AULA_DIAS} dias depois da aula — passado o prazo, só a coordenação
+          libera. ⏳
+        </span>
       </p>
     </Card>
   )
