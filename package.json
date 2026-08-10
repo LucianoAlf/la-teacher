@@ -106,7 +106,9 @@
     "teste:081": "node scripts/rodar-teste-sql.mjs supabase/migrations/081-os-sinais-do-radar.sql supabase/migrations/081-os-sinais-do-radar.test.sql",
     "mutantes:081": "node scripts/mutantes-081.mjs",
     "teste:082": "node scripts/rodar-teste-sql.mjs supabase/migrations/082-as-reguas-do-radar.sql supabase/migrations/082-as-reguas-do-radar.test.sql",
-    "mutantes:082": "node scripts/mutantes-082.mjs"
+    "mutantes:082": "node scripts/mutantes-082.mjs",
+    "teste:083": "node scripts/rodar-teste-sql.mjs supabase/migrations/083-a-cobranca-para-de-aceitar-plano-como-relato.sql supabase/migrations/083-a-cobranca-para-de-aceitar-plano-como-relato.test.sql",
+    "mutantes:083": "node scripts/mutantes-083.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
