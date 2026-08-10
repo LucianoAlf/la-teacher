@@ -8,6 +8,7 @@ import EquipePage from './pages/app/Equipe'
 import CoordenacaoPage from './pages/app/Coordenacao'
 import PerfilCoordenacaoPage from './pages/app/PerfilCoordenacao'
 import CoordenacaoFeedbackPage from './pages/app/CoordenacaoFeedback'
+import CoordenacaoRadarPage from './pages/app/CoordenacaoRadar'
 import { RequireAdmin } from './pages/app/RequireAdmin'
 import LoginPage from './pages/app/Login'
 import NovaSenhaPage from './pages/app/NovaSenha'
@@ -118,8 +119,9 @@ export const router = createBrowserRouter(
           element: <RequireAdmin />,
           children: [
             { path: '/app/coordenacao', element: <CoordenacaoPage /> },
-            // Bloco 2 do painel: o semáforo do mês — e o único lugar onde a
-            // observação escrita pelo professor tem leitor (077).
+            // Radar do aluno (081–088): quem procurar esta semana, e por quê.
+            { path: '/app/coordenacao/radar', element: <CoordenacaoRadarPage /> },
+            // Semáforo do mês — filha do Radar ("ver o mês inteiro"), fora do menu.
             { path: '/app/coordenacao/feedback', element: <CoordenacaoFeedbackPage /> },
             // Perfil PRÓPRIO da coordenação: o /app/perfil mora dentro do
             // RequireProfessor e lê a RPC do professor, que devolve vazio pra

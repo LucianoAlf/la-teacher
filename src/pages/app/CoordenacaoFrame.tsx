@@ -35,10 +35,10 @@ const COLAPSADA_KEY = 'la-coord-sidebar-colapsada'
 const ITENS = [
   { id: 'painel', para: '/app/coordenacao', rotulo: 'Painel', icone: 'fa-solid fa-table-columns' },
   {
-    id: 'feedback',
-    para: '/app/coordenacao/feedback',
-    rotulo: 'Feedback',
-    icone: 'fa-solid fa-heart-pulse',
+    id: 'radar',
+    para: '/app/coordenacao/radar',
+    rotulo: 'Radar',
+    icone: 'fa-solid fa-satellite-dish',
   },
   { id: 'equipe', para: '/app/equipe', rotulo: 'Equipe', icone: 'fa-solid fa-users' },
 ] as const
@@ -50,7 +50,7 @@ const ABAS = [
 ]
 const ROTA: Record<string, string> = {
   painel: '/app/coordenacao',
-  feedback: '/app/coordenacao/feedback',
+  radar: '/app/coordenacao/radar',
   equipe: '/app/equipe',
   perfil: '/app/coordenacao/perfil',
 }
@@ -75,10 +75,15 @@ export function CoordenacaoFrame({
 }) {
   const nav = useNavigate()
   const { pathname } = useLocation()
+  // A tela de Feedback deixou de ser item de menu (decisão do Alf, 10/08):
+  // ela é o "ver o mês inteiro" do cartão do Radar. Item aceso tem que dizer a
+  // verdade sobre onde você está.
   const abaAtiva = pathname.startsWith('/app/coordenacao/perfil')
     ? 'perfil'
-    : pathname.startsWith('/app/coordenacao/feedback')
-      ? 'feedback'
+    : pathname.startsWith('/app/coordenacao/radar') ||
+        pathname.startsWith('/app/coordenacao/feedback') ||
+        pathname.startsWith('/app/coordenacao/reguas')
+      ? 'radar'
       : pathname.startsWith('/app/equipe')
         ? 'equipe'
         : 'painel'
