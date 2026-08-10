@@ -893,7 +893,6 @@ declare
   v_dec        jsonb := '[]'::jsonb;
   v_peso_vivo  numeric := 0;
   v_apurados   int := 0;
-  v_bruto      numeric := 0;
   v_nota       numeric;
   v_status     text;
   v_minimo     int := coalesce((p_config->>'minimo_sinais_para_nota')::int, 2);
@@ -924,11 +923,19 @@ begin
        coalesce((p_config->>'peso_pratica')::numeric, 0),
        p_sinais->>'pratica_em_casa'),
       ('faltas_mes',
-       case when coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
+       -- A guarda tem que testar o MESMO campo que o corpo usa. Testar só
+       -- aulas_mes>0 deixava faltas_mes ausente entrar no GREATEST — que no
+       -- Postgres ignora NULL (greatest(0,null)=0, não null). Sinal sem dado
+       -- virava score zero: o "não-marcado = falta" que esta função existe
+       -- pra evitar, entrando pela porta de trás. Achado numa revisão,
+       -- medido contra a função em produção antes de corrigir.
+       case when (p_sinais->>'faltas_mes') is not null
+             and coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
             then greatest(0, 100 - 100.0 * (p_sinais->>'faltas_mes')::numeric
                                         / (p_sinais->>'aulas_mes')::numeric) end,
        coalesce((p_config->>'peso_faltas_mes')::numeric, 0),
-       case when coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
+       case when (p_sinais->>'faltas_mes') is not null
+             and coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
             then format('%s de %s no mês', p_sinais->>'faltas_mes', p_sinais->>'aulas_mes') end)
     ) as t(sinal, score, peso, valor)
   loop
@@ -939,7 +946,6 @@ begin
     else
       v_apurados  := v_apurados + 1;
       v_peso_vivo := v_peso_vivo + r.peso;
-      v_bruto     := v_bruto + r.score * r.peso;
       v_dec := v_dec || jsonb_build_object(
         'sinal', r.sinal, 'valor', r.valor, 'score', r.score,
         'peso', r.peso, 'sem_dado', false);
@@ -948,7 +954,6 @@ begin
 
   -- Redistribuição: o peso efetivo é a fatia do sinal DENTRO do que sobrou.
   if v_peso_vivo > 0 then
-    v_nota := round(v_bruto / v_peso_vivo);
     v_dec := (
       select jsonb_agg(
         case when (d->>'sem_dado')::boolean then d
@@ -959,12 +964,30 @@ begin
                'de',           round(100.0 * (d->>'peso')::numeric / v_peso_vivo, 1))
         end order by ord)
         from jsonb_array_elements(v_dec) with ordinality as e(d, ord));
+
+    -- A nota deriva da SOMA das contribuições já arredondadas — não de uma
+    -- conta paralela. As duas rodadas de arredondamento (a da nota e a de
+    -- cada `contribuiu`) são independentes e, medido, ~3% dos casos cruzam
+    -- o 0,5 em direções diferentes: a decomposição existe pra EXPLICAR a
+    -- nota, e não pode somar um número que a nota não bate.
+    select round(sum((d->>'contribuiu')::numeric)) into v_nota
+      from jsonb_array_elements(v_dec) d
+     where not (d->>'sem_dado')::boolean;
   end if;
 
   -- O piso: com pouca cobertura a nota se cala, mas a decomposição vai junto
-  -- pra tela poder explicar o silêncio.
+  -- pra tela poder explicar o silêncio. O que ela NÃO leva junto são os
+  -- ingredientes de uma nota que não existe: contribuiu/peso_efetivo/de
+  -- saem (viram nulos) quando o piso não é cumprido — só o score, o valor e
+  -- o peso cru continuam, pra tela poder dizer "faltam sinais" sem fingir
+  -- que a nota calada tinha barra.
   if v_apurados < v_minimo then
     v_nota := null;
+    v_dec := (
+      select jsonb_agg(
+               d || jsonb_build_object('contribuiu', null, 'peso_efetivo', null, 'de', null)
+               order by ord)
+        from jsonb_array_elements(v_dec) with ordinality as e(d, ord));
   end if;
 
   v_status := case
