@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -219,7 +220,17 @@ def check_pipeline_presenca() -> None:
         return
     regs = [r for r in regs if r.get("status") != "descartado"]
     if not regs:
-        ok.append("nenhum registro novo nas últimas 24h")
+        # ANTES isto ia pro bloco "Saudável" — e em 10/08/2026 o relatório das 7h
+        # elogiou justamente o dia em que ninguém tinha registrado nada. Silêncio
+        # não é saúde: ou houve aula e ninguém registrou (problema), ou não houve
+        # aula (aí tudo bem). Quem decide é a agenda, não o otimismo.
+        aulas = _aulas_encerradas_na_janela(26)
+        if aulas > 0:
+            decisao.append(
+                f"🎙️ NENHUM registro novo em 24h, e {aulas} aula(s) terminaram nesse período "
+                "— ou os professores pararam de gravar, ou o caminho quebrou")
+        else:
+            ok.append("sem registro novo em 24h, e também nenhuma aula encerrada")
         return
     emitidos = [r for r in regs if (r.get("campos") or {}).get("presenca_aplicado") is True]
     sem_sinal = [r for r in regs if (r.get("campos") or {}).get("presenca_erro")
@@ -234,19 +245,159 @@ def check_pipeline_presenca() -> None:
 
 
 def check_governanca() -> None:
-    """Cobrança é de CONTEÚDO, nunca de presença (regra do Alf)."""
+    """Cobrança é de CONTEÚDO, nunca de presença (regra do Alf).
+
+    Olhava SÓ o professor piloto (25). Em 10/08/2026 a auditoria das 7h disse
+    "prof. piloto com conteúdo em dia · Tudo certo" no mesmo dia em que a
+    professora Daiana (3) tinha aula pendente e 7 relatos de aula perdidos.
+    Auditoria que audita 1 professor de 43 não é auditoria, é amostra — e
+    amostra de um só, sempre o mesmo, é a pior espécie.
+
+    `fn_pendencias_escalonadas()` sem argumento usa a régua da janela (084):
+    quem aparece aqui é quem PASSOU do prazo do professor e virou assunto da
+    coordenação. Não é a lista de quem tem pendência — é a de quem estourou.
+    """
     try:
-        r = rpc("fabio_pendencias_professor", {"p_professor_id": PROF_PILOTO})
-    except Exception:
+        r = rpc("fn_pendencias_escalonadas", {}) or {}
+    except Exception as e:
+        decisao.append(f"Não consegui ler a governança: {str(e)[:120]}")
         return
-    atraso = (r or {}).get("pior_atraso_dias", 0) or 0
-    n = (r or {}).get("total_aulas", 0) or 0
-    if n and atraso > 3:
-        decisao.append(f"📋 Prof. piloto: {n} aula(s) sem conteúdo, pior atraso {atraso}d — passou da régua de 3 dias")
-    elif n:
-        ok.append(f"prof. piloto: {n} aula(s) sem conteúdo (dentro da janela)")
+    linhas = r.get("linhas") or []
+    limite = r.get("limite_dias")
+    if not linhas:
+        ok.append(f"nenhum professor passou dos {limite}d sem registrar")
+        return
+    total_aulas = sum((p.get("total_aulas") or 0) for p in linhas)
+    piores = sorted(linhas, key=lambda p: -(p.get("pior_atraso") or 0))[:3]
+    detalhe = "; ".join(
+        f"{(p.get('professor_nome') or '?').split()[0]} {p.get('total_aulas')}a/{p.get('pior_atraso')}d"
+        for p in piores
+    )
+    resto = len(linhas) - len(piores)
+    decisao.append(
+        f"📋 {len(linhas)} professor(es) passaram dos {limite}d sem registrar "
+        f"({total_aulas} aulas): {detalhe}" + (f" +{resto}" if resto > 0 else ""))
+
+
+def _aulas_encerradas_na_janela(horas: int) -> int:
+    """Quantas aulas de verdade terminaram na janela. É o denominador honesto:
+    sem ele, "ninguém registrou nada" e "não havia o que registrar" viram a
+    mesma frase — e a segunda é elogiada."""
+    desde = (datetime.now(timezone.utc) - timedelta(hours=horas)).isoformat()
+    try:
+        linhas = tabela("/rest/v1/aulas_emusys", {
+            "select": "id",
+            "data_hora_fim": f"gte.{desde}",
+            "cancelada": "eq.false",
+            "professor_id": "not.is.null",
+            "limit": "500",
+        })
+        return len(linhas or [])
+    except Exception:
+        return 0
+
+
+# ── o casador de carimbo ───────────────────────────────────────────────────
+# MEDIDO contra as 113 respostas reais do Fábio no banco, não chutado. A
+# primeira versão era uma lista de frases e acertava metade: "Ficaram 4 aulas
+# SEM presença marcada" (relato de estado) e "ainda NÃO consigo gravar o
+# registro" (a resposta honesta nova, do MESMO dia) disparavam o alarme. Alarme
+# que grita errado o Alf aprende a ignorar em dois dias — e aí o alarme certo
+# morre junto.
+#
+# Três peneiras, nesta ordem:
+#   1. quebra em frases — negação numa frase não pode inocentar carimbo de outra;
+#   2. joga fora pergunta ("Posso deixar esse registro salvo?") e frase com
+#      negação/incapacidade ("sem", "não", "ainda não consigo", "nunca");
+#   3. só então procura a AFIRMAÇÃO, em primeira pessoa do passado.
+#
+# Quem prova é teste_auditoria_carimbo.py, com as frases reais do log.
+_FRASE = re.compile(r"[.!?\n]+")
+_INOCENTA = re.compile(
+    r"\b(n[aã]o|sem|nunca|ainda|preciso|precisa|quer que|posso|poderia|"
+    r"consegue|conseguir|conseguiria|falta|faltam|faltou|pendente)\b", re.I)
+_CARIMBO = re.compile(
+    r"\b(salvei|registrei|gravei|marquei|arquivei|apliquei)\b"
+    r"|deixei\b.{0,80}?\b(salv[oa]|registrad|gravad|encaminhad|marcad)"
+    r"|\b(est[aá]|ficou|foi)\s+(salv[oa]|registrad[oa]|gravad[oa])\b"
+    r"|presen[cç]a\s+(marcada|registrada|lan[cç]ada|aplicada)"
+    r"|\bconfirmad[oa]\b.{0,70}?\b(compareceu|presen[cç]a|falta|aus[eê]ncia|registro)"
+    r"|vou considerar\b.{0,50}?\b(aus[eê]ncia|falta|presen[cç]a)"
+    r"|deixo\s+a\s+presen[cç]a"
+    r"|\b(atualizei|corrigi)\b.{0,40}?\bno sistema\b", re.I | re.S)
+
+
+def carimba_escrita(texto: str) -> bool:
+    """True quando o Fábio AFIRMA, ao professor, que gravou algo no sistema."""
+    for frase in _FRASE.split(texto or ""):
+        frase = frase.strip()
+        if not frase or _INOCENTA.search(frase):
+            continue
+        if _CARIMBO.search(frase):
+            return True
+    return False
+
+
+def check_promessa_vs_banco(horas: int = 26) -> None:
+    """O carimbo do Fábio bate com o que ficou no banco?
+
+    ESTA É A CHECAGEM QUE FALTAVA. Em 10/08/2026 o relatório das 7h disse "Tudo
+    certo. Nenhum problema encontrado" no mesmo dia em que o Fábio tinha dito à
+    professora Daiana "deixei o registro organizado e salvo" e "confirmado: o
+    Eduardo compareceu" — com ZERO escritas no banco. A auditoria não tinha como
+    ver: ela media a MÁQUINA (serviço de pé, fila limpa, disco), nunca a VERDADE
+    do que foi prometido a um humano.
+
+    Serviço de pé com agente mentindo é o pior estado que existe: tudo verde no
+    relatório e o trabalho do professor no lixo.
+
+    Confere as duas portas de escrita, inclusive a que a auditoria antiga nem
+    conhecia: `aula_registros_fabio_log` (o caminho do WhatsApp) e
+    `aluno_presenca` com fonte forte. Carimbo sem escrita = alerta com nome.
+    """
+    desde = (datetime.now(timezone.utc) - timedelta(hours=horas)).isoformat()
+    try:
+        msgs = tabela("/rest/v1/fabio_chat_mensagens", {
+            "select": "professor_id,content,criado_em",
+            "role": "eq.fabio",
+            "criado_em": f"gte.{desde}",
+            "limit": "500",
+        })
+    except Exception as e:
+        decisao.append(f"Não consegui conferir as promessas do Fábio: {str(e)[:120]}")
+        return
+
+    prometeram: Dict[int, int] = {}
+    for m in msgs or []:
+        pid = m.get("professor_id")
+        if pid is not None and carimba_escrita(m.get("content") or ""):
+            prometeram[pid] = prometeram.get(pid, 0) + 1
+
+    if not prometeram:
+        ok.append("nenhum carimbo de escrita do Fábio no chat")
+        return
+
+    sem_lastro: List[str] = []
+    for pid, n in sorted(prometeram.items(), key=lambda kv: -kv[1]):
+        try:
+            escreveu = len(tabela("/rest/v1/aula_registros_fabio_log", {
+                "select": "id", "professor_id": f"eq.{pid}",
+                "criado_em": f"gte.{desde}", "limit": "20"}) or [])
+            escreveu += len(tabela("/rest/v1/aluno_presenca", {
+                "select": "id", "professor_id": f"eq.{pid}",
+                "respondido_por": "in.(professor_la_teacher,fabio_audio)",
+                "respondido_em": f"gte.{desde}", "limit": "20"}) or [])
+        except Exception:
+            continue
+        if escreveu == 0:
+            sem_lastro.append(f"professor {pid} ({n} carimbo(s), 0 escritas)")
+
+    if sem_lastro:
+        decisao.append(
+            "🤥 O Fábio disse que gravou e NÃO gravou: " + "; ".join(sem_lastro[:4])
+            + " — ler o chat desses professores antes que eles descubram sozinhos")
     else:
-        ok.append("prof. piloto com conteúdo em dia")
+        ok.append(f"{len(prometeram)} carimbo(s) do Fábio com escrita correspondente")
 
 
 def check_recursos() -> None:
@@ -303,7 +454,7 @@ def main() -> int:
 
     for etapa in (lambda: check_servicos(fix), check_briefing, check_agenda_do_dia,
                   lambda: check_fila_audios(fix), check_pipeline_presenca,
-                  check_governanca, check_recursos):
+                  check_promessa_vs_banco, check_governanca, check_recursos):
         try:
             etapa()
         except Exception as e:  # uma checagem quebrada não derruba a auditoria
