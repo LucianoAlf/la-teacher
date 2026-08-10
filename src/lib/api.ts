@@ -1365,6 +1365,12 @@ export type RadarNota = {
 export type RadarLinha = {
   aluno_id: number
   aluno: string
+  /**
+   * Foto do aluno (089). 290 dos 311 da coorte têm — as iniciais são fallback,
+   * não o caso comum. NULA quando não tem: string vazia faria o Avatar tentar
+   * `<img src="">` em vez de cair nas iniciais.
+   */
+  foto: string | null
   curso: string | null
   unidade: string | null
   professor_id: number | null

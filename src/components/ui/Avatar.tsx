@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { cx } from '../../lib/cx'
 
 /**
@@ -10,6 +11,13 @@ import { cx } from '../../lib/cx'
  *
  * `tamanho` é classe de Tailwind e não número porque quem chama também precisa
  * escolher a fonte das iniciais junto — 92px com texto de 15px fica ridículo.
+ *
+ * LINK PODRE CAI NAS INICIAIS. Medido no Radar em 10/08/2026: 11 das 188 fotos
+ * da primeira tela dão 404 no S3 do Emusys (a URL existe no banco, o arquivo
+ * não). Sem isto, o navegador desenha o ícone de imagem quebrada no lugar da
+ * cara da pessoa — pior que não ter foto, porque parece defeito do app. O
+ * estado guarda a URL que falhou, e não um booleano: assim ele se corrige
+ * sozinho quando a prop muda (mesma instância reaproveitada numa lista).
  */
 export function Avatar({
   fotoUrl,
@@ -22,12 +30,15 @@ export function Avatar({
   tamanho?: string
   className?: string
 }) {
-  if (fotoUrl) {
+  const [podre, setPodre] = useState<string | null>(null)
+
+  if (fotoUrl && podre !== fotoUrl) {
     return (
       <img
         src={fotoUrl}
         alt={nome ?? ''}
         draggable={false}
+        onError={() => setPodre(fotoUrl)}
         className={cx(tamanho, 'shrink-0 rounded-full object-cover', className)}
       />
     )

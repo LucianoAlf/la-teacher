@@ -1,5 +1,6 @@
 import { Select, type OpcaoSelect } from '../../../components/ui'
 import type { FiltroRadar, RadarResposta } from '../../../lib/api'
+import { nomeCurto } from '../../../lib/nomes'
 
 const ROTULO_STATUS: Record<string, string> = {
   critico: 'Crítico',
@@ -42,9 +43,11 @@ export function FiltrosRadar({
   ]
   const professores: OpcaoSelect[] = [
     { valor: '', rotulo: 'Todos os professores' },
+    // Mesmo nome curto da lista: "Daiana Pacifico" no filtro e na linha. Nome
+    // de cadastro inteiro estourava a largura do campo no celular.
     ...opcoes.professores.map((p) => ({
       valor: String(p.professor_id),
-      rotulo: p.professor,
+      rotulo: nomeCurto(p.professor),
       sufixo: p.alunos,
     })),
   ]

@@ -8,7 +8,9 @@
 > **Última atualização: 10/08/2026, noite (BRT) — Cursor.** Radar Tasks 5–9
 > verificadas ao vivo e **mergeadas em `main`** (`fcc4128`); depois disso, a
 > rodada de **mobile + desktop** do Radar (linha, card do aluno, vocabulário dos
-> sinais). Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
+> sinais) e, por último, o **desktop virando o mesmo cartão do celular** — com a
+> foto do aluno vinda do banco (migration **089**). Quem mais lê: o Alf, o Hugo,
+> o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
@@ -39,6 +41,52 @@
    `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`
    primeiro. Ver seção "Brainstorming feito, SPEC escrita", mais abaixo (dentro
    do histórico do incidente da Daiana, 10/08 tarde).
+
+---
+
+## ✅ 10/08 NOITE (Cursor) — o desktop do Radar virou o cartão do celular, com foto
+
+Pedido do Alf depois de aprovar o celular: _"esse componente que você colocou no
+celular eu gostei; pode copiar pro desktop? ... tem esses pontinhos embaixo dos
+números, não tá legal ... o nome do professor não precisa ser o nome todo ... tem
+que trazer a foto dos alunos"_.
+
+**Migration 089 — `a foto do aluno no radar`** (aplicada, `npm run teste:089`
+verde, `npm run mutantes:089` **5/5 mortos**):
+
+- `vw_radar_aluno_sinais` ganhou `aluno_foto_url` **no fim da lista** (mesma
+  regra que a 088 mediu: `create or replace view` só ACRESCENTA no fim), vindo de
+  `vw_aluno_sucesso_lista.foto_url` — a fonte de identidade que a view já usava.
+- A RPC manda `foto` em `linhas`. **Medido:** 290 das 311 linhas da coorte têm
+  foto; `alunos.photo_url` (a coluna gêmea) está **zerada** e ler ela daria uma
+  tela inteira de iniciais sem ninguém notar — é o mutante V1.
+- Foto ausente vem **NULA**, nunca `''`: string vazia faz o `<img>` desenhar
+  quadrado quebrado em vez de o `Avatar` cair nas iniciais (mutante V3).
+
+**Front (uma árvore de JSX, dois arranjos)** — `LinhaRadar.tsx` deixou de ter um
+layout de celular e outro de desktop. As peças são as mesmas (foto, selo da nota,
+identidade, células, status) e só a POSIÇÃO no grid muda por breakpoint. Era
+assim que o celular ganhava cuidado que o desktop não recebia.
+
+| O que o Alf apontou | O que foi feito |
+|---|---|
+| "pontinhos embaixo dos números" | `TooltipRadar` perdeu o `underline decoration-dotted`. Podia sair porque a base do número passou a viver no texto ("1 de 2", "100% · 2/2", "enchendo 0/4") — o tooltip virou extra de quem tem mouse, não o único caminho. Confirmado no navegador: `text-decoration-line: none`, `cursor: help`, tooltip ainda abre |
+| Nome do professor inteiro | `nomeCurto()` em `src/lib/nomes.ts` — primeiro nome + o sobrenome seguinte, **partícula grudada no que vem depois** (`Letícia de Almeida`, não `Letícia de`), apelido entre parênteses fora (`Rafael Alves Souza (Akeem)` → `Rafael Alves`). Rodado nos 10 professores reais. Vale na linha, no card e no **filtro** |
+| Foto dos alunos | `Avatar` do DS na linha e no cabeçalho do card |
+| "melhorar essa tabelinha" | selo da nota + foto + pílula de status (`Badge` do DS, não chip novo); números com `tabular-nums`; `avisou que sai · setembro` em vez de `2026-09-01` (`mesDoAno()` em `lib/datas.ts`) |
+
+**Achado no meio do caminho (medido, não previsto):** 11 das 188 fotos da
+primeira tela dão **404** no S3 do Emusys — a URL existe no banco, o arquivo não.
+O navegador desenhava o ícone de imagem quebrada. `Avatar` agora cai nas iniciais
+no `onError` (guarda a URL que falhou, não um booleano, pra se corrigir quando a
+prop muda). Depois: **0 quebradas**, 177 fotos + 23 iniciais.
+
+**Conferido ao vivo** (sessão de coordenação, 5183), nos dois temas: **390×844**
+(nome numa linha só, status desceu pra baixo do nome, 0 vazamento), **1100**
+(faixa `lg`: 3 células — Prática sai entre 1024 e 1279 em vez de espremer as
+outras) e **1400×900** (`xl`: 4 células; colunas medidas em 46/54/333/534/67px,
+0 vazamento). Clicar no número agora abre o card (o `stopPropagation` das células
+saiu junto com os tooltips de faltas).
 
 ---
 

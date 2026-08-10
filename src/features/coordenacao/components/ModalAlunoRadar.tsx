@@ -1,8 +1,10 @@
 import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
+import { Avatar, Badge } from '../../../components/ui'
 import type { RadarLinha, RadarResposta } from '../../../lib/api'
-import { dataDoDia } from '../../../lib/datas'
+import { dataDoDia, mesDoAno } from '../../../lib/datas'
+import { nomeCurto } from '../../../lib/nomes'
 import {
   COR_CORACAO,
   COR_STATUS,
@@ -91,6 +93,14 @@ export function ModalAlunoRadar({
       >
         {/* ── Cabeçalho: quem é, com quem, em que estado ─────────────────── */}
         <header className="flex shrink-0 items-start gap-3 border-b border-border-subtle px-5 pb-3.5 pt-4">
+          {/* A mesma foto da lista (089): abrir o card não pode dar a sensação
+              de ter aberto o aluno errado. */}
+          <Avatar
+            fotoUrl={linha.foto}
+            nome={linha.aluno}
+            tamanho="h-11 w-11 text-[14px]"
+            className="mt-0.5"
+          />
           <div className="min-w-0 flex-1">
             <p className="text-[17px] font-extrabold leading-tight tracking-[-.3px] text-text-primary">
               {linha.aluno}
@@ -100,16 +110,21 @@ export function ModalAlunoRadar({
               {linha.professor ? (
                 <>
                   {' · com '}
-                  <span className="text-text-secondary">{linha.professor}</span>
+                  <span className="text-text-secondary">{nomeCurto(linha.professor)}</span>
                 </>
               ) : null}
             </p>
             {linha.avisou_que_sai ? (
-              <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[.5px] text-warning-text">
-                <i className="fa-solid fa-door-open text-[10px]" aria-hidden />
+              <Badge
+                variant="warn"
+                icon="fa-solid fa-door-open"
+                className="mt-2 uppercase tracking-[.4px]"
+              >
                 avisou que sai
-                {linha.mes_saida ? ` · ${linha.mes_saida}` : ''}
-              </span>
+                {/* Era `2026-09-01` na tela — data crua, com um dia que não quer
+                    dizer nada (competência é sempre o dia 1). */}
+                {linha.mes_saida ? ` · ${mesDoAno(linha.mes_saida)}` : ''}
+              </Badge>
             ) : null}
           </div>
           {/* 36px de alvo: no celular isto é dedo, não ponteiro. */}

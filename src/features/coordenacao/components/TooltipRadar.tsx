@@ -9,6 +9,14 @@ import { useId, useState, type ReactNode } from 'react'
  *
  * Abre no hover E no foco: quem navega por teclado tem que alcançar a mesma
  * informação, senão o dado só existe pra quem usa mouse.
+ *
+ * SEM SUBLINHADO PONTILHADO (Alf, 10/08/2026 — "esses pontinhos embaixo dos
+ * números não tá legal", e ele está certo: pontilhado embaixo de número lê como
+ * erro de digitação). O gancho visual saiu porque a informação deixou de
+ * depender dele: a base de cada número agora está no próprio texto da célula
+ * ("1 de 2", "67% · 2/3"), o card do aluno abre com um clique em qualquer parte
+ * da linha, e no celular — que nunca teve hover — o tooltip já era invisível.
+ * O que sobra aqui é o EXTRA de quem passa o mouse, não o único caminho.
  */
 export function TooltipRadar({
   children,
@@ -29,7 +37,7 @@ export function TooltipRadar({
         onMouseLeave={() => setAberto(false)}
         onFocus={() => setAberto(true)}
         onBlur={() => setAberto(false)}
-        className="cursor-help underline decoration-dotted underline-offset-4"
+        className="cursor-help"
       >
         {children}
       </span>

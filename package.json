@@ -118,7 +118,9 @@
     "teste:087": "node scripts/rodar-teste-sql.mjs supabase/migrations/087-a-tela-do-radar.sql supabase/migrations/087-a-tela-do-radar.test.sql",
     "mutantes:087": "node scripts/mutantes-087.mjs",
     "teste:088": "node scripts/rodar-teste-sql.mjs supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.sql supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.test.sql",
-    "mutantes:088": "node scripts/mutantes-088.mjs"
+    "mutantes:088": "node scripts/mutantes-088.mjs",
+    "teste:089": "node scripts/rodar-teste-sql.mjs supabase/migrations/089-a-foto-do-aluno-no-radar.sql supabase/migrations/089-a-foto-do-aluno-no-radar.test.sql",
+    "mutantes:089": "node scripts/mutantes-089.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",

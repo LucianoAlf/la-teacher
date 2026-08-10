@@ -31,3 +31,19 @@ export function dataDoDia(iso: string | null | undefined): string {
     month: 'long',
   })
 }
+
+/**
+ * "2026-09-01" → "setembro". Mês de competência do banco é sempre o dia 1, e o
+ * dia não quer dizer nada — o selo do Radar mostrava "avisou que sai ·
+ * 2026-09-01", que é data crua com precisão que ninguém pediu.
+ *
+ * O ano entra só quando NÃO é o ano corrente ("janeiro de 2027"): quem lê a
+ * tela em agosto de 2026 não precisa que a tela repita 2026 em cada selo.
+ */
+export function mesDoAno(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const [ano, mes] = iso.slice(0, 7).split('-').map(Number)
+  if (!ano || !mes) return iso
+  const nome = new Date(ano, mes - 1, 1).toLocaleDateString('pt-BR', { month: 'long' })
+  return ano === new Date().getFullYear() ? nome : `${nome} de ${ano}`
+}

@@ -1,3 +1,4 @@
+import type { BadgeVariant } from '../../components/ui'
 import type { RadarLinha } from '../../lib/api'
 
 /**
@@ -62,6 +63,17 @@ const BARRA_STATUS: Record<RadarLinha['status'], string> = {
   atencao: 'bg-warning',
   saudavel: 'bg-success',
   sem_nota: 'bg-border-strong',
+}
+
+/**
+ * O selo de status usa o `Badge` do DS, não um chip próprio — mesma regra do
+ * painel da coordenação (ver o comentário do `neutro` em `Badge.tsx`).
+ */
+export const BADGE_STATUS: Record<RadarLinha['status'], BadgeVariant> = {
+  critico: 'danger',
+  atencao: 'warn',
+  saudavel: 'ok',
+  sem_nota: 'neutro',
 }
 
 export const ROTULO_STATUS: Record<RadarLinha['status'], string> = {
