@@ -32,7 +32,6 @@ declare
   v_dec        jsonb := '[]'::jsonb;
   v_peso_vivo  numeric := 0;
   v_apurados   int := 0;
-  v_bruto      numeric := 0;
   v_nota       numeric;
   v_status     text;
   v_minimo     int := coalesce((p_config->>'minimo_sinais_para_nota')::int, 2);
@@ -62,12 +61,20 @@ begin
             when 'sim' then 100 when 'as_vezes' then 50 when 'nao' then 0 end,
        coalesce((p_config->>'peso_pratica')::numeric, 0),
        p_sinais->>'pratica_em_casa'),
+      -- greatest() do Postgres IGNORA NULL (greatest(0,null) = 0, não null —
+      -- medido ao vivo). Por isso a guarda também precisa checar faltas_mes,
+      -- não só aulas_mes: sem o "is not null", faltas_mes ausente virava o
+      -- PIOR score possível em vez de sair da conta — o mesmo "não-marcado =
+      -- falta" que este arquivo existe pra evitar, entrando pela porta dos
+      -- fundos de uma função que o SQL padrão trataria como NULL-propagante.
       ('faltas_mes',
-       case when coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
+       case when (p_sinais->>'faltas_mes') is not null
+                 and coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
             then greatest(0, 100 - 100.0 * (p_sinais->>'faltas_mes')::numeric
                                         / (p_sinais->>'aulas_mes')::numeric) end,
        coalesce((p_config->>'peso_faltas_mes')::numeric, 0),
-       case when coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
+       case when (p_sinais->>'faltas_mes') is not null
+                 and coalesce((p_sinais->>'aulas_mes')::int, 0) > 0
             then format('%s de %s no mês', p_sinais->>'faltas_mes', p_sinais->>'aulas_mes') end)
     ) as t(sinal, score, peso, valor)
   loop
@@ -78,7 +85,6 @@ begin
     else
       v_apurados  := v_apurados + 1;
       v_peso_vivo := v_peso_vivo + r.peso;
-      v_bruto     := v_bruto + r.score * r.peso;
       v_dec := v_dec || jsonb_build_object(
         'sinal', r.sinal, 'valor', r.valor, 'score', r.score,
         'peso', r.peso, 'sem_dado', false);
@@ -86,8 +92,14 @@ begin
   end loop;
 
   -- Redistribuição: o peso efetivo é a fatia do sinal DENTRO do que sobrou.
+  -- A NOTA NASCE DA SOMA DAS CONTRIBUIÇÕES JÁ ARREDONDADAS — não é mais uma
+  -- conta paralela. Duas contas independentes (nota = round(bruto/vivo) de um
+  -- lado, contribuição = round(score*peso/vivo, 1) de outro) cruzam o ,5 em
+  -- direções diferentes: medido em produção, absenteísmo 100% + feedback
+  -- verde dava nota 38 pela fórmula separada enquanto a decomposição somava
+  -- 38,5 (arredonda pra 39) — a explicação discordava do número que
+  -- explicava. Agora as duas SEMPRE batem, porque são a mesma conta.
   if v_peso_vivo > 0 then
-    v_nota := round(v_bruto / v_peso_vivo);
     v_dec := (
       select jsonb_agg(
         case when (d->>'sem_dado')::boolean then d
@@ -98,12 +110,25 @@ begin
                'de',           round(100.0 * (d->>'peso')::numeric / v_peso_vivo, 1))
         end order by ord)
         from jsonb_array_elements(v_dec) with ordinality as e(d, ord));
+
+    select round(sum((d->>'contribuiu')::numeric)) into v_nota
+      from jsonb_array_elements(v_dec) d
+     where not (d->>'sem_dado')::boolean;
   end if;
 
-  -- O piso: com pouca cobertura a nota se cala, mas a decomposição vai junto
-  -- pra tela poder explicar o silêncio.
+  -- O piso: com pouca cobertura a nota se cala — e a decomposição não pode
+  -- vazar os INGREDIENTES de um número que a tela não vai mostrar. Sem isto,
+  -- uma linha de peso 15 aparecia com "contribuiu: 100, peso_efetivo: 100"
+  -- (100% de uma régua que não existe) mesmo com a nota nula. score/valor/
+  -- peso/sem_dado continuam intactos: a tela ainda precisa poder dizer
+  -- "1 de 4 sinais apurados".
   if v_apurados < v_minimo then
     v_nota := null;
+    v_dec := (
+      select jsonb_agg(
+               d || jsonb_build_object('contribuiu', null, 'peso_efetivo', null, 'de', null)
+               order by ord)
+        from jsonb_array_elements(v_dec) with ordinality as e(d, ord));
   end if;
 
   v_status := case

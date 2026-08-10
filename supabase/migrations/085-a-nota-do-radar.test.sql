@@ -41,6 +41,25 @@ begin
              from jsonb_array_elements(v->'decomposicao') d)) = (v->>'nota')::numeric,
     v->>'nota');
 
+  -- ── I1: A NOTA TEM QUE FECHAR COM A SOMA, NAO SO COINCIDIR ──────────────
+  -- Caso acima e trivial (todos os scores 100, some limpo). Este aqui pega o
+  -- caso real que a revisao mediu em producao em 10/08: absenteismo 100%
+  -- (score 0) + feedback verde (score 100) e mais nada. A formula antiga
+  -- (round(bruto/peso_vivo)) dava nota=38; a soma das contribuicoes ja
+  -- arredondadas dava 0,0+38,5=38,5, que arredonda pra 39 — duas contas
+  -- independentes cruzando o 0,5 em direcoes diferentes. Depois do fix a
+  -- nota NASCE dessa soma, entao as duas tem que bater sempre — aqui em 39,
+  -- nao mais em 38 (conferido com select direto contra producao antes de
+  -- escrever este teste, nao suposto).
+  v := public.fn_radar_nota(jsonb_build_object(
+         'absenteismo_pct', 100, 'aulas_medidas', 10, 'feedback', 'verde'), cfg);
+  insert into _res values ('caso-limite: a nota fecha em 39 (nao mais 38, a formula antiga)',
+    (v->>'nota')::numeric = 39, v->>'nota');
+  insert into _res values ('e bate com a soma das contribuicoes arredondadas',
+    round((select sum((d->>'contribuiu')::numeric)
+             from jsonb_array_elements(v->'decomposicao') d)) = (v->>'nota')::numeric,
+    v->>'nota');
+
   -- ── SINAL AUSENTE SAI DA CONTA E O PESO SE REDISTRIBUI ──────────────────
   -- Sem feedback e sem pratica, sobram absenteismo (40) e faltas do mes (15).
   -- Se os dois estao perfeitos, a nota tem que ser 100 — e NAO 55, que seria
@@ -60,6 +79,23 @@ begin
     (select d->>'peso_efetivo' from jsonb_array_elements(v->'decomposicao') d
       where d->>'sinal' = 'absenteismo'));
 
+  -- ── C1: aulas_mes SOZINHO (sem faltas_mes) NAO E DADO ───────────────────
+  -- greatest() do Postgres ignora NULL: greatest(0, 100 - 100.0*null/4) dava
+  -- ZERO, nao null — o pior score possivel pra um sinal que na verdade nao
+  -- tem nenhum dado. So absenteismo tem dado real aqui; com minimo=2 a nota
+  -- tem que se calar, e a linha de faltas_mes tem que vir SEM_DADO.
+  v := public.fn_radar_nota(jsonb_build_object(
+         'absenteismo_pct', 0, 'aulas_medidas', 10, 'aulas_mes', 4), cfg);
+  insert into _res values ('aulas_mes sem faltas_mes nao conta como sinal apurado',
+    (v->>'sinais_apurados')::int = 1, v->>'sinais_apurados');
+  insert into _res values ('com so 1 sinal real (absenteismo), a nota se cala',
+    v->>'nota' is null, coalesce(v->>'nota','(nulo)'));
+  insert into _res values ('a linha de faltas_mes vem SEM_DADO (nao score zero)',
+    (select (d->>'sem_dado')::boolean from jsonb_array_elements(v->'decomposicao') d
+      where d->>'sinal' = 'faltas_mes'),
+    (select d->>'sem_dado' from jsonb_array_elements(v->'decomposicao') d
+      where d->>'sinal' = 'faltas_mes'));
+
   -- ── PISO DE COBERTURA: com 1 sinal, a nota SE CALA ──────────────────────
   v := public.fn_radar_nota(jsonb_build_object('faltas_mes', 0, 'aulas_mes', 4), cfg);
   insert into _res values ('com 1 sinal, suficiente = false',
@@ -69,6 +105,23 @@ begin
   insert into _res values ('mas a decomposicao continua vindo (pra tela explicar)',
     jsonb_array_length(v->'decomposicao') >= 1,
     (jsonb_array_length(v->'decomposicao'))::text);
+
+  -- ── I2: A DECOMPOSICAO NAO PODE VAZAR OS INGREDIENTES DE UMA NOTA CALADA ──
+  -- A nota veio nula (certo, testado acima) — mas a linha de faltas_mes (que
+  -- TEM dado real) nao pode continuar mostrando contribuiu/peso_efetivo/de
+  -- calculados, como se ocupasse 100% de uma regua que a tela nem vai
+  -- desenhar. score/valor/peso/sem_dado continuam intactos: a tela ainda
+  -- precisa poder dizer "1 de 4 sinais apurados".
+  insert into _res values ('com poucos sinais, NENHUMA linha da decomposicao mostra contribuicao',
+    not exists (select 1 from jsonb_array_elements(v->'decomposicao') d
+                 where d->>'contribuiu' is not null
+                    or d->>'peso_efetivo' is not null
+                    or d->>'de' is not null),
+    'ok');
+  insert into _res values ('mas a linha com dado real ainda mostra score e valor',
+    (select (d->>'sem_dado')::boolean = false and d->>'score' is not null
+       from jsonb_array_elements(v->'decomposicao') d where d->>'sinal' = 'faltas_mes'),
+    'ok');
 
   -- ── Sem sinal nenhum ────────────────────────────────────────────────────
   v := public.fn_radar_nota('{}'::jsonb, cfg);

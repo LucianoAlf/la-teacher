@@ -1,10 +1,12 @@
 // Mutantes da 085 — a nota do Radar do aluno.
 //
-// Os cinco vêm do brief e cobrem as três amarras que a migration promete nos
-// comentários: a nota SEMPRE ABRE (V5), sinal sem dado SAI DA CONTA e o peso
-// SE REDISTRIBUI (V2 e V3), e o PISO DE COBERTURA cala a nota sem base (V1).
-// V4 cobre a régua vindo da config, não do código — mesma família de defeito
-// que a 082 existe pra evitar (régua hardcoded não muda com a gestão).
+// V1-V5 vêm da primeira rodada (brief original). V6 e V7 vêm da rodada de
+// correção: a revisão achou C1 (greatest(0,NULL)=0 faz faltas_mes ausente
+// virar o PIOR score, não SEM DADO), I1 (nota e soma das contribuições eram
+// duas contas independentes que cruzavam o ,5 em direções diferentes) e I2
+// (decomposição vazava contribuição de uma nota calada). I1 mudou onde v_nota
+// é calculado — V1 precisou de âncora nova por causa disso (o bloco do `if`
+// ganhou mais linhas dentro, mesmo sem a condição em si mudar).
 //
 // Se um mutante sobreviver, quem está errado é o TESTE que não pegou, nunca
 // o mutante — o passo que falta se adiciona lá, não se afrouxa aqui.
@@ -21,8 +23,8 @@ const MUTANTES = [
   {
     nome: 'V1 — o piso de cobertura cai (nota nunca se cala)',
     pega: 'passo "e a nota vem NULA (nao um numero bonito)"',
-    de: `  if v_apurados < v_minimo then\n    v_nota := null;\n  end if;`,
-    para: `  if false then\n    v_nota := null;\n  end if;`,
+    de: `  if v_apurados < v_minimo then`,
+    para: `  if false then`,
   },
   {
     nome: 'V2 — a redistribuicao desliga (peso_vivo vira sempre a soma dos 4)',
@@ -38,7 +40,7 @@ const MUTANTES = [
   },
   {
     nome: 'V4 — a faixa de critico para de vir da config (fica hardcoded em 40)',
-    pega: 'passo novo "descendo a faixa_critico, uma nota antes atencao vira critico"',
+    pega: 'passo "descendo a faixa_critico, uma nota antes atencao vira critico"',
     de: `    when v_nota < coalesce((p_config->>'faixa_critico')::numeric, 40)   then 'critico'`,
     para: `    when v_nota < 40 then 'critico'`,
   },
@@ -47,6 +49,25 @@ const MUTANTES = [
     pega: 'passo "cada linha diz quanto CONTRIBUIU (nao so o peso)"',
     de: `               'contribuiu',   round((d->>'score')::numeric * (d->>'peso')::numeric\n                                     / v_peso_vivo, 1),`,
     para: `               'contribuiu',   null,`,
+  },
+  {
+    // C1, achado da revisão: greatest() do Postgres ignora NULL, então a
+    // guarda velha (só aulas_mes>0) deixava faltas_mes ausente entrar como
+    // score ZERO. Reintroduz exatamente essa guarda velha no lado do score.
+    nome: 'V6 — C1: a guarda de faltas_mes volta a ignorar se o dado existe (so aulas_mes>0)',
+    pega: 'passo "aulas_mes sem faltas_mes nao conta como sinal apurado" e os dois seguintes',
+    de: `       case when (p_sinais->>'faltas_mes') is not null\n                 and coalesce((p_sinais->>'aulas_mes')::int, 0) > 0\n            then greatest(0, 100 - 100.0 * (p_sinais->>'faltas_mes')::numeric\n                                        / (p_sinais->>'aulas_mes')::numeric) end,`,
+    para: `       case when coalesce((p_sinais->>'aulas_mes')::int, 0) > 0\n            then greatest(0, 100 - 100.0 * (p_sinais->>'faltas_mes')::numeric\n                                        / (p_sinais->>'aulas_mes')::numeric) end,`,
+  },
+  {
+    // I2, achado da revisão: a nota se cala mas a decomposição não podia
+    // continuar vazando contribuiu/peso_efetivo/de calculados. Remove só a
+    // limpeza da decomposição, mantendo v_nota:=null intacto — prova que o
+    // passo "nota vem nula" sozinho NÃO bastava pra pegar esse vazamento.
+    nome: 'V7 — I2: a decomposicao para de ser limpa quando a nota se cala (mas a nota continua nula)',
+    pega: 'passo "com poucos sinais, NENHUMA linha da decomposicao mostra contribuicao"',
+    de: `    v_nota := null;\n    v_dec := (\n      select jsonb_agg(\n               d || jsonb_build_object('contribuiu', null, 'peso_efetivo', null, 'de', null)\n               order by ord)\n        from jsonb_array_elements(v_dec) with ordinality as e(d, ord));\n  end if;`,
+    para: `    v_nota := null;\n  end if;`,
   },
 ]
 
