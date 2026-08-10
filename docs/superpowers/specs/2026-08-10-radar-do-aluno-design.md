@@ -339,6 +339,46 @@ enquanto a média cai é a prova de que o lançamento melhorou. É o que transfo
 "a coisa tende a melhorar" em número — e é o placar da cobrança da Sol e da
 ferramenta de presença.
 
+**6.4 Tooltips — obrigatórios, não enfeite** (pedido do Alf)
+
+O padrão vem do LA Report, que o Alf aprovou, com duas correções medidas no
+código deles em 10/08.
+
+**Correção 1 — mostrar contribuição, não peso.** O tooltip deles diz
+`Presença: 72% (peso 10%)`. Peso é a *regra*; quem lê quer o *efeito*. A função
+deles **já calcula** a contribuição (`ROUND(score * peso / 100, 1)`) — só não a
+exibe. A nossa exibe:
+
+```
+Health Score 38 · Crítico
+  absenteísmo   60% (6 de 10)   contribuiu 21 de 40 possíveis
+  feedback      vermelho        contribuiu  0 de 25
+  prática       não             contribuiu  0 de 20
+  faltas do mês 2               contribuiu 11 de 15
+  ─────────────────────────────────────────────────
+  apurada em 4 de 4 sinais
+```
+
+**Correção 2 — sinal sem dado não vira meio.** O deles faz
+`ELSE 50 -- Sem feedback = neutro`: com o semáforo em 0% respondido, 20% da nota
+de **todo mundo** é o mesmo valor, e a nota mexe menos que a realidade. O nosso
+tira da conta e redistribui (§5.2), e o tooltip diz qual saiu e por quê.
+
+**Tooltip do absenteísmo — declara a base.** O deles faz isso bem
+(*"21% desde a matrícula · matriculado em 01/06 · última aula presente há 49
+dias"*), e é o mesmo princípio do §4.1:
+
+```
+60% de absenteísmo
+  6 faltas em 10 aulas medidas
+  janela: 04/ago → 15/out  (desde a virada de página em 01/08)
+  2 faltas justificadas ficaram fora da conta
+  média do professor 44%  ·  da unidade 38,8%
+```
+
+**Tooltip do status** — a faixa e de onde ela vem (`Crítico: nota < 40`), para
+que a régua seja legível sem abrir a aba de configuração.
+
 **Selos na linha:** "avisou que sai" (33 alunos hoje, da `movimentacoes_admin`
 com `mes_saida` à frente) e "presenteísmo". São selos, não colunas — não entram
 na nota, marcam a linha e filtram.
