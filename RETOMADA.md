@@ -5,9 +5,16 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 09/08/2026, noite (BRT).** Tudo no remoto — confira com
-> `git log --oneline -5`.
+> **Última atualização: 10/08/2026, noite (BRT).** Tudo no remoto — confira com
+> `git log --oneline -5`. Árvore de trabalho limpa (`git status -sb` = só
+> `## main...origin/main`, nada pendente).
 > Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
+
+> ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
+> do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
+> **Cursor** pra continuar. Este arquivo é o prompt de retomada — quem abrir aí
+> (Claude ou outro modelo) lê isto primeiro e segue do PRÓXIMO PASSO da seção
+> logo abaixo, sem reabrir o que já foi decidido nem repetir trabalho.
 
 > ⚠️ **10/08, tarde: outra sessão minha está rodando em paralelo, no MESMO
 > checkout** (não é worktree — ver `CLAUDE.md`, "Duas sessões, o mesmo
@@ -19,6 +26,88 @@
 > _(Nota da outra sessão, 10/08 tarde: sou eu, a da Daiana. O `19528fa` é meu,
 > e a frente inteira está na seção logo abaixo. Confirmo o combinado: não toco
 > na 081/082 nem no plano do Radar.)_
+
+---
+
+## ✅ 10/08 NOITE — Radar do aluno: backend completo (Tasks 1-4 + 10), telas (5-9) NÃO começaram
+
+**PRÓXIMO PASSO literal:** abrir `docs/superpowers/plans/2026-08-10-radar-do-aluno.md`
+e executar as **Tasks 5, 6, 7, 8, 9** na ordem em que estão escritas — types/
+wrappers em `api.ts`, sidebar + mesa do Radar pra coordenação, modal do aluno,
+tela de Réguas (config de pesos), e a linha de copy "isto não é avaliação sua"
+na mesa do professor. O plano já tem SQL/TS/testes completos pra cada uma, no
+mesmo formato das Tasks 1-4/10 (que já saíram assim e funcionaram). Ledger de
+progresso desta feature: `.superpowers/sdd/2026-08-10-radar-do-aluno/progress.md`
+(git-ignored, só local — se este handoff for pra outra máquina/ferramenta, ele
+não vai junto; este texto aqui é o resumo que sobrevive).
+
+**Backend no ar, testado e revisado, commits em `main`:**
+
+| Migration | O quê | Commits |
+|---|---|---|
+| 081 | View `vw_radar_aluno_sinais` (1 linha/aluno, 5 sinais + base de cada) | `b79aa26`+`107d4e6`, ampliada pela 088 |
+| 082 | Tabela `radar_config` (pesos/faixas, editável) + RPCs de config | `e709135` |
+| 085 | `fn_radar_nota(sinais, config)` — função pura, pontua + decompõe | `b473259`+`442edb0` |
+| 087 | `app_coordenacao_radar(...)` — RPC da tela (guard, filtros, resumo) | `ffc43ad`. **Não é 086** — esse número foi tomado por outra sessão no mesmo checkout (`086-o-gemeo-para-de-divergir-na-escrita.sql`), renumerado |
+| 088 | 5º sinal: **faltas consecutivas** (ponderado, não atropelo) | `42d713a`+`a0b3c96` (fix round) |
+
+**Por que virou 5 sinais em vez de 4 (decisão do Alf, no meio do trabalho):**
+rodar a Task 4 contra os 311 alunos reais mostrou 242 já com nota, mas só 13
+professores tinham respondido o semáforo — dois dos quatro sinais originais
+(absenteísmo da janela, faltas do mês) nascem da MESMA tabela de presença e
+cobrem quase a mesma janela em agosto, então acendiam juntos com 1 aula
+medida, sem entrada nenhuma do professor. Decisão dele: não travar a nota até
+o professor participar — trocar por um sinal mais robusto pra dado escasso:
+**contagem bruta de faltas seguidas**. Mapeamento: até 1 falta seguida pontua
+saudável (100), 2 pontua atenção (50), 3+ pontua crítico (0) — é sinal
+PONDERADO (peso próprio, entra na mesma redistribuição dos outros 4), não um
+`if` que atropela a conta.
+
+**Fase B, explicitamente adiada** (não é bug, é escopo cortado por decisão
+dele): Fábio avisar o professor proativamente com 2 faltas seguidas ("fala
+com ele, manda um exercício"), e escalar pro grupo da coordenação com 3+.
+Fica pra depois, provavelmente junto da tarefa já pendente "generalizar o
+worker da devolutiva em máquina de avisos ao professor".
+
+**Rigor aplicado em cada tarefa** (documentado pra quem for confiar nisso):
+TDD (teste antes do código), mutantes obrigatórios (todos morrendo), revisão
+de código dedicada por tarefa (`superpowers:code-reviewer`), e — depois de
+achar bug em 5 pedaços de SQL que eu mesmo escrevi nesta sessão sem testar
+antes (`greatest(0,NULL)` que devolve 0 não NULL, `#>` que não detecta jsonb
+null onde `#>>` detecta, agregado aninhado que o Postgres recusa) — toda SQL
+nova nas tarefas mais recentes foi testada por `SELECT` direto em produção
+ANTES de entrar em qualquer arquivo de migration.
+
+**Achado sério na Task 10 que quase passou batido:** o fix round da revisão
+corrigiu o arquivo certo, mas a função corrigida nunca tinha sido REAPLICADA
+no banco — `rodar-teste-sql.mjs` só faz BEGIN/ROLLBACK, nunca commita de
+verdade, e ninguém tinha rodado o passo de aplicar depois do fix. Descobri
+comparando `pg_get_functiondef` (o que está rodando) contra o arquivo (o que
+deveria estar rodando) — divergiam. Apliquei manualmente
+(`088_a_falta_seguida_e_o_quinto_sinal_fix_revisao`) e reconferi. **Lição pra
+quem continuar:** depois de QUALQUER correção em SQL de migration, confirmar
+que ela foi de fato reaplicada em produção — não basta o arquivo estar certo
+nem o teste passar (teste roda em transação descartável).
+
+**Menores registrados pra revisão de branch inteira** (não bloqueiam, ficam
+pro Fechamento do plano, depois das Tasks 5-9):
+- `faltas_consecutivas` na view não é limitado pela janela de 10 aulas
+  (diferente de `aulas_medidas`) — aluno com 15 faltas seguidas mostraria
+  "15" ao lado de "10 aulas medidas". Só o texto fica incoerente, o score não.
+- Sem validação que `faltas_consecutivas_atencao < faltas_consecutivas_critico`
+  na config (mesmo buraco pré-existente em `faixa_critico`/`faixa_saudavel`).
+- Sinal com peso=0 na config ainda conta pro piso de sinais apurados —
+  "desligar" um sinal pela régua ainda empurra alunos pra cima do mínimo.
+- A migration 081 não roda mais numa bateria automática "limpa" (só via
+  mutantes) — consequência de `create or replace view` recusar tirar coluna,
+  marcada com `-- SUPERADA POR: 088-...` no próprio arquivo.
+
+**Checkout compartilhado, ainda vale:** duas sessões Claude Code trabalharam
+no MESMO checkout esta tarde/noite (não worktrees separadas — ver `CLAUDE.md`,
+seção "Duas sessões, o mesmo checkout"). A outra tratava do incidente da
+Daiana (seção logo abaixo). Regra pra quem continuar, mesmo sozinho agora:
+`git status`/`git fetch` antes de mexer, `ls` no disco antes de numerar
+arquivo novo (não confiar só em `git log`), nunca `git add -A`/`.`/`-a`.
 
 ---
 
@@ -434,7 +523,7 @@ A ordem verdadeira, hoje, é esta:
 | # | Frente | Onde parou | Seção |
 |---|---|---|---|
 | ~~1~~ | ~~Semáforo do professor~~ | **FECHADO em 09/08 à noite.** Banco (073–080), mesa do professor, tela da coordenação, cobrança no timer, e o Fábio lendo. O texto abaixo desta tabela é HISTÓRIA — não reabrir | ✅ |
-| **1** | **Radar do aluno** (bloco 2 do painel da coordenação) | **Spec escrita em 10/08** (`docs/superpowers/specs/2026-08-10-radar-do-aluno-design.md`) — aguardando revisão do Alf. Depois dela: plano + execução | seção do topo |
+| **1** | **Radar do aluno** (bloco 2 do painel da coordenação) | **Backend completo e no ar em 10/08 noite** (Tasks 1-4 + 10 do plano — sinais, config, nota de 5 sinais, RPC da tela). **Faltam as Tasks 5-9 (telas)** — plano já escrito com SQL/TS/testes completos, é só executar | seção "Radar do aluno: backend completo", topo deste arquivo |
 | 2 | **Fila offline no feedback** | O ✓ é honesto (alerta + reenviar), mas o toque se perde se o app fechar. Janela abre 25/08 | "Ainda aberto" |
 | ~~3~~ | ~~Parede de texto do escalonamento~~ | **FECHADO em 10/08** (`146a593`): índice + uma mensagem por unidade, 9/9 mutantes | seção do topo |
 | 3 | **Registro de presença em Campo Grande** | **NOVO, medido em 10/08:** 126 alunos com 2+ faltas seguidas e zero presença afirmada, concentrados em CG (28–50% da carteira de alguns professores). É o que segura o cartão "Sumiu da escola" do Radar | spec do Radar, §3 |
