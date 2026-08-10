@@ -1343,6 +1343,130 @@ export async function coordenacaoFeedbackMes(
   return data as unknown as CoordenacaoFeedbackMes
 }
 
+/** Uma linha da mesa do Radar. `nota.nota` é null quando falta cobertura. */
+export type RadarNota = {
+  nota: number | null
+  status: 'critico' | 'atencao' | 'saudavel' | null
+  sinais_apurados: number
+  sinais_totais: number
+  suficiente: boolean
+  decomposicao: Array<{
+    sinal: string
+    valor: string | null
+    score: number | null
+    peso: number
+    peso_efetivo: number | null
+    contribuiu: number | null
+    de: number | null
+    sem_dado: boolean
+  }>
+}
+
+export type RadarLinha = {
+  aluno_id: number
+  aluno: string
+  curso: string | null
+  unidade: string | null
+  professor_id: number | null
+  professor: string | null
+  nota: RadarNota
+  status: 'critico' | 'atencao' | 'saudavel' | 'sem_nota'
+  /** NULL quando não há aula medida — nunca zero. Ver migration 081. */
+  absenteismo_pct: number | null
+  aulas_medidas: number
+  faltas_janela: number
+  faltas_mes: number
+  aulas_mes: number
+  /** 5º sinal (088) — contagem bruta de faltas seguidas. */
+  faltas_consecutivas: number
+  feedback: string | null
+  pratica_em_casa: string | null
+  evolucao: string | null
+  animo: string | null
+  observacao: string | null
+  avisou_que_sai: boolean
+  mes_saida: string | null
+}
+
+export type RadarResposta = {
+  config: Record<string, number>
+  resumo: {
+    alunos: number
+    criticos: number
+    atencao: number
+    saudaveis: number
+    sem_nota: number
+    avisaram_que_saem: number
+    absenteismo_media: number | null
+    absenteismo_mediana: number | null
+    aulas_por_aluno: number | null
+    com_base: number
+    base_desde: string
+  }
+  medias: {
+    escola: number | null
+    unidades: Array<{ unidade_id: string; unidade: string; absenteismo_media: number | null }>
+    professores: Array<{ professor_id: number; professor: string; absenteismo_media: number | null }>
+  }
+  linhas: RadarLinha[]
+  total_lista: number
+  truncado: boolean
+  filtros: {
+    unidades: Array<{ unidade_id: string; unidade: string; alunos: number }>
+    professores: Array<{ professor_id: number; professor: string; alunos: number }>
+    status: Array<{ status: string; alunos: number }>
+  }
+}
+
+export type FiltroRadar = {
+  unidadeId: string | null
+  professorId: number | null
+  status: 'critico' | 'atencao' | 'saudavel' | 'sem_nota' | null
+}
+
+export const SEM_FILTRO_RADAR: FiltroRadar = {
+  unidadeId: null,
+  professorId: null,
+  status: null,
+}
+
+export async function coordenacaoRadar(
+  filtro: FiltroRadar = SEM_FILTRO_RADAR,
+): Promise<RadarResposta> {
+  const { data, error } = await rpcSolta('app_coordenacao_radar', {
+    p_unidade_id: filtro.unidadeId,
+    p_professor_id: filtro.professorId,
+    p_status: filtro.status,
+    p_limite: 200,
+  })
+  if (error) throw error
+  return data as unknown as RadarResposta
+}
+
+export type RadarConfigItem = {
+  chave: string
+  valor: number
+  fabrica: number
+  rotulo: string
+  /** `consecutivas` veio na 088 (5º sinal). */
+  grupo: 'pesos' | 'faixas' | 'absenteismo' | 'base' | 'consecutivas'
+  mexido: boolean
+}
+
+export async function radarConfig(): Promise<{ itens: RadarConfigItem[] }> {
+  const { data, error } = await rpcSolta('app_radar_config', {})
+  if (error) throw error
+  return data as unknown as { itens: RadarConfigItem[] }
+}
+
+export async function salvarRadarConfig(chave: string, valor: number): Promise<void> {
+  const { error } = await rpcSolta('app_radar_config_salvar', {
+    p_chave: chave,
+    p_valor: valor,
+  })
+  if (error) throw error
+}
+
 export interface ResultadoRecado {
   ok: boolean
   /** Só é true quando o WhatsApp SAIU. Reservar não é enviar. */
