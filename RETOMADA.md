@@ -73,11 +73,43 @@ C,S,X,J" por consoantes Z,S,X,J; "aquecimento B,B,A,O" por bilabial; "das
 Sicilinas" por CeCe Winans). Corrigi antes de confirmar — que é o que a tela de
 confirmação oferece ao professor —, cada edição com fonte na fala dela.
 
-⚠️ **BURACO ABERTO, novo:** `fn_registrar_presencas_core` escreve **só na aula
-âncora**. Sofia (04/08) e Eduardo (06/08) seguem com o gêmeo individual dizendo
-`falta` pelo Emusys e o de turma dizendo `presente` pelo professor. A 083
-imunizou a *leitura* da cobrança; a **tabela continua com as duas linhas
-discordando**, e quem lê linha crua ainda vê a falta fantasma.
+✅ **RESOLVIDO na raiz, mesma tarde (`40d0814`, migration 086).** O buraco
+acima não era só da Sofia e do Eduardo — era estrutural: `fn_registrar_presencas_core`
+sempre escreveu só na aula-âncora, e o gêmeo individual ficava com o que o
+Emusys mandou por último. Medido antes de mexer: **59 das 61** respostas
+fortes já existentes tinham o gêmeo divergindo ou vazio. Não era exceção, era
+a regra — e ia **multiplicar a cada professor novo**, exatamente o alerta do
+Alf: *"resolver na raiz, antes de partir pra SPEC."*
+
+Conserto: `fn_sincronizar_gemeos_presenca(aula_id default null)` — propaga
+resposta forte pro gêmeo, com a MESMA trava que já protegia a âncora (nunca
+apaga resposta humana forte já existente). Chamada **escopada** ao final de
+toda `fn_registrar_presencas_core` (o defeito não nasce mais) e **sem escopo**
+uma vez na migration, como backfill. 11 passos, **5/5 mutantes** (um mutante de
+propósito NÃO escrito — apagar a linha de backfill é intestável neste harness,
+mesma limitação já documentada na migration 068; prova é medição direta:
+**59 pares divergentes → 0**, 61 → 120 escritas fortes).
+
+### ▶ A Beatriz também precisou de reprocesso (`4f9fbfe`)
+
+Medido depois do 086: o registro dela (a ÚNICA das 8 que tinha "escrito de
+verdade" em 08/08) **nunca passou pelo motor**. Era de quando o Fábio ainda
+tinha o MCP de banco — ele chamou `registrar_aula_fabio` **direto**, texto
+corrido, sem `fabio_registros_aula`, sem campos estruturados, sem devolutiva.
+"Ele escreveu" e "ele escreveu do jeito certo" são checagens diferentes; eu só
+tinha feito a primeira.
+
+Reprocessado pelo mesmo áudio original, mesma via, com
+`app_confirmar_registro(id, 'substituir')` — a aula já tinha `anotacoes_fabio`
+(o texto bruto), então `'novo'` seria recusado. `aula_registros_fabio_log`
+guarda as duas entradas (não apaga, acumula): `novo/texto` em 08/08,
+`substituir/áudio` agora. Duas correções antes de confirmar, mesmo critério das
+outras 4 (a "dificuldade no controle do fluxo de ar" tinha virado "Objetivo"
+genérico; a fatia veio sem `presenca` — o áudio só descreve conteúdo).
+
+**Presença aplicada nos DOIS gêmeos na MESMA escrita** (`gemeos_sincronizados:
+1`) — a 086 funcionando ao vivo pela primeira vez em produção. Pendência da
+Daiana: **0**.
 
 **PRÓXIMO PASSO desta frente: brainstorming + SPEC do Fábio** — o que ele pode
 escrever, com que confirmação, e plugar **o mesmo motor do app** no WhatsApp (é
