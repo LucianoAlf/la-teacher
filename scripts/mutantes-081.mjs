@@ -5,6 +5,12 @@
 // virada em 01/08 e coorte de professor com login — mais a coerência entre
 // absenteismo_pct e a ausência de base. Se um sobreviver, quem está errado é
 // o TESTE que não pegou, não o mutante — o passo que falta se adiciona lá.
+//
+// V6-V8 vieram da rodada de correção (revisão, 10/08): V6 é o C1 crítico (a
+// porta pra `authenticated` reabrindo), V7 é o I2 (o mutante "is not null"
+// que o passo estrutural sozinho não pegava — a coluna nunca é NULL de
+// verdade, então ele é gêmeo do V2), V8 é o I1 (current_date cru voltando no
+// lugar de fn_competencia_feedback).
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
@@ -49,6 +55,32 @@ const MUTANTES = [
     pega: 'passo "sem aula medida, o absenteismo e NULO (nao zero)"',
     de: `       case when coalesce(j.aulas_medidas, 0) > 0\n            then round(100.0 * j.faltas_janela / j.aulas_medidas, 1)\n       end`,
     para: `       coalesce(round(100.0 * j.faltas_janela / nullif(j.aulas_medidas,0), 1), 0)`,
+  },
+  {
+    // C1 da revisão: a porta pra `authenticated` reabre (ex.: alguém adiciona
+    // de volta sem tirar o revoke/grant certo). Sem este passo, RLS de
+    // aluno_feedback_professor fica sem efeito nenhum pra quem lê pela view.
+    nome: 'V6 — o grant pra authenticated volta (C1, a porta reabre)',
+    pega: 'passo "a view NAO e legivel por authenticated"',
+    de: `grant select on table public.vw_radar_aluno_sinais to service_role;`,
+    para: `grant select on table public.vw_radar_aluno_sinais to service_role;\ngrant select on public.vw_radar_aluno_sinais to authenticated;`,
+  },
+  {
+    // I2 da revisão: `is not null` é sempre verdadeiro (a coluna nunca é NULL
+    // de verdade) — MESMO defeito do V2, mas mantém o identificador no texto,
+    // então o passo estrutural sozinho não pega. Só o fixture ZZTESTE pega.
+    nome: 'V7 — denominador neutralizado sem apagar o identificador (is not null)',
+    pega: 'passo "aluno so com aula fora do denominador: aulas_medidas fica 0"',
+    de: `   where v.considera_frequencia_denominador\n     and v.data_aula >= date '2026-08-01'`,
+    para: `   where v.considera_frequencia_denominador is not null\n     and v.data_aula >= date '2026-08-01'`,
+  },
+  {
+    // I1 da revisão: current_date cru é UTC — erra a competência das 21h à
+    // meia-noite BRT do último dia do mês (mesma armadilha da 018/073).
+    nome: 'V8 — a competencia do semaforo volta a usar current_date cru',
+    pega: 'passo "a view usa fn_competencia_feedback, nao current_date cru"',
+    de: `   where f.competencia = public.fn_competencia_feedback()`,
+    para: `   where f.competencia = date_trunc('month', current_date)::date`,
   },
 ]
 

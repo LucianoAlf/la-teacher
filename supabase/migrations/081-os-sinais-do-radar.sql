@@ -63,7 +63,7 @@ mes as (
          count(*)                          as aulas_mes,
          count(*) filter (where not veio)  as faltas_mes
     from aula
-   where data_aula >= date_trunc('month', current_date)::date
+   where data_aula >= public.fn_competencia_feedback()
    group by 1
 ),
 -- O semáforo do mês, escrito pelo professor. Uma linha por aluno+professor.
@@ -73,7 +73,7 @@ semaforo as (
          f.evolucao, f.animo, nullif(btrim(f.observacao), '') as observacao,
          f.competencia
     from public.aluno_feedback_professor f
-   where f.competencia = date_trunc('month', current_date)::date
+   where f.competencia = public.fn_competencia_feedback()
    order by f.aluno_id, f.professor_id,
             coalesce(f.atualizado_em, f.respondido_em) desc
 ),
@@ -83,7 +83,7 @@ aviso as (
   select distinct ma.aluno_id, min(ma.mes_saida) as mes_saida
     from public.movimentacoes_admin ma
    where ma.tipo = 'aviso_previo'
-     and ma.mes_saida >= date_trunc('month', current_date)::date
+     and ma.mes_saida >= public.fn_competencia_feedback()
      and ma.aluno_id is not null
    group by ma.aluno_id
 )
@@ -124,4 +124,18 @@ comment on view public.vw_radar_aluno_sinais is
   'desde 01/08/2026, só coorte de professor com login liberado. '
   'absenteismo_pct é NULO sem base — nunca zero.';
 
-grant select on public.vw_radar_aluno_sinais to authenticated;
+-- ACHADO NA REVISÃO (rodada de correção, 10/08): sem security_invoker a view
+-- roda como DEFINER — o dono de quem aplicou a migration — e passa por cima
+-- da RLS de `aluno_feedback_professor` (2 policies vivas da 074, que travam
+-- professor a só ver o PRÓPRIO feedback). Com `grant ... to authenticated`
+-- qualquer login lia observacao/feedback/avisou_que_sai de aluno de OUTRO
+-- professor pelo PostgREST. Fronteira mais dura da casa: o canal do professor
+-- nunca alcança dado de colega.
+--
+-- Sem isto a view nasceria legível por `anon` e `authenticated` de qualquer
+-- jeito: o ALTER DEFAULT PRIVILEGES do projeto concede SELECT nos dois, e
+-- `revoke from public` sozinho não alcança nenhum. A porta é a FUNÇÃO, não a
+-- view — a RPC da Task 4 (security definer, com o guard) é quem lê daqui pra
+-- frente, do jeito que 028 já faz pra `vw_fabio_contexto_experimental`.
+revoke all on table public.vw_radar_aluno_sinais from public, anon, authenticated;
+grant select on table public.vw_radar_aluno_sinais to service_role;

@@ -359,7 +359,8 @@ comment on view public.vw_radar_aluno_sinais is
   'desde 01/08/2026, só coorte de professor com login liberado. '
   'absenteismo_pct é NULO sem base — nunca zero.';
 
-grant select on public.vw_radar_aluno_sinais to authenticated;
+revoke all on table public.vw_radar_aluno_sinais from public, anon, authenticated;
+grant select on table public.vw_radar_aluno_sinais to service_role;
 ```
 
 - [ ] **Step 4: Rodar o teste e confirmar que passa**
