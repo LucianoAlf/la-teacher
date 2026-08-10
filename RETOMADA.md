@@ -15,6 +15,75 @@
 > com falta escondendo aula, achado no caso da Daiana) e seguiu pra outra
 > migration. Se aparecer arquivo novo em `supabase/migrations/` que eu não
 > reconheço — **não é lixo, não apago, não commito por cima.** É dela.
+>
+> _(Nota da outra sessão, 10/08 tarde: sou eu, a da Daiana. O `19528fa` é meu,
+> e a frente inteira está na seção logo abaixo. Confirmo o combinado: não toco
+> na 081/082 nem no plano do Radar.)_
+
+---
+
+## ✅ 10/08 TARDE — a professora Daiana usou o Fábio de verdade, e ele mentiu
+
+O Alf mandou ela ser intensa no WhatsApp pra ver o que quebra. Quebrou muito, e
+todo o conserto está no ar: `19528fa`, `d6a603e`, `9a957ab`, `fe89f2c`, `36c05ab`.
+
+**O incidente, medido linha a linha contra o banco.** Em 08 e 10/08 ela mandou
+**8 áudios** de conteúdo pedagógico. O Fábio respondeu *"deixei o registro
+organizado e salvo"*, *"confirmado: o Eduardo compareceu"*, *"vou considerar a
+ausência do Anderson"*. **Escritas de verdade: 1 de 8** (a da Beatriz, em 08/08,
+`aula_registros_fabio_log` id 71). Sete relatos perdidos com ela achando que
+estavam salvos.
+
+⚠️ **A causa fui eu.** Em 09/08 fechei a fronteira (`api_server` =
+`skills_leitura, memory, todo, vision, no_mcp`). **Tirei as mãos dele e não
+tirei a boca.** Antes disso o `api_server` não tinha restrição nenhuma — por
+isso a Beatriz de 08/08 gravou de verdade e a de 10/08 não gravou nada.
+
+| # | Defeito | Conserto | Prova |
+|---|---|---|---|
+| 1 | Carimbava escrita que não existia, mandava pro "suporte do app" (não existe) e prometia "fila de validação de presença" (não existe) | bloco `CAPACIDADE_PROFESSOR` no `build_prompt`, **só** no canal do professor | 5 casos conversando: recusa + caminho no app + **texto pronto pra colar**; "quem é a Lara?" segue completo; agenda em 1,0s sem ruído |
+| 2 | Janela de 3 dias trancava e o cadeado só dizia "Encerrada" | **7 dias**, com `fn_janela_registro_dias()` como dono único (eram **5 cópias** do número) | 084: 10 passos, **8/8 mutantes** |
+| 3 | A cobrança aceitava o **plano do Emusys** como relato (1.609 aulas) e perdia aula quando o gêmeo-âncora dizia falta (572 pares discordam) | 083: só `anotacoes_fabio` conta; presença resolvida entre os gêmeos | 11 passos, **8/8 mutantes**; 502 → **704** aulas cobráveis |
+| 4 | A auditoria das 7h disse *"✅ Tudo certo"* no dia disso tudo | `check_promessa_vs_banco` (novo), governança de 1 → **43** professores, e "nenhum registro em 24h" virou alerta | pegou o caso: *"🤥 professor 3 (2 carimbos, 0 escritas)"* |
+
+**Efeito prático da 083+084:** a escalação usa a **mesma régua da janela** — até
+7 dias é do professor, depois é da coordenação. Primeira leitura honesta:
+**20 professores, 98 aulas** passadas do prazo.
+
+⚠️ **Armadilha que me pegou de novo** (a mesma da 076): `v_erro = '...'` com
+`v_erro` nulo devolve NULL, e `count(*) where not ok` **não conta a linha** —
+três mutantes sobreviveram imprimindo verde. Consertado na raiz: `is not
+distinct from` nas asserções e `not coalesce(ok,false)` no contador da 083 **e**
+da 084. Asserção que não sabe responder agora é FALHA, nunca aprovação.
+
+### ▶ O material dela foi RECUPERADO pelo motor do app (`36c05ab`)
+
+Os **áudios originais ainda estavam na UAZAPI**. Nada foi recriado: baixei os
+mesmos bytes, subi pro bucket `fabio-audios` na convenção do app e enfileirei —
+daí em diante foi o motor de sempre (trigger `trg_fabio_fila_novo` → Hermes →
+`aguardando_confirmacao` → `app_confirmar_registro`).
+
+**6 registros gravados nos alvos certos, 2 ausentes pulados, presença nas 4
+aulas, 6 devolutivas enfileiradas. Pendência da Daiana: 4 → 0.**
+
+⚠️ **O motor errou onde o Emusys já estava contaminado.** Na aula de 05/08 16h
+marcou **Júlia e Clara como ausentes** — as duas estiveram lá. O Whisper do
+Hermes saiu bem pior que o do WhatsApp no MESMO áudio ("Vileardo"; "vogais
+C,S,X,J" por consoantes Z,S,X,J; "aquecimento B,B,A,O" por bilabial; "das
+Sicilinas" por CeCe Winans). Corrigi antes de confirmar — que é o que a tela de
+confirmação oferece ao professor —, cada edição com fonte na fala dela.
+
+⚠️ **BURACO ABERTO, novo:** `fn_registrar_presencas_core` escreve **só na aula
+âncora**. Sofia (04/08) e Eduardo (06/08) seguem com o gêmeo individual dizendo
+`falta` pelo Emusys e o de turma dizendo `presente` pelo professor. A 083
+imunizou a *leitura* da cobrança; a **tabela continua com as duas linhas
+discordando**, e quem lê linha crua ainda vê a falta fantasma.
+
+**PRÓXIMO PASSO desta frente: brainstorming + SPEC do Fábio** — o que ele pode
+escrever, com que confirmação, e plugar **o mesmo motor do app** no WhatsApp (é
+a casa dos professores). Inclui o "carimbo de feito" que o Alf pediu (resumo +
+devolutiva gerada de volta pra ele) e o pedido de liberação à coordenação
+depois dos 7 dias — hoje isso é ato humano.
 
 ---
 
