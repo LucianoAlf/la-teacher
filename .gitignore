@@ -15,6 +15,10 @@ build/
 !.env.example
 .mcp.json
 
+# clone nested acidental (Cursor) — NÃO versionar; apagar com
+# scripts/apagar-clone-nested.ps1 depois de abrir D:\la-teacher
+/la-teacher/
+
 # claude code local
 .claude/
 

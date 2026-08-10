@@ -5,10 +5,10 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 10/08/2026, noite (BRT).** Tudo no remoto — confira com
-> `git log --oneline -5`. Árvore de trabalho limpa (`git status -sb` = só
-> `## main...origin/main`, nada pendente).
-> Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
+> **Última atualização: 10/08/2026, noite (BRT) — Cursor.** Radar Tasks 5–9
+> verificadas ao vivo; shell da coordenação corrigido (tarja preta ao
+> redimensionar). Merge em `main` em andamento nesta sessão. Quem mais lê: o
+> Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
@@ -31,30 +31,56 @@
 
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
 
-1. **Radar do aluno** — backend pronto, faltam as telas (Tasks 5-9), plano já
-   escrito. Trabalho de EXECUÇÃO, pode começar direto. Ver seção logo abaixo.
+1. **Radar do aluno** — backend no ar + telas verificadas. Ver seção logo
+   abaixo. Falta só o **Fechamento do plano** (menores já listados na seção de
+   backend — não bloqueiam).
 2. **Fábio escreve no WhatsApp** — SPEC escrita, **ainda sem aprovação do
    Alf e sem plano**. Não é pra codar ainda — é pra ele ler
    `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`
    primeiro. Ver seção "Brainstorming feito, SPEC escrita", mais abaixo (dentro
    do histórico do incidente da Daiana, 10/08 tarde).
 
-Se for continuar sozinho sem o Alf por perto pra aprovar a spec do Fábio, a
-frente 1 (Radar) é a que rende — tem plano completo esperando execução.
+---
+
+## ✅ 10/08 NOITE (Cursor) — Radar telas verificadas + shell sem tarja preta
+
+**PRÓXIMO PASSO literal:** Fechamento do plano do Radar — menores já
+registrados na seção de backend abaixo (não bloqueiam merge). Frente Fábio-
+no-WhatsApp continua esperando o Alf ler a SPEC (não codar).
+
+**Verificação ao vivo (medido, sessão coordenação = Alf):** preview
+`http://localhost:5183` a partir de `D:\la-teacher`. Sidebar desktop Painel ·
+Radar · Equipe; KPIs Crítico 62 / Atenção 35 / Avisaram 4 / Absenteísmo 32%;
+311 alunos; `—` em Prática/Feedback sem nota; modal com decomposição (3/5
+sinais); Réguas com grupo `faltas_consecutivas`; mesa do professor com copy
+do escudo.
+
+**Bug de responsividade (tarja preta embaixo ao redimensionar):** causa =
+`h-svh` no shell não acompanhava o container do `#root`. Conserto: `#root`
+vira coluna flex; `CoordenacaoFrame` e `AppFrame` usam `h-full`/`flex-1`/
+`items-stretch`. Medido depois: `gap=0` em 1400×900 e 1000×560; aside preenche
+a moldura.
+
+**Clone nested:** apagado (`Test-Path D:\la-teacher\la-teacher` → False).
+Workspace canônico = `D:\la-teacher`.
+
+**Commits na branch `feat/radar-telas`:**
+
+| Task | Commit | O quê |
+|---|---|---|
+| 5 | `67d76e2` | tipos/wrappers em `api.ts` (+ `faltas_consecutivas` da 088) |
+| 6 | `6c9fb1d` | mesa, tooltip, filtros, sidebar Radar, rota |
+| 7 | `348ddfe` | modal do aluno |
+| 8 | `42c4d66` | aba Réguas (grupos dinâmicos, incl. `consecutivas`) |
+| 9 | `b6f7233` | copy "isto não é avaliação sua" na `MesaFeedback` |
+| docs | `ffeeded`+ | checkpoints RETOMADA / nested |
+| fix | (este) | shell `h-full` — some a tarja preta ao redimensionar |
 
 ---
 
-## ✅ 10/08 NOITE — Radar do aluno: backend completo (Tasks 1-4 + 10), telas (5-9) NÃO começaram
+## ✅ 10/08 NOITE — Radar do aluno: backend completo (Tasks 1-4 + 10)
 
-**PRÓXIMO PASSO literal:** abrir `docs/superpowers/plans/2026-08-10-radar-do-aluno.md`
-e executar as **Tasks 5, 6, 7, 8, 9** na ordem em que estão escritas — types/
-wrappers em `api.ts`, sidebar + mesa do Radar pra coordenação, modal do aluno,
-tela de Réguas (config de pesos), e a linha de copy "isto não é avaliação sua"
-na mesa do professor. O plano já tem SQL/TS/testes completos pra cada uma, no
-mesmo formato das Tasks 1-4/10 (que já saíram assim e funcionaram). Ledger de
-progresso desta feature: `.superpowers/sdd/2026-08-10-radar-do-aluno/progress.md`
-(git-ignored, só local — se este handoff for pra outra máquina/ferramenta, ele
-não vai junto; este texto aqui é o resumo que sobrevive).
+**Telas (5–9):** feitas na Cursor — ver seção acima.
 
 **Backend no ar, testado e revisado, commits em `main`:**
 

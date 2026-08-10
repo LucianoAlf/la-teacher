@@ -35,10 +35,10 @@ const COLAPSADA_KEY = 'la-coord-sidebar-colapsada'
 const ITENS = [
   { id: 'painel', para: '/app/coordenacao', rotulo: 'Painel', icone: 'fa-solid fa-table-columns' },
   {
-    id: 'feedback',
-    para: '/app/coordenacao/feedback',
-    rotulo: 'Feedback',
-    icone: 'fa-solid fa-heart-pulse',
+    id: 'radar',
+    para: '/app/coordenacao/radar',
+    rotulo: 'Radar',
+    icone: 'fa-solid fa-satellite-dish',
   },
   { id: 'equipe', para: '/app/equipe', rotulo: 'Equipe', icone: 'fa-solid fa-users' },
 ] as const
@@ -50,7 +50,7 @@ const ABAS = [
 ]
 const ROTA: Record<string, string> = {
   painel: '/app/coordenacao',
-  feedback: '/app/coordenacao/feedback',
+  radar: '/app/coordenacao/radar',
   equipe: '/app/equipe',
   perfil: '/app/coordenacao/perfil',
 }
@@ -75,10 +75,15 @@ export function CoordenacaoFrame({
 }) {
   const nav = useNavigate()
   const { pathname } = useLocation()
+  // A tela de Feedback deixou de ser item de menu (decisão do Alf, 10/08):
+  // ela é o "ver o mês inteiro" do cartão do Radar. Item aceso tem que dizer a
+  // verdade sobre onde você está.
   const abaAtiva = pathname.startsWith('/app/coordenacao/perfil')
     ? 'perfil'
-    : pathname.startsWith('/app/coordenacao/feedback')
-      ? 'feedback'
+    : pathname.startsWith('/app/coordenacao/radar') ||
+        pathname.startsWith('/app/coordenacao/feedback') ||
+        pathname.startsWith('/app/coordenacao/reguas')
+      ? 'radar'
       : pathname.startsWith('/app/equipe')
         ? 'equipe'
         : 'painel'
@@ -104,10 +109,13 @@ export function CoordenacaoFrame({
   }, [])
 
   return (
-    <div className="flex h-svh overflow-hidden bg-bg-app">
+    // h-full (não h-svh): a moldura acompanha o #root, que já é a viewport.
+    // h-svh deixava tarja preta embaixo ao redimensionar a janela/painel —
+    // a unidade de viewport não acompanhava o container.
+    <div className="flex h-full min-h-0 w-full flex-1 items-stretch overflow-hidden bg-bg-app">
       {/* ── Sidebar: só md+ ─────────────────────────────────────────────── */}
       <aside
-        className={`relative hidden shrink-0 flex-col border-r border-border-subtle bg-bg-surface transition-[width] duration-150 md:flex ${
+        className={`relative hidden h-full min-h-0 shrink-0 flex-col border-r border-border-subtle bg-bg-surface transition-[width] duration-150 md:flex ${
           colapsada ? 'w-[72px]' : 'w-[228px]'
         }`}
       >
@@ -177,7 +185,7 @@ export function CoordenacaoFrame({
       {/* ── Coluna principal ─────────────────────────────────────────────
           `relative` porque a TabBar do DS se posiciona no rodapé do container
           posicionado mais próximo — igual ao AppFrame do professor. */}
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
         {/* Faixa flutuante: nome da PÁGINA à esquerda (o mesmo rótulo do item
             ativo na sidebar), data e perfil à direita. Sem fundo, sem borda. */}
         <div className="flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-6">

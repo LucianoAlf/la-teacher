@@ -73,10 +73,19 @@ export function MesaFeedback({ show }: { show: (mensagem: string) => void }) {
           (não no sticky) porque é instrução de primeira vez: rola pra cima e
           sai da frente. Quem confirma aluno por aluno é o ✓ de cada card. */}
       {mesa.alunos.length > 0 ? (
-        <p className="mb-4 flex items-center gap-2 text-[11.5px] text-text-muted">
-          <i className="fa-solid fa-cloud-arrow-up text-brand-text" aria-hidden />
-          Cada resposta salva sozinha — não tem botão de salvar.
-        </p>
+        <>
+          <p className="mb-4 flex items-center gap-2 text-[11.5px] text-text-muted">
+            <i className="fa-solid fa-cloud-arrow-up text-brand-text" aria-hidden />
+            Cada resposta salva sozinha — não tem botão de salvar.
+          </p>
+          <p className="mb-4 flex items-start gap-2 text-[11.5px] leading-relaxed text-text-muted">
+            <i className="fa-solid fa-shield-halved mt-0.5 text-brand-text" aria-hidden />
+            <span>
+              Isto não é avaliação sua. O que você marcar aqui não vira número sobre
+              você — serve pra coordenação chegar no aluno sabendo do que falar.
+            </span>
+          </p>
+        </>
       ) : null}
 
       {mesa.alunos.length === 0 ? (

@@ -14,7 +14,7 @@ const ROTULO: Record<string, string> = {
 }
 
 /** "não" vira "não pratica" — chip solto não diz de que pergunta veio. */
-const FRASE: Record<string, string> = {
+export const FRASE_SEMAFORO: Record<string, string> = {
   sim: 'pratica em casa',
   as_vezes: 'pratica às vezes',
   nao: 'não pratica',
@@ -25,6 +25,9 @@ const FRASE: Record<string, string> = {
   neutro: 'ânimo neutro',
   desanimado: 'desanimado',
 }
+
+/** @deprecated use FRASE_SEMAFORO — mantido pra não quebrar imports locais. */
+const FRASE = FRASE_SEMAFORO
 
 /**
  * Um aluno na lista do semáforo, do lado da COORDENAÇÃO.

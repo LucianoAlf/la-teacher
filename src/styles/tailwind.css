@@ -22,8 +22,17 @@
   body,
   #root {
     height: 100%;
+    width: 100%;
     overflow: hidden;
     overscroll-behavior: none;
+  }
+  /* #root vira coluna flex pra o shell da coordenação (e o AppFrame) herdarem
+     a altura do container de verdade — h-svh sozinho falha quando a janela/
+     painel é redimensionado e a unidade de viewport não acompanha. */
+  #root {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
   }
   /* App mobile: rola no dedo/scroll, sem a barra cinza do desktop (como app nativo). */
   * {

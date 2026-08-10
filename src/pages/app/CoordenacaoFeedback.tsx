@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CoordenacaoFrame } from './CoordenacaoFrame'
 import { EmptyState, Skeleton } from '../../components/ui'
 import { PainelNumero } from '../../features/coordenacao/components/PainelNumero'
@@ -42,6 +43,7 @@ const TITULO_LISTA: Record<string, string> = {
  * e os mesmos Selects do bloco 1.
  */
 export default function CoordenacaoFeedbackPage() {
+  const nav = useNavigate()
   const [dados, setDados] = useState<CoordenacaoFeedbackMes | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<FiltroSemaforo>(SEM_FILTRO_SEMAFORO)
@@ -70,7 +72,11 @@ export default function CoordenacaoFeedbackPage() {
   const titulo = filtro.coracao ? TITULO_LISTA[filtro.coracao] : 'Precisam de olho'
 
   return (
-    <CoordenacaoFrame titulo="Feedback do mês" icone="fa-solid fa-heart-pulse">
+    <CoordenacaoFrame
+      titulo="Feedback do mês"
+      icone="fa-solid fa-heart-pulse"
+      aoVoltar={() => nav('/app/coordenacao/radar')}
+    >
       <div className="px-5 pb-5 pt-3">
         {erro ? (
           <EmptyState
