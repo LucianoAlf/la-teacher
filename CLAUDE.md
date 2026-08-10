@@ -102,6 +102,44 @@ ninguém veja.
 atualiza com `pull` e acusa divergência. O `.env` de cada um fica no próprio
 clone, fora deste repo.
 
+## Duas sessões, o mesmo checkout — não é worktree separada
+
+Descoberto em **10/08/2026**: quando duas sessões minhas trabalham ao mesmo
+tempo neste repositório, elas não são cópias isoladas — é o **mesmo
+checkout**. A prova veio do próprio git: a outra sessão commitou e deu push, e
+o `main` **local** desta sessão já refletia o commit dela sem eu rodar
+`git pull` — as duas leem o mesmo `.git/refs/heads/main`.
+
+Isso quase custou caro uma vez: eu ia criar a migration `083`, e o número já
+estava ocupado no **disco** por um arquivo que a outra sessão ainda não tinha
+commitado — `git log` não via, `ls supabase/migrations` via. Renumerei antes
+de aplicar (ver `numero-de-migration-livre-no-log-ocupado-no-disco` na
+memória). Da próxima vez pode não sobrar tempo de perceber.
+
+**O que isso muda no que é seguro fazer:**
+
+- **NUNCA** `git add -A`, `git add .`, `git commit -a`, `git stash` (sem
+  `-u` já é arriscado; com `-u` guardaria o trabalho não commitado da outra
+  sessão junto do meu), `git reset --hard`, `git clean`, `git checkout .` —
+  todos operam na árvore de trabalho **inteira**, que agora é compartilhada.
+  Sempre `git add <arquivo1> <arquivo2> ...` nomeando exatamente os arquivos
+  da tarefa.
+- Antes de criar um número de migration (ou qualquer arquivo numerado) novo,
+  `ls` no disco — nunca só `git log`.
+- Antes de commitar, `git status` e conferir que só os arquivos esperados
+  estão staged.
+- Arquivo novo ou estranho aparecendo no `git status`: **não mexe**. Não é
+  lixo — é trabalho em andamento do outro lado. Vale a regra geral de nunca
+  apagar o que não criei sem entender primeiro, em dobro.
+- Despachando subagente: repetir estas regras no despacho, sempre — regra da
+  casa não viaja sozinha (ver `regra-da-casa-nao-viaja-no-subagente`).
+
+**Para trabalho grande planejado com antecedência** (não descoberto no meio,
+como desta vez): preferir `git worktree` por sessão — cada uma com índice e
+árvore de trabalho próprios, elimina o risco por completo — e abrir PR pra
+integrar em vez de as duas martelando o `main` direto. Ver skill
+`superpowers:using-git-worktrees`.
+
 ## A mesma função pode morar em mais de um repo
 
 Em 05/08/2026 a `notificar-anamnese` existia em **três**: aqui, no

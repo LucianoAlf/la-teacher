@@ -9,6 +9,13 @@
 > `git log --oneline -5`.
 > Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
+> ⚠️ **10/08, tarde: outra sessão minha está rodando em paralelo, no MESMO
+> checkout** (não é worktree — ver `CLAUDE.md`, "Duas sessões, o mesmo
+> checkout"). Ela já commitou `19528fa` (buraco do relato do Emusys + gêmeo
+> com falta escondendo aula, achado no caso da Daiana) e seguiu pra outra
+> migration. Se aparecer arquivo novo em `supabase/migrations/` que eu não
+> reconheço — **não é lixo, não apago, não commito por cima.** É dela.
+
 ---
 
 ## ✅ 10/08 MADRUGADA — a parede das 9h caiu, e o Radar ganhou spec
