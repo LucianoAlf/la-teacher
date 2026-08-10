@@ -32,6 +32,36 @@ perfil de matrícula. O que a gente provar aqui pode ser levado pra lá.
 | Pagamento, inadimplência, valor de parcela | Fronteira do Alf: é do Sucesso do Aluno. E é por isso que o `health_score` do LA Report **não serve**: 30% dele é pagamento (medido em 10/08), então usá-lo põe boleto na tela da coordenação lavado em cor |
 | Observação crua do professor fora do LA Teacher | A `observacao` é escrita pra coordenação, não pra família |
 | Sinal cujo dado ninguém confirmou | "Não lançado" nunca vira falta. Vale enquanto durar a transição (~6 meses) |
+| **Agregado de professor feito com o que o professor escreveu** | ver §2.1 |
+
+### 2.1 O sinal que o professor escreve nunca volta contra ele
+
+Levantado numa revisão externa da spec, e o buraco era meu: fui eu que
+especifiquei a média do professor ao lado da do aluno (§4.2). Se a coordenação
+abre o Radar e lê *"esse professor tem 8 alunos em crítico"*, o professor
+percebe — e passa a responder mais verde do que a realidade. Isso corrói
+exatamente a fonte que esta spec chama de canônica por origem, e o dano é
+silencioso: ninguém vê um semáforo mentir.
+
+**A linha divisória não é o professor — é quem escreveu o dado.**
+
+| Sinal | Quem escreve | Agrega por professor? |
+|---|---|---|
+| Semáforo, prática, evolução, ânimo | o professor, **opinando sobre o aluno** | **NUNCA** — nem coluna, nem média, nem ranking |
+| Absenteísmo, faltas | o mundo (Emusys + secretaria + lançamento) | Pode. Presença não é o que ele acha; é o que aconteceu |
+
+**Cobra-se que ele responda; nunca se avalia o que ele respondeu.** A cobrança
+da 076 conta "respondeu X de Y" e continua legítima. O que não pode existir em
+lugar nenhum é "este professor tem muito vermelho".
+
+**E ele precisa saber disso.** Regra que o professor não sabe que existe não
+muda comportamento. Vai uma linha na mesa do Feedback do mês, onde ele responde:
+
+> *Isto não é avaliação sua. O que você marcar aqui não vira número sobre você
+> — serve pra coordenação chegar no aluno sabendo do que falar.*
+
+**Tarefa que isso cria:** `MesaFeedback.tsx` ganha essa linha, e o Radar **não**
+pode ter filtro/ordenação por "professor com mais vermelhos".
 
 ## 3. O que eu medi antes de desenhar (tudo em 10/08/2026)
 
@@ -276,6 +306,28 @@ Duas notas 70 não se confundem.
 **5.3 A nota carrega em quanta aula ela foi medida.** Nota calculada sobre 2
 aulas e sobre 10 não podem parecer a mesma coisa.
 
+**5.4 Piso de cobertura: `minimo_sinais_para_nota`, default 2** (configurável).
+Abaixo disso a coluna mostra `—` e *"apurada em 1 de 4 · insuficiente"*, não um
+número.
+
+Levantado na revisão externa e aceito: `NOTA 38 · apurada em 1 de 4` é
+perigoso, porque quem lê fixa no 38 e ignora a legenda. E numa estreia realista
+o problema é concreto:
+
+| Se subir | Absenteísmo | Feedback / Prática | Sinais vivos |
+|---|---|---|---|
+| ~20/08 | ~3 aulas — abaixo do piso de 4 | 0 (janela do semáforo abre 25/08) | **1** |
+| ~01/09 | ~4-5 aulas — liga | ciclo de agosto respondido | **3** |
+
+→ **A nota do Radar acende no começo de setembro.** Isso é esperado e está
+escrito aqui pra não virar susto.
+
+A revisão sugeria **tirar a nota da Fase 1**. Recusado: contraria a decisão do
+Alf, com o motivo dito — *"a fórmula está pronta, o espaço de existir, o design
+pronto pra quando a coisa começar a acontecer"*. Adiar a nota é construir duas
+vezes. O piso resolve o risco sem adiar nada: a fórmula existe, roda e é
+testada desde o dia 1; ela só não fala antes de ter o que dizer.
+
 **Faixas:** Crítico < 40 · Atenção 40–69 · Saudável ≥ 70. Configuráveis junto
 com os pesos.
 
@@ -319,7 +371,7 @@ para se enxergar o que foi mexido sem consultar histórico:
 | Pesos dos sinais | absenteísmo · feedback · prática · faltas do mês | 40 · 25 · 20 · 15 |
 | Faixas do status | crítico < · saudável ≥ | 40 · 70 |
 | Linhas do absenteísmo | `atencao_pct` · `critico_pct` | 25 · 50 |
-| Base mínima | `minimo_aulas_para_taxa` | 4 |
+| Base mínima | `minimo_aulas_para_taxa` · `minimo_sinais_para_nota` | 4 · 2 |
 
 **A régua nasce frouxa e aperta com o tempo** — intenção do Alf: *"posso querer
 descer nesse primeiro momento para 30%, e aumentar aos poucos, de acordo com
@@ -412,6 +464,9 @@ Tabela `radar_pesos` (unidade_id nulo = global) + `radar_pesos_historico`.
 8. o guard caindo → professor lê a escola inteira
 9. faceta se filtrando → sem volta depois de escolher unidade
 10. total do cartão ≠ tamanho da lista
+11. a nota aparecendo com 1 sinal apurado → o `—` do §5.4 some e vira número
+12. **um agregado por professor construído com semáforo/prática** → §2.1 cai e
+    o professor ganha incentivo pra responder verde
 
 ## 9. Riscos
 
