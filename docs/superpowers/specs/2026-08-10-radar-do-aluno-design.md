@@ -1,349 +1,287 @@
-# Radar do aluno — bloco 2 do painel da coordenação
+# Radar do aluno — o Health Score v2 fatiado pra coordenação
 
 **Data:** 10/08/2026 · **Estado:** spec escrita, aguardando revisão do Alf
-**Direção aprovada em:** 08/08/2026 (Alf) — *"painel estratégico de gestão
-pedagógica; se coloca no lugar dos coordenadores"*
+**Revisão 2** — a v1 (mesma data, de manhã) desenhava três cartões consumindo
+o modelo do LA Report. O Alf virou a mesa: *"prefiro que a gente construa o
+nosso aqui de uma maneira correta"*. Esta versão é o modelo próprio.
 
 ---
 
-## O que é
+## 1. O que é
 
-Uma seção do painel da coordenação com **cartões de sinal**: contagem, os casos
-mais urgentes, e a **ação que o sinal pede**. Não é lista de alunos — é
-curadoria. A régua: se o cartão não diz a quem ligar hoje, ele não é cartão.
+Uma página na coordenação do LA Teacher que responde uma pergunta por manhã:
+**"quem eu procuro esta semana, e por quê?"**
 
-## O que ele NUNCA faz
+Não é mais uma tela de sinais — o LA Report já tem a mesa de 1.100 alunos com
+colunas coloridas. O que falta é uma leitura **pedagógica**, construída sobre
+dado que a gente confia, com a nota mostrando de onde veio.
 
-**Não fabrica score composto.** A regra de ouro do time de Sucesso do Aluno:
-peso não se chuta. O score manual antigo deles provou o custo — os "Atenção"
-evadiam *mais* que os "Crítico". Quem aprende peso é modelo, não spec. O Radar
-mostra dimensões lado a lado e aponta a conversa humana; somar duas delas num
-número novo está proibido nesta spec.
+**Por que aqui e não lá.** O LA Teacher não re-deriva sinal: ele **origina**
+sinal. O semáforo do professor, o `pratica_em_casa`, o `evolucao`, o `animo`, o
+registro de aula — isso nasce escrito por quem deu a aula, não existe no LA
+Report e não tem como existir. É canônico por origem.
 
-**Não mostra inadimplência.** Fronteira dura do Alf. Inadimplência é do módulo
-Sucesso do Aluno, não da coordenação pedagógica.
+**Dois olhares, dois donos.** A coordenação olha o pedagógico (este Radar). O
+time de Sucesso do Aluno olha conversas ADM, NPS, inadimplência, responsável,
+perfil de matrícula. O que a gente provar aqui pode ser levado pra lá.
 
-**Não publica número que não sabe explicar.** Vale para todo cartão: se a fonte
-tem artefato conhecido, ou o cartão trata o artefato ou o cartão não sai.
+## 2. Fronteiras duras
 
----
-
-## O que eu medi antes de desenhar (10/08/2026)
-
-Cinco medições mudaram o desenho. Três derrubaram coisas que a direção
-aprovada dava como certas.
-
-### 1. As duas réguas de "dias sem presença" nunca discordaram
-
-A anotação de 08/08 dizia que `vw_absenteismo_aluno` e `vw_aluno_sucesso_lista`
-discordavam (≥14 dias: 693 × 403). Medido:
-
-```
-absenteismo: 1.509 linhas   base ativa: 1.113 linhas
-mesma coluna, valores diferentes entre as duas: 0
-```
-
-`vw_aluno_sucesso_lista` **faz join na própria** `vw_absenteismo_aluno`. É a
-mesma medida sobre **populações diferentes**: a primeira inclui quem já saiu e
-segundo curso; a segunda filtra pela base ativa. Não era divergência de régua,
-era divergência de pergunta.
-
-→ **Decisão:** a base do Radar é `vw_aluno_sucesso_lista`. Radar que lista quem
-já evadiu como "sumiu da escola" é ruído com cara de urgência.
-
-### 2. Desde 09/07 cada aula real vira DUAS linhas de presença
-
-```
-(aluno, dia, hora) com 1 linha:  1.298
-(aluno, dia, hora) com 2 linhas: 1.840   ← 58% dos horários
-com 3 ou 4 linhas:                  10
-das 1.850 duplicadas, diferem no aula_emusys_id: 1.850 (100%)
-diferem no curso: 9 · diferem no status: 10
-```
-
-Mesmo aluno, mesmo dia, mesma hora, mesmo curso, **`aula_emusys_id` diferente**.
-É o id de EVENTO, não da aula — o mesmo achado que já está anotado para a
-agenda da experimental.
-
-→ **Decisão:** a unidade de contagem é `(aluno_id, data_aula, horario_aula)`,
-nunca a linha. E dentro do grupo, **presença é afirmação**: se qualquer linha
-diz `presente`, o aluno veio. Contar linha crua dobra qualquer número de falta.
-
-### 3. "Sumiu da escola" não pode sair agora — e o motivo tem nome
-
-Com a duplicata desfeita, faltas seguidas na base ativa:
-
-| Faltas seguidas | Alunos | Destes, já marcados presentes alguma vez na janela |
-|---|---|---|
-| 0 | 801 | — |
-| 1 | 148 | 122 |
-| 2 | 123 | **4** |
-| 3 | 7 | **0** |
-
-126 alunos acumulam 2+ faltas seguidas e **nunca** foram marcados presentes na
-janela honesta. Fui atrás: 124 deles vieram, sim, antes de 09/07 (2.516
-presenças), e 97 tiveram aula na semana de 03/08 — **99 aulas, zero presenças**
-— enquanto a escola inteira rodou a **68% de presença** naquela semana.
-
-Onde eles estão:
-
-| Professor | Unidade | Suspeitos / carteira |
-|---|---|---|
-| Gabriel Barbosa Rufino Otávio | CG | 11 / 24 (46%) |
-| Daiana Pacifico da Silva dos Anjos | CG | 6 / 12 (50%) |
-| Marcos Delfino Serafim | CG | 4 / 8 (50%) |
-| Israel Rocha da Silva | CG | 5 / 12 (42%) |
-| Caio Tenório de Araújo | CG | 12 / 43 (28%) |
-
-Dez das doze primeiras linhas são **Campo Grande**. Um sinal de evasão não se
-concentra numa unidade e em metade da carteira de um professor. Isso é
-**registro**, não aluno — e já está anotado nesta casa que CG tem problema de
-registro.
-
-→ **Decisão: o cartão "Sumiu da escola" NÃO entra na Fatia 1.** Publicado hoje,
-ele mandaria a coordenação ligar para 126 famílias por causa de chamada não
-lançada em CG. Ele volta quando o registro de CG estiver medido — e o dono
-disso é a frente de presença, não o Radar.
-
-Duas coisas ficam **decididas** para quando ele voltar:
-- conta **aula perdida** (aula que existiu e foi marcada), nunca dia de
-  calendário — o recesso de duas semanas de 20/07 dá ~15 dias de "sumiço" de
-  graça para a escola inteira;
-- exige **pelo menos uma presença afirmada** na janela, senão "nunca foi
-  marcado" entra disfarçado de "parou de vir".
-
-### 4. O aviso prévio está vivo, e o join até o aluno é que é frágil
-
-```
-aviso_previo total: 128 · com mês de saída à frente: 33
-33/33 têm professor · 32/33 têm aluno_id
-mas só 17/33 acham par na base ativa
-```
-
-→ **Decisão:** o cartão vive da **linha ADM** (nome, professor, unidade,
-motivo), que está completa. O link para a ficha do aluno é *enfeite*: aparece
-nos 17 que casam, some nos outros. Cartão que depende de join frágil mostra 17
-e finge que são 33.
-
-### 5. Os números dos outros cartões, hoje
-
-```
-risco crítico (base ativa): 33      perto de renovação (base ativa): 88
-cruzamento crítico × renovação: 2
-coração crítico (health_score, base ativa): 42
-semáforo do professor respondido em agosto: 0   ← eles começam amanhã
-```
-
-O cruzamento de ouro dá **2 alunos**. Isso não é defeito: é exatamente o que
-"curadoria" significa. Dois nomes para ligar esta semana é um cartão que se
-cumpre; 300 nomes é uma parede.
-
-### 6. As duas regras do Alf derrubam mais dois cartões (10/08)
-
-**Regra 1 — "esconde até o modelo estar seguro"** (decisão dele sobre risco de
-evasão). Fui ver o que "seguro" exclui:
-
-```
-faixa      confianca_dado   linhas
-critico    baixa            45
-atencao    baixa           143
-baixo      baixa           969
-```
-
-**Não há uma única linha de confiança alta.** As 1.157 estão marcadas `baixa`, e
-o motivo escrito na própria view é:
-
-> "Modelo em auditoria: as features de presenca ainda misturam falta com chamada
-> nao registrada."
-
-É o **mesmo defeito que eu medi em §2 e §3**, já conhecido por quem manteve o
-modelo. Aplicando a regra do Alf ao pé da letra, a fonte inteira de risco sai do
-ar — e com ela o **Cartão "Ligar essa semana"**, que era o cruzamento de ouro.
-
-**Regra 2 — inadimplência nunca chega à coordenação** (fronteira antiga). Fui
-ver do que o `health_score` é feito:
-
-| Fator | Peso |
+| Nunca entra | Por quê |
 |---|---|
-| **Pagamento** | **30%** |
-| Tempo de casa | 20% |
-| Fase da jornada | 20% |
-| Feedback do professor | 20% |
-| Presença | 10% |
+| Pagamento, inadimplência, valor de parcela | Fronteira do Alf: é do Sucesso do Aluno. E é por isso que o `health_score` do LA Report **não serve**: 30% dele é pagamento (medido em 10/08), então usá-lo põe boleto na tela da coordenação lavado em cor |
+| Observação crua do professor fora do LA Teacher | A `observacao` é escrita pra coordenação, não pra família |
+| Sinal cujo dado ninguém confirmou | "Não lançado" nunca vira falta. Vale enquanto durar a transição (~6 meses) |
 
-**Pagamento é 30% do coração.** Um cartão "coração vermelho" baseado em
-`health_score` põe situação de pagamento na tela da coordenação — lavada em
-cor, mas lá. É a fronteira sendo furada pela porta dos fundos, e nem dá pra
-saber olhando qual vermelho é pedagógico e qual é boleto. Os outros 10% vêm de
-`vw_absenteismo_aluno`, a fonte contaminada de §2/§3.
+## 3. O que eu medi antes de desenhar (tudo em 10/08/2026)
 
-→ **Decisão: o `health_score` sai do Radar.** Ele continua onde sempre esteve
-(no LA Report, com quem é dono de pagamento). O coração do Radar é **só o
-semáforo do professor** — que é pedagógico por construção, escrito por quem deu
-a aula, e não tem um centavo dentro.
+### 3.1 A view semântica canônica já existe — e implementa os 4 estados
 
----
-
-## Fatia 1 — dois cartões (era três)
-
-As duas regras acima cortaram um cartão inteiro e metade de outro. O que sobra é
-menor, e é honesto. **Nenhum dos dois depende de presença nem de pagamento** —
-que são exatamente as duas fontes doentes.
-
-### ~~Cartão · "Ligar essa semana"~~ — FORA da Fatia 1
-Risco de evasão `critico` × `perto_renovacao` dava **2 alunos** hoje. Sai porque
-**100% das linhas de risco estão em confiança baixa**, e a regra do Alf é
-esconder até o modelo estar seguro. Volta sozinho no dia em que
-`confianca_dado` deixar de ser `baixa` — a lógica do cartão fica escrita aqui,
-pronta, e o gatilho de volta é o campo, não uma decisão nova.
-
-### Cartão 1 · "Avisou que sai — e ainda está em aula"
-**Sinal:** `movimentacoes_admin.tipo = 'aviso_previo'` com `mes_saida` no mês
-corrente ou à frente.
-**Hoje:** 33.
-**Mostra:** nome, professor, unidade, motivo, mês de saída. Link para a ficha
-só quando o `aluno_id` casa na base ativa (17 dos 33).
-**Ação:** *"Última janela pedagógica: ele ainda vem às aulas."*
-**Por que é o cartão de primeira:** é o único sinal em que a escola já sabe o
-desfecho e ainda tem o aluno na sala.
-
-### Cartão 2 · "Coração vermelho"
-**Sinal:** o semáforo do professor no mês
-(`aluno_feedback_professor.feedback = 'vermelho'`), com as três respostas e a
-observação. Fonte única — o `health_score` **saiu** (ver §6: 30% dele é
-pagamento, e pagamento não chega à coordenação).
-**Hoje:** 0 — os professores começam a responder hoje, 10/08.
-**Mostra:** coração, nome, professor, **a frase que as três perguntas formam**
-("não pratica em casa, evolução travada, desanimado") e a observação do
-professor entre aspas.
-**Ver o mês inteiro:** link para `/app/coordenacao/feedback`, que continua com os
-quatro números do topo e os três filtros facetados — o Radar mostra os
-vermelhos, aquela tela mostra o mês.
-**Ação:** *"O professor levantou a mão. Fala com ele antes de falar com a família."*
-
-**É aqui que as duas pontas soltas do semáforo se resolvem:**
-- as **três perguntas** deixaram de ser dado sem leitor: elas viram a *frase do
-  porquê* dentro do cartão. Um coração vermelho sem motivo manda a coordenação
-  adivinhar; com motivo, ela chega na conversa sabendo o assunto.
-- a **observação do professor** já tem leitor no LA Teacher desde a 077. O que
-  falta é o LA Report, onde o semáforo entra só como coração valendo 20% do
-  `health_score`. Isso é **fronteira, não tarefa desta spec**: fica anotado como
-  item do LA Report, com a fonte pronta (`aluno_feedback_professor.observacao`).
-
----
-
-## Arquitetura
-
-Uma RPC só, no molde da 077: `app_coordenacao_radar(p_unidade_id, p_limite)`.
-
-- **Guarda:** `fn_e_coordenacao_la_teacher()` → `apenas_admin`. Mesma porta da
-  tela de feedback.
-- **Devolve um jsonb** com `{resumo, cartoes: {ligar, aviso, coracao}, filtros}`.
-  Cada cartão traz `total`, `linhas` (cortadas em `p_limite`) e `truncado`.
-- **Filtro por unidade** no padrão facetado da 079: cada faceta é cega ao
-  próprio filtro e enxerga os outros. Sem isso, escolher unidade apaga as
-  opções e não há volta sem F5.
-- **Um número só:** o total do cartão e o comprimento da lista contam a mesma
-  coisa, no mesmo grão. É a lição da 080 e ela vale aqui inteira.
-
-**Cliente:** `/app/coordenacao/radar`, reusando `PainelNumero` e o cartão do
-`LinhaSemaforo`. **Não** nasce componente novo de design: o que faltar se extrai
-do app do professor.
-
-### Onde isso entra na navegação (decidido pelo Alf, 10/08)
-
-A sidebar da coordenação **continua com três itens** — o Radar não é o quarto:
+O Alf descreveu o modelo certo: presença, falta, cancelamento, falta
+justificada com reposição. Fui procurar onde a presença do professor cruza com
+a da secretaria e achei **`vw_aluno_presenca_semantica_v1`**, que já faz isso:
 
 ```
-Painel   ← professores devendo lançamento   (operação da equipe, diária)
-Radar    ← quem procurar esta semana        (aluno, semanal)
-Equipe   ← quem tem acesso ao app
+resultado_pedagogico   situacao_chamada        confianca      denominador   n
+presente               registrada              confirmada     SIM        32.975
+falta_confirmada       registrada_atestada     confirmada     SIM         6.803
+falta_provavel         registrada_inferida     provavel       não         2.581
+indeterminado          indeterminada           desconhecida   não         7.941
+aula_justificada       nao_aplicavel           confirmada     não           587
+aula_cancelada         nao_aplicavel           confirmada     não             5
 ```
 
-**O Radar é a porta do aluno.** A tela de Feedback (`/app/coordenacao/feedback`,
-no ar desde 09/08) **não muda em nada** — ela só deixa de ser item de menu e
-passa a ser o "ver o mês inteiro" do cartão *Coração vermelho*. A rota continua
-existindo e continua acessível por link direto.
+A coluna **`considera_frequencia_denominador`** é a peça: ela tira da conta o
+que ninguém confirmou. **Esta é a fonte do Radar** — não se escreve view nova
+de presença.
 
-**Por quê:** o cartão 3 do Radar é uma fatia da tela de Feedback — os vermelhos
-do mês. Lado a lado no menu, os dois itens respondem perguntas parecidas, e o
-coordenador teria que adivinhar em qual delas a dúvida de hoje mora. Quando duas
-portas respondem quase a mesma coisa, as pessoas escolhem errado e concluem que
-a ferramenta é confusa. Uma porta com profundidade > duas portas rasas.
+⚠️ **Correção do que eu tinha dito.** Na v1 desta spec eu li a tabela crua
+`aluno_presenca` e concluí que 126 alunos de Campo Grande tinham sumido da
+escola. Errado: eu tratei como falta o que a view já classificava como não
+confirmado. Pela view, no grão de aula, "faltou todas as últimas 10" são **5
+alunos**.
 
-**Por que NÃO virou bloco 2 do Painel** (era a ideia original de 08/08): o
-Painel é sobre a operação da equipe; o Radar é sobre aluno. Empilhar os dois num
-scroll só é a mesma mistura que produziu a parede das 9h — dois públicos numa
-mensagem, ninguém lê.
+### 3.2 O grão: cada aula real vira ~1,7 linha
 
-**Tarefas que essa decisão cria:**
-1. `CoordenacaoFrame.tsx`: trocar o item `feedback` por `radar` em `ITENS`,
-   `ABAS` e `ROTA`; o `abaAtiva` de `/app/coordenacao/feedback` passa a acender
-   o **Radar** (a tela é filha dele), não item nenhum.
-2. `CoordenacaoFeedback.tsx`: ganha `aoVoltar` para o Radar — hoje ela é destino
-   de menu, e destino de menu não tem saída.
-3. Cartão *Coração vermelho*: link "ver o mês inteiro" → `/app/coordenacao/feedback`.
+A view **não** desduplica: **1,69 linha por aula**. Na tabela crua são 1.840 de
+3.148 horários com 2+ linhas, e **1.850 de 1.850** duplicatas diferem no
+`aula_emusys_id` — que é id de **EVENTO**, não da aula.
 
-## Testes
+**Isso já está visível na tela do LA Report hoje:** o modal do aluno Daniel
+Victor lista `03/08 Ausente` duas vezes e `13/07 Ausente` duas vezes. O "21% de
+presença" dele está calculado sobre linhas dobradas.
 
-`.test.sql` no molde das 077–080, rodando em `BEGIN/ROLLBACK`, mais um
-`scripts/mutantes-NNN.mjs`. Os mutantes que precisam morrer:
+→ **Regra:** a unidade de contagem é **`(aluno_id, data_aula, horario_aula)`**.
+Dentro do grupo, presença é afirmação: `bool_or(considera_presenca)`.
 
-1. o cartão de faltas conta **linha** em vez de `(aluno, dia, hora)` → dobra;
-2. o cruzamento vira **ou** em vez de **e** → 2 alunos viram 119;
-3. o cartão de aviso prévio passa a exigir join com `alunos` → 33 viram 17 em
-   silêncio;
-4. o guard cai → um professor lê a escola inteira;
-5. o total do cartão e a lista passam a contar coisas diferentes;
-6. a faceta de unidade passa a se filtrar → a volta some;
-7. o `health_score` e o semáforo viram um score só → a regra de ouro cai.
+### 3.3 A régua da falta, tirada da distribuição
 
-## O que fica fora, e por quê
+Faltas nas últimas 10 aulas medidas, 717 alunos com base ≥8:
 
-| Fora | Motivo |
-|---|---|
-| "Sumiu da escola" | registro de CG contamina; volta com aula perdida + presença afirmada |
-| "Ligar essa semana" (risco × renovação) | 100% das linhas de risco em confiança baixa; volta quando `confianca_dado` mudar |
-| `health_score` como coração | 30% dele é pagamento — fura a fronteira da inadimplência |
-| Inadimplência | fronteira do Alf: é do Sucesso do Aluno |
-| NPS, conversas ADM, responsável, perfil de matrícula | "cada um no seu quadrado" — donos são outros |
-| Normalizar anotação do Emusys | trilho paralelo, já anotado; não é o Radar |
-| Coleta do semáforo pela agente Lia virar nativa | fatia futura |
+| Faltou | Alunos | Acumulado |
+|---:|---:|---:|
+| 8 de 10 | 9 | 1,3% |
+| 7 de 10 | 22 | 4,3% |
+| 6 de 10 | 75 | 14,8% |
+| **5 de 10** | 87 | **26,9%** |
+| 4 de 10 | 153 | 48,3% |
+| 3 de 10 | 157 | 70,2% |
 
-## O que destrava o Radar: uma coisa só
+**Alerta em 5 ou mais de 10** (decisão do Alf). A referência de mercado para
+escolas de música (10–15%) **não serve aqui**: o absenteísmo geral da casa é
+**38,6%**, então um corte de 15% acenderia quase todo mundo. A régua está
+calibrada pela realidade da casa e vai apertar sozinha conforme o lançamento
+melhora — o número se corrige pelo dado, não por decisão nova.
 
-Três dos quatro sinais que a direção aprovada pedia caíram — e os três caem no
-**mesmo lugar**:
+### 3.4 Campo Grande tem grupo de controle
 
-| Sinal que caiu | Por quê | Raiz |
-|---|---|---|
-| "Sumiu da escola" | 126 alunos que parecem sumidos são chamada não lançada em CG | registro de presença |
-| "Ligar essa semana" | modelo em auditoria: *"as features de presenca ainda misturam falta com chamada nao registrada"* | registro de presença |
-| `health_score` como coração | 30% pagamento (fronteira) + 10% da mesma presença contaminada | fronteira + registro |
+Alunos em alerta (5+ de 10), por unidade:
 
-Não são três problemas: é **um**, aparecendo em três telas. Enquanto a presença
-não for registro confiável, todo sinal derivado dela nasce com uma dúvida que
-nenhuma tela resolve.
+| Unidade | Em alerta | Alunos | % | Aulas medidas (média) |
+|---|---:|---:|---:|---:|
+| **Campo Grande** | 153 | 467 | **32,8%** | 8,8 |
+| Barra | 30 | 258 | 11,6% | 9,2 |
+| Recreio | 44 | 390 | 11,3% | 8,8 |
 
-→ **Consequência de prioridade:** consertar o registro de presença em Campo
-Grande não é a pendência nº 3 da fila. É o que devolve dois cartões ao Radar e
-tira o modelo de risco da auditoria. É a tarefa com maior alavanca aberta hoje.
+Barra e Recreio concordam entre si em 11,5%, com a **mesma cobertura de
+medição**. CG está 3× acima. Enquanto a transição não fechar, o Radar mostra o
+número de CG **ao lado da régua das outras duas**, pra ninguém ler 153 como
+comportamento de aluno.
 
-O Radar **não fica parado esperando** por isso: os dois cartões que sobraram não
-dependem de presença nem de pagamento, e são os dois mais acionáveis que existem
-(quem já avisou que sai, e quem o professor marcou de vermelho). Fatia 1 sobe
-com eles; os outros voltam pelo campo, sem decisão nova.
+### 3.5 A coorte e a janela
 
-## Riscos
+```
+professores liberados no app      6  (5 concluíram onboarding)  de 44 ativos
+alunos desses professores       158
+aulas medidas em agosto         189   →  1,2 aula por aluno
+```
 
-- **O cartão 3 nasce quase vazio.** Os professores respondem a partir de
-  11/08. É honesto e esperado; a tela diz "ainda não respondido" em vez de
-  fingir número. Se em 15/08 continuar em zero, o problema é adoção, não Radar.
-- **O cruzamento de 2 pode virar 0.** O cartão precisa ler bem vazio — vazio ali
-  é a escola em dia, e o texto tem que dizer isso.
-- **O Radar sobe com dois cartões, e um deles começa em zero.** Só o do aviso
-  prévio (33) tem número no dia 1. Se isso parecer pouco na tela, a resposta é
-  consertar a presença — não afrouxar a régua de confiança pra encher a página.
-- ~~`vw_risco_evasao_atual` tem `confianca_dado`~~ — **decidido pelo Alf em
-  10/08: esconder até o modelo estar seguro.** Ver §6: hoje isso remove a fonte
-  inteira.
+**Coorte:** só alunos de professor que já entrou no app. Sai de graça — os
+sinais que o professor produz só existem pra quem está lá. Cresce sozinho:
+liberou no painel, entra no Radar.
+
+**Janela:** decisão do Alf — *"vira a página"*. A janela **nasce em 01/08/2026**
+e cresce até 10 aulas; nunca busca antes disso. Motivo dele, e é bom: julho teve
+duas semanas de recesso e as três unidades vinham sem compromisso com presença.
+Aproveitar dado ruim porque é o que tem foi exatamente o erro do §3.1.
+
+Enquanto a janela não enche, a coluna diz **"enchendo: 3 de 10"** — não é tela
+vazia, é tela que diz o que está fazendo. Ela fica cheia por volta de meados de
+outubro.
+
+### 3.6 Números de hoje, para os outros sinais
+
+```
+faltas em agosto            353 em 1.066 aulas  (349 alunos)
+aula_justificada            243 aulas, 209 alunos   (o "faltou e repôs")
+semáforo respondido em ago    0   ← os professores começam hoje
+anamnese                     40 de 1.115 alunos ativos
+registro de aula (dever_casa) 8 registros — piloto
+```
+
+## 4. As colunas da Fase 1 (definidas pelo Alf)
+
+```
+Aluno · Health Score · Faltas · Absenteísmo · Prática · Feedback · Status
+```
+
+| Coluna | O que é | Fonte | Régua |
+|---|---|---|---|
+| **Health Score** | 0–100, nosso, com pesos configuráveis | calculado | ver §5 |
+| **Faltas** | quantidade no mês corrente | view semântica, grão de aula | o fato do mês |
+| **Absenteísmo (10 aulas)** | % de falta nas últimas 10 aulas medidas | idem, janela de §3.5 | **≥50% = alerta** |
+| **Prática** | pratica em casa? | `aluno_feedback_professor.pratica_em_casa` | "não" = alerta |
+| **Feedback** | coração do mês + evolução + ânimo | `aluno_feedback_professor` | vermelho = alerta |
+| **Status** | Crítico · Atenção · Saudável | derivado da nota | faixas em §5 |
+
+**Por que Faltas E Absenteísmo, os dois.** Respondem perguntas diferentes.
+Falta do mês é o fato que a família reconhece e a coordenação cobra; sozinho,
+some no dia 3 de cada mês, quando todo mundo tem zero. Absenteísmo é o padrão,
+que prevê evasão e não depende de onde o mês está. O rótulo **carrega o
+denominador** (`(10 aulas)`) porque foi exatamente isso que faltou no "21%" da
+tela do LA Report.
+
+**Falta justificada não conta como falta.** `aula_justificada` fica fora do
+denominador (243 aulas, 209 alunos). Quem falta e repõe não é quem falta e
+some — é a distinção que o próprio material do Health Score v2 aponta como a
+que importa.
+
+**Presenteísmo sai de graça.** Aluno `presente` + `pratica_em_casa = não`, em
+dois meses seguidos, é o aluno que vai, paga, frequenta e apagou — o que
+nenhuma planilha pega. Não é coluna nova: é um selo na linha, do cruzamento de
+duas colunas que já estão lá.
+
+**Fora da Fase 1, e volta quando tiver lastro:** nota do Fábio (sinal contínuo
+dos registros), jornada do aluno (não está pronta), anamnese × expectativa
+(40 de 1.115 — acenderia 96% da escola, é projeto de coleta e não sinal),
+professor que não passa dever de casa (8 registros).
+
+## 5. A nota
+
+**Pesos configuráveis já na Fase 1** (decisão do Alf, contra a minha
+recomendação inicial — registrado). Mas com três coisas que impedem a nota de
+virar opinião com cara de número:
+
+**5.1 A nota sempre abre.** Nunca aparece sozinha: mostra qual sinal contribuiu
+quanto. É a diferença entre um ponteiro em que se acredita e uma nota que se
+audita.
+
+```
+NOTA 38          apurada em 3 de 4 sinais
+├ absenteísmo     5 de 10      peso 40 → 53   contribuiu 21
+├ feedback        vermelho     peso 25 → 33   contribuiu 11
+├ prática         não          peso 20 → 27   contribuiu  6
+└ faltas do mês   —            SEM DADO (fora da conta)
+```
+
+**5.2 Sinal sem dado sai da conta e o peso se redistribui** (decisão do Alf).
+Nunca conta como neutro nem como ruim — contar ausência de dado como coisa ruim
+é o mesmo defeito de "não-marcado = falta" que a gente acabou de tirar da
+presença. Ao lado da nota vai a **cobertura**: *"apurada em 3 de 4 sinais"*.
+Duas notas 70 não se confundem.
+
+**5.3 A nota carrega em quanta aula ela foi medida.** Nota calculada sobre 2
+aulas e sobre 10 não podem parecer a mesma coisa.
+
+**Faixas:** Crítico < 40 · Atenção 40–69 · Saudável ≥ 70. Configuráveis junto
+com os pesos.
+
+**Pesos iniciais** (chute explícito, e é por isso que ficam configuráveis):
+absenteísmo 40 · feedback 25 · prática 20 · faltas do mês 15.
+
+**Quem mexe:** coordenação e o Alf, em tela dentro do LA Teacher. Toda alteração
+é registrada com quem mudou, quando e os valores de antes — peso que muda sem
+histórico vira discussão sem árbitro daqui a três meses.
+
+**O caminho de sair do chute.** O banco tem **758 evasões, 205 não-renovações,
+87 trancamentos e 522 renovações**. Quando a janela encher (out/2026), dá pra
+medir quais pesos separam quem ficou de quem saiu — em casa, sem esperar o LA
+Report. A tela de configuração ganha então um "sugerido pelo modelo" ao lado do
+valor manual. **Não é Fase 1**; é o destino, e está anotado aqui pra não virar
+"peso é chute pra sempre".
+
+## 6. As telas
+
+Formato adaptado do módulo Sucesso do Aluno do LA Report, que o Alf aprovou —
+**mesa + modal**. O esqueleto é parecido de propósito; o conteúdo é outro, e a
+ausência das caixas de pagamento é intencional e visível.
+
+**6.1 Mesa** (`/app/coordenacao/radar`) — colunas do §4, ordenáveis, filtros
+facetados (unidade, professor, status) no padrão da 079: cada faceta é cega ao
+próprio filtro e enxerga as outras. Um número só entre KPI, lista e chip
+(lição da 080).
+
+**6.2 Modal do aluno** — a decomposição da nota (§5.1), o semáforo do mês com a
+frase das três perguntas e a observação do professor entre aspas, e o
+**histórico de presença desduplicado** com os quatro estados por extenso e a
+janela declarada ("10 aulas, de 04/ago a 15/out").
+
+**6.3 Configuração de pesos** — dentro da coordenação, com histórico de
+alteração.
+
+**Selos na linha:** "avisou que sai" (33 alunos hoje, da `movimentacoes_admin`
+com `mes_saida` à frente) e "presenteísmo". São selos, não colunas — não entram
+na nota, marcam a linha e filtram.
+
+**Reuso:** `PainelNumero`, `LinhaSemaforo` e os `Select` dos filtros já
+existem. Não nasce Design System paralelo; o que faltar se extrai do app do
+professor.
+
+## 7. Backend
+
+`app_coordenacao_radar(p_unidade_id, p_professor_id, p_status, p_limite)` —
+molde da 077/079: guard `fn_e_coordenacao_la_teacher()` → `apenas_admin`,
+devolve um jsonb com `{resumo, linhas, filtros, config_pesos, cobertura}`.
+
+Uma view intermediária, `vw_radar_aluno_sinais`, faz o trabalho pesado: grão de
+aula, janela desde 01/08, coorte, e as quatro colunas de sinal. A nota é
+calculada em função separada que **recebe os pesos como parâmetro** — assim o
+teste consegue variar peso sem tocar em configuração.
+
+Tabela `radar_pesos` (unidade_id nulo = global) + `radar_pesos_historico`.
+
+## 8. Testes — o que os mutantes precisam matar
+
+1. contar **linha** em vez de `(aluno, dia, hora)` → todo número de falta dobra
+2. `aula_justificada` entrando no denominador → 209 alunos viram faltosos
+3. a janela buscando antes de 01/08 → volta o ruído do recesso
+4. a coorte caindo → o Radar mostra aluno de professor que não usa o app
+5. sinal sem dado contando como zero em vez de sair → escola inteira em crítico
+6. o peso não se redistribuindo → nota de quem tem 2 sinais fica artificialmente baixa
+7. a cobertura sumindo da tela → nota de 2 aulas passa por nota de 10
+8. o guard caindo → professor lê a escola inteira
+9. faceta se filtrando → sem volta depois de escolher unidade
+10. total do cartão ≠ tamanho da lista
+
+## 9. Riscos
+
+- **A coluna Feedback nasce vazia.** Os professores começam hoje. Se em 15/08
+  seguir em zero, o problema é adoção, não Radar.
+- **O absenteísmo de CG vai chamar atenção antes da hora.** Por isso a régua
+  das outras duas unidades aparece do lado. Se ainda assim gerar cobrança de
+  aluno em vez de conserto de registro, esconder a coluna em CG é preferível a
+  publicá-la sem contexto.
+- **Pesos configuráveis podem virar disputa.** O histórico de alteração é o que
+  transforma discussão em fato — e §5.4 é a saída definitiva.
+- **A janela nasce em 01/08 e só enche em outubro.** Até lá o Radar é magro, e
+  isso é honesto. Afrouxar a janela pra encher a tela é a tentação a evitar.
