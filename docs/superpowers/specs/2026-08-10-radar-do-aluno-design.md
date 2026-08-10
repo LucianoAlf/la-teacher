@@ -138,19 +138,66 @@ O cruzamento de ouro dá **2 alunos**. Isso não é defeito: é exatamente o que
 "curadoria" significa. Dois nomes para ligar esta semana é um cartão que se
 cumpre; 300 nomes é uma parede.
 
+### 6. As duas regras do Alf derrubam mais dois cartões (10/08)
+
+**Regra 1 — "esconde até o modelo estar seguro"** (decisão dele sobre risco de
+evasão). Fui ver o que "seguro" exclui:
+
+```
+faixa      confianca_dado   linhas
+critico    baixa            45
+atencao    baixa           143
+baixo      baixa           969
+```
+
+**Não há uma única linha de confiança alta.** As 1.157 estão marcadas `baixa`, e
+o motivo escrito na própria view é:
+
+> "Modelo em auditoria: as features de presenca ainda misturam falta com chamada
+> nao registrada."
+
+É o **mesmo defeito que eu medi em §2 e §3**, já conhecido por quem manteve o
+modelo. Aplicando a regra do Alf ao pé da letra, a fonte inteira de risco sai do
+ar — e com ela o **Cartão "Ligar essa semana"**, que era o cruzamento de ouro.
+
+**Regra 2 — inadimplência nunca chega à coordenação** (fronteira antiga). Fui
+ver do que o `health_score` é feito:
+
+| Fator | Peso |
+|---|---|
+| **Pagamento** | **30%** |
+| Tempo de casa | 20% |
+| Fase da jornada | 20% |
+| Feedback do professor | 20% |
+| Presença | 10% |
+
+**Pagamento é 30% do coração.** Um cartão "coração vermelho" baseado em
+`health_score` põe situação de pagamento na tela da coordenação — lavada em
+cor, mas lá. É a fronteira sendo furada pela porta dos fundos, e nem dá pra
+saber olhando qual vermelho é pedagógico e qual é boleto. Os outros 10% vêm de
+`vw_absenteismo_aluno`, a fonte contaminada de §2/§3.
+
+→ **Decisão: o `health_score` sai do Radar.** Ele continua onde sempre esteve
+(no LA Report, com quem é dono de pagamento). O coração do Radar é **só o
+semáforo do professor** — que é pedagógico por construção, escrito por quem deu
+a aula, e não tem um centavo dentro.
+
 ---
 
-## Fatia 1 — três cartões
+## Fatia 1 — dois cartões (era três)
 
-### Cartão 1 · "Ligar essa semana"
-**Sinal:** risco de evasão `critico` **e** marco `perto_renovacao`, na base ativa.
-**Hoje:** 2 alunos.
-**Mostra:** nome, unidade, professor, probabilidade, quando renova.
-**Ação:** *"Liga antes da renovação — depois de renovar, a conversa muda de assunto."*
-**Vazio:** *"Ninguém no cruzamento esta semana."* — vazio aqui é boa notícia e a
-tela diz isso, em vez de parecer quebrada.
+As duas regras acima cortaram um cartão inteiro e metade de outro. O que sobra é
+menor, e é honesto. **Nenhum dos dois depende de presença nem de pagamento** —
+que são exatamente as duas fontes doentes.
 
-### Cartão 2 · "Avisou que sai — e ainda está em aula"
+### ~~Cartão · "Ligar essa semana"~~ — FORA da Fatia 1
+Risco de evasão `critico` × `perto_renovacao` dava **2 alunos** hoje. Sai porque
+**100% das linhas de risco estão em confiança baixa**, e a regra do Alf é
+esconder até o modelo estar seguro. Volta sozinho no dia em que
+`confianca_dado` deixar de ser `baixa` — a lógica do cartão fica escrita aqui,
+pronta, e o gatilho de volta é o campo, não uma decisão nova.
+
+### Cartão 1 · "Avisou que sai — e ainda está em aula"
 **Sinal:** `movimentacoes_admin.tipo = 'aviso_previo'` com `mes_saida` no mês
 corrente ou à frente.
 **Hoje:** 33.
@@ -160,15 +207,18 @@ só quando o `aluno_id` casa na base ativa (17 dos 33).
 **Por que é o cartão de primeira:** é o único sinal em que a escola já sabe o
 desfecho e ainda tem o aluno na sala.
 
-### Cartão 3 · "Coração vermelho"
-**Sinal:** duas fontes, **lado a lado, nunca somadas**:
-- semáforo do professor no mês (`aluno_feedback_professor.feedback = 'vermelho'`),
-  com as três respostas e a observação — a fonte humana e fresca;
-- `health_score = 'critico'` na base ativa (42) — a fonte do modelo.
-**Hoje:** 0 do semáforo (os professores começam amanhã) + 42 do health score.
-**Mostra:** coração, nome, professor, e — quando vier do semáforo — **a frase que
-as três perguntas formam** ("não pratica em casa, evolução travada, desanimado")
-e a observação do professor entre aspas.
+### Cartão 2 · "Coração vermelho"
+**Sinal:** o semáforo do professor no mês
+(`aluno_feedback_professor.feedback = 'vermelho'`), com as três respostas e a
+observação. Fonte única — o `health_score` **saiu** (ver §6: 30% dele é
+pagamento, e pagamento não chega à coordenação).
+**Hoje:** 0 — os professores começam a responder hoje, 10/08.
+**Mostra:** coração, nome, professor, **a frase que as três perguntas formam**
+("não pratica em casa, evolução travada, desanimado") e a observação do
+professor entre aspas.
+**Ver o mês inteiro:** link para `/app/coordenacao/feedback`, que continua com os
+quatro números do topo e os três filtros facetados — o Radar mostra os
+vermelhos, aquela tela mostra o mês.
 **Ação:** *"O professor levantou a mão. Fala com ele antes de falar com a família."*
 
 **É aqui que as duas pontas soltas do semáforo se resolvem:**
@@ -253,10 +303,36 @@ mensagem, ninguém lê.
 | Fora | Motivo |
 |---|---|
 | "Sumiu da escola" | registro de CG contamina; volta com aula perdida + presença afirmada |
+| "Ligar essa semana" (risco × renovação) | 100% das linhas de risco em confiança baixa; volta quando `confianca_dado` mudar |
+| `health_score` como coração | 30% dele é pagamento — fura a fronteira da inadimplência |
 | Inadimplência | fronteira do Alf: é do Sucesso do Aluno |
 | NPS, conversas ADM, responsável, perfil de matrícula | "cada um no seu quadrado" — donos são outros |
 | Normalizar anotação do Emusys | trilho paralelo, já anotado; não é o Radar |
 | Coleta do semáforo pela agente Lia virar nativa | fatia futura |
+
+## O que destrava o Radar: uma coisa só
+
+Três dos quatro sinais que a direção aprovada pedia caíram — e os três caem no
+**mesmo lugar**:
+
+| Sinal que caiu | Por quê | Raiz |
+|---|---|---|
+| "Sumiu da escola" | 126 alunos que parecem sumidos são chamada não lançada em CG | registro de presença |
+| "Ligar essa semana" | modelo em auditoria: *"as features de presenca ainda misturam falta com chamada nao registrada"* | registro de presença |
+| `health_score` como coração | 30% pagamento (fronteira) + 10% da mesma presença contaminada | fronteira + registro |
+
+Não são três problemas: é **um**, aparecendo em três telas. Enquanto a presença
+não for registro confiável, todo sinal derivado dela nasce com uma dúvida que
+nenhuma tela resolve.
+
+→ **Consequência de prioridade:** consertar o registro de presença em Campo
+Grande não é a pendência nº 3 da fila. É o que devolve dois cartões ao Radar e
+tira o modelo de risco da auditoria. É a tarefa com maior alavanca aberta hoje.
+
+O Radar **não fica parado esperando** por isso: os dois cartões que sobraram não
+dependem de presença nem de pagamento, e são os dois mais acionáveis que existem
+(quem já avisou que sai, e quem o professor marcou de vermelho). Fatia 1 sobe
+com eles; os outros voltam pelo campo, sem decisão nova.
 
 ## Riscos
 
@@ -265,6 +341,9 @@ mensagem, ninguém lê.
   fingir número. Se em 15/08 continuar em zero, o problema é adoção, não Radar.
 - **O cruzamento de 2 pode virar 0.** O cartão precisa ler bem vazio — vazio ali
   é a escola em dia, e o texto tem que dizer isso.
-- **`vw_risco_evasao_atual` tem `confianca_dado`.** Antes de publicar
-  probabilidade, conferir se a faixa `critico` de baixa confiança deve aparecer.
-  Fica como pergunta aberta da revisão.
+- **O Radar sobe com dois cartões, e um deles começa em zero.** Só o do aviso
+  prévio (33) tem número no dia 1. Se isso parecer pouco na tela, a resposta é
+  consertar a presença — não afrouxar a régua de confiança pra encher a página.
+- ~~`vw_risco_evasao_atual` tem `confianca_dado`~~ — **decidido pelo Alf em
+  10/08: esconder até o modelo estar seguro.** Ver §6: hoje isso remove a fonte
+  inteira.

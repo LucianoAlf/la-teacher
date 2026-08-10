@@ -68,6 +68,28 @@ passa a ser o "ver o mês inteiro" do cartão *Coração vermelho*. Não virou b
 2 do Painel (ideia original de 08/08) porque o Painel é da equipe e o Radar é do
 aluno — empilhar num scroll só é a mesma mistura da parede das 9h.
 
+**Decidido pelo Alf em 10/08 (risco de evasão):** *"esconde até o modelo estar
+seguro"*. Fui medir o que isso exclui — **as 1.157 linhas de
+`vw_risco_evasao_atual` estão em `confianca_dado = 'baixa'`**, nenhuma exceção,
+e o motivo escrito na própria view é *"Modelo em auditoria: as features de
+presenca ainda misturam falta com chamada nao registrada"*. É o mesmo defeito
+que eu medi. A regra tira a fonte inteira do ar, e com ela o cartão "Ligar essa
+semana".
+
+**Achado no mesmo puxão:** o `health_score` é **30% pagamento** (+ 20% tempo de
+casa, 20% fase, 20% feedback, 10% presença). Usar ele como "coração vermelho"
+põe situação de pagamento na tela da coordenação, lavada em cor — fura a
+fronteira da inadimplência pela porta dos fundos. **Saiu do Radar.**
+
+**Fatia 1 virou DOIS cartões:** "Avisou que sai e ainda está em aula" (33) e
+"Coração vermelho" só com o semáforo do professor (0 hoje; enche a partir de
+hoje). Os dois **não dependem de presença nem de pagamento** — de propósito.
+
+⚠️ **A alavanca mudou de lugar.** Os três sinais que caíram (Sumiu da escola,
+Ligar essa semana, health_score) caem na MESMA raiz: **registro de presença**.
+Não são três problemas, é um aparecendo em três telas. Consertar o registro de
+CG deixou de ser a pendência nº 3 e virou a tarefa de maior alavanca aberta.
+
 **PRÓXIMO PASSO:** o Alf revisa a spec inteira. Depois dela, plano e execução.
 
 ---
