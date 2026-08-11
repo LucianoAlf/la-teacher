@@ -73,7 +73,10 @@ Regra permanente: **envio real só com OK explícito do Alf.**
 
 ## Registro de aula pelo WhatsApp — fluxo e piloto
 
-O fluxo novo fica desligado por padrão:
+### Valores-modelo de documentação — nunca copiar para runtime
+
+Este bloco descreve valores-modelo e não representa a configuração ativa. Ele
+**nunca** deve ser copiado, aplicado ou usado como instrução de alteração:
 
 ```dotenv
 FABIO_WHATSAPP_REGISTRO_MODE=off
@@ -83,9 +86,12 @@ FABIO_REGISTRO_RECIBO_MODE=off
 FABIO_REGISTRO_RECIBO_PILOT_IDS=
 ```
 
-As duas flags `FABIO_REGISTRO_RECIBO_*` acima são exclusivamente valores de
-referência desta documentação. **Elas não estão presentes na configuração
-runtime ativa enquanto o hard-stop existir** e não foram adicionadas à VPS.
+### Estado runtime conhecido — pilot, allowlist preservada, valores omitidos
+
+O runtime conhecido está em `pilot`, com a allowlist existente preservada e
+seus valores omitidos desta documentação. As flags `FABIO_REGISTRO_RECIBO_*`
+**não foram aplicadas à VPS**. Enquanto o hard-stop existir, nenhum dos blocos
+desta seção é instrução de alteração e ninguém deve alterar o runtime.
 
 Os modos são `off` (Hermes atual), `shadow` (classifica e mede, sem abrir
 ação), `pilot` (somente os `professor_id` da allowlist) e `on` (professores
@@ -101,9 +107,8 @@ remover um blob.
 ### G6 — paridade de fonte e congelamento do piloto (11/08/2026)
 
 Há um piloto restrito já configurado na VPS. A allowlist existente não pode ser
-ampliada durante esta fase. O recibo posterior à confirmação fica desligado por
-padrão nas duas flags acima, e a lista dele deverá copiar a allowlist já ativa
-sem revelar os valores.
+ampliada durante esta fase. O recibo posterior à confirmação ainda não tem
+configuração runtime; as flags de recibo existem somente como referência acima.
 
 **Hard-stop atual:** a Edge `fabio-registro-aula` ativa está na versão 17 e
 assina o callback com HMAC, mas a fonte legível e versionável do receptor desse

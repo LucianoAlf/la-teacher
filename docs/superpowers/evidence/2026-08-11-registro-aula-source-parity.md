@@ -12,8 +12,9 @@ alteração de Python/TypeScript/Edge, deploy, envio de WhatsApp, alteração de
 dados pedagógicos, leitura de `.env` ou de logs de mensagens.
 
 O `git status --short` estava vazio antes da auditoria. O único diretório
-temporário criado para baixar a fonte da Edge será removido antes do commit; a
-evidência abaixo mantém apenas o hash verificável.
+temporário criado para baixar a fonte da Edge foi removido após a auditoria,
+não foi versionado e não pertence ao procedimento de retomada; a evidência
+abaixo mantém apenas o hash verificável.
 
 ## Runtime e teste de segurança
 
