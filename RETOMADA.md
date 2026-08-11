@@ -5,12 +5,12 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 11/08/2026, ~01h (BRT) — Codex.** Radar telas no ar
+> **Última atualização: 11/08/2026, ~02h (BRT) — Codex.** Radar telas no ar
 > (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
-> (`f00c96d`, aprovado). Deploy desta frente = **Vercel + Supabase** — VPS do
-> Fábio não entra. Frente “Fábio escreve no WhatsApp” = SPEC aprovada + plano
-> em gates; G0/G1 concluídos e schema 090/091 publicado no Supabase. O bridge
-> novo continua desligado e não houve fluxo real. Quem mais lê: o
+> (`f00c96d`, aprovado). Deploy do Radar = **Vercel + Supabase** — a frente do
+> Fábio usa a VPS própria. Frente “Fábio escreve no WhatsApp” = SPEC aprovada + plano
+> em gates; G0/G1 concluídos, schema 090/091/092 publicado no Supabase e G4
+> publicado em `shadow` na VPS. Não houve fluxo real. Quem mais lê: o
 > Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
@@ -32,25 +32,47 @@
 
 ---
 
-## ✅ 11/08 — G3 local fechado, WhatsApp novo ainda desligado
+## ✅ 11/08 — G3 local fechado, G4 shadow publicado
 
 No worktree `D:\la-teacher-worktrees\fabio-whatsapp`, branch
 `codex/fabio-whatsapp`, a frente local avançou até o fim do G3:
 
 - 092 fecha o contrato do reconciliador: `registro_id` no read-back, validação
   do rascunho por professor/áudio, tentativas persistidas e prova de limpeza do
-  Storage; **a migration 092 ainda não foi aplicada no Supabase**.
+  Storage; a migration 092 foi aplicada em definitivo pelo runner do repositório.
 - Reconciliador one-shot com claim/lease, retry limitado, stale-token,
   read-back, expiração e limpeza protegida; unidade/timer systemd versionado.
 - Bridge com inbox durável antes do ACK, hidratação depois do claim, modos
   `off|shadow|pilot|on`, allowlist de piloto, interceptação depois do batching e
   antes do Hermes, e CAPACIDADE_PROFESSOR honesta.
-- Evidência final: `teste:091`, `teste:092`, 33 testes Python, `py_compile`,
-  `diff --check` e 10/10 mutantes mortos. Nenhum deploy, SSH write, aplicação
-  de 092 ou fluxo real foi executado.
+- Evidência local fresca: `teste:092`, 5 testes de intenções, 11 de ações, 7 do
+  reconciliador, 10 do bridge, 10/10 mutantes mortos, 25 casos de carimbo,
+  `py_compile` e `diff --check` verdes.
 
 Commits locais desta sequência: `b4fd73c` (reconciliador/092) e `001c4ef`
-(bridge/G3). Próximo gate é revisão/aprovação para G4; não copiar para a VPS.
+(bridge/G3). O G4 foi autorizado e publicado em shadow; G5 (piloto real) e G6
+(rollout geral) continuam exigindo aprovação própria.
+
+## ✅ 11/08, ~02h BRT — G4 shadow publicado na VPS
+
+O preflight confirmou acesso SSH, Python 3.12.3, bridge antigo ativo e ausência
+dos quatro módulos novos. Foi criado backup recuperável em
+`/home/fabio/fabio-chat-bridge/backups/20260811-fabio-whatsapp-g4/` contendo o
+bridge anterior e o `.env` protegido. A 092 foi aplicada antes do deploy e a
+releitura confirmou `registro_id` no retorno de `fabio_status_audio_fila`, prova
+de limpeza presente e ACLs apenas para `service_role` nas novas portas.
+
+Na VPS foram publicados `fabio_chat_bridge.py`, os três módulos do fluxo e a
+unidade/timer do reconciliador. O modo efetivo ficou
+`FABIO_WHATSAPP_REGISTRO_MODE=shadow`; o bridge reiniciou ativo e o timer ficou
+habilitado/ativo. O primeiro ciclo do reconciliador terminou com
+`claimed=0`, `falhas=0`; não houve erro recente no log do bridge. Os quatro
+hashes SHA-256 vivos coincidem com o worktree local.
+
+Snapshot read-only pós-deploy: `fabio_acoes_pendentes=0`, ações ativas `0` e
+`fabio_fila_audios.origem='whatsapp'=0`. Portanto: **código e worker publicados;
+entrada de escrita continua em shadow; nenhum piloto ou fluxo real foi
+executado**. Rollback preservado pelo backup datado e pelo modo `off`.
 
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
 
