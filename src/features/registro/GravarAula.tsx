@@ -14,7 +14,9 @@ import {
 import { SessaoRow } from '../agenda/SessaoRow'
 import { useSessoes } from '../agenda/useSessoes'
 import { AppFrame } from '../../pages/app/AppFrame'
-import { enviarAudio } from './uploadAudio'
+import { useAuth } from '../../lib/auth'
+import { descartarItemFila, enviarAudio, tentarNovamenteItemFila } from './uploadAudio'
+import { descreverFalhaFila, LIMITE_TENTATIVAS_AUTOMATICAS } from './camposCanonicos'
 import { useRecorder, LIMITE_SEGUNDOS } from './useRecorder'
 import { SOMENTE_LEITURA } from '../../lib/config'
 
@@ -119,6 +121,7 @@ const MSG_GRAVACAO: Record<ErroGravacao, { icon: string; title: string; desc: st
 
 function Gravador({ aulaId }: { aulaId: number }) {
   const navigate = useNavigate()
+  const { session } = useAuth()
   const { state } = useLocation() as { state?: { sessao?: SessaoAula } }
   const [params] = useSearchParams()
   /** Não nulo = correção por voz: complementa um registro existente. */
@@ -127,6 +130,15 @@ function Gravador({ aulaId }: { aulaId: number }) {
   const rec = useRecorder()
   const [envio, setEnvio] = useState<FaseEnvio>('nao_enviado')
   const [erroGrav, setErroGrav] = useState<ErroGravacao | null>(null)
+  const [erroEnvio, setErroEnvio] = useState<string | null>(null)
+  const [filaLocal, setFilaLocal] = useState<{
+    id: string
+    mensagem: string
+    retryAutomatico: boolean
+    tentativas: number
+    falhaTerminal?: boolean
+    codigoFalhaTerminal?: string | null
+  } | null>(null)
 
   const titulo = sessao ? tituloSessao(sessao) : `Aula #${aulaId}`
   const sub = sessao ? [subtituloSessao(sessao), horaSessao(sessao)].filter(Boolean).join(' · ') : undefined
@@ -153,8 +165,53 @@ function Gravador({ aulaId }: { aulaId: number }) {
     } else if ('erroGravacao' in r) {
       setErroGrav(r.erroGravacao)
       setEnvio('erro_gravacao')
+    } else if (r.guardadoOffline) {
+      setFilaLocal({ id: r.itemFilaId, mensagem: r.mensagem, retryAutomatico: r.retryAutomatico, tentativas: r.tentativas })
+      setEnvio('fila_offline')
     } else {
-      setEnvio(r.guardadoOffline ? 'fila_offline' : 'erro_envio')
+      setErroEnvio(r.mensagem)
+      setEnvio('erro_envio')
+    }
+  }
+
+  async function tentarFilaLocal() {
+    if (!filaLocal) return
+    if (filaLocal.falhaTerminal) return
+    setEnvio('enviando')
+    try {
+      const resultado = await tentarNovamenteItemFila(filaLocal.id, session?.user.id)
+      if (resultado.ok) {
+        navigate(`/app/processando/${resultado.audioId}`, { state: { aulaLabel: titulo } })
+        return
+      }
+      setFilaLocal({
+        ...filaLocal,
+        mensagem: resultado.mensagem,
+        retryAutomatico: resultado.retryAutomatico,
+        tentativas: resultado.tentativas,
+        falhaTerminal: resultado.falhaTerminal === true,
+        codigoFalhaTerminal: resultado.codigoFalhaTerminal ?? null,
+      })
+      setEnvio('fila_offline')
+    } catch {
+      setFilaLocal({ ...filaLocal, mensagem: 'Não consegui acessar a fila local agora', retryAutomatico: false })
+      setEnvio('fila_offline')
+    }
+  }
+
+  async function descartarFilaLocal() {
+    if (!filaLocal) return
+    try {
+      const descartado = await descartarItemFila(filaLocal.id, session?.user.id)
+      if (!descartado.ok) {
+        setFilaLocal({ ...filaLocal, mensagem: descartado.mensagem, retryAutomatico: false })
+        return
+      }
+      setFilaLocal(null)
+      rec.reset()
+      setEnvio('nao_enviado')
+    } catch {
+      setFilaLocal({ ...filaLocal, mensagem: 'Não consegui descartar o áudio local agora', retryAutomatico: false })
     }
   }
 
@@ -296,12 +353,44 @@ function Gravador({ aulaId }: { aulaId: number }) {
         {envio === 'fila_offline' && (
           <EmptyState
             icon="fa-solid fa-cloud-arrow-up"
-            title="Guardei sua gravação 💾"
-            description="Sem conexão agora. O áudio está na fila local e sobe sozinho assim que a internet voltar — pode seguir o dia."
+            title={
+              filaLocal?.falhaTerminal
+                ? 'Este áudio não pode mais ser enviado'
+                : filaLocal?.retryAutomatico
+                ? 'Guardei sua gravação 💾'
+                : filaLocal && filaLocal.tentativas >= LIMITE_TENTATIVAS_AUTOMATICAS
+                  ? 'Aguarda sua decisão'
+                  : 'Guardei sua gravação para você decidir'
+            }
+            description={
+              filaLocal
+                ? `${descreverFalhaFila({ ultimaFalha: filaLocal.mensagem, tentativas: filaLocal.tentativas })}. ${
+                    filaLocal.falhaTerminal
+                      ? `O motor recusou este lançamento${filaLocal.codigoFalhaTerminal ? ` (código ${filaLocal.codigoFalhaTerminal})` : ''}. O áudio permanece preservado neste aparelho; descarte-o quando não precisar mais dele.`
+                      : filaLocal.retryAutomatico
+                      ? 'Uma nova tentativa automática está habilitada; você também pode tentar agora.'
+                      : filaLocal.tentativas >= LIMITE_TENTATIVAS_AUTOMATICAS
+                        ? 'O áudio continua preservado, mas não vou tentar sozinho de novo.'
+                        : 'Não vou chamar isso de problema de conexão nem tentar sozinho.'
+                  }`
+                : 'O áudio está preservado na fila local.'
+            }
             action={
-              <Button size="sm" variant="ghost" onClick={() => navigate('/app')}>
-                Voltar ao início
-              </Button>
+              <div className="flex flex-col gap-2">
+                {!filaLocal?.falhaTerminal && (
+                  <Button size="sm" onClick={() => void tentarFilaLocal()}>
+                    <i className="fa-solid fa-rotate-right" aria-hidden="true" /> Tentar agora
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" onClick={() => void descartarFilaLocal()}>
+                  Descartar esta gravação
+                </Button>
+                {!filaLocal?.falhaTerminal && (
+                  <Button size="sm" variant="ghost" onClick={() => navigate('/app')}>
+                    Voltar ao início
+                  </Button>
+                )}
+              </div>
             }
           />
         )}
@@ -323,7 +412,7 @@ function Gravador({ aulaId }: { aulaId: number }) {
           <EmptyState
             icon="fa-solid fa-triangle-exclamation"
             title="Não consegui enviar"
-            description="Deu um problema no envio e não consegui nem guardar localmente. Sua gravação ainda está aqui — tenta de novo."
+            description={`${erroEnvio ?? 'Deu um problema no envio e não consegui nem guardar localmente.'} Sua gravação ainda está aqui — tenta de novo.`}
             action={
               <Button size="sm" onClick={() => void enviar()}>
                 <i className="fa-solid fa-rotate-right" aria-hidden="true" /> Tentar de novo

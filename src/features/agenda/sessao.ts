@@ -80,6 +80,9 @@ export function agruparSessoes(cruas: SessaoAula[]): SessaoAula[] {
         return { ...a, aula_id_alvo: par?.aula_id_ancora ?? t.aula_id_ancora }
       })
       const agrupadas = [t.aula_id_ancora, ...alunos.map((a) => a.aula_id_alvo!).filter((id) => id !== t.aula_id_ancora)]
+      const temRascunho = slot.some(
+        (aula) => agrupadas.includes(aula.aula_id_ancora) && aula.tem_rascunho === true,
+      )
 
       if (alunos.length === 1 && alunos[0].aula_id_alvo !== t.aula_id_ancora) {
         // turma de 1: a linha visível é a individual do aluno (regra v3),
@@ -90,9 +93,10 @@ export function agruparSessoes(cruas: SessaoAula[]): SessaoAula[] {
           alunos: par.alunos.map((a) => ({ ...a, aula_id_alvo: par.aula_id_ancora })),
           aulas_agrupadas: agrupadas,
           aula_id_chamada: t.aula_id_ancora,
+          tem_rascunho: temRascunho,
         })
       } else {
-        resultado.push({ ...t, alunos, aulas_agrupadas: agrupadas, aula_id_chamada: t.aula_id_ancora })
+        resultado.push({ ...t, alunos, aulas_agrupadas: agrupadas, aula_id_chamada: t.aula_id_ancora, tem_rascunho: temRascunho })
       }
     }
 

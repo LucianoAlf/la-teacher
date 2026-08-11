@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test:unit": "vitest run src",
+    "test:unit:watch": "vitest src",
     "teste:018": "node scripts/rodar-teste-sql.mjs supabase/migrations/018-notificacoes-lease-e-referencia.sql supabase/migrations/018-notificacoes-lease-e-referencia.test.sql",
     "teste:019": "node scripts/rodar-teste-sql.mjs supabase/migrations/019-presenca-declarada-e-pendencia-por-alvo.sql supabase/migrations/019-presenca-declarada-e-pendencia-por-alvo.test.sql",
     "teste:020": "node scripts/rodar-teste-sql.mjs supabase/migrations/020-devolutiva-aula-fila-e-skill.sql supabase/migrations/020-devolutiva-aula-fila-e-skill.test.sql",
@@ -154,6 +156,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.10"
   }
 }

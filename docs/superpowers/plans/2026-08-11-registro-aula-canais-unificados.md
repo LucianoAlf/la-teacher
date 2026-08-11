@@ -380,6 +380,8 @@ git commit -m "feat: sanear fatiamento antes do registro"
 - Modify: `src/features/agenda/SessaoRow.tsx`
 - Modify: `src/features/registro/filaOffline.ts`
 - Modify: `src/features/registro/uploadAudio.ts`
+- Modify: `src/pages/app/Home.tsx`
+- Modify: `src/features/registro/GravarAula.tsx`
 - Modify: `src/lib/api.ts`
 
 - [ ] **Step 1: Adicionar Vitest e escrever RED para as funcoes puras**
@@ -408,7 +410,7 @@ Criar `textoEquivalente`, `repertorioIndividualVisivel`, `nomeCabecalho`, `rotul
 
 - [ ] **Step 3: Integrar os helpers nas telas e na fila offline**
 
-`Confirmar.tsx` renderiza somente o read-back da RPC/registro em `aguardando_confirmacao`: tronco, fatias, campos vazios, presencas/faltas e destino de devolutiva. Ele nao remonta texto de audio. `TurmaHistorico.tsx` nao mostra repertorio individual igual ao de turma mesmo para dado legado. `Devolutivas.tsx` chama o wrapper app de `fabio_atualizar_devolutiva_rascunho`, exibe a versao editada e deixa qualquer `marcar enviada` como ato manual fora deste fluxo. `SessaoRow.tsx` recebe `temRascunho` da projecao de agenda e deixa claro que falta confirmar. A schema da fila IndexedDB sobe versao preservando cada blob e adiciona `ultimaFalha`, `tentativas` e `ultimaTentativaEm`; `uploadAudio.ts` grava o erro real, agenda retry so para falha transitoria e oferece acao explicita de tentar novamente/descartar localmente. Nunca chama todo erro de falta de conexao.
+`Confirmar.tsx` renderiza somente o read-back da RPC/registro em `aguardando_confirmacao`: tronco, fatias, campos vazios, presencas/faltas e destino de devolutiva. Ele nao remonta texto de audio. Ausencia de declaracao nao gera pergunta: o preview diz que sera `presente` ao confirmar; somente `faltou` explicitamente marcado altera esse resultado. `TurmaHistorico.tsx` nao mostra repertorio individual igual ao de turma mesmo para dado legado. `Devolutivas.tsx` chama o wrapper app de `app_atualizar_devolutiva_rascunho`, exibe a versao editada e persiste somente `acaoId` + impressao SHA-256 nao reversivel do mesmo payload: cancelar fica desabilitado enquanto salva e nenhuma chave e removida antes de resposta positiva inequivoca. `SessaoRow.tsx` recebe `temRascunho` da projecao de agenda e deixa claro que falta confirmar. A schema da fila IndexedDB sobe versao preservando cada blob e adiciona `ownerUserId`, `chaveIntencao`, `storagePath`, `ultimaFalha`, `tentativas` e `ultimaTentativaEm`: todo listar, renderizar, descartar e reenviar recebe a identidade da sessao atual; itens legados sem dono ficam preservados em quarentena. A operacao IndexedDB so confirma em `transaction.oncomplete`. Reenvios usam o mesmo path, possuem mutex por `item.id` e retry automatico somente para falha transitoria, com backoff observavel e no maximo tres tentativas totais; timers duplicados nao criam novo envio. Depois disso, Home e Gravador oferecem somente `Tentar agora` ou `Descartar`, com estado `aguarda sua decisao`. Nunca chama todo erro de falta de conexao.
 
 - [ ] **Step 4: Rodar GREEN e build**
 
@@ -424,7 +426,7 @@ Expected: testes passam e `tsc && vite build` termina sem erro.
 `src/types/db.ts` continua intocado neste commit: ele e regenerado no G8, apos 093--095 existirem no projeto remoto e antes de publicar o frontend.
 
 ```powershell
-git add -- package.json package-lock.json src/features/registro/camposCanonicos.ts src/features/registro/camposCanonicos.test.ts src/pages/app/AppHeader.tsx src/pages/app/TurmaHistorico.tsx src/features/registro/Confirmar.tsx src/pages/app/Devolutivas.tsx src/features/agenda/sessao.ts src/features/agenda/SessaoRow.tsx src/features/registro/filaOffline.ts src/features/registro/uploadAudio.ts src/lib/api.ts
+git add -- package.json package-lock.json src/features/registro/camposCanonicos.ts src/features/registro/camposCanonicos.test.ts src/pages/app/AppHeader.tsx src/pages/app/TurmaHistorico.tsx src/features/registro/Confirmar.tsx src/pages/app/Devolutivas.tsx src/features/agenda/sessao.ts src/features/agenda/SessaoRow.tsx src/features/registro/filaOffline.ts src/features/registro/uploadAudio.ts src/pages/app/Home.tsx src/features/registro/GravarAula.tsx src/lib/api.ts
 git diff --cached --check
 git commit -m "fix: mostrar registro e fila de audio com estado honesto"
 ```
@@ -449,6 +451,9 @@ select public._assert(v_notificacoes_recibo = 1, 'confirmacao deve enfileirar um
 select public._assert(v_claim_antes_devolutivas = 0, 'recibo espera todos os rascunhos exigidos');
 select public._assert(v_claim_replay = 0, 'recibo enviado nao pode ser reivindicado de novo');
 select public._assert(v_mensagens_contexto = 1, 'recibo enviado deve espelhar uma unica saida no contexto');
+select public._assert(v_agenda_tem_rascunho, 'agenda deve expor rascunho aguardando confirmacao no slot e alvo corretos');
+select public._assert(v_edicao_app_autenticada, 'wrapper app deve resolver professor por auth e auditar a edicao no nucleo');
+select public._assert(v_audio_replay_mesmo_id, 'replay do mesmo storage_path deve devolver o mesmo audio_id');
 ```
 
 - [ ] **Step 2: Implementar outbox sobre `fabio_notificacoes`, nao uma segunda fila**
@@ -467,6 +472,8 @@ create or replace function public.fabio_falhar_registro_recibo(
 
 O claim so retorna registros confirmados cuja lista de devolutivas de alunos presentes esteja toda `gerada|oferecida`. A conclusao confere lease, marca enviada, persiste recibo de transporte e insere/atualiza uma mensagem outbound idempotente em `fabio_chat_mensagens` com `wa_message_id` igual ao recibo. Somente `service_role` executa as tres RPCs.
 
+Antes de qualquer deploy, 095 tambem fecha tres contratos que a UI ja consome: (1) `app_minha_agenda_sessao` retorna `tem_rascunho = true` quando existe `fabio_registros_aula.status = 'aguardando_confirmacao'` ligado a aula da sessao ou ao alvo individual agrupado; (2) `app_atualizar_devolutiva_rascunho` e uma porta autenticada, resolve `professor_id` por `auth`, valida propriedade e chama somente o nucleo auditado `fabio_atualizar_devolutiva_rascunho` de `service_role`; (3) `fn_enfileirar_audio_core` e `app_enfileirar_audio` deduplicam o replay por `storage_path` do mesmo professor, retornando o `audio_id` ja existente em vez de inserir outra fila. O navegador nunca chama RPC `fabio_*` diretamente.
+
 - [ ] **Step 3: Garantir que o ofertador legado nao duplique a mensagem**
 
 Alterar `fabio_devolutivas_a_oferecer` para excluir devolutivas cujo registro possui `registro_recibo` pendente/processando/enviado. O worker antigo continua como fallback apenas de devolutiva historica sem recibo; ele nunca concorre com o novo tipo.
@@ -478,7 +485,7 @@ node scripts/rodar-teste-sql.mjs supabase/migrations/095-recibo-de-registro-no-w
 node scripts/mutantes-095.mjs
 ```
 
-Os mutantes removem a chave de referencia, permitem claim antes das devolutivas e removem o insert em `fabio_chat_mensagens`; todos devem morrer.
+Os mutantes removem a chave de referencia, permitem claim antes das devolutivas e removem o insert em `fabio_chat_mensagens`; tambem removem a projecao `tem_rascunho`, a resolucao de professor por `auth` do wrapper e a guarda unica de `(professor_id, storage_path)`. Todos devem morrer. As provas SQL incluem uma sessao de turma e seu alvo individual, uma tentativa de editar devolutiva por outro professor e dois `app_enfileirar_audio` com o mesmo path verificando um unico `audio_id`/registro.
 
 - [ ] **Step 5: Adicionar scripts e commitar**
 

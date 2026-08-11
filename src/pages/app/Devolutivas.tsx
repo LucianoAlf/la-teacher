@@ -5,20 +5,57 @@ import {
   devolutivasAguardando,
   devolutivasPendentes,
   marcarDevolutiva,
-  salvarTextoDevolutiva,
+  atualizarDevolutivaRascunho,
   type AcaoDevolutiva,
   type DevolutivaAguardando,
   type DevolutivaPendente,
 } from '../../lib/api'
+import { assinaturaIntencaoDevolutiva } from '../../features/registro/camposCanonicos'
 import { AppFrame } from './AppFrame'
 import { AppHeader } from './AppHeader'
 import { AppNav } from './AppNav'
 
 type Versao = 'normal' | 'apoio_casa'
+type RascunhoEdicao = { normal: string; apoioCasa: string; motivo: string }
+type IntencaoPendente = { acaoId: string }
 
-/** Texto que está na tela agora: o editado pelo professor vence o do Fábio. */
-function textoAtual(d: DevolutivaPendente, versao: Versao, rascunho: string | undefined): string {
-  if (rascunho !== undefined) return rascunho
+const PREFIXO_INTENCAO = 'la-teacher:devolutiva-intencao'
+
+/** O navegador guarda só a chave para o replay, nunca o texto da devolutiva. */
+function chaveIntencaoPendente(devolutivaId: string, assinatura: string): string {
+  return `${PREFIXO_INTENCAO}:${devolutivaId}:${assinatura}`
+}
+
+function lerIntencaoPendente(devolutivaId: string, assinatura: string): IntencaoPendente | null {
+  try {
+    const bruta = window.localStorage.getItem(chaveIntencaoPendente(devolutivaId, assinatura))
+    if (!bruta) return null
+    const valor = JSON.parse(bruta) as Partial<IntencaoPendente>
+    return typeof valor.acaoId === 'string' && valor.acaoId ? { acaoId: valor.acaoId } : null
+  } catch {
+    return null
+  }
+}
+
+function guardarIntencaoPendente(devolutivaId: string, assinatura: string, acaoId: string): void {
+  try {
+    window.localStorage.setItem(chaveIntencaoPendente(devolutivaId, assinatura), JSON.stringify({ acaoId }))
+  } catch {
+    // A RPC ainda recebe uma chave estável durante a sessão; o banco continua
+    // protegido. Em navegação privada sem storage, não prometemos replay após reload.
+  }
+}
+
+function limparIntencaoPendente(devolutivaId: string, assinatura: string): void {
+  try {
+    window.localStorage.removeItem(chaveIntencaoPendente(devolutivaId, assinatura))
+  } catch {
+    // Sem storage local não há nada a limpar.
+  }
+}
+
+/** Texto que está na tela agora; as edições ficam no banco, nunca só no componente. */
+function textoAtual(d: DevolutivaPendente, versao: Versao): string {
   if (versao === 'apoio_casa' && d.texto_apoio_casa) return d.texto_apoio_casa
   return d.texto_normal
 }
@@ -27,17 +64,19 @@ function CardDevolutiva({
   devolutiva,
   onAviso,
   onSumir,
+  onAtualizar,
 }: {
   devolutiva: DevolutivaPendente
   onAviso: (m: string) => void
   onSumir: (id: string) => void
+  onAtualizar: (id: string, campos: Pick<DevolutivaPendente, 'texto_normal' | 'texto_apoio_casa' | 'editada_em'>) => void
 }) {
   const [versao, setVersao] = useState<Versao>('normal')
   const [editando, setEditando] = useState(false)
-  const [rascunho, setRascunho] = useState<string | undefined>(undefined)
+  const [rascunho, setRascunho] = useState<RascunhoEdicao | null>(null)
   const [salvando, setSalvando] = useState(false)
 
-  const texto = textoAtual(devolutiva, versao, rascunho)
+  const texto = textoAtual(devolutiva, versao)
   const paraQuem =
     devolutiva.destinatario === 'responsavel'
       ? devolutiva.destinatario_nome || 'o responsável'
@@ -77,20 +116,55 @@ function CardDevolutiva({
   }
 
   const salvar = async () => {
-    if (rascunho === undefined) {
+    if (salvando) return
+    if (!rascunho) {
       setEditando(false)
       return
     }
-    const limpo = rascunho.trim()
-    if (!limpo) {
-      onAviso('O texto não pode ficar vazio')
+    const normal = rascunho.normal.trim()
+    const apoioCasa = rascunho.apoioCasa.trim()
+    const motivo = rascunho.motivo.trim()
+    if (!normal || !apoioCasa) {
+      onAviso('As duas versões precisam de texto')
       return
     }
+    if (!motivo) {
+      onAviso('Explique o ajuste para o histórico')
+      return
+    }
+    let assinatura: string
+    try {
+      assinatura = await assinaturaIntencaoDevolutiva({
+        devolutivaId: devolutiva.id,
+        textoNormal: normal,
+        textoApoioCasa: apoioCasa,
+        motivo,
+      })
+    } catch {
+      onAviso('Não consegui preparar este ajuste com segurança. Tenta de novo?')
+      return
+    }
+    const acaoId = lerIntencaoPendente(devolutiva.id, assinatura)?.acaoId ?? crypto.randomUUID()
+    // Grava antes da RPC: timeout ou reload reaproveitam a mesma intenção.
+    guardarIntencaoPendente(devolutiva.id, assinatura, acaoId)
     setSalvando(true)
     try {
-      await salvarTextoDevolutiva(devolutiva.id, limpo)
+      const resultado = await atualizarDevolutivaRascunho({
+        devolutivaId: devolutiva.id,
+        textoNormal: normal,
+        textoApoioCasa: apoioCasa,
+        motivo,
+        acaoId,
+      })
+      onAtualizar(devolutiva.id, {
+        texto_normal: normal,
+        texto_apoio_casa: apoioCasa,
+        editada_em: resultado.editada_em ?? new Date().toISOString(),
+      })
       onAviso('Ajuste salvo ✓')
       setEditando(false)
+      setRascunho(null)
+      limparIntencaoPendente(devolutiva.id, assinatura)
     } catch {
       onAviso('Não consegui salvar agora. Tenta de novo?')
     } finally {
@@ -151,14 +225,38 @@ function CardDevolutiva({
           </div>
         )}
 
-        {editando ? (
-          <textarea
-            value={texto}
-            onChange={(e) => setRascunho(e.target.value)}
-            rows={7}
-            className="w-full rounded-md border border-border-subtle bg-bg-app p-3 text-[14px] leading-[1.5] text-text-primary"
-            autoFocus
-          />
+        {editando && rascunho ? (
+          <div className="space-y-3">
+            <label className="block text-[12.5px] font-bold text-text-secondary">
+              Versão direta
+              <textarea
+                value={rascunho.normal}
+                onChange={(e) => setRascunho({ ...rascunho, normal: e.target.value })}
+                rows={5}
+                className="mt-1 w-full rounded-md border border-border-subtle bg-bg-app p-3 text-[14px] font-normal leading-[1.5] text-text-primary"
+                autoFocus
+              />
+            </label>
+            <label className="block text-[12.5px] font-bold text-text-secondary">
+              Versão com prática em casa
+              <textarea
+                value={rascunho.apoioCasa}
+                onChange={(e) => setRascunho({ ...rascunho, apoioCasa: e.target.value })}
+                rows={5}
+                className="mt-1 w-full rounded-md border border-border-subtle bg-bg-app p-3 text-[14px] font-normal leading-[1.5] text-text-primary"
+              />
+            </label>
+            <label className="block text-[12.5px] font-bold text-text-secondary">
+              Motivo do ajuste (fica no histórico)
+              <input
+                value={rascunho.motivo}
+                onChange={(e) => setRascunho({ ...rascunho, motivo: e.target.value })}
+                maxLength={500}
+                className="mt-1 w-full rounded-md border border-border-subtle bg-bg-app px-3 py-2 text-[14px] font-normal text-text-primary"
+                placeholder="Ex.: deixei o tom mais claro para a família"
+              />
+            </label>
+          </div>
         ) : (
           <p className="whitespace-pre-wrap rounded-md bg-bg-app p-3 text-[14px] leading-[1.5] text-text-primary">
             {texto}
@@ -173,8 +271,12 @@ function CardDevolutiva({
             <Button
               size="sm"
               variant="ghost"
+              disabled={salvando}
               onClick={() => {
-                setRascunho(undefined)
+                if (salvando) return
+                // Uma intenção já enviada só pode ser removida após resposta
+                // positiva da RPC; cancelar não pode trocar a chave de replay.
+                setRascunho(null)
                 setEditando(false)
               }}
             >
@@ -190,7 +292,18 @@ function CardDevolutiva({
               <Button size="sm" variant="ghost" onClick={copiar}>
                 <i className="fa-regular fa-copy" aria-hidden="true" /> Copiar
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setEditando(true)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setRascunho({
+                    normal: devolutiva.texto_normal,
+                    apoioCasa: devolutiva.texto_apoio_casa ?? devolutiva.texto_normal,
+                    motivo: '',
+                  })
+                  setEditando(true)
+                }}
+              >
                 <i className="fa-solid fa-pen" aria-hidden="true" /> Ajustar
               </Button>
             </div>
@@ -319,6 +432,13 @@ export default function DevolutivasPage() {
     show('Boa! Devolutiva entregue 🎵')
   }
 
+  const atualizar = (
+    id: string,
+    campos: Pick<DevolutivaPendente, 'texto_normal' | 'texto_apoio_casa' | 'editada_em'>,
+  ) => {
+    setItens((atual) => (atual ?? []).map((d) => (d.id === id ? { ...d, ...campos } : d)))
+  }
+
   return (
     <AppFrame>
       <AppHeader />
@@ -370,7 +490,7 @@ export default function DevolutivasPage() {
         )}
 
         {(itens ?? []).map((d) => (
-          <CardDevolutiva key={d.id} devolutiva={d} onAviso={show} onSumir={sumir} />
+          <CardDevolutiva key={d.id} devolutiva={d} onAviso={show} onSumir={sumir} onAtualizar={atualizar} />
         ))}
       </div>
 

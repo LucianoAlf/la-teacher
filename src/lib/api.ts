@@ -63,6 +63,8 @@ export interface SessaoAula {
   n_alunos: number
   /** Nº de alunos com presença de FONTE FORTE (chamada real, não o default do Emusys). */
   n_registradas: number
+  /** true = há registro do Fábio aguardando confirmação nesta sessão. */
+  tem_rascunho?: boolean
   /** true = há aluno do roster sem conciliação (chamada bloqueada no banco). */
   roster_incompleto: boolean
   alunos: AlunoSessao[]
@@ -837,6 +839,38 @@ export async function marcarDevolutiva(id: string, acao: AcaoDevolutiva): Promis
 export async function salvarTextoDevolutiva(id: string, texto: string): Promise<void> {
   const { error } = await rpcSolta('app_devolutiva_salvar_texto', { p_id: id, p_texto: texto })
   if (error) throw error
+}
+
+/**
+ * Ajusta as duas versões da devolutiva pela porta autenticada do app.
+ *
+ * A RPC ainda será adicionada no próximo gate de banco. O cliente já usa a
+ * assinatura segura prevista, sem nunca chamar a API `fabio_*` de service_role
+ * diretamente do browser. `acaoId` é durável para que uma tentativa repetida
+ * não crie uma segunda edição auditada.
+ */
+export async function atualizarDevolutivaRascunho({
+  devolutivaId,
+  textoNormal,
+  textoApoioCasa,
+  motivo,
+  acaoId,
+}: {
+  devolutivaId: string
+  textoNormal: string
+  textoApoioCasa: string
+  motivo: string
+  acaoId: string
+}): Promise<{ devolutiva_id: string; editada_em: string | null }> {
+  const { data: res, error } = await rpcSolta('app_atualizar_devolutiva_rascunho', {
+    p_devolutiva_id: devolutivaId,
+    p_texto_normal: textoNormal,
+    p_texto_apoio_casa: textoApoioCasa,
+    p_motivo: motivo,
+    p_acao_id: acaoId,
+  })
+  if (error) throw error
+  return res as { devolutiva_id: string; editada_em: string | null }
 }
 
 export interface DevolutivaAguardando {

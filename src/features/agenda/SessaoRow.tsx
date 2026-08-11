@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { SessaoAula } from '../../lib/api'
 import { AulaRow, Badge } from '../../components/ui'
 import { cx } from '../../lib/cx'
+import { rotuloRegistro } from '../registro/camposCanonicos'
 import {
   aulaRegistrada,
   horaSessao,
@@ -36,6 +37,8 @@ export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props
   const parcial = sessao.n_registradas > 0 && sessao.n_registradas < sessao.n_alunos
   const mostrarGravar = onGravar != null && podeGravar(sessao, now)
   const registrada = aulaRegistrada(sessao)
+  const temRascunho = sessao.tem_rascunho === true
+  const rotuloDoRegistro = rotuloRegistro({ temRegistro: registrada, temRascunho })
   const comecou = status !== 'futura'
 
   // Estado da CHAMADA
@@ -77,13 +80,17 @@ export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props
   // Estado do REGISTRO (prontuário) — não se aplica quando todos faltaram (sem conteúdo).
   let registroBadge: ReactNode
   if (comecou && status !== 'faltaram') {
-    registroBadge = registrada ? (
+    registroBadge = temRascunho ? (
+      <Badge variant="brand" icon="fa-solid fa-clipboard-check" title="O Fábio organizou o registro; confira e confirme antes de gravar.">
+        {rotuloDoRegistro}
+      </Badge>
+    ) : registrada ? (
       <Badge variant="ok" icon="fa-solid fa-clipboard-check">
-        Registrada
+        {rotuloDoRegistro}
       </Badge>
     ) : (
       <Badge variant="warn" icon="fa-solid fa-microphone">
-        Sem registro
+        {rotuloDoRegistro}
       </Badge>
     )
   }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, EmptyState, ScreenHeader, Skeleton } from '../../components/ui'
 import { cx } from '../../lib/cx'
+import { repertorioIndividualVisivel } from '../../features/registro/camposCanonicos'
 import {
   historicoTurma,
   TURMA_NAO_SUA,
@@ -164,16 +165,17 @@ function SessaoItem({ s, primeiro }: { s: HistoricoTurmaSessao; primeiro?: boole
 
 /** Repertório da sessão: o da turma e/ou o de cada aluno (recital). Coexistem. */
 function RepertorioSessao({ turma, porAluno }: { turma: string | null; porAluno: RepertorioAluno[] }) {
-  if (!turma && porAluno.length === 0) return null
+  const individuaisVisiveis = porAluno.filter((r) => repertorioIndividualVisivel(turma, r.repertorio))
+  if (!turma && individuaisVisiveis.length === 0) return null
   return (
     <div>
       <LabelSecao rotulo="Repertório" />
       {turma && (
         <p className="whitespace-pre-line text-[13px] leading-relaxed text-text-primary">{turma}</p>
       )}
-      {porAluno.length > 0 && (
+      {individuaisVisiveis.length > 0 && (
         <div className={cx('flex flex-col gap-[3px]', turma && 'mt-[6px]')}>
-          {porAluno.map((r, i) => (
+          {individuaisVisiveis.map((r, i) => (
             <p
               key={`${r.aluno}-${i}`}
               className="flex items-start gap-[7px] text-[13px] leading-relaxed text-text-primary"
