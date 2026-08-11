@@ -83,6 +83,10 @@ FABIO_REGISTRO_RECIBO_MODE=off
 FABIO_REGISTRO_RECIBO_PILOT_IDS=
 ```
 
+As duas flags `FABIO_REGISTRO_RECIBO_*` acima são exclusivamente valores de
+referência desta documentação. **Elas não estão presentes na configuração
+runtime ativa enquanto o hard-stop existir** e não foram adicionadas à VPS.
+
 Os modos são `off` (Hermes atual), `shadow` (classifica e mede, sem abrir
 ação), `pilot` (somente os `professor_id` da allowlist) e `on` (professores
 identificados). Entrada de áudio primeiro grava uma linha idempotente no inbox;

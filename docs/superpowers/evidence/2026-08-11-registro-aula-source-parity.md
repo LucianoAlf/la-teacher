@@ -74,6 +74,10 @@ trecho do motor.
 backup de configuração, reinício de serviço, expansão de piloto ou novo E2E.
 O piloto existente permanece exatamente como estava antes desta auditoria.
 
+**Bloqueio de sequência:** G7 e qualquer task posterior estão proibidos até que
+a fonte do receptor HMAC seja localizada e versionada. Nenhum novo gate pode
+interpretar este hard-stop como autorização para contorná-lo.
+
 Para retomar, é necessário localizar e versionar a fonte do receptor do
 callback (ou fornecer seu repositório e procedimento de deploy), com prova da
 validação HMAC e do ponto que materializa o registro normalizado. Só depois
