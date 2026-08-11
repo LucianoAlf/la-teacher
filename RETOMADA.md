@@ -74,6 +74,25 @@ Snapshot read-only pós-deploy: `fabio_acoes_pendentes=0`, ações ativas `0` e
 entrada de escrita continua em shadow; nenhum piloto ou fluxo real foi
 executado**. Rollback preservado pelo backup datado e pelo modo `off`.
 
+## ✅ 11/08, ~02h BRT — G5 preparado para teste real, Isaque em pilot
+
+O Alf escolheu Isaque Mendes da Silva (`professor_id=10`) e confirmou dois casos
+reais. O primeiro caso sugerido (`202774`) foi rejeitado no preflight porque já
+tinha 2 registros e 1 áudio pendente do app. O caso de registro foi substituído
+por `202679` (Teclado T, T_Sáb_14, 08/08 14h); o caso de chamada é `202702`
+(Violão T, V_Sáb_15, 08/08 15h).
+
+Snapshot imediatamente antes da ativação: as duas aulas continuavam elegíveis;
+ambas tinham 0 registros, 0 filas, 0 logs e 0 devolutivas; Isaque tinha 0 ações
+ativas. Depois da ativação, a releitura continuou em 0 ações, 0 filas WhatsApp,
+0 registros no caso de conteúdo, 0 logs no caso de chamada e 0 devolutivas.
+
+O bridge foi configurado com `FABIO_WHATSAPP_REGISTRO_MODE=pilot` e
+`FABIO_WHATSAPP_REGISTRO_PILOT_IDS=10`, reiniciado e confirmado ativo. O timer
+do reconciliador continua ativo; o último ciclo terminou com `claimed=0` e
+`falhas=0`; não há erro recente no log do bridge. **Nenhuma mensagem real foi
+enviada ainda; G5 E2E continua pendente do áudio/texto do professor.**
+
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
 
 1. **Radar do aluno** — backend no ar + telas no ar. Tooltip do score
