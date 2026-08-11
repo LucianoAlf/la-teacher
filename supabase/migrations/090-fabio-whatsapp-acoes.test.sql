@@ -32,12 +32,17 @@ begin
     'ZZTESTE-090-A',
     'confirmar_intencao_audio',
     'whatsapp/' || v_prof || '/ZZTESTE-090-A.ogg',
-    jsonb_build_object('candidatas', '[]'::jsonb)
+    jsonb_build_object('candidatas', jsonb_build_array(2147483647))
   );
   v_id := (v_a -> 'acao' ->> 'id')::uuid;
   insert into _fabio_090_res values (
     'inicio cria uma acao auditavel',
     (v_a ->> 'ok')::boolean and v_id is not null and (v_a ->> 'codigo') = 'acao_criada',
+    v_a::text
+  );
+  insert into _fabio_090_res values (
+    'inicio nao aceita shortlist vinda do payload',
+    (v_a -> 'acao' -> 'candidatas') = '[]'::jsonb,
     v_a::text
   );
 
@@ -70,6 +75,16 @@ begin
   );
 
   v_c := public.fabio_aplicar_evento_acao(
+    v_id, v_prof, 'ZZTESTE-090-S', 'shortlist_definida',
+    jsonb_build_object('candidatas', jsonb_build_array(2147483647))
+  );
+  insert into _fabio_090_res values (
+    'shortlist inventada pelo bridge e rejeitada',
+    (v_c ->> 'ok')::boolean = false and (v_c ->> 'codigo') = 'shortlist_invalida',
+    v_c::text
+  );
+
+  v_c := public.fabio_aplicar_evento_acao(
     v_id, v_prof, 'ZZTESTE-090-C', 'intencao_confirmada', '{}'::jsonb
   );
   insert into _fabio_090_res values (
@@ -81,7 +96,7 @@ begin
 
   v_c := public.fabio_aplicar_evento_acao(
     v_id, v_prof, 'ZZTESTE-090-D', 'aula_escolhida',
-    jsonb_build_object('aula_id', 2147483647)
+    jsonb_build_object('aula_id', 2147483646)
   );
   insert into _fabio_090_res values (
     'aula fora da shortlist nunca e escolhida',
@@ -138,6 +153,34 @@ begin
     position('where v.professor_id = p_professor_id' in lower(pg_get_functiondef('public.fabio_aulas_candidatas(integer,text,timestamptz)'::regprocedure))) > 0
       and position('v.data_hora_fim >= p_referencia - (public.fn_janela_registro_dias()' in lower(pg_get_functiondef('public.fabio_aulas_candidatas(integer,text,timestamptz)'::regprocedure))) > 0,
     'guardas do pool'
+  );
+
+  insert into _fabio_090_res values (
+    'contrato de eventos fechados existe na maquina',
+    position('shortlist_definida' in lower(pg_get_functiondef(
+      'public.fabio_aplicar_evento_acao(uuid,integer,text,text,jsonb)'::regprocedure))) > 0
+      and position('audio_enfileirado' in lower(pg_get_functiondef(
+        'public.fabio_aplicar_evento_acao(uuid,integer,text,text,jsonb)'::regprocedure))) > 0
+      and position('rascunho_pronto' in lower(pg_get_functiondef(
+        'public.fabio_aplicar_evento_acao(uuid,integer,text,text,jsonb)'::regprocedure))) > 0
+      and position('correcao_aplicada' in lower(pg_get_functiondef(
+        'public.fabio_aplicar_evento_acao(uuid,integer,text,text,jsonb)'::regprocedure))) > 0
+      and position('confirmado' in lower(pg_get_functiondef(
+        'public.fabio_aplicar_evento_acao(uuid,integer,text,text,jsonb)'::regprocedure))) > 0
+      and position('limpeza_concluida' in lower(pg_get_functiondef(
+        'public.fabio_aplicar_evento_acao(uuid,integer,text,text,jsonb)'::regprocedure))) > 0,
+    'eventos da SPEC'
+  );
+
+  insert into _fabio_090_res values (
+    'escolha revalida a aula contra o pool atual',
+    (length(lower(pg_get_functiondef(
+      'public.fabio_aplicar_evento_acao(uuid,integer,text,text,jsonb)'::regprocedure)))
+      - length(replace(lower(pg_get_functiondef(
+        'public.fabio_aplicar_evento_acao(uuid,integer,text,text,jsonb)'::regprocedure)),
+        'fabio_shortlist_valida', '')))
+      / length('fabio_shortlist_valida') >= 2,
+    'revalidacao da shortlist'
   );
 
   insert into _fabio_090_res values (

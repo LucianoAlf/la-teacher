@@ -235,6 +235,32 @@ begin
 end;
 $function$;
 
+create or replace function public.fabio_shortlist_valida(
+  p_professor_id integer,
+  p_fluxo text,
+  p_candidatas integer[],
+  p_referencia timestamptz default now()
+) returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $function$
+  select p_fluxo in ('registro', 'chamada')
+    and cardinality(coalesce(p_candidatas, '{}'::integer[])) between 1 and 3
+    and not exists (
+      select 1
+        from unnest(coalesce(p_candidatas, '{}'::integer[])) id(aula_id)
+       where not exists (
+         select 1
+           from jsonb_array_elements(
+             public.fabio_aulas_candidatas(
+               p_professor_id, p_fluxo, p_referencia)->'candidatas') c
+          where (c->>'aula_id')::integer = id.aula_id
+       )
+    );
+$function$;
+
 create or replace function public.fabio_iniciar_acao(
   p_professor_id integer,
   p_wa_message_id text,
@@ -271,9 +297,9 @@ begin
     return jsonb_build_object('ok', false, 'codigo', 'acao_ativa_existente', 'acao', public.fabio_acao_ativa(p_professor_id) -> 'acao');
   end if;
 
-  select coalesce(array_agg(x.value::integer), '{}'::integer[])
-    into v_candidatas
-  from jsonb_array_elements_text(coalesce(p_payload -> 'candidatas', '[]'::jsonb)) x;
+  -- A acao nasce sem shortlist. A lista do payload e evidencia nao confiavel;
+  -- somente shortlist_definida, apos consultar o pool do banco, a preenche.
+  v_candidatas := '{}'::integer[];
 
   insert into public.fabio_acoes_pendentes(
     professor_id, wa_message_id, tipo, estado, storage_path, candidatas, payload, expira_em
@@ -328,6 +354,10 @@ declare
   v_novo_tipo text;
   v_novo_estado text;
   v_aula integer;
+  v_candidatas integer[];
+  v_audio_id uuid;
+  v_registro_id uuid;
+  v_fluxo text;
 begin
   select resultado into v_existente from public.fabio_acao_eventos where wa_message_id = p_wa_message_id;
   if v_existente is not null then
@@ -349,14 +379,66 @@ begin
     v_novo_tipo := case when v_a.tipo = 'confirmar_intencao_audio' then 'escolher_aula_audio' else 'escolher_aula_chamada' end;
   elsif p_evento = 'intencao_negada' and v_a.tipo in ('confirmar_intencao_audio','confirmar_intencao_chamada') then
     v_novo_estado := 'cancelada';
+  elsif p_evento = 'shortlist_definida' and v_a.tipo in ('escolher_aula_audio','escolher_aula_chamada') then
+    if coalesce(jsonb_typeof(p_dados -> 'candidatas'), '') <> 'array' then
+      return jsonb_build_object('ok', false, 'codigo', 'shortlist_invalida',
+        'acao', public.fabio_acao_json(v_a.id));
+    end if;
+    select coalesce(array_agg(x.value::integer), '{}'::integer[])
+      into v_candidatas
+      from jsonb_array_elements_text(p_dados -> 'candidatas') x;
+    v_fluxo := case when v_a.tipo = 'escolher_aula_audio'
+                    then 'registro' else 'chamada' end;
+    if not public.fabio_shortlist_valida(
+      p_professor_id, v_fluxo, v_candidatas, now()) then
+      return jsonb_build_object('ok', false, 'codigo', 'shortlist_invalida',
+        'acao', public.fabio_acao_json(v_a.id));
+    end if;
   elsif p_evento = 'aula_escolhida' and v_a.tipo in ('escolher_aula_audio','escolher_aula_chamada') then
     v_aula := nullif(p_dados ->> 'aula_id','')::integer;
-    if v_aula is null or not (v_aula = any(v_a.candidatas)) then
+    v_fluxo := case when v_a.tipo = 'escolher_aula_audio'
+                    then 'registro' else 'chamada' end;
+    if v_aula is null or not (v_aula = any(v_a.candidatas))
+       or not public.fabio_shortlist_valida(
+         p_professor_id, v_fluxo, array[v_aula], now()) then
       return jsonb_build_object('ok', false, 'codigo', 'aula_fora_da_shortlist', 'acao', public.fabio_acao_json(v_a.id));
     end if;
     v_novo_tipo := case when v_a.tipo = 'escolher_aula_audio' then 'processando_audio' else 'confirmar_chamada' end;
     v_novo_estado := case when v_a.tipo = 'escolher_aula_audio' then 'processando' else 'aberta' end;
   elsif p_evento = 'pergunta_refinada' and v_a.tipo in ('escolher_aula_audio','escolher_aula_chamada') then
+    null;
+  elsif p_evento = 'audio_enfileirado' and v_a.tipo = 'processando_audio' and v_a.estado = 'processando' then
+    v_audio_id := nullif(p_dados ->> 'audio_id', '')::uuid;
+    if v_audio_id is null or not exists (
+      select 1 from public.fabio_fila_audios f
+       where f.id = v_audio_id and f.professor_id = p_professor_id
+         and f.origem = 'whatsapp' and f.aula_id = v_a.aula_id
+    ) then
+      return jsonb_build_object('ok', false, 'codigo', 'audio_invalido',
+        'acao', public.fabio_acao_json(v_a.id));
+    end if;
+  elsif p_evento = 'rascunho_pronto' and v_a.tipo = 'processando_audio' and v_a.estado = 'processando' then
+    v_registro_id := nullif(p_dados ->> 'registro_id', '')::uuid;
+    if v_registro_id is null or not exists (
+      select 1 from public.fabio_registros_aula r
+       where r.id = v_registro_id and r.parent_id is null
+         and r.professor_id = p_professor_id
+         and r.status in ('rascunho', 'aguardando_confirmacao')
+    ) then
+      return jsonb_build_object('ok', false, 'codigo', 'rascunho_invalido',
+        'acao', public.fabio_acao_json(v_a.id));
+    end if;
+    v_novo_tipo := 'confirmar_registro';
+    v_novo_estado := 'aberta';
+  elsif p_evento = 'correcao_aplicada' and v_a.tipo = 'confirmar_registro' and v_a.estado = 'aberta' then
+    null;
+  elsif p_evento = 'confirmado' and v_a.tipo in ('confirmar_registro', 'confirmar_chamada') and v_a.estado = 'aberta' then
+    v_novo_estado := 'resolvida';
+  elsif p_evento = 'expirado' and v_a.estado in ('aberta', 'adiada') then
+    v_novo_estado := 'expirada';
+  elsif p_evento = 'limpeza_solicitada' and v_a.estado in ('cancelada', 'expirada', 'erro') then
+    null;
+  elsif p_evento = 'limpeza_concluida' and v_a.estado in ('cancelada', 'expirada', 'erro') then
     null;
   elsif p_evento = 'adiado' and v_a.estado = 'aberta' then
     v_novo_estado := 'adiada';
@@ -375,6 +457,9 @@ begin
      set tipo = v_novo_tipo,
          estado = v_novo_estado,
          aula_id = coalesce(v_aula, aula_id),
+         audio_id = coalesce(v_audio_id, audio_id),
+         registro_id = coalesce(v_registro_id, registro_id),
+         candidatas = coalesce(v_candidatas, candidatas),
          ultima_resposta_wa_id = p_wa_message_id,
          expira_em = case when v_novo_tipo = 'confirmar_registro' then now() + interval '24 hours' else expira_em end,
          atualizado_em = now(),
@@ -517,6 +602,7 @@ revoke all on table public.fabio_acao_eventos from public, anon, authenticated;
 
 revoke all on function public.fabio_acao_json(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.fabio_aulas_candidatas(integer,text,timestamptz) from public, anon, authenticated;
+revoke all on function public.fabio_shortlist_valida(integer,text,integer[],timestamptz) from public, anon, authenticated, service_role;
 revoke all on function public.fabio_iniciar_acao(integer,text,text,text,jsonb) from public, anon, authenticated;
 revoke all on function public.fabio_acao_ativa(integer) from public, anon, authenticated;
 revoke all on function public.fabio_aplicar_evento_acao(uuid,integer,text,text,jsonb) from public, anon, authenticated;

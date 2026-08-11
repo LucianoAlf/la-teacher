@@ -27,7 +27,7 @@ const MUTANTES = [
   },
   {
     nome: 'M4 — aula fora da shortlist passa',
-    de: 'if v_aula is null or not (v_aula = any(v_a.candidatas)) then',
+    de: 'if v_aula is null or not (v_aula = any(v_a.candidatas))\n       or not public.fabio_shortlist_valida(\n         p_professor_id, v_fluxo, array[v_aula], now()) then',
     para: 'if false then',
   },
   {
@@ -44,6 +44,21 @@ const MUTANTES = [
     nome: 'M7 — RLS da tabela de eventos desaparece',
     de: 'alter table public.fabio_acao_eventos enable row level security;',
     para: '-- alter table public.fabio_acao_eventos enable row level security;',
+  },
+  {
+    nome: 'M8 — inicio volta a confiar no payload da shortlist',
+    de: "v_candidatas := '{}'::integer[];",
+    para: 'v_candidatas := ARRAY[2147483647]::integer[];',
+  },
+  {
+    nome: 'M9 — shortlist_definida desaparece da transicao',
+    de: "elsif p_evento = 'shortlist_definida' and v_a.tipo in ('escolher_aula_audio','escolher_aula_chamada') then",
+    para: "elsif false and p_evento = 'shortlist_definida' and v_a.tipo in ('escolher_aula_audio','escolher_aula_chamada') then",
+  },
+  {
+    nome: 'M10 — aula escolhida pula revalidacao do pool atual',
+    de: "or not public.fabio_shortlist_valida(\n         p_professor_id, v_fluxo, array[v_aula], now()) then",
+    para: 'or false then',
   },
 ]
 
