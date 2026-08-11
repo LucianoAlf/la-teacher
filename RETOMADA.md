@@ -5,11 +5,12 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 10/08/2026, ~22h (BRT) — Cursor.** Radar telas no ar
+> **Última atualização: 11/08/2026, ~01h (BRT) — Codex.** Radar telas no ar
 > (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
 > (`f00c96d`, aprovado). Deploy desta frente = **Vercel + Supabase** — VPS do
 > Fábio não entra. Frente “Fábio escreve no WhatsApp” = SPEC aprovada + plano
-> em gates, ainda sem código no bridge, migration ou deploy. Quem mais lê: o
+> em gates; G0/G1 concluídos e schema 090/091 publicado no Supabase. O bridge
+> novo continua desligado e não houve fluxo real. Quem mais lê: o
 > Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
@@ -39,9 +40,63 @@
    cada linha) — tentativa anterior saiu feia e foi **revertida**; não reabrir
    sem ele. Fechamento do plano (menores do backend) não bloqueia.
 2. **Fábio escreve no WhatsApp** — SPEC **aprovada pelo Alf** e plano escrito em
-   `docs/superpowers/plans/2026-08-10-fabio-escreve-no-whatsapp.md`. Ainda não há
-   código, migration ou deploy desta frente. A execução começa pelo G0 em
-   worktree; G2, G4, G5 e G6 param para aprovação explícita do Alf.
+   `docs/superpowers/plans/2026-08-10-fabio-escreve-no-whatsapp.md`. G0/G1 foram
+   concluídos no worktree `D:\la-teacher-worktrees\fabio-whatsapp`; G2 publicou
+   as migrations 090/091 no projeto `ouqwbbermlzqqvtqwlul`. A próxima etapa é
+   G3 (bridge/reconciliador local); G4, G5 e G6 continuam exigindo aprovação
+   explícita do Alf.
+
+---
+
+## ✅ 11/08, ~01h BRT — G2 publicado, WhatsApp novo ainda desligado
+
+**Aplicação definitiva, em ordem, pelo runner do repositório:**
+
+```text
+supabase/migrations/090-fabio-whatsapp-acoes.sql       ok
+supabase/migrations/091-as-cinco-portas-do-whatsapp.sql ok
+```
+
+O preflight imediatamente anterior confirmou o projeto correto, ausência de
+drift nos 17 hashes capturados no G0, ausência dos objetos novos e ausência de
+conflito com o histórico remoto timestamped. O snapshot pós-aplicação registrou
+`2026-08-11 04:02:28 UTC` (`01:02:28 BRT`): as duas tabelas novas estão vazias e
+com RLS habilitado; não há grant de tabela para `anon` ou `authenticated`; as
+portas `fabio_*` ficaram executáveis só por `service_role`; e as assinaturas
+`app_*` permaneceram inalteradas. O `fn_registrar_presencas_core` live contém
+`professor_whatsapp` e preserva o sincronizador de gêmeos.
+
+**Hashes live principais (MD5 de `pg_get_functiondef`):**
+
+```text
+fabio_aulas_candidatas       2b1b361225e546f936ac2e4e221126a4
+fabio_shortlist_valida       583d8d9450c13b9039ff96a356ceb653
+fabio_iniciar_acao           95cc0e293c6d89f754de8d1957b757c5
+fabio_aplicar_evento_acao    d7068bd8fc6865246fe8e9ff85113696
+fn_enfileirar_audio_core     2d2f2a2bd1efd649ebd84e6006f5d005 / 06c2cb7bbabc500696e3b7b5bf3f83c8
+fn_atualizar_fatia_core      2035017ce5b98426880703966880034f
+fn_responder_presenca_core   0859c37f0f94634abd59dd15a923b61e
+fn_confirmar_registro_core   641f9cee39bf5b222a119ef03396610f
+fn_registrar_presencas_core  8633fdf54cfe647bf8881dac659d1172
+```
+
+**Verificação funcional sem escrita:** chamada ao RPC de candidatas via
+`service_role` para um professor existente retornou 21 candidatas, todas com
+`aula_id` pertencente ao professor. Não foram criadas ação, evento, blob,
+fila, registro, presença ou devolutiva.
+
+**Advisors:** o Security Advisor apontou somente os dois avisos INFO esperados
+para tabelas RPC-only com RLS sem policies; como não há grants a `anon`/
+`authenticated`, isso não abre leitura direta. O Performance Advisor apontou
+índices/FKs novos ainda não usados; fica registrado para revisão antes de carga
+real, sem bloquear este gate. O bridge novo não foi publicado: na VPS o serviço
+antigo está ativo, mas `fabio_whatsapp_intents.py`,
+`fabio_whatsapp_reconciler.py`, `fabio_whatsapp_state.py` e referências às novas
+ações estão ausentes. Portanto: **schema published; WhatsApp ingress still off;
+no real flow enabled.**
+
+**G2 fechado. Parar aqui.** O próximo trabalho autorizado é G3 local; não fazer
+shadow na VPS, piloto ou rollout sem o respectivo gate aprovado.
 
 ---
 
