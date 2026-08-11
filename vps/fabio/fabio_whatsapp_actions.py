@@ -68,7 +68,10 @@ def _event(backend: FabioWhatsappBackend, action: dict[str, Any], context: dict[
     return _call(backend, "fabio_aplicar_evento_acao", {
         "p_acao_id": action["id"],
         "p_professor_id": int(context["professor_id"]),
-        "p_wa_message_id": str(context["wa_message_id"]),
+        # Uma mensagem pode atravessar shortlist -> aula escolhida -> fila.
+        # O ledger live tem wa_message_id unico por evento; a chave derivada
+        # preserva replay idempotente sem descartar as transicoes seguintes.
+        "p_wa_message_id": f"{context['wa_message_id']}:fabio:{event}",
         "p_evento": event,
         "p_dados": data or {},
     })
@@ -154,6 +157,62 @@ def _start_from_candidates(backend: FabioWhatsappBackend, context: dict[str, Any
     return _result("call_preview", reply="Encontrei a aula. Quem esteve presente? Confirma essa chamada?", action_id=str(action["id"]), aula_id=aula_id)
 
 
+def _looks_like_class_refinement(text: str) -> bool:
+    hay = str(text or "").lower()
+    return bool(
+        re.search(r"\b(?:[01]?\d|2[0-3])(?:h|:[0-5]\d)\b", hay)
+        or re.search(r"\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b", hay)
+        or any(word in hay for word in (
+            "hoje", "ontem", "amanha", "amanhã", "turma", "curso",
+            "piano", "teclado", "violao", "violão", "canto", "guitarra",
+        ))
+    )
+
+
+def _refine_pending_class(
+    backend: FabioWhatsappBackend,
+    context: dict[str, Any],
+    action: dict[str, Any],
+) -> dict[str, Any] | None:
+    if action.get("tipo") not in {"escolher_aula_audio", "escolher_aula_chamada"}:
+        return None
+    if action.get("candidatas"):
+        return None
+    if not _looks_like_class_refinement(context.get("text") or ""):
+        return None
+
+    fluxo = "registro" if action.get("tipo") == "escolher_aula_audio" else "chamada"
+    shortlist = reduzir_shortlist(
+        str(context.get("text") or ""),
+        _pool(backend, context, fluxo),
+    )
+    if shortlist["status"] == "nenhuma":
+        return _result(
+            "no_candidate",
+            reply="Ainda não encontrei uma aula compatível com esse dia, horário ou turma. Não gravei nada.",
+            action_id=str(action["id"]),
+        )
+
+    ids = [int(item["aula_id"]) for item in shortlist["candidatas"]]
+    if shortlist["status"] == "discriminante":
+        _event(backend, action, context, "pergunta_refinada", {})
+        return _result("refine_class", reply=shortlist["pergunta"], action_id=str(action["id"]))
+
+    _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
+    if shortlist["status"] == "perguntar":
+        return _result(
+            "choose_audio_class" if fluxo == "registro" else "choose_call_class",
+            reply=shortlist["pergunta"],
+            action_id=str(action["id"]),
+        )
+
+    aula_id = int(shortlist["aula_id"])
+    if fluxo == "registro":
+        return _select_and_enqueue_audio(backend, context, action, aula_id)
+    _event(backend, action, context, "aula_escolhida", {"aula_id": aula_id})
+    return _result("call_preview", reply="Encontrei a aula. Quem esteve presente? Confirma essa chamada?", action_id=str(action["id"]), aula_id=aula_id)
+
+
 def _correction_output(text: str, action: dict[str, Any], readback: dict[str, Any] | None) -> dict[str, Any]:
     payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
     draft = payload.get("rascunho") if isinstance(payload.get("rascunho"), dict) else None
@@ -185,6 +244,9 @@ def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, An
     if kind == "adiar":
         _event(backend, action, context, "adiado", {})
         return _result("deferred", reply="Tudo bem. Deixei para depois sem renovar o prazo.", action_id=str(action["id"]))
+    refined = _refine_pending_class(backend, context, action)
+    if refined is not None:
+        return refined
     if kind == "escolher_aula":
         if action.get("tipo") == "escolher_aula_audio":
             return _select_and_enqueue_audio(backend, context, action, int(response["aula_id"]))

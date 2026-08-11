@@ -108,6 +108,60 @@ class WhatsappActionsTest(unittest.TestCase):
         self.assertEqual(enqueue["p_aula_id"], 101)
         self.assertTrue(enqueue["p_storage_path"].startswith("whatsapp/25/wa-1."))
 
+    def test_selected_audio_uses_distinct_event_keys_for_each_transition(self):
+        backend = FakeBackend(candidates=[{"aula_id": 101, "data": "2026-08-11", "hora": "14:00", "curso": "Piano"}])
+        result = tratar_mensagem_professor(
+            professor_context(
+                kind="audio",
+                text="Na aula de piano de hoje as 14h trabalhei respiracao",
+                media_url="https://media/1",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        events = [
+            payload for name, payload in backend.calls
+            if name == "fabio_aplicar_evento_acao"
+        ]
+        self.assertEqual(
+            [payload["p_evento"] for payload in events],
+            ["shortlist_definida", "aula_escolhida", "audio_enfileirado"],
+        )
+        self.assertEqual(
+            len({payload["p_wa_message_id"] for payload in events}),
+            len(events),
+        )
+
+    def test_discriminant_reply_recalculates_pool_before_selecting(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-11", "hora": "19:00", "curso": "Piano"},
+            {"aula_id": 102, "data": "2026-08-11", "hora": "16:00", "curso": "Piano"},
+            {"aula_id": 103, "data": "2026-08-11", "hora": "14:00", "curso": "Piano"},
+            {"aula_id": 104, "data": "2026-08-11", "hora": "12:00", "curso": "Piano"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                wa_message_id="refine-1",
+                text="Foi a aula de hoje as 19h",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        pool = next(payload for name, payload in backend.calls if name == "fabio_aulas_candidatas")
+        self.assertEqual(pool["p_fluxo"], "registro")
+        enqueue = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertEqual(enqueue["p_aula_id"], 101)
+
     def test_two_candidates_wait_for_human_choice_and_do_not_enqueue(self):
         backend = FakeBackend(candidates=[
             {"aula_id": 101, "data": "2026-08-11", "hora": "14:00", "curso": "Piano"},
