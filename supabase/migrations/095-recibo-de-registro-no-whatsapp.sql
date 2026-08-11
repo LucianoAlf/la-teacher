@@ -385,10 +385,10 @@ end
 $function$;
 
 create or replace function public.fabio_concluir_registro_recibo(
-  notificacao_id uuid,
-  lease_token uuid,
-  envio_recibo text,
-  corpo text
+  p_notificacao_id uuid,
+  p_lease_token uuid,
+  p_envio_recibo text,
+  p_corpo text
 ) returns jsonb
 language plpgsql
 security definer
@@ -397,10 +397,10 @@ as $function$
 declare
   v_notificacao public.fabio_notificacoes%rowtype;
   v_chat_id uuid;
-  v_envio_recibo text := nullif(btrim(envio_recibo), '');
-  v_corpo text := nullif(btrim(corpo), '');
+  v_envio_recibo text := nullif(btrim(p_envio_recibo), '');
+  v_corpo text := nullif(btrim(p_corpo), '');
 begin
-  if notificacao_id is null or lease_token is null then
+  if p_notificacao_id is null or p_lease_token is null then
     return jsonb_build_object('ok', false, 'codigo', 'lease_obrigatorio');
   end if;
   if v_envio_recibo is null or v_corpo is null then
@@ -409,7 +409,7 @@ begin
 
   select * into v_notificacao
     from public.fabio_notificacoes n
-   where n.id = notificacao_id
+   where n.id = p_notificacao_id
      and n.tipo = 'registro_recibo'
      and n.referencia_tipo = 'registro_aula'
      and n.canal = 'whatsapp'
@@ -427,7 +427,7 @@ begin
     );
   end if;
   if v_notificacao.status is distinct from 'processando'
-     or v_notificacao.lease_token is distinct from lease_token
+     or v_notificacao.lease_token is distinct from p_lease_token
      or v_notificacao.lease_expira_em is null
      or v_notificacao.lease_expira_em <= now() then
     return jsonb_build_object('ok', false, 'codigo', 'lease_invalido');
@@ -476,9 +476,9 @@ end
 $function$;
 
 create or replace function public.fabio_falhar_registro_recibo(
-  notificacao_id uuid,
-  lease_token uuid,
-  erro text
+  p_notificacao_id uuid,
+  p_lease_token uuid,
+  p_erro text
 ) returns jsonb
 language plpgsql
 security definer
@@ -487,20 +487,20 @@ as $function$
 declare
   v_afetadas integer;
 begin
-  if notificacao_id is null or lease_token is null or nullif(btrim(erro), '') is null then
+  if p_notificacao_id is null or p_lease_token is null or nullif(btrim(p_erro), '') is null then
     return jsonb_build_object('ok', false, 'codigo', 'parametros_invalidos');
   end if;
 
   update public.fabio_notificacoes n
      set status = 'falhou',
-         last_error = left(btrim(erro), 1000),
+         last_error = left(btrim(p_erro), 1000),
          proxima_tentativa_em = now() + interval '1 minute',
          lease_token = null,
          lease_expira_em = null
-   where n.id = notificacao_id
+   where n.id = p_notificacao_id
      and n.tipo = 'registro_recibo'
      and n.status = 'processando'
-     and n.lease_token = lease_token
+     and n.lease_token = p_lease_token
      and n.lease_expira_em > now();
   get diagnostics v_afetadas = row_count;
   return jsonb_build_object('ok', v_afetadas = 1, 'codigo',
