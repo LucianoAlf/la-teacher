@@ -150,6 +150,16 @@ class BridgeIntegrationTest(unittest.TestCase):
         self.assertEqual(patch_mock.call_args.args[0], "/rest/v1/fabio_chat_mensagens")
         self.assertEqual(patch_mock.call_args.args[2]["media_extracted_text"], "trabalhei ritmo")
 
+    def test_remove_audio_uses_storage_bulk_delete_contract(self):
+        backend = bridge.FabioBridgeBackend("fabio-audios")
+        response = type("Response", (), {"status_code": 200, "text": ""})()
+        with patch.object(bridge, "SUPABASE_KEY", "test-key"), \
+             patch.object(bridge.requests, "delete", return_value=response) as delete_mock:
+            backend.remove_audio("whatsapp/25/e2e.ogg")
+        delete_mock.assert_called_once()
+        self.assertTrue(delete_mock.call_args.args[0].endswith("/storage/v1/object/fabio-audios"))
+        self.assertEqual(delete_mock.call_args.kwargs["json"], {"prefixes": ["whatsapp/25/e2e.ogg"]})
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

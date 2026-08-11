@@ -277,7 +277,14 @@ class FabioBridgeBackend(FabioWhatsappBackend):
             raise RuntimeError(f"storage_upload_failed_{response.status_code}")
 
     def remove_audio(self, storage_path: str) -> None:
-        response = requests.delete(self._storage_url(storage_path), headers=sb_headers(), timeout=_HTTP_TIMEOUT)
+        # Supabase Storage remove is a bulk-delete operation: the bucket is
+        # the route and the exact object key travels in `prefixes`.
+        response = requests.delete(
+            f"{SUPABASE_URL}/storage/v1/object/{self.bucket}",
+            headers=sb_headers(),
+            json={"prefixes": [storage_path]},
+            timeout=_HTTP_TIMEOUT,
+        )
         if response.status_code not in {200, 204, 404}:
             raise RuntimeError(f"storage_remove_failed_{response.status_code}")
 
