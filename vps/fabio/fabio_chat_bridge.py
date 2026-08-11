@@ -29,8 +29,13 @@ from urllib.parse import urlparse
 
 import requests
 
+_CONTRACT_DIR = Path(__file__).resolve().parent
+if str(_CONTRACT_DIR) not in sys.path:
+    sys.path.insert(0, str(_CONTRACT_DIR))
+
 from fabio_whatsapp_actions import FabioWhatsappBackend, tratar_mensagem_professor
 from fabio_whatsapp_intents import classificar_intencao_audio, classificar_intencao_texto
+from fabio_registro_normalization_contract import sanear_readback_para_preview
 
 HERMES_HOME = Path(os.getenv("HERMES_HOME", "/home/fabio/.hermes"))
 ENV_FILE = HERMES_HOME / ".env"
@@ -143,6 +148,70 @@ def sb_patch(path: str, params: Dict[str, str], body: Any, prefer: Optional[str]
     return requests.patch(f"{SUPABASE_URL}{path}", headers=sb_headers(prefer), params=params, json=body, timeout=_HTTP_TIMEOUT)
 
 
+def _readback_fail_closed(professor_id: Any) -> dict[str, Any]:
+    return sanear_readback_para_preview(
+        None,
+        professor_id=professor_id,
+        roster_ids=set(),
+    )
+
+
+def _sanear_readback_com_roster_real(result: Any, payload: dict[str, Any]) -> dict[str, Any]:
+    """Busca o roster autoritativo antes de liberar um preview de read-back."""
+    try:
+        professor_id = payload.get("p_professor_id")
+        if isinstance(professor_id, bool) or not isinstance(professor_id, int):
+            return _readback_fail_closed(professor_id)
+        if not isinstance(result, dict):
+            return _readback_fail_closed(professor_id)
+        trunk = result.get("tronco")
+        raw_slices = result.get("fatias")
+        if not isinstance(trunk, dict) or not isinstance(raw_slices, list) or not raw_slices:
+            return _readback_fail_closed(professor_id)
+        aula_id = trunk.get("aula_id")
+        trunk_professor_id = trunk.get("professor_id")
+        if (
+            isinstance(aula_id, bool)
+            or not isinstance(aula_id, int)
+            or isinstance(trunk_professor_id, bool)
+            or trunk_professor_id != professor_id
+        ):
+            return _readback_fail_closed(professor_id)
+
+        context_rows = sb_get(
+            "/rest/v1/vw_fabio_aulas_contexto",
+            {
+                "select": "aula_local_id,professor_id,aluno_id",
+                "aula_local_id": f"eq.{aula_id}",
+                "professor_id": f"eq.{professor_id}",
+            },
+        )
+        if not isinstance(context_rows, list) or not context_rows:
+            return _readback_fail_closed(professor_id)
+        roster_ids: set[int] = set()
+        for row in context_rows:
+            if not isinstance(row, dict):
+                return _readback_fail_closed(professor_id)
+            aluno_id = row.get("aluno_id")
+            if (
+                row.get("aula_local_id") != aula_id
+                or row.get("professor_id") != professor_id
+                or isinstance(aluno_id, bool)
+                or not isinstance(aluno_id, int)
+            ):
+                return _readback_fail_closed(professor_id)
+            roster_ids.add(aluno_id)
+        if not roster_ids:
+            return _readback_fail_closed(professor_id)
+        return sanear_readback_para_preview(
+            result,
+            professor_id=professor_id,
+            roster_ids=roster_ids,
+        )
+    except Exception:
+        return _readback_fail_closed(payload.get("p_professor_id"))
+
+
 class FabioBridgeBackend(FabioWhatsappBackend):
     """Guarded service-role adapter used by actions and the reconciler."""
 
@@ -153,7 +222,10 @@ class FabioBridgeBackend(FabioWhatsappBackend):
         response = sb_post(f"/rest/v1/rpc/{name}", payload)
         if response.status_code >= 400:
             raise RuntimeError(f"{name}_rpc_failed_{response.status_code}")
-        return response.json() if response.content else None
+        result = response.json() if response.content else None
+        if name != "fabio_registro_completo":
+            return result
+        return _sanear_readback_com_roster_real(result, payload)
 
     @staticmethod
     def _extension(mime: str) -> str:

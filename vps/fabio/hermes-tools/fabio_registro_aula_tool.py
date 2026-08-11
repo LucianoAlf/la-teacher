@@ -8,6 +8,7 @@ They do NOT expose arbitrary SQL, shell, filesystem, or generic HTTP writes.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import tempfile
@@ -19,6 +20,48 @@ from datetime import datetime
 import requests
 
 from tools.registry import registry
+
+# A tool roda fora do checkout. Carregamos exatamente o arquivo versionado do
+# bridge; o espelho local existe somente para os testes e desenvolvimento.
+_CONTRACT_FILENAME = "fabio_registro_normalization_contract.py"
+
+
+def _contract_path(
+    *,
+    runtime_root: Path | None = None,
+    local_file: Path | None = None,
+) -> Path:
+    runtime_file = (
+        runtime_root
+        if runtime_root is not None
+        else Path(os.getenv("FABIO_CHAT_BRIDGE_DIR", "/home/fabio/fabio-chat-bridge"))
+    ) / _CONTRACT_FILENAME
+    fallback_file = (
+        local_file
+        if local_file is not None
+        else Path(__file__).resolve().parents[1] / _CONTRACT_FILENAME
+    )
+    for candidate in (runtime_file, fallback_file):
+        if candidate.is_file():
+            return candidate.resolve()
+    raise RuntimeError("fabio_registro_normalization_contract_missing")
+
+
+def _load_contract_module(contract_file: Path) -> Any:
+    spec = importlib.util.spec_from_file_location("fabio_registro_normalization_contract", contract_file)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("fabio_registro_normalization_contract_unloadable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_CONTRACT_PATH = _contract_path()
+_CONTRACT_MODULE = _load_contract_module(_CONTRACT_PATH)
+NormalizationContractError = _CONTRACT_MODULE.NormalizationContractError
+adaptar_contrato_para_payload_rpc = _CONTRACT_MODULE.adaptar_contrato_para_payload_rpc
+adaptar_payload_legado_para_contrato = _CONTRACT_MODULE.adaptar_payload_legado_para_contrato
+validar_e_sanear_normalizacao = _CONTRACT_MODULE.validar_e_sanear_normalizacao
 
 _TOOLSET = "fabio_registro_aula"
 _DEFAULT_SUPABASE_URL = "https://ouqwbbermlzqqvtqwlul.supabase.co"
@@ -222,67 +265,6 @@ def fabio_buscar_presencas_pendentes_professor(professor_id: Any) -> str:
     return json.dumps({"ok": True, "status_code": resp.status_code, "result": data}, ensure_ascii=False)
 
 
-def _normalizar_shape_com_roster(p_payload: Dict[str, Any]) -> tuple[Dict[str, Any] | None, dict[str, Any] | None]:
-    """Garante que nunca seja criado tronco aluno_id null + 0 fatias.
-
-    A RPC pública atual hardcoda aluno_id null no tronco. Até o banco aceitar
-    tronco.aluno_id, o caminho seguro é materializar fatias a partir do roster.
-    Individual vira 1 fatia; turma vira 1 fatia por aluno.
-    """
-    fatias = p_payload.get("fatias")
-    if isinstance(fatias, list) and len(fatias) > 0:
-        # A Alma/LLM pode mandar presenca no topo da fatia. A RPC atual persiste
-        # apenas fatia->campos, então precisamos copiar fatia.presenca para
-        # campos.presenca antes de retornar o shape já materializado.
-        novas_fatias = []
-        changed = False
-        for fatia in fatias:
-            if not isinstance(fatia, dict):
-                novas_fatias.append(fatia)
-                continue
-            nova = dict(fatia)
-            campos = nova.get("campos") if isinstance(nova.get("campos"), dict) else {}
-            if "presenca" in nova and "presenca" not in campos:
-                campos = {**campos, "presenca": nova.get("presenca")}
-                nova["campos"] = campos
-                changed = True
-            novas_fatias.append(nova)
-        if changed:
-            p_payload = dict(p_payload)
-            p_payload["fatias"] = novas_fatias
-        return p_payload, None
-
-    try:
-        aula_int = int(p_payload.get("aula_id"))
-        prof_int = int(p_payload.get("professor_id")) if p_payload.get("professor_id") is not None else None
-    except Exception:
-        return None, {"error": "aula_id/professor_id inválidos para resolver roster"}
-
-    roster, meta = _buscar_roster_aula(aula_int, prof_int)
-    if not roster:
-        return None, {"error": "roster não resolvido; registro não criado para evitar tronco null + 0 fatias", "meta": meta}
-
-    expected = meta.get("qtd_contexto") if isinstance(meta, dict) else None
-    if isinstance(expected, int) and expected > 0 and len(roster) != expected:
-        return None, {"error": "roster divergente de qtd_alunos; registro não criado", "meta": meta, "roster": roster}
-
-    tronco = p_payload.get("tronco") if isinstance(p_payload.get("tronco"), dict) else {}
-    texto = tronco.get("texto") or p_payload.get("texto_consolidado")
-    campos_base = tronco.get("campos") if isinstance(tronco.get("campos"), dict) else {}
-    novas_fatias = []
-    for aluno in roster:
-        novas_fatias.append({
-            "aula_id": aluno.get("aula_id") or aula_int,
-            "aluno_id": aluno["aluno_id"],
-            "texto": texto,
-            "campos": {**campos_base, "aluno_nome": aluno.get("aluno_nome"), "shape_autogerado_por_roster": True},
-        })
-    p_payload = dict(p_payload)
-    p_payload["fatias"] = novas_fatias
-    p_payload["tronco"] = {**tronco, "campos": {**campos_base, "shape_roster_meta": meta}}
-    return p_payload, None
-
-
 def fabio_transcrever_audio_url(audio_url: str, language: str | None = "pt") -> str:
     """Download and transcribe a temporary Supabase audio URL with local Whisper."""
     _validate_https_url(audio_url)
@@ -431,98 +413,6 @@ def _has_pedagogical_content(value: Any) -> bool:
     return False
 
 
-def _infer_audio_id_for_payload(p_payload: Dict[str, Any]) -> tuple[str, Any]:
-    """Recover the queue audio_id when the model omits it from p_payload.
-
-    The webhook prompt carries audio_id and the agent usually uses it in prior
-    tool calls, but occasionally drops it in the final RPC payload. At that
-    point the queue may already be transcrito/erro, so searching only
-    status=transcrevendo produces candidates=[]. Keep this fallback narrow:
-    same aula/professor, recent lifecycle row, and prefer rows without an
-    existing registro.
-    """
-    try:
-        aula_id = int(p_payload.get("aula_id"))
-        professor_id = int(p_payload.get("professor_id"))
-    except Exception:
-        return "", {"error": "aula_id/professor_id inválidos para inferir audio_id"}
-
-    try:
-        import datetime as _dt
-        since = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(minutes=90)).isoformat()
-        q_resp = requests.get(
-            f"{_supabase_url()}/rest/v1/fabio_fila_audios",
-            headers=_headers(),
-            params={
-                "select": "id,status,erro,atualizado_em,criado_em,transcricao",
-                "aula_id": f"eq.{aula_id}",
-                "professor_id": f"eq.{professor_id}",
-                "status": "in.(pendente,transcrevendo,transcrito,erro)",
-                "atualizado_em": f"gte.{since}",
-                "order": "atualizado_em.desc",
-                "limit": "5",
-            },
-            timeout=_HTTP_TIMEOUT,
-        )
-        q_data = _safe_json_response(q_resp)
-        if q_resp.status_code >= 400 or not isinstance(q_data, list):
-            return "", q_data
-
-        candidates = []
-        for row in q_data:
-            audio_id = str(row.get("id") or "")
-            if not audio_id:
-                continue
-            existing_resp = requests.get(
-                f"{_supabase_url()}/rest/v1/fabio_registros_aula",
-                headers=_headers(),
-                params={"audio_id": f"eq.{audio_id}", "select": "id", "limit": "1"},
-                timeout=_HTTP_TIMEOUT,
-            )
-            existing_data = _safe_json_response(existing_resp)
-            if existing_resp.status_code < 400 and not existing_data:
-                candidates.append(row)
-
-        pool = candidates or q_data
-        if len(pool) == 1:
-            return str(pool[0].get("id") or ""), pool
-
-        # Same aula/professor can have multiple retrying queue rows. When that
-        # happens, disambiguate by the transcription/content the model placed in
-        # the final payload; never pick by timestamp alone if text identifies the
-        # row.
-        payload_text = json.dumps(p_payload, ensure_ascii=False).lower()
-        text_matches = []
-        for row in pool:
-            tr = str(row.get("transcricao") or "").strip().lower()
-            if not tr:
-                continue
-            probes = [tr[:80], tr[:50], tr[:32]]
-            if any(probe and probe in payload_text for probe in probes):
-                text_matches.append(row)
-        if len(text_matches) == 1:
-            return str(text_matches[0].get("id") or ""), text_matches
-
-        # Fallback only for the common case where a new recording is being
-        # processed while an old retry from the same aula/professor is still in
-        # erro. If exactly one candidate was created very recently, use it.
-        recent_created = []
-        recent_cutoff = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(hours=4)
-        for row in pool:
-            try:
-                created = _dt.datetime.fromisoformat(str(row.get("criado_em")).replace("Z", "+00:00"))
-            except Exception:
-                continue
-            if created >= recent_cutoff:
-                recent_created.append(row)
-        if len(recent_created) == 1:
-            return str(recent_created[0].get("id") or ""), recent_created
-
-        return "", pool
-    except Exception as exc:
-        return "", {"error": str(exc)}
-
-
 def fabio_criar_registro_aula(p_payload: Dict[str, Any]) -> str:
     """Call only public.fabio_criar_registro(p_payload jsonb) via Supabase REST."""
     if not isinstance(p_payload, dict):
@@ -534,25 +424,70 @@ def fabio_criar_registro_aula(p_payload: Dict[str, Any]) -> str:
     if p_payload.get("origem") != "app":
         return json.dumps({"ok": False, "error": "origem must be 'app' for this route"}, ensure_ascii=False)
 
-    audio_id = str(p_payload.get("audio_id") or "")
-    if not audio_id and p_payload.get("origem") == "app":
-        # Safety net for webhook turns: the model occasionally omitted audio_id
-        # from p_payload even though the webhook message had it and used it in
-        # previous tool calls. The queue may already be transcrito/erro here.
-        audio_id, candidates = _infer_audio_id_for_payload(p_payload)
-        if audio_id:
-            p_payload["audio_id"] = audio_id
-        else:
-            return json.dumps({
-                "ok": False,
-                "error": "audio_id obrigatório para origem app",
-                "debug": {
-                    "aula_id": p_payload.get("aula_id"),
-                    "professor_id": p_payload.get("professor_id"),
-                    "payload_has_transcricao": bool(p_payload.get("transcricao") or p_payload.get("texto_consolidado")),
-                },
-                "candidates": candidates,
-            }, ensure_ascii=False)
+    raw_audio_id = p_payload.get("audio_id")
+    if not isinstance(raw_audio_id, str) or not raw_audio_id.strip():
+        return json.dumps({"ok": False, "error": "audio_id_obrigatorio"}, ensure_ascii=False)
+    audio_id = raw_audio_id.strip()
+    transcricao = p_payload.get("transcricao") if isinstance(p_payload.get("transcricao"), str) else None
+    if not isinstance(p_payload.get("fatias"), list) or not p_payload["fatias"]:
+        return json.dumps({"ok": False, "error": "normalizacao_invalida"}, ensure_ascii=False)
+
+    try:
+        aula_id = p_payload.get("aula_id")
+        professor_id = p_payload.get("professor_id")
+        if (
+            isinstance(aula_id, bool)
+            or not isinstance(aula_id, int)
+            or isinstance(professor_id, bool)
+            or not isinstance(professor_id, int)
+        ):
+            raise NormalizationContractError("ids_resolvidos_invalidos")
+
+        roster, roster_meta = _buscar_roster_aula(aula_id, professor_id)
+        if not isinstance(roster_meta, dict) or roster_meta.get("ok") is not True or not roster:
+            raise NormalizationContractError("roster_invalido")
+        expected_roster_size = roster_meta.get("qtd_contexto")
+        if expected_roster_size is not None and (
+            isinstance(expected_roster_size, bool)
+            or not isinstance(expected_roster_size, int)
+            or expected_roster_size <= 0
+            or len(roster) != expected_roster_size
+        ):
+            raise NormalizationContractError("roster_incompleto")
+        roster_ids: set[int] = set()
+        for aluno in roster:
+            if not isinstance(aluno, dict):
+                raise NormalizationContractError("roster_invalido")
+            aluno_id = aluno.get("aluno_id")
+            if isinstance(aluno_id, bool) or not isinstance(aluno_id, int):
+                raise NormalizationContractError("roster_invalido")
+            if aluno.get("aula_id") is not None and aluno["aula_id"] != aula_id:
+                raise NormalizationContractError("roster_aula_divergente")
+            roster_ids.add(aluno_id)
+        if not roster_ids:
+            raise NormalizationContractError("roster_invalido")
+
+        canonical = validar_e_sanear_normalizacao(
+            adaptar_payload_legado_para_contrato(p_payload),
+            aula_id=aula_id,
+            professor_id=professor_id,
+            roster_ids=roster_ids,
+        )
+    except requests.RequestException:
+        return json.dumps({"ok": False, "error": "roster_indisponivel"}, ensure_ascii=False)
+    except (NormalizationContractError, TypeError, ValueError):
+        return json.dumps({"ok": False, "error": "normalizacao_invalida"}, ensure_ascii=False)
+
+    try:
+        rpc_payload = adaptar_contrato_para_payload_rpc(
+            canonical,
+            origem=p_payload["origem"],
+            molde=p_payload["molde"],
+            audio_id=audio_id or None,
+        )
+    except (NormalizationContractError, KeyError, TypeError, ValueError):
+        return json.dumps({"ok": False, "error": "normalizacao_invalida"}, ensure_ascii=False)
+
     if audio_id:
         existing_resp = requests.get(
             f"{_supabase_url()}/rest/v1/fabio_registros_aula",
@@ -564,27 +499,22 @@ def fabio_criar_registro_aula(p_payload: Dict[str, Any]) -> str:
         if existing_resp.status_code >= 400:
             return json.dumps({"ok": False, "status_code": existing_resp.status_code, "error": existing_data}, ensure_ascii=False)
         if existing_data:
-            fabio_atualizar_status_audio(audio_id, "normalizado", None, p_payload.get("transcricao"))
-            return json.dumps({"ok": True, "status_code": 200, "result": {"status": "ja_existia", "registro_id": existing_data[0].get("id"), "fatias": None}}, ensure_ascii=False)
+            fabio_atualizar_status_audio(audio_id, "normalizado", None, transcricao)
+            return json.dumps({
+                "ok": True,
+                "status_code": 200,
+                "result": {"status": "ja_existia", "registro_id": existing_data[0].get("id"), "fatias": None},
+                "incertezas": canonical["incertezas"],
+                "aguardando_confirmacao": bool(canonical["incertezas"]),
+            }, ensure_ascii=False)
 
-    content_probe = {
-        "tronco": p_payload.get("tronco"),
-        "fatias": p_payload.get("fatias"),
-        "texto_consolidado": p_payload.get("texto_consolidado"),
-    }
-    if not _has_pedagogical_content(content_probe):
+    if not _has_pedagogical_content(canonical):
         if audio_id:
             fabio_atualizar_status_audio(audio_id, "erro", "transcricao vazia; professor precisa regravar")
         return json.dumps({"ok": False, "error": "sem conteúdo pedagógico real; registro não criado", "audio_id": audio_id or None}, ensure_ascii=False)
 
-    p_payload, shape_error = _normalizar_shape_com_roster(p_payload)
-    if shape_error:
-        if audio_id:
-            fabio_atualizar_status_audio(audio_id, "erro", shape_error.get("error", "shape inválido"))
-        return json.dumps({"ok": False, **shape_error, "audio_id": audio_id or None}, ensure_ascii=False)
-
     url = f"{_supabase_url()}/rest/v1/rpc/fabio_criar_registro"
-    body = {"p_payload": p_payload}
+    body = {"p_payload": rpc_payload}
     resp = requests.post(url, headers=_headers(), json=body, timeout=_HTTP_TIMEOUT)
     data = _safe_json_response(resp)
     if resp.status_code >= 400:
@@ -592,8 +522,14 @@ def fabio_criar_registro_aula(p_payload: Dict[str, Any]) -> str:
             fabio_atualizar_status_audio(audio_id, "erro", f"rpc fabio_criar_registro {resp.status_code}")
         return json.dumps({"ok": False, "status_code": resp.status_code, "error": data}, ensure_ascii=False)
     if audio_id:
-        fabio_atualizar_status_audio(audio_id, "normalizado", None, p_payload.get("transcricao"))
-    return json.dumps({"ok": True, "status_code": resp.status_code, "result": data}, ensure_ascii=False)
+        fabio_atualizar_status_audio(audio_id, "normalizado", None, transcricao)
+    return json.dumps({
+        "ok": True,
+        "status_code": resp.status_code,
+        "result": data,
+        "incertezas": canonical["incertezas"],
+        "aguardando_confirmacao": bool(canonical["incertezas"]),
+    }, ensure_ascii=False)
 
 
 registry.register(
