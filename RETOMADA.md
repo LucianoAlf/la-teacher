@@ -6,11 +6,9 @@
 > que já foi decidido.
 >
 > **Última atualização: 10/08/2026, noite (BRT) — Cursor.** Radar Tasks 5–9
-> verificadas ao vivo e **mergeadas em `main`** (`fcc4128`); depois disso, a
-> rodada de **mobile + desktop** do Radar (linha, card do aluno, vocabulário dos
-> sinais) e, por último, o **desktop virando o mesmo cartão do celular** — com a
-> foto do aluno vinda do banco (migration **089**). Quem mais lê: o Alf, o Hugo,
-> o Alfredo. Escrever pra eles, não pra mim.
+> mergeadas; desktop = cartão do celular + foto (089, `bcf995c`); tooltip do
+> score **organizado sem perder informação** (aprovado pelo Alf). Quem mais lê:
+> o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
@@ -33,14 +31,44 @@
 
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
 
-1. **Radar do aluno** — backend no ar + telas verificadas. Ver seção logo
-   abaixo. Falta só o **Fechamento do plano** (menores já listados na seção de
-   backend — não bloqueiam).
+1. **Radar do aluno** — backend no ar + telas no ar. Tooltip do score
+   organizado (aprovado). **Próximo com calma (combinado com o Alf):** cabeçalho
+   único da mesa no desktop (hoje os rótulos FALTAS/ABSENTEÍSMO/… repetem em
+   cada linha) — tentativa anterior saiu feia e foi **revertida**; não reabrir
+   sem ele. Fechamento do plano (menores do backend) não bloqueia.
 2. **Fábio escreve no WhatsApp** — SPEC escrita, **ainda sem aprovação do
    Alf e sem plano**. Não é pra codar ainda — é pra ele ler
    `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`
    primeiro. Ver seção "Brainstorming feito, SPEC escrita", mais abaixo (dentro
    do histórico do incidente da Daiana, 10/08 tarde).
+
+---
+
+## ✅ 10/08 NOITE (Cursor) — tooltip do score organizado (sem tirar informação)
+
+Pedido do Alf: o tooltip do score estava bagunçado (`flex justify-between` com
+rótulo+detalhe numa linha e "contribuiu X de Y" na outra, dentro de `max-w-xs`
+— quebrava no meio de "aulas"). **Regra explícita:** organizar, mas **não
+tirar** nenhuma informação que já estava lá.
+
+Uma tentativa anterior tirou contribuição / agrupou "fora da conta" / mexeu na
+mesa inteira — o Alf mandou cancelar e voltar ao `bcf995c`. Esta rodada mexeu
+**só** no tooltip.
+
+**O que ficou** (`DecomposicaoNotaTooltip.tsx` + uso em `LinhaRadar`):
+
+- Cabeçalho: `13 · Crítico` (cor do status)
+- Cada sinal em **dois andares**: nome | `contribuiu X de Y` (ou `fora da conta`);
+  detalhe embaixo (`100% · 2 de 2 aulas` / `professor ainda não respondeu` / …)
+- Rodapé: `apurada em 3 de 5 sinais` (+ `· insuficiente` quando couber)
+- Largura fixa 300px — acabou a quebra no meio da palavra
+
+**Conferido no preview (sessão de coordenação):** as 5 linhas da decomposição +
+cabeçalho + rodapé, todos os textos da versão bagunçada presentes. Alf: _"Ficou
+bom."_
+
+**Ainda NÃO feito (deixar pra ele com calma):** cabeçalho único da mesa no
+desktop. Combinado que fica melhor; não reabrir sem pedido.
 
 ---
 

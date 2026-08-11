@@ -10,11 +10,9 @@ import {
   FUNDO_STATUS,
   ROTULO_CORACAO,
   ROTULO_STATUS,
-  motivoSemDado,
   pct,
-  rotuloSinal,
-  valorSinal,
 } from '../sinaisRadar'
+import { DecomposicaoNotaTooltip } from './DecomposicaoNotaTooltip'
 import { FRASE_SEMAFORO } from './LinhaSemaforo'
 import { TooltipRadar } from './TooltipRadar'
 
@@ -104,40 +102,7 @@ export function LinhaRadar({
   ) : null
 
   const selo = (
-    <TooltipRadar
-      conteudo={
-        <>
-          <strong>
-            {linha.nota.nota ?? '—'} · {ROTULO_STATUS[linha.status]}
-          </strong>
-          <ul className="mt-2 space-y-1">
-            {linha.nota.decomposicao.map((d) => {
-              // Sinal fora da conta mostra o MOTIVO, não o valor: "0 faltas
-              // seguidas" ao lado de "fora da conta" afirma o que a guarda da
-              // 088 se recusa a afirmar.
-              const detalhe = d.sem_dado
-                ? motivoSemDado(d.sinal)
-                : valorSinal(d.sinal, linha, d.valor)
-              return (
-                <li key={d.sinal} className="flex justify-between gap-3">
-                  <span className={d.sem_dado ? 'text-text-muted' : undefined}>
-                    {rotuloSinal(d.sinal)}
-                    {detalhe ? ` · ${detalhe}` : ''}
-                  </span>
-                  <span>
-                    {d.sem_dado ? 'fora da conta' : `contribuiu ${d.contribuiu} de ${d.de}`}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-          <p className="mt-2 text-text-muted">
-            apurada em {linha.nota.sinais_apurados} de {linha.nota.sinais_totais} sinais
-            {!linha.nota.suficiente ? ' · insuficiente' : ''}
-          </p>
-        </>
-      }
-    >
+    <TooltipRadar conteudo={<DecomposicaoNotaTooltip linha={linha} />}>
       <span
         className={`flex h-[48px] w-[48px] flex-col items-center justify-center rounded-md lg:h-[54px] lg:w-[54px] ${FUNDO_STATUS[linha.status]}`}
       >

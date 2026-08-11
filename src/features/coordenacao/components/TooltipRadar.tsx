@@ -45,7 +45,7 @@ export function TooltipRadar({
         <span
           id={id}
           role="tooltip"
-          className="absolute left-0 top-full z-20 mt-1 w-max max-w-xs rounded-lg border border-border-subtle bg-bg-surface p-3 text-xs leading-relaxed text-text-primary shadow-card"
+          className="absolute left-0 top-full z-20 mt-1.5 w-max max-w-none rounded-lg border border-border-subtle bg-bg-surface p-3.5 text-xs leading-relaxed text-text-primary shadow-card"
         >
           {conteudo}
         </span>
