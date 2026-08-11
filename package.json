@@ -122,7 +122,9 @@
     "teste:089": "node scripts/rodar-teste-sql.mjs supabase/migrations/089-a-foto-do-aluno-no-radar.sql supabase/migrations/089-a-foto-do-aluno-no-radar.test.sql",
     "mutantes:089": "node scripts/mutantes-089.mjs",
     "teste:090": "node scripts/rodar-teste-sql.mjs supabase/migrations/090-fabio-whatsapp-acoes.sql supabase/migrations/090-fabio-whatsapp-acoes.test.sql",
-    "mutantes:090": "node scripts/mutantes-090.mjs"
+    "mutantes:090": "node scripts/mutantes-090.mjs",
+    "teste:091": "node scripts/rodar-teste-sql.mjs supabase/migrations/091-as-cinco-portas-do-whatsapp.sql supabase/migrations/091-as-cinco-portas-do-whatsapp.test.sql",
+    "mutantes:091": "node scripts/mutantes-091.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
