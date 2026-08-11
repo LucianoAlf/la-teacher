@@ -5,15 +5,15 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 11/08/2026 — 11/08-G6 bloqueada por receptor HMAC não
-> versionável.** Radar telas no ar
+> **Última atualização: 11/08/2026 — 11/08-G6 source parity registrada; o
+> próximo gate é G6 operacional separado.** Radar telas no ar
 > (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
 > (`f00c96d`, aprovado). Deploy do Radar = **Vercel + Supabase** — a frente do
 > Fábio usa a VPS própria. Frente “Fábio escreve no WhatsApp” = SPEC aprovada + plano
 > em gates; 10/08-G0/G1 concluídos, schema 090/091/092 publicado no Supabase e
-> 10/08-G4 publicado em `shadow` na VPS. O 10/08-G5 passou a piloto restrito; a
-> 11/08-G6 de paridade
-> de fonte está bloqueada até o receptor HMAC ficar versionável. Quem mais lê: o
+> 10/08-G4 publicado em `shadow` na VPS. O 10/08-G5 passou a piloto restrito;
+> a fonte do callback foi correlacionada e espelhada sem alterar o runtime.
+> G6 operacional exige revisão própria; G7 continua proibido. Quem mais lê: o
 > Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
@@ -97,7 +97,7 @@ do reconciliador continua ativo; o último ciclo terminou com `claimed=0` e
 `falhas=0`; não há erro recente no log do bridge. **Nenhuma mensagem real foi
 enviada ainda; G5 E2E continua pendente do áudio/texto do professor.**
 
-## ⛔ 11/08-G6 — paridade da fonte e congelamento do piloto: BLOCKED
+## ✅ 11/08-G6 — paridade da fonte registrada; G6 operacional pendente de revisão
 
 Evidência completa: `docs/superpowers/evidence/2026-08-11-registro-aula-source-parity.md`.
 
@@ -107,27 +107,35 @@ Evidência completa: `docs/superpowers/evidence/2026-08-11-registro-aula-source-
 - A Edge recebe `audio_id`, repassa os identificadores já resolvidos e uma URL
   temporária, e assina o corpo em HMAC. Ela não contém a implementação que
   recebe o callback ou normaliza o registro.
-- A busca de fontes no bridge e no Hermes não encontrou receptor versionável
-  que valide a assinatura ou monte o rascunho. Logo, não é seguro assumir onde
-  ficam a normalização e o contrato de fatias.
-- Nenhuma flag de recibo foi adicionada, nenhum backup/configuração foi tocado,
-  nenhum serviço foi reiniciado e a allowlist do piloto não mudou.
+- O callback foi correlacionado com o gateway Hermes de usuário na porta 8644:
+  o adaptador Webhook upstream valida o HMAC e entrega a rota dinâmica
+  `registro-aula`. O listener não é Nginx nem o bridge de conversa.
+- A skill viva foi espelhada em
+  `vps/fabio/hermes-skills/registro-aula-audio-la-music/SKILL.md`
+  (SHA-256 `145bb5f6cff2bfd3aec753c7a20ddee93481aaff9e0c51e8ea47a82b170427a3`).
+  A ferramenta Python viva, que é untracked no checkout Hermes, foi espelhada
+  em `vps/fabio/hermes-tools/fabio_registro_aula_tool.py`
+  (SHA-256 `c76a3600df7a368c2d9b9a6766e7559dfdaddb035e2c98e79cb167b35efa5e8a`).
+- O runtime segue VPS-owned; os espelhos são trilha de auditoria, não origem
+  automática de deploy. Nenhuma flag de recibo foi adicionada, nenhum
+  backup/configuração foi tocado, nenhum serviço foi reiniciado e a allowlist
+  do piloto não mudou.
 - Os comandos `teste:090`, `teste:091` e `teste:092` não rodaram: o runner abre
   transação no banco produtivo e executa DDL/DML antes do rollback, contrariando
   o escopo somente leitura desta tarefa.
 
-**ÚNICO PRÓXIMO PASSO ATIVO DA FRENTE WHATSAPP:** localizar e versionar a fonte
-do receptor HMAC do callback. Só então fazer backup recuperável, acrescentar
-`FABIO_REGISTRO_RECIBO_MODE=off` e a allowlist espelhada em
-`FABIO_REGISTRO_RECIBO_PILOT_IDS`, conferir saída sanitizada e reiniciar pelo
-procedimento já provado. Até isso acontecer, não expandir o piloto nem rodar
-novo E2E.
+**ÚNICO PRÓXIMO PASSO ATIVO DA FRENTE WHATSAPP:** `11/08-G6 operacional`,
+em task separada e somente após revisão desta paridade. Ele poderá comparar
+espelhos contra a VPS, fazer backup e tratar flags sem ampliar a allowlist.
+Nesta task não se muda runtime. Até a revisão e a conclusão segura do G6
+operacional, G7 continua proibido, o piloto não expande e não há novo E2E.
 
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
 
 > **Nota somente da frente WhatsApp:** os próximos passos de 10/08-G0/G3 e
-> posteriores são históricos/superados pelo hard-stop do 11/08-G6 acima. Esta
-> nota não altera o estado da frente do Radar.
+> posteriores são históricos/superados. A paridade de fonte do 11/08-G6 foi
+> registrada; vale somente o G6 operacional separado acima. Esta nota não altera
+> o estado da frente do Radar.
 
 1. **Radar do aluno** — backend no ar + telas no ar. Tooltip do score
    organizado (aprovado). **Próximo com calma (combinado com o Alf):** cabeçalho
@@ -139,8 +147,8 @@ novo E2E.
    10/08-G0/G1 foram concluídos no worktree
    `D:\la-teacher-worktrees\fabio-whatsapp`; 10/08-G2 publicou as migrations
    090/091. A indicação original de seguir para 10/08-G3 e depois 10/08-G4/G5/
-   **10/08-G6 rollout geral** é histórica/superada; vale somente o hard-stop
-   ativo do 11/08-G6.
+   **10/08-G6 rollout geral** é histórica/superada; vale somente o G6
+   operacional separado do 11/08, após a revisão de paridade.
 
 ---
 
@@ -193,7 +201,8 @@ no real flow enabled.**
 
 **Histórico: 10/08-G2 fechado.** A indicação de seguir para 10/08-G3 local e
 depois para shadow, piloto ou **10/08-G6 rollout geral** está superada; não é
-autorização operacional enquanto persistir o hard-stop do 11/08-G6.
+autorização operacional. Vale o G6 operacional do 11/08, separado e pendente
+de revisão.
 
 ---
 
@@ -303,7 +312,8 @@ hex/cor arbitrária em `src/features/coordenacao` volta **vazio**.
 
 **HISTÓRICO/SUPERADO (10/08):** (1) Na frente do Fábio, a SPEC já tinha sido
 aprovada e o plano em gates mandava começar pelo 10/08-G0. Essa instrução foi
-superada pelo hard-stop do 11/08-G6. (2) No Radar, só com pedido dele:
+superada pelo G6 operacional do 11/08, separado e pendente de revisão. (2) No
+Radar, só com pedido dele:
 cabeçalho único da mesa no desktop (rótulos hoje repetem por linha; tentativa
 anterior revertida). Menores do backend ficam pro fechamento do plano e **não
 bloqueiam**. Deploy do que já entrou: Vercel (`f00c96d` em Production) +
@@ -520,7 +530,8 @@ pedido de liberação de prazo à coordenação e correção pós-confirmação.
 consolidar estes docs, criar worktree próprio e congelar o contrato vivo antes
 de extrair qualquer miolo. As passagens produtivas 10/08-G2 (banco),
 10/08-G4 (shadow na VPS), 10/08-G5 (piloto) e **10/08-G6 rollout geral** não
-são próximos passos ativos; o único é o hard-stop do 11/08-G6.
+são próximos passos ativos; o único é o G6 operacional do 11/08, separado e
+pendente de revisão.
 
 ---
 
@@ -841,7 +852,7 @@ A ordem verdadeira, **hoje**, é esta (a tabela antiga que dizia “faltam Tasks
 |---|---|---|---|
 | ~~1~~ | ~~Semáforo do professor~~ | **FECHADO em 09/08 à noite.** Banco (073–080), mesa do professor, tela da coordenação, cobrança no timer, e o Fábio lendo. O texto abaixo desta tabela é HISTÓRIA — não reabrir | ✅ |
 | **1** | **Radar do aluno** | **Backend + telas no ar** (Tasks 1–10). Foto na linha (089, `bcf995c`); tooltip do score organizado (`f00c96d`, Alf aprovou). Deploy = **Vercel Production + Supabase** — **VPS do Fábio não entra** nesta frente. Próximo só com pedido do Alf: cabeçalho único da mesa no desktop (não reabrir sozinho). Menores do backend não bloqueiam | topo deste arquivo + seções ✅ da noite 10/08 |
-| **2** | **Fábio escreve no WhatsApp** | **Histórico/superado:** plano de 10/08 (`10/08-G0` até `10/08-G6 rollout geral`) já avançou até piloto restrito. O único passo ativo é o hard-stop do **11/08-G6 paridade de fonte**; não retomar G0/G3 antigos | topo deste arquivo + evidência 11/08-G6 |
+| **2** | **Fábio escreve no WhatsApp** | **Histórico/superado:** plano de 10/08 (`10/08-G0` até `10/08-G6 rollout geral`) já avançou até piloto restrito. A paridade de fonte do 11/08-G6 foi registrada; o único passo ativo é o **G6 operacional**, separado e pendente de revisão. Não retomar G0/G3 antigos | topo deste arquivo + evidência 11/08-G6 |
 | 3 | **Fila offline no feedback** | O ✓ é honesto (alerta + reenviar), mas o toque se perde se o app fechar. Janela abre 25/08 | "Ainda aberto" |
 | ~~4~~ | ~~Parede de texto do escalonamento~~ | **FECHADO em 10/08** (`146a593`): índice + uma mensagem por unidade, 9/9 mutantes | seção do topo |
 | 4 | **Registro de presença em Campo Grande** | **NOVO, medido em 10/08:** 126 alunos com 2+ faltas seguidas e zero presença afirmada, concentrados em CG (28–50% da carteira de alguns professores). É o que segura o cartão "Sumiu da escola" do Radar | spec do Radar, §3 |

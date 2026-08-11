@@ -8,6 +8,7 @@ O repo é a fonte de leitura; **a VPS é onde executa**. Ao editar aqui, subir c
 | `fabio_auditoria.py` | Auditoria: diagnostica, **conserta o que dá**, reporta o resto | `fabio-auditoria.timer` → 7h e 21h (BRT) |
 | `hermes-platform-toolsets.yaml.txt` | Fragmento do `~/.hermes/config.yaml`: **a fronteira entre professor e admin** | gateway do Hermes |
 | `hermes-plugins/la-skills-leitura/` | Plugin que registra o toolset `skills_leitura` (skill sem `skill_manage`) | `~/.hermes/plugins/` |
+| `hermes-tools/fabio_registro_aula_tool.py` | Espelho auditável da ferramenta customizada de registro | `~/.hermes/hermes-agent/tools/` |
 
 ## A fronteira professor × admin é o CANAL (09/08/2026)
 
@@ -104,17 +105,25 @@ O reconciliador é um ciclo limitado por lease e roda pelo unit/timer
 confirmar antes da gravação final e prova no banco a limpeza do Storage antes de
 remover um blob.
 
-### G6 — paridade de fonte e congelamento do piloto (11/08/2026)
+### G6 — paridade de fonte registrada; operação separada (11/08/2026)
 
 Há um piloto restrito já configurado na VPS. A allowlist existente não pode ser
 ampliada durante esta fase. O recibo posterior à confirmação ainda não tem
 configuração runtime; as flags de recibo existem somente como referência acima.
 
-**Hard-stop atual:** a Edge `fabio-registro-aula` ativa está na versão 17 e
-assina o callback com HMAC, mas a fonte legível e versionável do receptor desse
-callback não foi localizada no bridge nem no Hermes. Não adicionar flags,
-reiniciar o bridge ou rodar novo E2E até localizar e versionar esse consumidor.
-O preflight, hash e contrato exigido estão em
+O bloqueio de localização foi resolvido sem mudar o runtime: a Edge
+`fabio-registro-aula` chega ao gateway Hermes de usuário na porta 8644, cujo
+adaptador Webhook upstream valida HMAC antes da rota dinâmica
+`registro-aula`. Os dois artefatos customizados do caminho estão espelhados:
+`hermes-skills/registro-aula-audio-la-music/SKILL.md` e
+`hermes-tools/fabio_registro_aula_tool.py`. A ferramenta Python ainda é
+VPS-owned e não está rastreada no checkout Hermes; o Git deste projeto é espelho
+de auditoria, não origem automática de deploy.
+
+**Próximo passo ativo:** `11/08-G6 operacional`, separado e dependente de
+revisão desta paridade. Até ele ser autorizado e concluído, não adicionar flags,
+reiniciar o bridge, rodar E2E novo, alterar serviço ou ampliar a allowlist. G7
+continua bloqueado. Hashes, caminhos e contrato estão na evidência
 `docs/superpowers/evidence/2026-08-11-registro-aula-source-parity.md`.
 
 ## Timers do usuário `fabio`
