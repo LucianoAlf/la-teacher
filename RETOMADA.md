@@ -5,15 +5,15 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 11/08/2026 — 11/08-G6 source parity registrada; o
-> próximo gate é G6 operacional separado.** Radar telas no ar
+> **Última atualização: 11/08/2026 — 11/08-G6 source parity e configuração
+> mínima do piloto concluídas; G7 permanece proibido até nova autorização.** Radar telas no ar
 > (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
 > (`f00c96d`, aprovado). Deploy do Radar = **Vercel + Supabase** — a frente do
 > Fábio usa a VPS própria. Frente “Fábio escreve no WhatsApp” = SPEC aprovada + plano
 > em gates; 10/08-G0/G1 concluídos, schema 090/091/092 publicado no Supabase e
 > 10/08-G4 publicado em `shadow` na VPS. O 10/08-G5 passou a piloto restrito;
-> a fonte do callback foi correlacionada e espelhada sem alterar o runtime.
-> G6 operacional exige revisão própria; G7 continua proibido. Quem mais lê: o
+> a fonte do callback foi correlacionada e espelhada e o G6 operacional aplicou
+> somente os flags de recibo desligados, sem restart. G7 continua proibido. Quem mais lê: o
 > Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
@@ -97,7 +97,7 @@ do reconciliador continua ativo; o último ciclo terminou com `claimed=0` e
 `falhas=0`; não há erro recente no log do bridge. **Nenhuma mensagem real foi
 enviada ainda; G5 E2E continua pendente do áudio/texto do professor.**
 
-## ✅ 11/08-G6 — paridade da fonte registrada; G6 operacional pendente de revisão
+## ✅ 11/08-G6 — paridade da fonte e configuração mínima do piloto concluídas
 
 Evidência completa: `docs/superpowers/evidence/2026-08-11-registro-aula-source-parity.md`.
 
@@ -117,25 +117,31 @@ Evidência completa: `docs/superpowers/evidence/2026-08-11-registro-aula-source-
   em `vps/fabio/hermes-tools/fabio_registro_aula_tool.py`
   (SHA-256 `c76a3600df7a368c2d9b9a6766e7559dfdaddb035e2c98e79cb167b35efa5e8a`).
 - O runtime segue VPS-owned; os espelhos são trilha de auditoria, não origem
-  automática de deploy. Nenhuma flag de recibo foi adicionada, nenhum
-  backup/configuração foi tocado, nenhum serviço foi reiniciado e a allowlist
-  do piloto não mudou.
+  automática de deploy. Em seguida, o G6 operacional alterou somente
+  `/home/fabio/.hermes/.env` por substituição atômica: criou backup privado em
+  `~/fabio-chat-bridge/backups/20260811-registro-unificado/` e gravou os dois
+  flags de recibo. Arquivo e backup foram verificados em `0600`; as chaves de
+  recibo ocorrem exatamente uma vez, `recibo_mode=off` e a contagem da
+  allowlist copiada é `1`, igual à origem. Valores foram omitidos.
+- O bridge permaneceu ativo com o mesmo `MainPID` e timestamp de início. Não
+  houve restart, reload ou sinal; os flags só terão efeito em futuro restart
+  explicitamente aprovado. A allowlist do piloto não mudou e não houve
+  Supabase, Edge, WhatsApp, E2E, dado pedagógico ou mudança de fonte.
 - Os comandos `teste:090`, `teste:091` e `teste:092` não rodaram: o runner abre
   transação no banco produtivo e executa DDL/DML antes do rollback, contrariando
   o escopo somente leitura desta tarefa.
 
-**ÚNICO PRÓXIMO PASSO ATIVO DA FRENTE WHATSAPP:** `11/08-G6 operacional`,
-em task separada e somente após revisão desta paridade. Ele poderá comparar
-espelhos contra a VPS, fazer backup e tratar flags sem ampliar a allowlist.
-Nesta task não se muda runtime. Até a revisão e a conclusão segura do G6
-operacional, G7 continua proibido, o piloto não expande e não há novo E2E.
+**ÚNICO PRÓXIMO PASSO ATIVO DA FRENTE WHATSAPP:** nenhuma nova task está
+autorizada. O `11/08-G6 operacional` terminou com o recibo desligado e sem
+restart. **G7 continua proibido** até uma nova autorização explícita; o piloto
+não expande e não há novo E2E.
 
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
 
 > **Nota somente da frente WhatsApp:** os próximos passos de 10/08-G0/G3 e
-> posteriores são históricos/superados. A paridade de fonte do 11/08-G6 foi
-> registrada; vale somente o G6 operacional separado acima. Esta nota não altera
-> o estado da frente do Radar.
+> posteriores são históricos/superados. A paridade e o G6 operacional do 11/08
+> foram concluídos; G7 segue bloqueado até autorização própria. Esta nota não
+> altera o estado da frente do Radar.
 
 1. **Radar do aluno** — backend no ar + telas no ar. Tooltip do score
    organizado (aprovado). **Próximo com calma (combinado com o Alf):** cabeçalho

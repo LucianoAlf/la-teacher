@@ -3,14 +3,16 @@
 **Data:** 11/08/2026 (BRT)
 **Worktree:** `D:\la-teacher-worktrees\fabio-whatsapp`
 **Branch:** `codex/fabio-whatsapp`
-**Status:** **SOURCE_PARITY_RECORDED — G6 operacional ainda não iniciado**
+**Status:** **SOURCE_PARITY_RECORDED — 11/08-G6 operacional concluído; G7 ainda requer autorização própria**
 
 ## Escopo desta atualização
 
-Esta atualização resolve somente a localização e o espelhamento auditável das
-fontes ativas do caminho de registro de aula. Não houve alteração na VPS,
-migration, serviço, flag, piloto, dados pedagógicos, envio de WhatsApp ou na
-Edge ativa `fabio-registro-aula`.
+Esta atualização resolve a localização e o espelhamento auditável das fontes
+ativas do caminho de registro de aula e, em 11/08-G6 operacional, aplica
+exclusivamente os dois flags não funcionais de recibo na VPS. Não houve
+migration, alteração na Edge ativa `fabio-registro-aula`, mudança de fonte,
+envio de WhatsApp, alteração de dados pedagógicos, expansão do piloto nem
+restart/reload de serviço.
 
 A única escrita externa de diagnóstico foi uma Edge Function temporária, criada
 somente para devolver metadados sanitizados do alvo do callback e excluída
@@ -22,6 +24,29 @@ ou URL de callback foi copiado para o repositório.
 Os testes SQL `teste:090`, `teste:091` e `teste:092` continuam fora deste
 recorte: o runner abre transação no banco produtivo e executa DDL/DML antes do
 rollback. A validação desta task é de integridade de fonte e de diff.
+
+## 11/08-G6 operacional — configuração mínima do piloto
+
+Foi feita uma substituição atômica de `/home/fabio/.hermes/.env`, precedida de
+pré-validação fail-closed e de backup privado recuperável em
+`/home/fabio/fabio-chat-bridge/backups/20260811-registro-unificado/`. O backup
+e o arquivo de ambiente ficaram em modo `0600`.
+
+- A origem continuou com `registro_mode=pilot` e uma única ID de piloto; a
+  allowlist não foi ampliada.
+- Foram gravados exatamente uma vez `FABIO_REGISTRO_RECIBO_MODE=off` e
+  `FABIO_REGISTRO_RECIBO_PILOT_IDS`, este último copiado byte a byte da
+  allowlist de registro já existente. As duas listas têm contagem `1`; valores
+  não foram registrados.
+- O read-back sanitizado confirmou: as duas chaves de recibo ocorrem uma vez,
+  `recibo_mode=off`, arquivo e backup em `0600` e bridge ativo.
+- `MainPID` e o timestamp monotônico de início do
+  `fabio-chat-bridge.service` permaneceram iguais antes e depois da escrita.
+  Nenhum processo foi reiniciado, recarregado ou sinalizado.
+
+Os flags só passam a ser lidos em um futuro restart explicitamente aprovado.
+Esta task não fez esse restart e, portanto, não mudou o comportamento do
+processo em execução.
 
 ## Edge ativa `fabio-registro-aula`
 
@@ -119,10 +144,7 @@ vira fato de prontuário.
 
 ## Próximo gate explícito
 
-**Próximo passo ativo: 11/08-G6 operacional, separado e sujeito à revisão desta
-task.** Ele poderá, com autorização própria, comparar os espelhos contra a VPS,
-fazer backup recuperável e tratar as flags de recibo sem ampliar a allowlist.
-
-**G7 permanece proibido** até a revisão desta paridade e a conclusão segura do
-G6 operacional. Esta atualização não libera migration, mudança funcional,
-reinício, novo E2E ou expansão do piloto.
+**11/08-G6 operacional está concluído.** O backup recuperável existe, o recibo
+permanece desligado e a allowlist foi preservada. **G7 permanece proibido** até
+uma autorização explícita do próximo gate. Esta atualização não libera
+migration, mudança funcional, reinício, novo E2E ou expansão do piloto.
