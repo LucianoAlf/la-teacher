@@ -1,0 +1,34 @@
+# Instalar os dois blocos em ~/.config/systemd/user/ como:
+#   fabio-whatsapp-reconciler.service
+#   fabio-whatsapp-reconciler.timer
+#
+# O unit nao liga a entrada do WhatsApp. Ele apenas retoma acoes ja aceitas,
+# com leases curtos e lotes pequenos. Segredos continuam no .env protegido.
+
+[Unit]
+Description=Fabio — reconcilia audio e limpa rascunhos do WhatsApp
+Documentation=https://github.com/LucianoAlf/la-teacher
+After=network-online.target
+
+[Service]
+Type=exec
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+EnvironmentFile=/home/fabio/.hermes/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/flock -n /tmp/fabio-whatsapp-reconciler.lock /usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_whatsapp_reconciler.py
+Restart=on-failure
+RestartSec=15s
+
+# --- ~/.config/systemd/user/fabio-whatsapp-reconciler.timer ---------------
+[Unit]
+Description=Varre a fila de acoes do WhatsApp a cada 30 segundos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=true
+Unit=fabio-whatsapp-reconciler.service
+
+[Install]
+WantedBy=timers.target

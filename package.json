@@ -124,7 +124,8 @@
     "teste:090": "node scripts/rodar-teste-sql.mjs supabase/migrations/090-fabio-whatsapp-acoes.sql supabase/migrations/090-fabio-whatsapp-acoes.test.sql",
     "mutantes:090": "node scripts/mutantes-090.mjs",
     "teste:091": "node scripts/rodar-teste-sql.mjs supabase/migrations/091-as-cinco-portas-do-whatsapp.sql supabase/migrations/091-as-cinco-portas-do-whatsapp.test.sql",
-    "mutantes:091": "node scripts/mutantes-091.mjs"
+    "mutantes:091": "node scripts/mutantes-091.mjs",
+    "teste:092": "node scripts/rodar-teste-sql.mjs supabase/migrations/092-fecha-contrato-do-reconciliador.sql supabase/migrations/092-fecha-contrato-do-reconciliador.test.sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
