@@ -5,10 +5,11 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 10/08/2026, noite (BRT) — Cursor.** Radar Tasks 5–9
-> mergeadas; desktop = cartão do celular + foto (089, `bcf995c`); tooltip do
-> score **organizado sem perder informação** (aprovado pelo Alf). Quem mais lê:
-> o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
+> **Última atualização: 10/08/2026, ~22h (BRT) — Cursor.** Radar telas no ar
+> (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
+> (`f00c96d`, aprovado). Deploy desta frente = **Vercel + Supabase** — VPS do
+> Fábio não entra. Frente “Fábio escreve no WhatsApp” = SPEC só, sem código no
+> bridge. Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
@@ -148,9 +149,12 @@ hex/cor arbitrária em `src/features/coordenacao` volta **vazio**.
 
 ## ✅ 10/08 NOITE (Cursor) — Radar telas verificadas + shell sem tarja preta
 
-**PRÓXIMO PASSO literal:** Fechamento do plano do Radar — menores já
-registrados na seção de backend abaixo (não bloqueiam merge). Frente Fábio-
-no-WhatsApp continua esperando o Alf ler a SPEC (não codar).
+**PRÓXIMO PASSO literal:** (1) Alf lê a SPEC do Fábio no WhatsApp e diz o que
+muda — **não codar** essa frente ainda. (2) No Radar, só com pedido dele:
+cabeçalho único da mesa no desktop (rótulos hoje repetem por linha; tentativa
+anterior revertida). Menores do backend ficam pro fechamento do plano e **não
+bloqueiam**. Deploy do que já entrou: Vercel (`f00c96d` em Production) +
+migration 089 no Supabase — **nada pra subir na VPS do Fábio** nesta entrega.
 
 **Verificação ao vivo (medido, sessão coordenação = Alf):** preview
 `http://localhost:5183` a partir de `D:\la-teacher`. Sidebar desktop Painel ·
@@ -234,8 +238,8 @@ quem continuar:** depois de QUALQUER correção em SQL de migration, confirmar
 que ela foi de fato reaplicada em produção — não basta o arquivo estar certo
 nem o teste passar (teste roda em transação descartável).
 
-**Menores registrados pra revisão de branch inteira** (não bloqueiam, ficam
-pro Fechamento do plano, depois das Tasks 5-9):
+**Menores registrados pra revisão de branch inteira** (não bloqueiam; Tasks
+5–9 das telas **já estão no ar** — ficam pro Fechamento do plano):
 - `faltas_consecutivas` na view não é limitado pela janela de 10 aulas
   (diferente de `aulas_medidas`) — aluno com 15 faltas seguidas mostraria
   "15" ao lado de "10 aulas medidas". Só o texto fica incoerente, o score não.
@@ -673,16 +677,17 @@ direto na função. Foi assim que os dois erros acima apareceram.
 
 ---
 
-## 🧭 POR ONDE COMEÇAR (duas frentes abertas, 09/08 à noite)
+## 🧭 POR ONDE COMEÇAR (duas frentes abertas — atualizado 10/08 ~22h)
 
 Este arquivo tem seções de datas diferentes e mais de uma diz "próximo passo".
-A ordem verdadeira, hoje, é esta:
+A ordem verdadeira, **hoje**, é esta (a tabela antiga que dizia “faltam Tasks
+5–9” estava errada — as telas já entraram):
 
 | # | Frente | Onde parou | Seção |
 |---|---|---|---|
 | ~~1~~ | ~~Semáforo do professor~~ | **FECHADO em 09/08 à noite.** Banco (073–080), mesa do professor, tela da coordenação, cobrança no timer, e o Fábio lendo. O texto abaixo desta tabela é HISTÓRIA — não reabrir | ✅ |
-| **1** | **Radar do aluno** (bloco 2 do painel da coordenação) | **Backend completo e no ar em 10/08 noite** (Tasks 1-4 + 10 do plano — sinais, config, nota de 5 sinais, RPC da tela). **Faltam as Tasks 5-9 (telas)** — plano já escrito com SQL/TS/testes completos, é só executar | seção "Radar do aluno: backend completo", topo deste arquivo |
-| **2** | **Fábio escreve no WhatsApp** (motor do app, plugado no canal do professor) | **SPEC escrita em 10/08 noite** (`5b6f5d6`), aguardando o Alf ler. Ainda NENHUM código escrito — não começar implementação sem aprovação da spec | seção "Brainstorming feito, SPEC escrita", logo abaixo da seção do Radar |
+| **1** | **Radar do aluno** | **Backend + telas no ar** (Tasks 1–10). Foto na linha (089, `bcf995c`); tooltip do score organizado (`f00c96d`, Alf aprovou). Deploy = **Vercel Production + Supabase** — **VPS do Fábio não entra** nesta frente. Próximo só com pedido do Alf: cabeçalho único da mesa no desktop (não reabrir sozinho). Menores do backend não bloqueiam | topo deste arquivo + seções ✅ da noite 10/08 |
+| **2** | **Fábio escreve no WhatsApp** | **SPEC escrita** (`5b6f5d6` / `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`), **ainda sem aprovação do Alf e sem plano**. Nenhum código novo no bridge — **nada pra deployar na VPS** até a spec fechar. Não começar implementação sem ele ler | "Brainstorming feito, SPEC escrita" |
 | 3 | **Fila offline no feedback** | O ✓ é honesto (alerta + reenviar), mas o toque se perde se o app fechar. Janela abre 25/08 | "Ainda aberto" |
 | ~~4~~ | ~~Parede de texto do escalonamento~~ | **FECHADO em 10/08** (`146a593`): índice + uma mensagem por unidade, 9/9 mutantes | seção do topo |
 | 4 | **Registro de presença em Campo Grande** | **NOVO, medido em 10/08:** 126 alunos com 2+ faltas seguidas e zero presença afirmada, concentrados em CG (28–50% da carteira de alguns professores). É o que segura o cartão "Sumiu da escola" do Radar | spec do Radar, §3 |
