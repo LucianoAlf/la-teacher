@@ -89,10 +89,10 @@ FABIO_REGISTRO_RECIBO_PILOT_IDS=
 
 ### Estado runtime conhecido — pilot, allowlist preservada, valores omitidos
 
-O runtime conhecido está em `pilot`, com a allowlist existente preservada e
+O runtime conhecido segue em `pilot`, com a allowlist existente preservada e
 seus valores omitidos desta documentação. As flags `FABIO_REGISTRO_RECIBO_*`
-**não foram aplicadas à VPS**. Enquanto o hard-stop existir, nenhum dos blocos
-desta seção é instrução de alteração e ninguém deve alterar o runtime.
+foram aplicadas à VPS com `FABIO_REGISTRO_RECIBO_MODE=off`; o timer está
+instalado e habilitado, mas a barreira impede qualquer claim ou envio.
 
 Os modos são `off` (Hermes atual), `shadow` (classifica e mede, sem abrir
 ação), `pilot` (somente os `professor_id` da allowlist) e `on` (professores
@@ -108,8 +108,9 @@ remover um blob.
 ### G6 — paridade de fonte registrada; operação separada (11/08/2026)
 
 Há um piloto restrito já configurado na VPS. A allowlist existente não pode ser
-ampliada durante esta fase. O recibo posterior à confirmação ainda não tem
-configuração runtime; as flags de recibo existem somente como referência acima.
+ampliada durante esta fase. O recibo posterior à confirmação está publicado com
+configuração runtime desligada; as flags de recibo permanecem documentadas para
+uma futura ativação controlada.
 
 O bloqueio de localização foi resolvido sem mudar o runtime: a Edge
 `fabio-registro-aula` chega ao gateway Hermes de usuário na porta 8644, cujo
@@ -120,11 +121,12 @@ adaptador Webhook upstream valida HMAC antes da rota dinâmica
 VPS-owned e não está rastreada no checkout Hermes; o Git deste projeto é espelho
 de auditoria, não origem automática de deploy.
 
-**Próximo passo ativo:** `11/08-G6 operacional`, separado e dependente de
-revisão desta paridade. Até ele ser autorizado e concluído, não adicionar flags,
-reiniciar o bridge, rodar E2E novo, alterar serviço ou ampliar a allowlist. G7
-continua bloqueado. Hashes, caminhos e contrato estão na evidência
-`docs/superpowers/evidence/2026-08-11-registro-aula-source-parity.md`.
+**Estado atual:** G8 publicado com recibo desligado. O próximo gate é o E2E
+funcional restrito, que exige aprovação própria; não ampliar a allowlist nem
+ligar o recibo geral antes de comparar banco, app e WhatsApp. Hashes, caminhos e
+contrato estão nas evidências
+`docs/superpowers/evidence/2026-08-11-registro-aula-source-parity.md` e
+`docs/superpowers/evidence/2026-08-11-registro-unificado-g8-rollout.md`.
 
 ### Estado local do G7/G8 — pronto para preflight, ainda sem rollout
 

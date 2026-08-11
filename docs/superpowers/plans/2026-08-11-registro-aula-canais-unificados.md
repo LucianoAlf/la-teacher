@@ -629,7 +629,7 @@ git commit -m "ops: agendar recibo do registro"
 - `supabase/migrations/095-recibo-de-registro-no-whatsapp.sql`
 - arquivos `vps/fabio/` dos Tasks 4, 7 e 8
 
-- [ ] **Step 1: Fazer preflight remoto e confirmar a proxima migration**
+- [ ] **Step 1: Fazer preflight remoto e confirmar a proxima migration** — preflight concluído; os testes SQL descartáveis não foram executados porque o runner aponta para o banco remoto.
 
 ```powershell
 node scripts/consultar-sql.mjs "select version from supabase_migrations.schema_migrations order by version desc limit 10"
@@ -646,7 +646,7 @@ npm run build
 
 Expected: 093--095 nao existem ainda e a arvore esta limpa. Se outro ator ja usou qualquer numero, parar, reservar o proximo livre e atualizar todos os caminhos/scripts deste plano antes de aplicar; nunca reaplicar uma migration com conteudo diferente.
 
-- [ ] **Step 2: Obter aprovacao explicita para G8 e aplicar uma migration por vez**
+- [x] **Step 2: Obter aprovacao explicita para G8 e aplicar uma migration por vez** — 093, 094 e 095 aplicadas em sequência e verificadas por consultas de assinatura/ACL.
 
 ```powershell
 node scripts/aplicar-sql.mjs supabase/migrations/093-presenca-padrao-e-fatias-canonicas.sql
@@ -657,11 +657,11 @@ node scripts/aplicar-sql.mjs supabase/migrations/095-recibo-de-registro-no-whats
 
 Depois de cada aplicacao, consultar definicao/ACL e executar o teste correspondente contra o banco antes de seguir. Falha para o gate; nao corrigir estado produtivo com SQL manual.
 
-- [ ] **Step 3: Fazer backup preciso e copiar somente arquivos versionados**
+- [x] **Step 3: Fazer backup preciso e copiar somente arquivos versionados** — backup remoto criado e hashes locais/remotos conferidos.
 
 No VPS, verificar caminho absoluto dentro de `~/fabio-chat-bridge/backups/20260811-registro-unificado/`, criar copias apenas dos arquivos a substituir, executar `python3 -m py_compile` e comparar checksums entre espelho e runtime. Drift inesperado interrompe o deploy para reconciliacao; nao sobrescrever a fonte viva.
 
-- [ ] **Step 4: Instalar/reiniciar com recibo desligado**
+- [x] **Step 4: Instalar/reiniciar com recibo desligado** — bridge ativo; timer habilitado; duas execuções observadas com `claimed=0` e `sent=0`.
 
 ```text
 systemctl --user daemon-reload

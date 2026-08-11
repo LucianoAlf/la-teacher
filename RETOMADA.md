@@ -5,15 +5,16 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 11/08/2026 — 11/08-G6 source parity e configuração
-> mínima do piloto concluídas; G7 permanece proibido até nova autorização.** Radar telas no ar
+> **Última atualização: 11/08/2026 — G8 publicado com recibo desligado; E2E
+> funcional ainda pendente.** Radar telas no ar
 > (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
 > (`f00c96d`, aprovado). Deploy do Radar = **Vercel + Supabase** — a frente do
 > Fábio usa a VPS própria. Frente “Fábio escreve no WhatsApp” = SPEC aprovada + plano
 > em gates; 10/08-G0/G1 concluídos, schema 090/091/092 publicado no Supabase e
 > 10/08-G4 publicado em `shadow` na VPS. O 10/08-G5 passou a piloto restrito;
 > a fonte do callback foi correlacionada e espelhada e o G6 operacional aplicou
-> somente os flags de recibo desligados, sem restart. G7 continua proibido. Quem mais lê: o
+> somente os flags de recibo desligados, sem restart. O G8 posterior publicou o
+> contrato e o timer com barreira `off`; E2E funcional continua pendente. Quem mais lê: o
 > Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
@@ -47,12 +48,16 @@ Em 11/08/2026, a implementação local do recibo canônico foi concluída em
 - Commits locais de G7: `8ea5fa2`, `aa19113`, `93bb675`; o artefato e a
   documentação de G8 local estão no mesmo branch, sem efeito operacional.
 
-Não houve nesta etapa escrita no Supabase remoto, instalação/restart na VPS,
-envio pelo WhatsApp, alteração de `.env`, rollout ou teste E2E. O runner SQL
-do repositório aponta para o endpoint remoto e, portanto, não é prova local;
-`npm run mutantes:095` deve permanecer `NAO VERIFICAVEL` quando não houver um
-runner PostgreSQL local seguro. O próximo gate é o preflight G8, seguido de
-autorização operacional explícita antes de migration/deploy.
+O preflight confirmou o projeto correto e saudável. As migrations 093, 094 e
+095 foram aplicadas em sequência pelo script definitivo do repositório e
+verificadas por consultas de assinatura/ACL; o runner SQL descartável não foi
+usado porque aponta para o banco remoto. O backup remoto foi criado em
+`/home/fabio/fabio-chat-bridge/backups/20260811-registro-recibo-g8-20260811230107/`.
+Os arquivos versionados foram publicados, compilados na VPS e o bridge foi
+reiniciado ativo. O timer `fabio-registro-recibo.timer` está habilitado e
+executou com `status=disabled`, `claimed=0`, `sent=0`; o banco permanece com
+zero recibos pendentes/enviados. Não houve envio WhatsApp nem E2E funcional.
+O próximo gate é o piloto E2E restrito, não a expansão.
 
 ---
 
