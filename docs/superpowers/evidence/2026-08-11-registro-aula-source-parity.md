@@ -3,7 +3,7 @@
 **Data:** 11/08/2026 (BRT)
 **Worktree:** `D:\la-teacher-worktrees\fabio-whatsapp`
 **Branch:** `codex/fabio-whatsapp`
-**Status:** **BLOCKED**
+**Status:** **BLOCKED_BY_ACCESS**
 
 ## Escopo cumprido
 
@@ -79,11 +79,30 @@ O piloto existente permanece exatamente como estava antes desta auditoria.
 a fonte do receptor HMAC seja localizada e versionada. Nenhum novo gate pode
 interpretar este hard-stop como autorização para contorná-lo.
 
-Para retomar, é necessário localizar e versionar a fonte do receptor do
-callback (ou fornecer seu repositório e procedimento de deploy), com prova da
-validação HMAC e do ponto que materializa o registro normalizado. Só depois
-disso é permitido executar o preflight de configuração e adicionar as duas
-flags, inicialmente com recibo desligado.
+### Classificação forense independente: `BLOCKED_BY_ACCESS`
+
+- Foram identificados candidatos HTTP, mas nenhum foi provado como receptor do
+  callback.
+- Não há ocorrência de `FABIO_WEBHOOK_URL` nos cinco candidatos locais de
+  configuração examinados.
+- A busca, excluindo ambientes, logs, cache, dependências, ambientes virtuais e
+  backups, não encontrou marcadores de HMAC ou callback.
+- A correlação com nginx falhou por falta de permissão para ler sua
+  configuração.
+
+Portanto, não é possível afirmar que o bridge ou o gateway seja o receptor.
+
+### Requisitos mínimos para remover o bloqueio de acesso
+
+1. Um administrador deve fornecer um parser sanitizado do nginx contendo
+   somente arquivo, listen, upstream, host, porta e formato do caminho.
+2. O proprietário do Supabase deve fornecer metadados sanitizados de
+   `FABIO_WEBHOOK_URL`: protocolo, host, porta e formato do caminho, sem o
+   valor integral.
+
+Somente depois desses dois insumos é permitido correlacionar processo e fonte;
+até lá não há base para inferir o receptor, alterar o runtime ou continuar o
+preflight de configuração.
 
 ## Contrato fechado exigido antes do rascunho
 
@@ -124,7 +143,10 @@ implementado nesta G6:
 Uma incerteza mantém o campo correspondente nulo; ela não pode virar fato de
 prontuário.
 
-## Preflight pendente para a retomada
+## Preflight posterior (bloqueado por acesso)
+
+Os passos abaixo não são próximos passos ativos. Eles só podem começar após os
+dois requisitos mínimos de acesso documentados acima.
 
 1. Identificar o processo, arquivo e repositório do receptor HMAC.
 2. Conferir que a fonte é legível, versionável e corresponde à configuração
