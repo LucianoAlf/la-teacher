@@ -127,7 +127,9 @@
     "mutantes:091": "node scripts/mutantes-091.mjs",
     "teste:092": "node scripts/rodar-teste-sql.mjs supabase/migrations/092-fecha-contrato-do-reconciliador.sql supabase/migrations/092-fecha-contrato-do-reconciliador.test.sql",
     "teste:093": "node scripts/rodar-teste-sql.mjs supabase/migrations/093-presenca-padrao-e-fatias-canonicas.sql supabase/migrations/093-presenca-padrao-e-fatias-canonicas.test.sql",
-    "mutantes:093": "node scripts/mutantes-093.mjs"
+    "mutantes:093": "node scripts/mutantes-093.mjs",
+    "teste:094": "node scripts/rodar-teste-sql.mjs supabase/migrations/093-presenca-padrao-e-fatias-canonicas.sql supabase/migrations/094-falhas-e-correcoes-auditadas.sql supabase/migrations/094-falhas-e-correcoes-auditadas.test.sql",
+    "mutantes:094": "node scripts/mutantes-094.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
