@@ -32,6 +32,26 @@
 
 ---
 
+## ✅ 11/08 — G3 local fechado, WhatsApp novo ainda desligado
+
+No worktree `D:\la-teacher-worktrees\fabio-whatsapp`, branch
+`codex/fabio-whatsapp`, a frente local avançou até o fim do G3:
+
+- 092 fecha o contrato do reconciliador: `registro_id` no read-back, validação
+  do rascunho por professor/áudio, tentativas persistidas e prova de limpeza do
+  Storage; **a migration 092 ainda não foi aplicada no Supabase**.
+- Reconciliador one-shot com claim/lease, retry limitado, stale-token,
+  read-back, expiração e limpeza protegida; unidade/timer systemd versionado.
+- Bridge com inbox durável antes do ACK, hidratação depois do claim, modos
+  `off|shadow|pilot|on`, allowlist de piloto, interceptação depois do batching e
+  antes do Hermes, e CAPACIDADE_PROFESSOR honesta.
+- Evidência final: `teste:091`, `teste:092`, 33 testes Python, `py_compile`,
+  `diff --check` e 10/10 mutantes mortos. Nenhum deploy, SSH write, aplicação
+  de 092 ou fluxo real foi executado.
+
+Commits locais desta sequência: `b4fd73c` (reconciliador/092) e `001c4ef`
+(bridge/G3). Próximo gate é revisão/aprovação para G4; não copiar para a VPS.
+
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
 
 1. **Radar do aluno** — backend no ar + telas no ar. Tooltip do score
