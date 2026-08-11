@@ -29,6 +29,9 @@ from urllib.parse import urlparse
 
 import requests
 
+from fabio_whatsapp_actions import FabioWhatsappBackend, tratar_mensagem_professor
+from fabio_whatsapp_intents import classificar_intencao_audio, classificar_intencao_texto
+
 HERMES_HOME = Path(os.getenv("HERMES_HOME", "/home/fabio/.hermes"))
 ENV_FILE = HERMES_HOME / ".env"
 ROOT_DIR = Path(os.getenv("FABIO_HOME", "/home/fabio"))
@@ -52,6 +55,34 @@ SUPABASE_KEY = os.getenv("LAREPORT_SUPABASE_SERVICE_ROLE") or os.getenv("SUPABAS
 UAZAPI_URL = (os.getenv("FABIO_UAZAPI_URL") or os.getenv("UAZAPI_URL") or "https://lamusic.uazapi.com").rstrip("/")
 UAZAPI_TOKEN = os.getenv("FABIO_UAZAPI_TOKEN") or os.getenv("UAZAPI_TOKEN") or ""
 LOG_PATH = Path(os.getenv("FABIO_CHAT_BRIDGE_LOG", "/home/fabio/.hermes/logs/fabio-chat-bridge.log"))
+
+
+def normalizar_whatsapp_registro_mode(value: Any) -> str:
+    mode = str(value or "").strip().lower()
+    return mode if mode in {"off", "shadow", "pilot", "on"} else "off"
+
+
+def _pilot_ids(value: Any) -> set[int]:
+    ids: set[int] = set()
+    for item in re.split(r"[,\s]+", str(value or "")):
+        try:
+            if item:
+                ids.add(int(item))
+        except (TypeError, ValueError):
+            continue
+    return ids
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+WHATSAPP_REGISTRO_MODE = normalizar_whatsapp_registro_mode(os.getenv("FABIO_WHATSAPP_REGISTRO_MODE", "off"))
+WHATSAPP_REGISTRO_PILOT_IDS = _pilot_ids(os.getenv("FABIO_WHATSAPP_REGISTRO_PILOT_IDS", ""))
+WHATSAPP_REGISTRO_MAX_AUDIO_BYTES = _int_env("FABIO_WHATSAPP_REGISTRO_MAX_AUDIO_BYTES", 25 * 1024 * 1024)
 
 _HTTP_TIMEOUT = (10, 60)
 
@@ -110,6 +141,73 @@ def sb_post(path: str, body: Any, prefer: Optional[str] = None) -> requests.Resp
 
 def sb_patch(path: str, params: Dict[str, str], body: Any, prefer: Optional[str] = None) -> requests.Response:
     return requests.patch(f"{SUPABASE_URL}{path}", headers=sb_headers(prefer), params=params, json=body, timeout=_HTTP_TIMEOUT)
+
+
+class FabioBridgeBackend(FabioWhatsappBackend):
+    """Guarded service-role adapter used by actions and the reconciler."""
+
+    def __init__(self, bucket: str = "fabio-audios") -> None:
+        self.bucket = bucket
+
+    def rpc(self, name: str, payload: dict[str, Any]) -> Any:
+        response = sb_post(f"/rest/v1/rpc/{name}", payload)
+        if response.status_code >= 400:
+            raise RuntimeError(f"{name}_rpc_failed_{response.status_code}")
+        return response.json() if response.content else None
+
+    @staticmethod
+    def _extension(mime: str) -> str:
+        base = (mime or "").split(";", 1)[0].strip().lower()
+        return {
+            "audio/ogg": "ogg",
+            "audio/opus": "ogg",
+            "audio/webm": "webm",
+            "audio/mp4": "m4a",
+            "audio/m4a": "m4a",
+            "audio/mpeg": "mp3",
+            "audio/wav": "wav",
+            "audio/x-wav": "wav",
+        }.get(base, "ogg")
+
+    def download_audio(self, media_url: str, max_bytes: int) -> tuple[bytes, str, str]:
+        response = requests.get(media_url, timeout=_HTTP_TIMEOUT, stream=True)
+        if response.status_code >= 400:
+            raise RuntimeError(f"media_download_failed_{response.status_code}")
+        content_length = response.headers.get("Content-Length")
+        if content_length:
+            try:
+                if int(content_length) > max_bytes:
+                    raise RuntimeError("audio_too_large")
+            except ValueError:
+                pass
+        chunks = bytearray()
+        try:
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                if not chunk:
+                    continue
+                chunks.extend(chunk)
+                if len(chunks) > max_bytes:
+                    raise RuntimeError("audio_too_large")
+        finally:
+            response.close()
+        mime = response.headers.get("Content-Type") or "audio/ogg"
+        return bytes(chunks), self._extension(mime), mime
+
+    def _storage_url(self, storage_path: str) -> str:
+        from urllib.parse import quote
+        return f"{SUPABASE_URL}/storage/v1/object/{self.bucket}/{quote(storage_path, safe='/')}"
+
+    def upload_audio(self, storage_path: str, content: bytes, mime: str) -> None:
+        headers = sb_headers()
+        headers.update({"Content-Type": mime or "audio/ogg", "x-upsert": "false"})
+        response = requests.post(self._storage_url(storage_path), headers=headers, data=content, timeout=_HTTP_TIMEOUT)
+        if response.status_code >= 400:
+            raise RuntimeError(f"storage_upload_failed_{response.status_code}")
+
+    def remove_audio(self, storage_path: str) -> None:
+        response = requests.delete(self._storage_url(storage_path), headers=sb_headers(), timeout=_HTTP_TIMEOUT)
+        if response.status_code not in {200, 204, 404}:
+            raise RuntimeError(f"storage_remove_failed_{response.status_code}")
 
 
 def get_data(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -175,6 +273,14 @@ def extract_media_kind(body: Dict[str, Any]) -> Optional[str]:
     if any(t in blob for t in ("conversation", "extendedtext", "text")):
         return None
     return pistas[0] if pistas else None
+
+
+def extract_media_mime(body: Dict[str, Any]) -> Optional[str]:
+    data = get_data(body)
+    content = data.get("content") if isinstance(data.get("content"), dict) else {}
+    value = data.get("mimetype") or data.get("mimeType") or content.get("mimetype") or content.get("mimeType")
+    value = str(value).strip() if value else ""
+    return value or None
 
 
 def uazapi_transcrever_audio(wa_message_id: str) -> Dict[str, Any]:
@@ -305,12 +411,65 @@ def insert_identity_message(
     return data[0] if isinstance(data, list) and data else row
 
 
+def whatsapp_registro_mode(row: Dict[str, Any]) -> str:
+    """Return the effective mode; every non-professor/WhatsApp row is off."""
+    if (row.get("channel") or "app") != "whatsapp":
+        return "off"
+    if (row.get("identidade_tipo") or "professor") != "professor":
+        return "off"
+    try:
+        professor_id = int(row.get("professor_id"))
+    except (TypeError, ValueError):
+        return "off"
+    mode = normalizar_whatsapp_registro_mode(WHATSAPP_REGISTRO_MODE)
+    if mode == "pilot" and professor_id not in WHATSAPP_REGISTRO_PILOT_IDS:
+        return "off"
+    return mode
+
+
+def hydrate_audio_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Fetch/transcribe an audio only after its durable inbox row was claimed."""
+    if (row.get("kind") or "") != "audio":
+        return row
+    if row.get("media_extracted_text") and row.get("media_url"):
+        return row
+    wa_id = row.get("wa_message_id")
+    if not wa_id:
+        raise RuntimeError("audio_wa_message_id_missing")
+    audio = uazapi_transcrever_audio(str(wa_id))
+    texto = str(audio.get("texto") or "").strip()
+    media_url = audio.get("url") or row.get("media_url")
+    media_mime = audio.get("mime") or row.get("media_mime") or "audio/ogg"
+    if not texto or not media_url:
+        raise RuntimeError("audio_hydration_incomplete")
+    response = sb_patch(
+        "/rest/v1/fabio_chat_mensagens",
+        {"id": f"eq.{row['id']}"},
+        {
+            "media_url": media_url,
+            "media_mime": media_mime,
+            "media_extracted_text": texto,
+        },
+        prefer="return=representation",
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"audio_hydration_patch_failed_{response.status_code}")
+    try:
+        data = response.json()
+    except ValueError:
+        data = []
+    hydrated = data[0] if isinstance(data, list) and data else dict(row)
+    hydrated.update({"media_url": media_url, "media_mime": media_mime, "media_extracted_text": texto})
+    log("audio_hydrated_after_claim", id=row.get("id"), professor_id=row.get("professor_id"), wa_message_id=wa_id)
+    return hydrated
+
+
 def insert_professor_message(professor_id: int, text: str, channel: str, wa_message_id: Optional[str] = None) -> Dict[str, Any]:
     return insert_identity_message({"tipo": "professor", "professor_id": int(professor_id)}, text, channel, wa_message_id)
 
 
 def claim_next_message() -> Optional[Dict[str, Any]]:
-    select_cols = "id,identidade_tipo,usuario_id,professor_id,role,kind,content,media_extracted_text,channel,wa_message_id,criado_em,fabio_seen_at,fabio_done_at"
+    select_cols = "id,identidade_tipo,usuario_id,professor_id,role,kind,content,media_url,media_mime,media_extracted_text,channel,wa_message_id,criado_em,fabio_seen_at,fabio_done_at"
     rows = sb_get("/rest/v1/fabio_chat_mensagens", {
         "select": select_cols,
         "role": "eq.professor",
@@ -381,7 +540,7 @@ def collect_message_batch(first_row: Dict[str, Any]) -> list[Dict[str, Any]]:
     if debounce_seconds > 0:
         time.sleep(debounce_seconds)
     filters = {
-        "select": "id,identidade_tipo,usuario_id,professor_id,role,kind,content,media_extracted_text,channel,wa_message_id,criado_em",
+        "select": "id,identidade_tipo,usuario_id,professor_id,role,kind,content,media_url,media_mime,media_extracted_text,channel,wa_message_id,criado_em",
         "role": "eq.professor",
         "fabio_seen_at": "is.null",
         "identidade_tipo": f"eq.{first_row.get('identidade_tipo') or 'professor'}",
@@ -1764,6 +1923,21 @@ CAPACIDADE_PROFESSOR = """O QUE VOCE CONSEGUE FAZER NESTE CANAL (WhatsApp) - lei
 """
 
 
+CAPACIDADE_PROFESSOR_REGISTRO = """O QUE VOCE CONSEGUE FAZER NESTE CANAL (WhatsApp) - leia antes de prometer qualquer coisa:
+- Existe um fluxo guardado para o professor registrar conteúdo de aula por áudio e confirmar uma chamada por texto. Ele começa somente quando a intenção e a aula forem reconhecidas com segurança.
+- O áudio nunca vira gravação final sozinho: primeiro é organizado, mostrado de volta e fica aguardando a sua confirmação. "Sim" reconhecido é o que autoriza a gravação; cancelar ou dizer "depois" não grava.
+- Se eu perguntar qual aula, responda escolhendo uma das opções. Se a mensagem misturar conteúdo e presença, eu vou pedir para separar a intenção; não vou bater chamada silenciosamente.
+- Você pode corrigir o rascunho antes de confirmar. Se eu não identificar com segurança o aluno, a aula ou a confirmação, vou perguntar em vez de chutar.
+- Depois de uma confirmação positiva, eu devolvo um recibo do que foi gravado. O texto completo de devolutiva para família continua fora deste fluxo.
+- Continue sendo honesto: nunca diga "salvei", "gravei", "registrei" ou "confirmei" antes da porta de banco retornar sucesso. Para leitura, agenda, alunos e conversa, siga normalmente.
+
+"""
+
+
+def capacidade_professor(row: Dict[str, Any]) -> str:
+    return CAPACIDADE_PROFESSOR_REGISTRO if whatsapp_registro_mode(row) in {"pilot", "on"} else CAPACIDADE_PROFESSOR
+
+
 def _agenda_de_outro_dia(professor_id: int, text: str) -> Optional[Dict[str, Any]]:
     """A agenda do dia CITADO na pergunta, quando esse dia não é hoje.
 
@@ -1845,7 +2019,7 @@ def build_prompt(row: Dict[str, Any]) -> str:
         agenda_stats = _today_agenda_stats(contexto_professor) if isinstance(contexto_professor, dict) and contexto_professor.get("ok") else {}
         outro_dia = _agenda_de_outro_dia(professor_id, text)
         identidade_linha = f"- identidade_tipo: professor\n- professor_id: {professor_id}"
-        bloco_escopo = CAPACIDADE_PROFESSOR + ESCOPO_PROFESSOR
+        bloco_escopo = capacidade_professor(row) + ESCOPO_PROFESSOR
     return f"""Canal: chat livre do Fábio com professor/admin da LA Music.
 Use a skill chat-fabio-la-music como guia principal de personalidade, roteamento e guardrails.
 Para presença pendente/governança de presença, siga governanca-presenca-fabio-la-music: preview-first, read-only, liderar pelo conteúdo, sem cobrança policial e sem auto-envio/escala sem validação.
@@ -2063,6 +2237,106 @@ AVISO_MIDIA_SEM_SUPORTE = (
 )
 
 
+def ingest_media_message(
+    body: Dict[str, Any],
+    phone: str,
+    wa_id: Optional[str],
+    midia: Optional[str],
+) -> Dict[str, Any]:
+    """Persist a media inbox row before the webhook sends its ACK.
+
+    Transcription and Storage staging are deliberately absent here.  The
+    poller claims the durable row first and hydrates it afterwards.
+    """
+    if not wa_id:
+        return {"status": "ignored_missing_message_id", "kind": midia or "desconhecida"}
+    identity = resolve_identity_by_phone(phone)
+    inserted = insert_identity_message(
+        identity,
+        None,
+        "whatsapp",
+        wa_id,
+        kind=midia or "media",
+        media_mime=extract_media_mime(body),
+    )
+    log(
+        "whatsapp_media_ingested",
+        professor_id=identity.get("professor_id"),
+        usuario_id=identity.get("usuario_id"),
+        identidade_tipo=identity.get("tipo"),
+        phone_tail=phone[-4:],
+        kind=midia or "desconhecida",
+        duplicate=bool(inserted.get("duplicate")),
+    )
+    return {
+        "status": "media",
+        "kind": midia or "desconhecida",
+        "duplicate": bool(inserted.get("duplicate")),
+        "tipo": identity.get("tipo"),
+    }
+
+
+def _whatsapp_action_context(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "professor_id": row.get("professor_id"),
+        "channel": row.get("channel"),
+        "kind": row.get("kind"),
+        "wa_message_id": row.get("wa_message_id"),
+        "text": row.get("media_extracted_text") or row.get("content") or "",
+        "media_extracted_text": row.get("media_extracted_text"),
+        "media_url": row.get("media_url"),
+        "media_mime": row.get("media_mime"),
+        "max_audio_bytes": WHATSAPP_REGISTRO_MAX_AUDIO_BYTES,
+    }
+
+
+def _shadow_whatsapp_action(row: Dict[str, Any]) -> None:
+    text = str(row.get("media_extracted_text") or row.get("content") or "")
+    intent = (
+        classificar_intencao_audio(text, row.get("llm_json"))
+        if row.get("kind") == "audio"
+        else classificar_intencao_texto(text, row.get("llm_json"))
+    )
+    log(
+        "whatsapp_registro_shadow",
+        id=row.get("id"),
+        professor_id=row.get("professor_id"),
+        kind=row.get("kind"),
+        intent=intent,
+    )
+
+
+def _send_whatsapp_action_reply(row: Dict[str, Any], reply: str) -> None:
+    insert_fabio_response_for_row(row, reply, "whatsapp")
+    send_whatsapp_text(int(row["professor_id"]), reply)
+
+
+def try_handle_whatsapp_action(row: Dict[str, Any]) -> Optional[bool]:
+    """Handle a guarded action, or return None so the existing Hermes path runs."""
+    if int(row.get("_batch_count") or 1) != 1:
+        return None
+    mode = whatsapp_registro_mode(row)
+    if mode == "off":
+        return None
+    if mode == "shadow":
+        _shadow_whatsapp_action(row)
+        return None
+    result = tratar_mensagem_professor(_whatsapp_action_context(row), FabioBridgeBackend())
+    if not result.get("handled"):
+        return None
+    reply = result.get("reply")
+    if reply:
+        _send_whatsapp_action_reply(row, str(reply))
+    log(
+        "whatsapp_registro_action_handled",
+        id=row.get("id"),
+        professor_id=row.get("professor_id"),
+        code=result.get("code"),
+        action_id=result.get("action_id"),
+    )
+    return True
+
+
 def handle_media_message(body: Dict[str, Any], phone: str, wa_id: Optional[str], midia: Optional[str]) -> None:
     """Mensagem sem texto: transcreve o audio, ou avisa que nao deu.
 
@@ -2128,7 +2402,22 @@ def process_one() -> bool:
         except Exception as e:
             log("whatsapp_presence_failed", id=first_row.get("id"), error=str(e)[:500])
     batch = collect_message_batch(first_row)
+    if first_row.get("channel") == "whatsapp":
+        batch = [hydrate_audio_row(item) if item.get("kind") == "audio" else item for item in batch]
     row = merge_message_batch(batch)
+    if row.get("channel") == "whatsapp" and row.get("kind") != "audio" and not (
+        row.get("content") or row.get("media_extracted_text")
+    ):
+        _send_row_whatsapp(row, AVISO_MIDIA_SEM_SUPORTE.format(tipo=row.get("kind") or "arquivo"))
+        for mid in row.get("_batch_ids") or [str(first_row["id"])]:
+            mark_done(str(mid))
+        log("processed_unsupported_media", id=first_row.get("id"), kind=row.get("kind"))
+        return True
+    if try_handle_whatsapp_action(row) is True:
+        for mid in row.get("_batch_ids") or [str(first_row["id"])]:
+            mark_done(str(mid))
+        log("processed_whatsapp_action", id=first_row.get("id"), batch_count=row.get("_batch_count", 1))
+        return True
     if _admin_deep_analysis_intent(row):
         answer = "Fechado, Alf. Vou rodar esse pente-fino em paralelo agora — carteira, presença/jornada, registros e retenção — e já te devolvo uma lista curta com evidência, sem achismo."
         insert_fabio_response_for_row(row, answer, row.get("channel") or "app")
@@ -2237,14 +2526,10 @@ class Handler(BaseHTTPRequestHandler):
             if not text:
                 midia = extract_media_kind(body)
                 log("webhook_sem_texto", midia=midia or "desconhecida", phone_tail=phone[-4:], tem_wa_id=bool(wa_id))
-                # Responde ja: transcrever leva segundos e a UAZAPI reenvia o
-                # webhook se o ack demorar.
-                self._send(200, {"ok": True, "status": "media", "kind": midia or "desconhecida"})
-                threading.Thread(
-                    target=handle_media_message,
-                    args=(body, phone, wa_id, midia),
-                    daemon=True,
-                ).start()
+                # O ACK so sai depois da entrada duravel no inbox. A
+                # transcricao fica para depois do claim em process_one().
+                queued = ingest_media_message(body, phone, wa_id, midia)
+                self._send(200, {"ok": True, **queued})
                 return
             identity = resolve_identity_by_phone(phone)
             inserted = insert_identity_message(identity, text, "whatsapp", wa_id)
@@ -2305,6 +2590,9 @@ UAZAPI_TOKEN = os.getenv("FABIO_UAZAPI_TOKEN") or os.getenv("UAZAPI_TOKEN") or U
 HERMES_API_URL = (os.getenv("FABIO_HERMES_API_URL") or HERMES_API_URL).strip()
 HERMES_API_KEY = (os.getenv("FABIO_HERMES_API_KEY") or os.getenv("API_SERVER_KEY") or HERMES_API_KEY or "").strip()
 HERMES_API_MODEL = (os.getenv("FABIO_HERMES_API_MODEL") or HERMES_API_MODEL).strip()
+WHATSAPP_REGISTRO_MODE = normalizar_whatsapp_registro_mode(os.getenv("FABIO_WHATSAPP_REGISTRO_MODE", WHATSAPP_REGISTRO_MODE))
+WHATSAPP_REGISTRO_PILOT_IDS = _pilot_ids(os.getenv("FABIO_WHATSAPP_REGISTRO_PILOT_IDS", ""))
+WHATSAPP_REGISTRO_MAX_AUDIO_BYTES = _int_env("FABIO_WHATSAPP_REGISTRO_MAX_AUDIO_BYTES", WHATSAPP_REGISTRO_MAX_AUDIO_BYTES)
 
 if __name__ == "__main__":
     try:

@@ -8,6 +8,7 @@ updates action tables or Storage through an unguarded client.
 from __future__ import annotations
 
 import os
+import json
 from typing import Any
 
 from fabio_whatsapp_actions import FabioWhatsappBackend
@@ -245,9 +246,16 @@ def cleanup_once(backend: FabioWhatsappBackend, limit: int = 20) -> dict[str, An
 
 
 def main() -> int:
-    """Runtime wiring is supplied by the bridge adapter in the next gate."""
-    print("fabio_whatsapp_reconciler: backend adapter not wired in this mirror")
-    return 2
+    """Run one bounded reconciliation and cleanup cycle."""
+    from fabio_chat_bridge import FabioBridgeBackend
+
+    backend = FabioBridgeBackend(os.getenv("FABIO_AUDIO_BUCKET", "fabio-audios"))
+    resultado = {
+        "reconcile": reconcile_once(backend),
+        "cleanup": cleanup_once(backend),
+    }
+    print(json.dumps(resultado, ensure_ascii=False, separators=(",", ":")))
+    return 0 if all(item.get("ok") for item in resultado.values()) else 1
 
 
 if __name__ == "__main__":

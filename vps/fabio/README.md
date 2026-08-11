@@ -71,6 +71,28 @@ O `ExecStart` do service **não** usa `--send` — a saída fica no journal
 `FABIO_AUDIT_WHATSAPP` (número do Alf) no service e acrescentar `--send`.
 Regra permanente: **envio real só com OK explícito do Alf.**
 
+## Registro de aula pelo WhatsApp — G3 local
+
+O fluxo novo fica desligado por padrão:
+
+```dotenv
+FABIO_WHATSAPP_REGISTRO_MODE=off
+FABIO_WHATSAPP_REGISTRO_PILOT_IDS=
+FABIO_WHATSAPP_REGISTRO_MAX_AUDIO_BYTES=26214400
+```
+
+Os modos são `off` (Hermes atual), `shadow` (classifica e mede, sem abrir
+ação), `pilot` (somente os `professor_id` da allowlist) e `on` (professores
+identificados). Entrada de áudio primeiro grava uma linha idempotente no inbox;
+transcrição e upload acontecem somente depois do claim do poller. O bridge chama
+apenas as RPCs `fabio_*`; não há SQL direto nem chave service-role em log.
+
+O reconciliador é um ciclo limitado por lease e roda pelo unit/timer
+`fabio-whatsapp-reconciler`. Ele faz read-back do registro, deixa o professor
+confirmar antes da gravação final e prova no banco a limpeza do Storage antes de
+remover um blob. A unidade é apenas um espelho versionado nesta fase; o fluxo
+novo não foi copiado para a VPS nem ativado.
+
 ## Timers do usuário `fabio`
 
 | Timer | Quando | O quê |
