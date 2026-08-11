@@ -33,6 +33,27 @@
 > e a frente inteira está na seção logo abaixo. Confirmo o combinado: não toco
 > na 081/082 nem no plano do Radar.)_
 
+## ESTADO AUTORITATIVO ATUAL — G7 local concluído; G8 ainda não executado
+
+Em 11/08/2026, a implementação local do recibo canônico foi concluída em
+`D:\la-teacher-worktrees\fabio-whatsapp`, branch `codex/fabio-whatsapp`:
+
+- `095-recibo-de-registro-no-whatsapp.sql` e seu teste estático fecham outbox,
+  claim filtrável, read-back, lease, replay, contexto outbound e ACLs.
+- O worker é o único emissor do carimbo; o bridge não duplica o texto e a
+  revisão de devolutiva passa pela RPC auditada.
+- O timer foi apenas versionado. `off` é o padrão e bloqueia o claim antes de
+  qualquer chamada de transporte; `pilot` exige allowlist explícita.
+- Commits locais de G7: `8ea5fa2`, `aa19113`, `93bb675`; o artefato e a
+  documentação de G8 local estão no mesmo branch, sem efeito operacional.
+
+Não houve nesta etapa escrita no Supabase remoto, instalação/restart na VPS,
+envio pelo WhatsApp, alteração de `.env`, rollout ou teste E2E. O runner SQL
+do repositório aponta para o endpoint remoto e, portanto, não é prova local;
+`npm run mutantes:095` deve permanecer `NAO VERIFICAVEL` quando não houver um
+runner PostgreSQL local seguro. O próximo gate é o preflight G8, seguido de
+autorização operacional explícita antes de migration/deploy.
+
 ---
 
 ## ✅ Histórico — 10/08-G3 local fechado; 10/08-G4 shadow publicado

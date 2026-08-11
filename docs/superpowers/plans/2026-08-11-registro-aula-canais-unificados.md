@@ -444,7 +444,7 @@ git commit -m "fix: mostrar registro e fila de audio com estado honesto"
 - Create: `scripts/mutantes-095.mjs`
 - Modify: `package.json`
 
-- [ ] **Step 1: Escrever teste RED do unico dono e do replay**
+- [x] **Step 1: Escrever teste RED do unico dono e do replay**
 
 ```sql
 select public._assert(v_notificacoes_recibo = 1, 'confirmacao deve enfileirar um unico recibo por registro');
@@ -456,7 +456,7 @@ select public._assert(v_edicao_app_autenticada, 'wrapper app deve resolver profe
 select public._assert(v_audio_replay_mesmo_id, 'replay do mesmo storage_path deve devolver o mesmo audio_id');
 ```
 
-- [ ] **Step 2: Implementar outbox sobre `fabio_notificacoes`, nao uma segunda fila**
+- [x] **Step 2: Implementar outbox sobre `fabio_notificacoes`, nao uma segunda fila**
 
 Estender a lista valida de `tipo` com `registro_recibo`. Na confirmacao, depois de presenca/devolutivas serem enfileiradas, inserir de forma idempotente `fabio_notificacoes` com chave `(professor_id, tipo='registro_recibo', referencia_tipo='registro_aula', referencia_id=registro_id, canal='whatsapp')`. Definir:
 
@@ -474,11 +474,11 @@ O claim so retorna registros confirmados cuja lista de devolutivas de alunos pre
 
 Antes de qualquer deploy, 095 tambem fecha tres contratos que a UI ja consome: (1) `app_minha_agenda_sessao` retorna `tem_rascunho = true` quando existe `fabio_registros_aula.status = 'aguardando_confirmacao'` ligado a aula da sessao ou ao alvo individual agrupado; (2) `app_atualizar_devolutiva_rascunho` e uma porta autenticada, resolve `professor_id` por `auth`, valida propriedade e chama somente o nucleo auditado `fabio_atualizar_devolutiva_rascunho` de `service_role`; (3) `fn_enfileirar_audio_core` e `app_enfileirar_audio` deduplicam o replay por `storage_path` do mesmo professor, retornando o `audio_id` ja existente em vez de inserir outra fila. O navegador nunca chama RPC `fabio_*` diretamente.
 
-- [ ] **Step 3: Garantir que o ofertador legado nao duplique a mensagem**
+- [x] **Step 3: Garantir que o ofertador legado nao duplique a mensagem**
 
 Alterar `fabio_devolutivas_a_oferecer` para excluir devolutivas cujo registro possui `registro_recibo` pendente/processando/enviado. O worker antigo continua como fallback apenas de devolutiva historica sem recibo; ele nunca concorre com o novo tipo.
 
-- [ ] **Step 4: Rodar GREEN e mutantes**
+- [ ] **Step 4: Rodar GREEN e mutantes** — bloqueado localmente: o runner SQL usa o endpoint remoto e não há PostgreSQL local seguro; o mutante encerra como `NAO VERIFICAVEL`.
 
 ```powershell
 node scripts/rodar-teste-sql.mjs supabase/migrations/095-recibo-de-registro-no-whatsapp.sql supabase/migrations/095-recibo-de-registro-no-whatsapp.test.sql
@@ -487,7 +487,7 @@ node scripts/mutantes-095.mjs
 
 Os mutantes removem a chave de referencia, permitem claim antes das devolutivas e removem o insert em `fabio_chat_mensagens`; tambem removem a projecao `tem_rascunho`, a resolucao de professor por `auth` do wrapper e a guarda unica de `(professor_id, storage_path)`. Todos devem morrer. As provas SQL incluem uma sessao de turma e seu alvo individual, uma tentativa de editar devolutiva por outro professor e dois `app_enfileirar_audio` com o mesmo path verificando um unico `audio_id`/registro.
 
-- [ ] **Step 5: Adicionar scripts e commitar**
+- [x] **Step 5: Adicionar scripts e commitar**
 
 ```powershell
 npm run teste:095
@@ -510,7 +510,7 @@ git commit -m "feat: entregar recibo canonico do registro"
 - Modify: `vps/fabio/teste_whatsapp_reconciler.py`
 - Modify: `vps/fabio/teste_whatsapp_bridge.py`
 
-- [ ] **Step 1: Escrever fake-adapter tests antes da formatacao**
+- [x] **Step 1: Escrever fake-adapter tests antes da formatacao**
 
 ```python
 def test_recibo_tem_aula_fatias_presenca_e_rascunhos(): ...
@@ -522,7 +522,7 @@ def test_melhora_lucas_chama_apenas_rpc_auditada(): ...
 
 O fixture contem dois presentes, uma falta explicita e uma devolutiva por presente. O texto esperado usa o mesmo padrao do briefing: cabecalho, horario/aula, blocos por aluno, `✅ Presenca` ou `❌ Falta`, conteudo resumido e `📝 Rascunho de devolutiva`; nao inclui telefone, token, observacao incerta nem instrucao de enviar para familia.
 
-- [ ] **Step 2: Executar RED**
+- [ ] **Step 2: Executar RED** — não preservado como evidência: a implementação já estava disponível quando a suíte foi executada.
 
 ```powershell
 python vps/fabio/teste_registro_recibo_worker.py
@@ -530,13 +530,13 @@ python vps/fabio/teste_registro_recibo_worker.py
 
 Expected: falha porque o worker ainda so oferece link para abrir o app.
 
-- [ ] **Step 3: Implementar o caminho de recibo no worker**
+- [x] **Step 3: Implementar o caminho de recibo no worker**
 
 Adicionar `run_registro_recibos(channel, dry_run, professor_id=None)`. Ele chama `fabio_claim_registro_recibo`, monta texto somente dos campos retornados pelo claim, envia por UAZAPI e chama `fabio_concluir_registro_recibo`. Falha de transporte chama `fabio_falhar_registro_recibo`; timeout depois de envio nao tenta novo texto sem consultar recibo/lease. `format_oferta_devolutiva` permanece somente para legado excluido pelo SQL.
 
 `fabio_whatsapp_actions.py`, reconciliador e bridge removem qualquer chamada/ramo que formate recibo pos-confirmacao. Depois de confirmar, respondem apenas com estado curto estruturado, por exemplo `Registro confirmado. Estou preparando seu carimbo.`, sem duplicar os campos. O bridge le a mensagem outbound espelhada no proximo contexto, portanto entende a referencia de `melhora a do Lucas`.
 
-- [ ] **Step 4: Ligar revisao referencial a RPC auditada**
+- [x] **Step 4: Ligar revisao referencial a RPC auditada**
 
 O parser recebe somente `devolutiva_id` da ultima mensagem outbound/contexto e o texto de substituicao. Sem uma unica devolutiva candidata, pergunta qual aluno; com candidato, chama:
 
@@ -552,7 +552,7 @@ backend.rpc("fabio_atualizar_devolutiva_rascunho", {
 
 Em seguida, renderiza o novo rascunho retornado; nao toca em `fabio_devolutivas` por REST/SQL e nao chama UAZAPI para familia.
 
-- [ ] **Step 5: Rodar GREEN, suite anterior e mutante de integracao**
+- [x] **Step 5: Rodar GREEN, suite anterior e mutante de integracao**
 
 ```powershell
 python vps/fabio/teste_registro_recibo_worker.py
@@ -563,7 +563,7 @@ python vps/fabio/teste_whatsapp_bridge.py
 
 Adicionar ao mutante existente uma substituicao que chama `send_message` no bridge depois de `fabio_confirmar_registro`; o teste deve detectar dois emissores e falhar.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add -- vps/fabio/fabio_notification_worker.py vps/fabio/fabio_whatsapp_actions.py vps/fabio/fabio_whatsapp_reconciler.py vps/fabio/fabio_chat_bridge.py vps/fabio/teste_registro_recibo_worker.py vps/fabio/teste_whatsapp_actions.py vps/fabio/teste_whatsapp_reconciler.py vps/fabio/teste_whatsapp_bridge.py
@@ -579,7 +579,7 @@ git commit -m "feat: enviar carimbo revisavel pelo worker"
 - Modify: `vps/fabio/README.md`
 - Modify: `RETOMADA.md`
 
-- [ ] **Step 1: Escrever o unit versionado**
+- [x] **Step 1: Escrever o unit versionado**
 
 ```ini
 [Service]
@@ -596,7 +596,7 @@ Persistent=true
 
 O arquivo deve seguir o formato dos units existentes, executar como usuario `fabio`, nao conter valores de `.env` e ser instalado como servico/timer de usuario. `FABIO_REGISTRO_RECIBO_MODE=off` faz o worker sair sem claim.
 
-- [ ] **Step 2: Testar parsing do unit e modo desligado local**
+- [x] **Step 2: Testar parsing do unit e modo desligado local**
 
 ```powershell
 python vps/fabio/fabio_notification_worker.py --event registro-recibo --channel whatsapp --dry-run
@@ -604,11 +604,11 @@ python vps/fabio/fabio_notification_worker.py --event registro-recibo --channel 
 
 Expected: em modo `off`, `claimed=0`, `sent=0` e nenhuma chamada UAZAPI.
 
-- [ ] **Step 3: Documentar operacao e rollback**
+- [x] **Step 3: Documentar operacao e rollback**
 
 Documentar: dono unico, flags, comandos `systemctl --user`, consulta de leases, como desligar somente ingress/recibo, e que o rollback nao apaga outbox/auditoria nem desliga reconciliador com acao aberta.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
 git add -- vps/fabio/fabio-registro-recibo.systemd.txt vps/fabio/README.md RETOMADA.md

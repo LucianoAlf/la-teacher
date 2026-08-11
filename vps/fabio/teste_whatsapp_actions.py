@@ -180,7 +180,11 @@ class WhatsappActionsTest(unittest.TestCase):
     def test_devolutiva_revision_uses_only_audited_rpc(self):
         backend = FakeBackend()
         result = tratar_mensagem_professor(
-            professor_context(text="melhora a devolutiva do Lucas", devolutiva_id="dev-1"),
+            professor_context(
+                text="melhora a devolutiva do Lucas",
+                devolutiva_id="dev-1",
+                devolutiva_texto_apoio_casa="Praticar a leitura por dez minutos.",
+            ),
             backend,
         )
         self.assertEqual(result["code"], "devolutiva_draft_updated")
@@ -190,6 +194,15 @@ class WhatsappActionsTest(unittest.TestCase):
         payload = next(payload for name, payload in backend.calls if name == "fabio_atualizar_devolutiva_rascunho")
         self.assertEqual(payload["p_devolutiva_id"], "dev-1")
         self.assertEqual(payload["p_canal"], "whatsapp")
+
+    def test_devolutiva_revision_without_homework_text_asks_instead_of_calling_rpc(self):
+        backend = FakeBackend()
+        result = tratar_mensagem_professor(
+            professor_context(text="melhora a devolutiva do Lucas", devolutiva_id="dev-1"),
+            backend,
+        )
+        self.assertEqual(result["code"], "devolutiva_revision_question")
+        self.assertFalse([call for call in backend.calls if call[0] == "fabio_atualizar_devolutiva_rascunho"])
 
 
 if __name__ == "__main__":

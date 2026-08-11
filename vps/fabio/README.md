@@ -126,6 +126,25 @@ reiniciar o bridge, rodar E2E novo, alterar serviço ou ampliar a allowlist. G7
 continua bloqueado. Hashes, caminhos e contrato estão na evidência
 `docs/superpowers/evidence/2026-08-11-registro-aula-source-parity.md`.
 
+### Estado local do G7/G8 — pronto para preflight, ainda sem rollout
+
+As tarefas locais do recibo canônico estão implementadas e versionadas nos
+commits `8ea5fa2`, `aa19113` e `93bb675`; o artefato do timer fica neste
+checkout. Isso não significa que a migration 095 foi aplicada ou que qualquer
+arquivo foi copiado para a VPS.
+
+O worker usa uma barreira antes do claim: `FABIO_REGISTRO_RECIBO_MODE=off`
+retorna `claimed=0` e `sent=0`; `pilot` só reivindica o professor permitido por
+`FABIO_REGISTRO_RECIBO_PILOT_IDS`; `on` habilita o fluxo para todos os
+professores resolvidos. O timer `fabio-registro-recibo.timer` está apenas
+versionado e não está instalado/habilitado.
+
+O dono do carimbo é o `fabio_notification_worker`; o bridge só responde com o
+estado curto e o contexto de saída fica auditado. Para rollback, desligar
+somente o ingress/timer do recibo e preservar outbox, auditoria e o
+reconciliador com ações abertas. Instalação, migration, restart, E2E e rollout
+ficam no G8 e exigem autorização operacional separada.
+
 ## Timers do usuário `fabio`
 
 | Timer | Quando | O quê |
@@ -133,6 +152,7 @@ continua bloqueado. Hashes, caminhos e contrato estão na evidência
 | `fabio-auditoria.timer` | 7h e 21h BRT | esta auditoria |
 | `fabio-briefing-matheus.timer` | 8h BRT | briefing matinal (piloto prof. 25) |
 | `fabio-notification-worker.timer` | — | worker genérico (disabled) |
+| `fabio-registro-recibo.timer` | a cada 20s (versionado, **não instalado**) | entrega o carimbo canônico após confirmação |
 | `fabio-feedback.timer` | 9h30/12h30/15h30 BRT — 3 passes de recuperação, 1 cobrança (criado, **não habilitado**) | cobra o feedback mensal do professor (lembrete/reforço) e entrega a lista de quem não fechou ao grupo da coordenação no dia 1º — ver `fabio-feedback.systemd.txt` |
 
 ⚠️ **A VPS roda em UTC.** Os units usam `America/Sao_Paulo` no `OnCalendar`, então o

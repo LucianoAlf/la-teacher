@@ -100,6 +100,27 @@ class ReceiptBackend:
 
 
 class RegistroReciboWorkerTest(unittest.TestCase):
+    def setUp(self):
+        self.old_mode = worker.REGISTRO_RECIBO_MODE
+        self.old_pilot_ids = worker.REGISTRO_RECIBO_PILOT_IDS
+        worker.REGISTRO_RECIBO_MODE = "on"
+        worker.REGISTRO_RECIBO_PILOT_IDS = set()
+
+    def tearDown(self):
+        worker.REGISTRO_RECIBO_MODE = self.old_mode
+        worker.REGISTRO_RECIBO_PILOT_IDS = self.old_pilot_ids
+
+    def test_off_mode_never_claims_or_sends(self):
+        worker.REGISTRO_RECIBO_MODE = "off"
+        backend = ReceiptBackend()
+        with patch.object(worker, "rpc", side_effect=backend.rpc), \
+             patch.object(worker, "deliver", side_effect=backend.deliver):
+            result = worker.run_registro_recibos("whatsapp", False, professor_id=25)
+
+        self.assertEqual(result, [{"event": "registro_recibo", "status": "disabled", "claimed": 0, "sent": 0}])
+        self.assertEqual(backend.calls, [])
+        self.assertEqual(backend.sent, [])
+
     def test_receipt_has_class_students_presence_content_and_draft_feedback(self):
         text = worker.format_registro_recibo(registro_fixture(), "Registro confirmado")
 

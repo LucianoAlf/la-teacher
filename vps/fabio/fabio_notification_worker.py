@@ -47,6 +47,12 @@ DEFAULT_WINDOW_MINUTES = int(os.getenv("FABIO_NOTIFY_WINDOW_MINUTES", "15"))
 DEFAULT_CHANNEL = os.getenv("FABIO_NOTIFY_CHANNEL", "whatsapp")
 SEND_EMPTY_BRIEFING = os.getenv("FABIO_NOTIFY_EMPTY_BRIEFING", "false").lower() in {"1", "true", "yes", "sim"}
 MAX_PROFESSORS = int(os.getenv("FABIO_NOTIFY_MAX_PROFESSORS", "0"))
+REGISTRO_RECIBO_MODE = os.getenv("FABIO_REGISTRO_RECIBO_MODE", "off").strip().lower()
+REGISTRO_RECIBO_PILOT_IDS = {
+    int(value.strip())
+    for value in os.getenv("FABIO_REGISTRO_RECIBO_PILOT_IDS", "").split(",")
+    if value.strip().isdigit()
+}
 
 
 @dataclass(frozen=True)
@@ -1209,8 +1215,18 @@ def _concluir_recibo_com_retry(payload: Dict[str, Any]) -> Dict[str, Any]:
     raise last_error or RuntimeError("recibo_nao_concluido")
 
 
+def _registro_recibo_habilitado(professor_id: Optional[int]) -> bool:
+    if REGISTRO_RECIBO_MODE == "on":
+        return True
+    if REGISTRO_RECIBO_MODE == "pilot":
+        return professor_id is not None and int(professor_id) in REGISTRO_RECIBO_PILOT_IDS
+    return False
+
+
 def run_registro_recibos(channel: str, dry_run: bool, professor_id: Optional[int] = None) -> list[Dict[str, Any]]:
     """Claim, deliver and close receipt outbox items exactly once per lease."""
+    if not _registro_recibo_habilitado(professor_id):
+        return [{"event": "registro_recibo", "status": "disabled", "claimed": 0, "sent": 0}]
     if dry_run:
         return [{"event": "registro_recibo", "status": "dry_run_skipped", "reason": "claim cria lease"}]
     claim_payload: Dict[str, Any] = {"p_limite": 20}
@@ -1519,7 +1535,7 @@ def run_devolutivas(channel: str, dry_run: bool, professor_id: Optional[int] = N
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "registro_recibo", "escalonamento", "feedback", "all"], default="all")
+    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "registro_recibo", "registro-recibo", "escalonamento", "feedback", "all"], default="all")
     parser.add_argument("--professor-id", type=int)
     parser.add_argument("--channel", choices=["whatsapp", "app"], default=DEFAULT_CHANNEL)
     parser.add_argument("--dry-run", action="store_true")
@@ -1534,6 +1550,8 @@ def main() -> int:
         "'--event feedback --date YYYY-MM-DD' WITHOUT --dry-run reserves and "
         "sends a REAL WhatsApp message dated for that day. Defaults to today."))
     args = parser.parse_args()
+    if args.event == "registro-recibo":
+        args.event = "registro_recibo"
 
     now = datetime.now(BRT)
     target_date = args.date or now.date().isoformat()

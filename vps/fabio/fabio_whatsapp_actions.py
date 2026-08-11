@@ -239,11 +239,18 @@ def _handle_devolutiva_revision(backend: FabioWhatsappBackend, context: dict[str
     text = str(context.get("text") or "").strip()
     if not devolutiva_id or not _is_devolutiva_revision(text):
         return None
+    texto_apoio_casa = str(context.get("devolutiva_texto_apoio_casa") or "").strip()
+    if not texto_apoio_casa:
+        return _result(
+            "devolutiva_revision_question",
+            reply="Posso revisar esse rascunho, mas preciso do texto do dever de casa. Quer manter o atual ou me diga o novo texto?",
+            devolutiva_id=str(devolutiva_id),
+        )
     updated = _call(backend, "fabio_atualizar_devolutiva_rascunho", {
         "p_professor_id": int(context["professor_id"]),
         "p_devolutiva_id": devolutiva_id,
         "p_texto_normal": text,
-        "p_texto_apoio_casa": context.get("devolutiva_texto_apoio_casa"),
+        "p_texto_apoio_casa": texto_apoio_casa,
         "p_motivo": "revisao solicitada no WhatsApp",
         "p_canal": "whatsapp",
         "p_acao_id": str(context["wa_message_id"]),
