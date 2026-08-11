@@ -96,7 +96,7 @@ const mutantes = [
   ],
   [
     'M7 token do lease de conclusao',
-    '     or v_notificacao.lease_token is distinct from lease_token',
+    '     or v_notificacao.lease_token is distinct from p_lease_token',
     '     or false -- M7: token do lease ignorado',
   ],
   [

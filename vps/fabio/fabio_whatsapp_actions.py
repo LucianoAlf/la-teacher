@@ -221,7 +221,7 @@ def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, An
             _event(backend, action, context, "confirmado", {"registro_id": action["registro_id"]})
             receipt = {key: committed.get(key) for key in ("registro_id", "gravadas", "ausentes_pulados", "presenca") if key in committed}
             receipt["readback"] = readback
-            return _result("confirmed", reply="Pronto: registrei o conteúdo depois da sua confirmação.", action_id=str(action["id"]), receipt=receipt)
+            return _result("confirmed", reply="Registro confirmado. Estou preparando seu carimbo.", action_id=str(action["id"]), receipt=receipt)
         aula_id = int(action["aula_id"])
         committed = _call(backend, "fabio_registrar_presencas_aula", {"p_professor_id": int(context["professor_id"]), "p_aula_emusys_id": aula_id, "p_alunos_ausentes": action.get("payload", {}).get("alunos_ausentes", [])})
         _event(backend, action, context, "confirmado", {"aula_id": aula_id})
@@ -229,10 +229,40 @@ def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, An
     return _result("pending_question", reply="Ainda não gravei. Você quer confirmar, corrigir, cancelar ou deixar para depois?", action_id=str(action["id"]))
 
 
+def _is_devolutiva_revision(text: str) -> bool:
+    hay = text.lower()
+    return any(word in hay for word in ("melhora", "melhorar", "ajusta", "ajustar", "revisa", "revisar"))
+
+
+def _handle_devolutiva_revision(backend: FabioWhatsappBackend, context: dict[str, Any]) -> dict[str, Any] | None:
+    devolutiva_id = context.get("devolutiva_id")
+    text = str(context.get("text") or "").strip()
+    if not devolutiva_id or not _is_devolutiva_revision(text):
+        return None
+    updated = _call(backend, "fabio_atualizar_devolutiva_rascunho", {
+        "p_professor_id": int(context["professor_id"]),
+        "p_devolutiva_id": devolutiva_id,
+        "p_texto_normal": text,
+        "p_texto_apoio_casa": context.get("devolutiva_texto_apoio_casa"),
+        "p_motivo": "revisao solicitada no WhatsApp",
+        "p_canal": "whatsapp",
+        "p_acao_id": str(context["wa_message_id"]),
+    })
+    return _result(
+        "devolutiva_draft_updated",
+        reply="Atualizei o rascunho da devolutiva. Ainda não enviei para a família.",
+        devolutiva_id=str(devolutiva_id),
+        devolutiva=updated,
+    )
+
+
 def tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBackend) -> dict[str, Any]:
     context = dict(contexto or {})
     if not context.get("professor_id") or not context.get("wa_message_id"):
         return _result("invalid_context", handled=False, forward=True)
+    revision = _handle_devolutiva_revision(backend, context)
+    if revision is not None:
+        return revision
     action = _action(backend, context)
     if action:
         return _handle_existing_action(backend, context, action)

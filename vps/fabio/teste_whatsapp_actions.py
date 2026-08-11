@@ -42,6 +42,8 @@ class FakeBackend:
             return {"ok": True, "registro_id": payload["p_registro_id"], "gravadas": 1, "ausentes_pulados": 0}
         if name == "fabio_atualizar_fatia":
             return {"ok": True, "registro_id": payload["p_id"]}
+        if name == "fabio_atualizar_devolutiva_rascunho":
+            return {"ok": True, "devolutiva_id": payload["p_devolutiva_id"], "texto_normal": payload["p_texto_normal"]}
         if name == "fabio_responder_presenca":
             return {"ok": True, "registro_alvo_id": payload["p_registro_alvo_id"], "presenca": payload["p_presenca"]}
         if name == "fabio_registrar_presencas_aula":
@@ -174,6 +176,20 @@ class WhatsappActionsTest(unittest.TestCase):
         self.assertEqual(result["code"], "replay")
         self.assertFalse(backend.uploads)
         self.assertFalse([call for call in backend.calls if call[0] in {"fabio_iniciar_acao", "fabio_enfileirar_audio"}])
+
+    def test_devolutiva_revision_uses_only_audited_rpc(self):
+        backend = FakeBackend()
+        result = tratar_mensagem_professor(
+            professor_context(text="melhora a devolutiva do Lucas", devolutiva_id="dev-1"),
+            backend,
+        )
+        self.assertEqual(result["code"], "devolutiva_draft_updated")
+        names = [name for name, _ in backend.calls]
+        self.assertIn("fabio_atualizar_devolutiva_rascunho", names)
+        self.assertNotIn("update_table", names)
+        payload = next(payload for name, payload in backend.calls if name == "fabio_atualizar_devolutiva_rascunho")
+        self.assertEqual(payload["p_devolutiva_id"], "dev-1")
+        self.assertEqual(payload["p_canal"], "whatsapp")
 
 
 if __name__ == "__main__":

@@ -2259,7 +2259,7 @@ def send_whatsapp_presence_for_row(row: Dict[str, Any], presence: str = "composi
         return
     send_whatsapp_presence(phone, presence=presence)
 
-def send_whatsapp_text(professor_id: int, text: str) -> None:
+def send_whatsapp_text(professor_id: int, text: str) -> Optional[str]:
     if not UAZAPI_TOKEN:
         log("uazapi_token_missing_skip_send", professor_id=professor_id)
         return
@@ -2276,6 +2276,18 @@ def send_whatsapp_text(professor_id: int, text: str) -> None:
     if r.status_code >= 400:
         raise RuntimeError(f"uazapi send/text {r.status_code}: {r.text[:500]}")
     log("whatsapp_sent", professor_id=professor_id, phone_tail=phone[-4:], typing_delay_ms=whatsapp_send_payload(phone, text).get("delay", 0))
+    try:
+        payload = r.json()
+    except ValueError:
+        payload = {}
+    if isinstance(payload, dict):
+        for key in ("id", "message_id", "messageid"):
+            if payload.get(key):
+                return str(payload[key])
+        nested = payload.get("key")
+        if isinstance(nested, dict) and nested.get("id"):
+            return str(nested["id"])
+    return None
 
 
 def send_whatsapp_text_direto(phone: str, text: str, motivo: str = "direto") -> None:
@@ -2349,6 +2361,7 @@ def ingest_media_message(
 
 
 def _whatsapp_action_context(row: Dict[str, Any]) -> Dict[str, Any]:
+    contexto = row.get("contexto") if isinstance(row.get("contexto"), dict) else {}
     return {
         "professor_id": row.get("professor_id"),
         "channel": row.get("channel"),
@@ -2359,6 +2372,8 @@ def _whatsapp_action_context(row: Dict[str, Any]) -> Dict[str, Any]:
         "media_url": row.get("media_url"),
         "media_mime": row.get("media_mime"),
         "max_audio_bytes": WHATSAPP_REGISTRO_MAX_AUDIO_BYTES,
+        "devolutiva_id": row.get("devolutiva_id") or contexto.get("devolutiva_id"),
+        "devolutiva_texto_apoio_casa": row.get("devolutiva_texto_apoio_casa") or contexto.get("devolutiva_texto_apoio_casa"),
     }
 
 

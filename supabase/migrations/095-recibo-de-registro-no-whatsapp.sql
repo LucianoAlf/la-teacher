@@ -309,8 +309,41 @@ begin
 end
 $function$;
 
+create or replace function public.fabio_registro_recibo_dados(
+  p_professor_id integer,
+  p_registro_id uuid
+) returns jsonb
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $function$
+  with base as (
+    select public.fabio_registro_completo(p_professor_id, p_registro_id) as dados
+  ), devolutivas as (
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'registro_fatia_id', d.registro_fatia_id,
+      'id', d.id,
+      'texto_normal', d.texto_normal,
+      'texto_apoio_casa', d.texto_apoio_casa,
+      'status', d.status
+    ) order by d.criado_em), '[]'::jsonb) as itens
+      from public.fabio_devolutivas d
+      join public.fabio_registros_aula fatia on fatia.id = d.registro_fatia_id
+     where d.professor_id = p_professor_id
+       and (fatia.id = p_registro_id or fatia.parent_id = p_registro_id)
+  )
+  select case
+    when base.dados ? 'erro' then base.dados
+    else base.dados || jsonb_build_object('devolutivas', devolutivas.itens)
+  end
+    from base cross join devolutivas;
+$function$;
+
+drop function if exists public.fabio_claim_registro_recibo(integer);
 create or replace function public.fabio_claim_registro_recibo(
-  p_limite integer default 20
+  p_limite integer default 20,
+  p_professor_id integer default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -330,6 +363,7 @@ begin
      where n.tipo = 'registro_recibo'
        and n.referencia_tipo = 'registro_aula'
        and n.canal = 'whatsapp'
+       and (p_professor_id is null or n.professor_id = p_professor_id)
        and raiz.confirmado_em is not null
        and raiz.status in ('gravado_emusys', 'confirmado')
        and (
@@ -869,7 +903,9 @@ $function$;
 -- ACL explicita: o navegador chama apenas app_*, nunca fabio_* ou os nucleos.
 revoke all on function public.fn_enfileirar_registro_recibo(uuid, integer)
   from public, anon, authenticated, service_role;
-revoke all on function public.fabio_claim_registro_recibo(integer)
+revoke all on function public.fabio_registro_recibo_dados(integer, uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.fabio_claim_registro_recibo(integer, integer)
   from public, anon, authenticated, service_role;
 revoke all on function public.fabio_concluir_registro_recibo(uuid, uuid, text, text)
   from public, anon, authenticated, service_role;
@@ -890,7 +926,8 @@ revoke all on function public.fn_enfileirar_audio_core(integer, text, integer, u
 revoke all on function public.app_enfileirar_audio(integer, text, integer, uuid)
   from public, anon, authenticated, service_role;
 
-grant execute on function public.fabio_claim_registro_recibo(integer) to service_role;
+grant execute on function public.fabio_claim_registro_recibo(integer, integer) to service_role;
+grant execute on function public.fabio_registro_recibo_dados(integer, uuid) to service_role;
 grant execute on function public.fabio_concluir_registro_recibo(uuid, uuid, text, text) to service_role;
 grant execute on function public.fabio_falhar_registro_recibo(uuid, uuid, text) to service_role;
 grant execute on function public.fabio_atualizar_devolutiva_rascunho(integer, uuid, text, text, text, text, text)
@@ -904,7 +941,9 @@ grant execute on function public.app_enfileirar_audio(integer, text, integer, uu
 
 comment on index public.uq_fabio_notificacoes_registro_recibo_unico is
   'Recibo autoritativo por professor, tipo, registro raiz e canal; a confirmacao pode repetir sem duplicar a saida.';
-comment on function public.fabio_claim_registro_recibo(integer) is
+comment on function public.fabio_registro_recibo_dados(integer, uuid) is
+  'Worker service_role: read-back do registro com devolutivas por fatia, sem expor a porta ao navegador.';
+comment on function public.fabio_claim_registro_recibo(integer, integer) is
   'Worker service_role: reivindica somente recibos cujo registro esta confirmado e cujas devolutivas exigidas estao gerada ou oferecida.';
 comment on function public.app_atualizar_devolutiva_rascunho(uuid, text, text, text, text) is
   'Porta autenticada do app: resolve professor por auth.uid() e delega ao nucleo auditado sem expor fabio_* ao navegador.';

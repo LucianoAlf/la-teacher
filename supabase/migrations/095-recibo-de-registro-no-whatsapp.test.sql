@@ -82,7 +82,8 @@ declare
   v_porta_legada_funciona boolean := false;
   v_def text;
 begin
-  if to_regprocedure('public.fabio_claim_registro_recibo(integer)') is null
+  if to_regprocedure('public.fabio_claim_registro_recibo(integer,integer)') is null
+     or to_regprocedure('public.fabio_registro_recibo_dados(integer,uuid)') is null
      or to_regprocedure('public.fabio_concluir_registro_recibo(uuid,uuid,text,text)') is null
      or to_regprocedure('public.fabio_falhar_registro_recibo(uuid,uuid,text)') is null
      or to_regprocedure('public.app_atualizar_devolutiva_rascunho(uuid,text,text,text,text)') is null then
@@ -96,16 +97,19 @@ begin
 
   perform pg_temp.checar_095(
     'recibo e exclusivo do service_role',
-    not has_function_privilege('anon', 'public.fabio_claim_registro_recibo(integer)', 'EXECUTE')
-      and not has_function_privilege('authenticated', 'public.fabio_claim_registro_recibo(integer)', 'EXECUTE')
-      and has_function_privilege('service_role', 'public.fabio_claim_registro_recibo(integer)', 'EXECUTE')
+    not has_function_privilege('anon', 'public.fabio_claim_registro_recibo(integer,integer)', 'EXECUTE')
+      and not has_function_privilege('authenticated', 'public.fabio_claim_registro_recibo(integer,integer)', 'EXECUTE')
+      and has_function_privilege('service_role', 'public.fabio_claim_registro_recibo(integer,integer)', 'EXECUTE')
       and not has_function_privilege('anon', 'public.fabio_concluir_registro_recibo(uuid,uuid,text,text)', 'EXECUTE')
       and not has_function_privilege('authenticated', 'public.fabio_concluir_registro_recibo(uuid,uuid,text,text)', 'EXECUTE')
       and has_function_privilege('service_role', 'public.fabio_concluir_registro_recibo(uuid,uuid,text,text)', 'EXECUTE')
       and not has_function_privilege('anon', 'public.fabio_falhar_registro_recibo(uuid,uuid,text)', 'EXECUTE')
       and not has_function_privilege('authenticated', 'public.fabio_falhar_registro_recibo(uuid,uuid,text)', 'EXECUTE')
-      and has_function_privilege('service_role', 'public.fabio_falhar_registro_recibo(uuid,uuid,text)', 'EXECUTE'),
-    'ACL das tres portas fabio_*'
+    and has_function_privilege('service_role', 'public.fabio_falhar_registro_recibo(uuid,uuid,text)', 'EXECUTE')
+      and not has_function_privilege('anon', 'public.fabio_registro_recibo_dados(integer,uuid)', 'EXECUTE')
+      and not has_function_privilege('authenticated', 'public.fabio_registro_recibo_dados(integer,uuid)', 'EXECUTE')
+      and has_function_privilege('service_role', 'public.fabio_registro_recibo_dados(integer,uuid)', 'EXECUTE'),
+    'ACL das portas fabio_* do recibo'
   );
 
   select pg_get_functiondef('public.app_atualizar_devolutiva_rascunho(uuid,text,text,text,text)'::regprocedure)
