@@ -121,6 +121,19 @@ class RegistroReciboWorkerTest(unittest.TestCase):
         self.assertEqual(backend.calls, [])
         self.assertEqual(backend.sent, [])
 
+    def test_pilot_without_explicit_argument_claims_only_allowlisted_professors(self):
+        worker.REGISTRO_RECIBO_MODE = "pilot"
+        worker.REGISTRO_RECIBO_PILOT_IDS = {25, 26}
+        backend = ReceiptBackend(empty_claim=True)
+        with patch.object(worker, "rpc", side_effect=backend.rpc), \
+             patch.object(worker, "deliver", side_effect=backend.deliver):
+            result = worker.run_registro_recibos("whatsapp", False)
+
+        self.assertEqual(result, [])
+        claims = [payload for name, payload in backend.calls if name == "fabio_claim_registro_recibo"]
+        self.assertEqual([payload["p_professor_id"] for payload in claims], [25, 26])
+        self.assertEqual(backend.sent, [])
+
     def test_receipt_has_class_students_presence_content_and_draft_feedback(self):
         text = worker.format_registro_recibo(registro_fixture(), "Registro confirmado")
 

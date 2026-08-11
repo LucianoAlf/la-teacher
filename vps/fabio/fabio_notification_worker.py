@@ -1223,7 +1223,7 @@ def _registro_recibo_habilitado(professor_id: Optional[int]) -> bool:
     return False
 
 
-def run_registro_recibos(channel: str, dry_run: bool, professor_id: Optional[int] = None) -> list[Dict[str, Any]]:
+def _run_registro_recibos_for_professor(channel: str, dry_run: bool, professor_id: Optional[int] = None) -> list[Dict[str, Any]]:
     """Claim, deliver and close receipt outbox items exactly once per lease."""
     if not _registro_recibo_habilitado(professor_id):
         return [{"event": "registro_recibo", "status": "disabled", "claimed": 0, "sent": 0}]
@@ -1311,6 +1311,26 @@ def run_registro_recibos(channel: str, dry_run: bool, professor_id: Optional[int
             finally:
                 resultado.update(status="failed", error=str(exc)[:500])
         resultados.append(resultado)
+    return resultados
+
+
+def run_registro_recibos(channel: str, dry_run: bool, professor_id: Optional[int] = None) -> list[Dict[str, Any]]:
+    """Run the receipt worker for one target or every explicitly allowlisted pilot."""
+    if REGISTRO_RECIBO_MODE == "off":
+        return [{"event": "registro_recibo", "status": "disabled", "claimed": 0, "sent": 0}]
+    if REGISTRO_RECIBO_MODE == "pilot":
+        if professor_id is not None:
+            targets = [int(professor_id)] if int(professor_id) in REGISTRO_RECIBO_PILOT_IDS else []
+        else:
+            targets = sorted(REGISTRO_RECIBO_PILOT_IDS)
+    else:
+        targets = [professor_id]
+    if not targets:
+        return [{"event": "registro_recibo", "status": "disabled", "claimed": 0, "sent": 0}]
+
+    resultados: list[Dict[str, Any]] = []
+    for target in targets:
+        resultados.extend(_run_registro_recibos_for_professor(channel, dry_run, target))
     return resultados
 
 
