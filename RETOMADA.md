@@ -10,7 +10,8 @@
 > (`f00c96d`, aprovado). Deploy do Radar = **Vercel + Supabase** — a frente do
 > Fábio usa a VPS própria. Frente “Fábio escreve no WhatsApp” = SPEC aprovada + plano
 > em gates; G0/G1 concluídos, schema 090/091/092 publicado no Supabase e G4
-> publicado em `shadow` na VPS. Não houve fluxo real. Quem mais lê: o
+> publicado em `shadow` na VPS. O G5 passou a piloto restrito; a G6 de paridade
+> de fonte está bloqueada até o receptor HMAC ficar versionável. Quem mais lê: o
 > Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
@@ -92,6 +93,32 @@ O bridge foi configurado com `FABIO_WHATSAPP_REGISTRO_MODE=pilot` e
 do reconciliador continua ativo; o último ciclo terminou com `claimed=0` e
 `falhas=0`; não há erro recente no log do bridge. **Nenhuma mensagem real foi
 enviada ainda; G5 E2E continua pendente do áudio/texto do professor.**
+
+## ⛔ 11/08 — G6, paridade da fonte e congelamento do piloto: BLOCKED
+
+Evidência completa: `docs/superpowers/evidence/2026-08-11-registro-aula-source-parity.md`.
+
+- O worktree `D:\la-teacher-worktrees\fabio-whatsapp` começou limpo. A Edge
+  ativa `fabio-registro-aula` foi baixada somente para auditoria: versão 17,
+  SHA-256 `B3B062BDD86EEF3AA04081A1C7E0DDE3ADCD79F987600BF26E0C90558DE7BF81`.
+- A Edge recebe `audio_id`, repassa os identificadores já resolvidos e uma URL
+  temporária, e assina o corpo em HMAC. Ela não contém a implementação que
+  recebe o callback ou normaliza o registro.
+- A busca de fontes no bridge e no Hermes não encontrou receptor versionável
+  que valide a assinatura ou monte o rascunho. Logo, não é seguro assumir onde
+  ficam a normalização e o contrato de fatias.
+- Nenhuma flag de recibo foi adicionada, nenhum backup/configuração foi tocado,
+  nenhum serviço foi reiniciado e a allowlist do piloto não mudou.
+- Os comandos `teste:090`, `teste:091` e `teste:092` não rodaram: o runner abre
+  transação no banco produtivo e executa DDL/DML antes do rollback, contrariando
+  o escopo somente leitura desta tarefa.
+
+**PRÓXIMO PASSO literal:** localizar e versionar a fonte do receptor HMAC do
+callback. Só então fazer backup recuperável, acrescentar
+`FABIO_REGISTRO_RECIBO_MODE=off` e a allowlist espelhada em
+`FABIO_REGISTRO_RECIBO_PILOT_IDS`, conferir saída sanitizada e reiniciar pelo
+procedimento já provado. Até isso acontecer, não expandir o piloto nem rodar
+novo E2E.
 
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
 

@@ -71,7 +71,7 @@ O `ExecStart` do service **não** usa `--send` — a saída fica no journal
 `FABIO_AUDIT_WHATSAPP` (número do Alf) no service e acrescentar `--send`.
 Regra permanente: **envio real só com OK explícito do Alf.**
 
-## Registro de aula pelo WhatsApp — G3 local
+## Registro de aula pelo WhatsApp — fluxo e piloto
 
 O fluxo novo fica desligado por padrão:
 
@@ -79,6 +79,8 @@ O fluxo novo fica desligado por padrão:
 FABIO_WHATSAPP_REGISTRO_MODE=off
 FABIO_WHATSAPP_REGISTRO_PILOT_IDS=
 FABIO_WHATSAPP_REGISTRO_MAX_AUDIO_BYTES=26214400
+FABIO_REGISTRO_RECIBO_MODE=off
+FABIO_REGISTRO_RECIBO_PILOT_IDS=
 ```
 
 Os modos são `off` (Hermes atual), `shadow` (classifica e mede, sem abrir
@@ -90,8 +92,21 @@ apenas as RPCs `fabio_*`; não há SQL direto nem chave service-role em log.
 O reconciliador é um ciclo limitado por lease e roda pelo unit/timer
 `fabio-whatsapp-reconciler`. Ele faz read-back do registro, deixa o professor
 confirmar antes da gravação final e prova no banco a limpeza do Storage antes de
-remover um blob. A unidade é apenas um espelho versionado nesta fase; o fluxo
-novo não foi copiado para a VPS nem ativado.
+remover um blob.
+
+### G6 — paridade de fonte e congelamento do piloto (11/08/2026)
+
+Há um piloto restrito já configurado na VPS. A allowlist existente não pode ser
+ampliada durante esta fase. O recibo posterior à confirmação fica desligado por
+padrão nas duas flags acima, e a lista dele deverá copiar a allowlist já ativa
+sem revelar os valores.
+
+**Hard-stop atual:** a Edge `fabio-registro-aula` ativa está na versão 17 e
+assina o callback com HMAC, mas a fonte legível e versionável do receptor desse
+callback não foi localizada no bridge nem no Hermes. Não adicionar flags,
+reiniciar o bridge ou rodar novo E2E até localizar e versionar esse consumidor.
+O preflight, hash e contrato exigido estão em
+`docs/superpowers/evidence/2026-08-11-registro-aula-source-parity.md`.
 
 ## Timers do usuário `fabio`
 
