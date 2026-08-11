@@ -8,8 +8,9 @@
 > **Última atualização: 10/08/2026, ~22h (BRT) — Cursor.** Radar telas no ar
 > (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
 > (`f00c96d`, aprovado). Deploy desta frente = **Vercel + Supabase** — VPS do
-> Fábio não entra. Frente “Fábio escreve no WhatsApp” = SPEC só, sem código no
-> bridge. Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
+> Fábio não entra. Frente “Fábio escreve no WhatsApp” = SPEC aprovada + plano
+> em gates, ainda sem código no bridge, migration ou deploy. Quem mais lê: o
+> Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
@@ -37,11 +38,10 @@
    único da mesa no desktop (hoje os rótulos FALTAS/ABSENTEÍSMO/… repetem em
    cada linha) — tentativa anterior saiu feia e foi **revertida**; não reabrir
    sem ele. Fechamento do plano (menores do backend) não bloqueia.
-2. **Fábio escreve no WhatsApp** — SPEC escrita, **ainda sem aprovação do
-   Alf e sem plano**. Não é pra codar ainda — é pra ele ler
-   `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`
-   primeiro. Ver seção "Brainstorming feito, SPEC escrita", mais abaixo (dentro
-   do histórico do incidente da Daiana, 10/08 tarde).
+2. **Fábio escreve no WhatsApp** — SPEC **aprovada pelo Alf** e plano escrito em
+   `docs/superpowers/plans/2026-08-10-fabio-escreve-no-whatsapp.md`. Ainda não há
+   código, migration ou deploy desta frente. A execução começa pelo G0 em
+   worktree; G2, G4, G5 e G6 param para aprovação explícita do Alf.
 
 ---
 
@@ -149,8 +149,9 @@ hex/cor arbitrária em `src/features/coordenacao` volta **vazio**.
 
 ## ✅ 10/08 NOITE (Cursor) — Radar telas verificadas + shell sem tarja preta
 
-**PRÓXIMO PASSO literal:** (1) Alf lê a SPEC do Fábio no WhatsApp e diz o que
-muda — **não codar** essa frente ainda. (2) No Radar, só com pedido dele:
+**PRÓXIMO PASSO literal:** (1) Na frente do Fábio, a SPEC já foi aprovada e o
+plano em gates está escrito; começar somente pelo G0, sem pular os checkpoints
+produtivos. (2) No Radar, só com pedido dele:
 cabeçalho único da mesa no desktop (rótulos hoje repetem por linha; tentativa
 anterior revertida). Menores do backend ficam pro fechamento do plano e **não
 bloqueiam**. Deploy do que já entrou: Vercel (`f00c96d` em Production) +
@@ -349,7 +350,7 @@ genérico; a fatia veio sem `presenca` — o áudio só descreve conteúdo).
 1`) — a 086 funcionando ao vivo pela primeira vez em produção. Pendência da
 Daiana: **0**.
 
-### ▶ Brainstorming feito, SPEC escrita (`5b6f5d6`)
+### ▶ Brainstorming e SPEC aprovados; plano em gates escrito
 
 `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`.
 Escopo: registro de aula por áudio + chamada avulsa, sempre com leitura-e-
@@ -363,10 +364,11 @@ chamar a RPC) é código determinístico no bridge, mesma lógica que já proteg
 `allowlist-de-ferramenta-vence-aprovacao`). Fora do escopo, anotado no spec:
 pedido de liberação de prazo à coordenação e correção pós-confirmação.
 
-**PRÓXIMO PASSO desta frente:** o Alf lê a spec inteira e diz o que muda.
-Aprovada → invocar `superpowers:writing-plans` pra virar plano de execução (o
-mesmo formato que o Radar já usou, com SQL/TS/testes por task). Ainda não
-comecei a implementação — nenhuma migration nova, nenhum código do bridge.
+**PRÓXIMO PASSO desta frente:** executar o G0 do plano: consolidar estes docs,
+criar worktree próprio e congelar o contrato vivo antes de extrair qualquer
+miolo. Ainda não começou a implementação — nenhuma migration nova, nenhum
+código do bridge. As passagens produtivas G2 (banco), G4 (shadow na VPS), G5
+(piloto) e G6 (rollout) exigem aprovação explícita do Alf.
 
 ---
 
@@ -687,7 +689,7 @@ A ordem verdadeira, **hoje**, é esta (a tabela antiga que dizia “faltam Tasks
 |---|---|---|---|
 | ~~1~~ | ~~Semáforo do professor~~ | **FECHADO em 09/08 à noite.** Banco (073–080), mesa do professor, tela da coordenação, cobrança no timer, e o Fábio lendo. O texto abaixo desta tabela é HISTÓRIA — não reabrir | ✅ |
 | **1** | **Radar do aluno** | **Backend + telas no ar** (Tasks 1–10). Foto na linha (089, `bcf995c`); tooltip do score organizado (`f00c96d`, Alf aprovou). Deploy = **Vercel Production + Supabase** — **VPS do Fábio não entra** nesta frente. Próximo só com pedido do Alf: cabeçalho único da mesa no desktop (não reabrir sozinho). Menores do backend não bloqueiam | topo deste arquivo + seções ✅ da noite 10/08 |
-| **2** | **Fábio escreve no WhatsApp** | **SPEC escrita** (`5b6f5d6` / `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`), **ainda sem aprovação do Alf e sem plano**. Nenhum código novo no bridge — **nada pra deployar na VPS** até a spec fechar. Não começar implementação sem ele ler | "Brainstorming feito, SPEC escrita" |
+| **2** | **Fábio escreve no WhatsApp** | **SPEC aprovada + plano em gates escrito** (`docs/superpowers/plans/2026-08-10-fabio-escreve-no-whatsapp.md`). Nenhum código novo, migration ou deploy desta frente. Começar pelo G0 em worktree; G2/G4/G5/G6 exigem aprovação do Alf | "Brainstorming e SPEC aprovados; plano em gates escrito" |
 | 3 | **Fila offline no feedback** | O ✓ é honesto (alerta + reenviar), mas o toque se perde se o app fechar. Janela abre 25/08 | "Ainda aberto" |
 | ~~4~~ | ~~Parede de texto do escalonamento~~ | **FECHADO em 10/08** (`146a593`): índice + uma mensagem por unidade, 9/9 mutantes | seção do topo |
 | 4 | **Registro de presença em Campo Grande** | **NOVO, medido em 10/08:** 126 alunos com 2+ faltas seguidas e zero presença afirmada, concentrados em CG (28–50% da carteira de alguns professores). É o que segura o cartão "Sumiu da escola" do Radar | spec do Radar, §3 |
