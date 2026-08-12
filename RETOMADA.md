@@ -7,7 +7,8 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 11/08/2026 — G8 publicado com recibo desligado; E2E
+> **Última atualização: 12/08/2026 — presença canônica redesenhada após revisão
+> técnica; implementação ainda não iniciada.** G8 publicado com recibo desligado; E2E
 > funcional ainda pendente.** Radar telas no ar
 > (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
 > (`f00c96d`, aprovado). Deploy do Radar = **Vercel + Supabase** — a frente do
@@ -18,6 +19,178 @@
 > somente os flags de recibo desligados, sem restart. O G8 posterior publicou o
 > contrato e o timer com barreira `off`; E2E funcional continua pendente. Quem mais lê: o
 > Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
+
+## 🧭 12/08 — presença canônica e entrada manual: checkpoint ativo
+
+**Pedido aprovado pelo Alf:** Emusys, LA Report, LA Teacher e Fábio/WhatsApp
+precisam usar `public.aluno_presenca` como mesma decisão local, mostrando a
+origem. O Emusys é válido quando marca **presente**; `ausente` vindo dele segue
+como pendência operacional até decisão humana. A equipe pode resolver no LA
+Report, o professor no app ou WhatsApp/Fábio. Nenhuma dessas portas pode apagar
+evidência bruta do Emusys ou abrir escrita direta por RLS. A auditoria reutiliza
+retificações humanas e ações WhatsApp; só uma estrutura focada em conflitos
+abertos é admitida, se não existir equivalente no schema.
+
+**Fonte de verdade do desenho:**
+`docs/superpowers/specs/2026-08-12-presenca-canonica-e-entrada-manual-design.md`.
+Ela também preserva a segunda frente aprovada: agenda com microfone **e**
+caderno; formulário manual completo, rascunho automático e campos individuais
+por aluno; copiar campo + duplicar ficha inteira com confirmação de
+sobrescrita. A revisão técnica acrescentou contrato obrigatório de rascunho por
+professor+aula+aluno, versão/conflito áudio-manual, recuperação de conexão e
+progresso explicitamente individual.
+
+**Branch isolada criada:**
+`D:\la-teacher-worktrees\presenca-canonica`, branch
+`codex/presenca-canonica`, baseada em `origin/main` no commit `57e70be`.
+Esse commit já contém a migration produtiva `20260812135033` (presença JSON
+nula). Ela é apenas pré-requisito de histórico e **não** resolve a convergência
+de fontes.
+
+**Worktree complementar criado (somente Git):**
+`D:\2026\LA-performance-report\.worktrees\presenca-canonica`, branch
+`codex/presenca-canonica-report`, baseado em `origin/main` no commit
+`3f850cc5`. Nenhuma branch Supabase foi criada.
+
+**Dono da migration compartilhada:** o LA Report. O snapshot remoto contém a
+migration `20260812135824`, que ainda não existe neste worktree do LA Teacher;
+por isso, uma migration em cada repo criaria duas histórias concorrentes para o
+mesmo banco. O LA Teacher recebe o contrato/RPC e os badges, sem SQL novo.
+
+**Fatos auditados antes do desenho:**
+
+- `fn_presenca_e_forte(respondido_por)` é a régua humana histórica; **não
+  alterar** para incluir Emusys, pois isso fecharia `ausente` bruto como se fosse
+  decisão.
+- O próximo contrato é uma função status-aware, usada por
+  `app_minha_agenda_sessao` e pelas portas de escrita, por exemplo
+  `fn_presenca_fecha_chamada(status_presenca, respondido_por)`: só fecha com
+  status terminal e fonte humana forte, ou Emusys/presente.
+- A matriz de consumidores é parte do contrato: `fn_presenca_e_forte` continua
+  para autoria/evidência humana; pendências, sessão, Fábio e guards de chamada
+  usam o novo resolvedor. Não trocar uma pela outra por grep genérico.
+- O snapshot remoto confirmou as trilhas existentes: `aluno_presenca_retificacoes`
+  para retificação humana, `fabio_acoes_pendentes` para a ação WhatsApp e
+  `fabio_acao_eventos` para idempotência por `wa_message_id`. Não criar ledger
+  universal; criar somente conflito aberto/resolvido se não houver equivalente.
+- `upsert_presenca_emusys_bruta` hoje descarta `presente → ausente`, e
+  `app_registrar_chamada_agenda(...indeterminado)` pode apagar a linha. Ambos
+  são comportamentos a corrigir no projeto principal: atualização automática
+  reabre pendência; só divergência contra humano abre conflito revisável.
+- Espelhos precisam carregar a referência da decisão que os originou, mas nunca
+  copiar raw Emusys entre aulas. Devolvem/registram sincronizados, mantidos por
+  precedência e conflitos. Conflitos humanos nunca são decididos silenciosamente.
+- `sync-presenca-emusys` conhecido é pull-only. LA Teacher/Report convergem já
+  pelo banco compartilhado; escrita de volta na API Emusys fica bloqueada até
+  endpoint externo, autenticação e idempotência verificáveis.
+- Fábio continua por RPC server-side com `professor_whatsapp`; não receberá
+  grant direto de tabela nem acesso SQL no chat. Ação pendente, shortlist,
+  expiração e idempotência já existem em `fabio_acoes_pendentes` e
+  `fabio_acao_eventos`; a correção deve reaproveitá-las, não inventar nonce
+  paralelo. A identidade telefone→professor é prova do bridge, não algo que
+  `service_role` sozinho possa provar dentro do Postgres.
+
+**Plano versionado:**
+`docs/superpowers/plans/2026-08-12-presenca-canonica.md`. Ele separa o contrato
+de presença do formulário manual e fixa a propriedade: LA Teacher mantém
+leitura/badges; LA Report mantém a migration canônica, RPC, resolvedor,
+conflitos, gêmeos, Fábio e UX da chamada.
+A auditoria remota confirmou que `fn_sincronizar_gemeos_presenca(integer)` ainda é
+`SECURITY DEFINER` executável por `PUBLIC`/`anon`/`authenticated`; a migration
+planejada revoga essas ACLs sem abrir outra porta de escrita. A porta do Fábio
+`fabio_registrar_presencas_aula` permanece exclusiva de `service_role`, mas a
+autorização contextual WhatsApp ainda precisa ser implementada/testada.
+
+**Alvo de banco decidido pelo Alf:** aplicar as migrations diretamente no projeto
+Supabase principal `ouqwbbermlzqqvtqwlul`; não criar branch Supabase e não pedir
+custo. O isolamento desta frente é somente de Git. O runner SQL atual abre uma
+transação contra produção; não usá-lo aqui, mesmo com rollback, pois esta frente
+não cria dados sintéticos na produção.
+
+**Implantação efetiva (12/08/2026):** a única migration de schema desta frente
+foi aplicada no projeto Supabase principal `ouqwbbermlzqqvtqwlul`, pelo worktree
+do LA Report, sem branch Supabase e sem fixture produtiva:
+
+- `20260812175508_presenca_canonica_confirmacao_respeita_falta_humana`:
+  preserva falta humana canonica na confirmacao final do registro. Rascunho,
+  autosave e copia nao escrevem chamada; apenas confirmar/gravar pode promover
+  presenca, e nao grava conteudo para aluno que secretaria/professor/Fabio ja
+  marcou como falta ou falta justificada.
+- `20260812172432_presenca_canonica_resolvedor_conflitos`: resolvedor
+  status-aware, preservação do raw Emusys, conflito revisável, origem de
+  espelho, consumidores de pendência/sessão/Fábio e confirmação WhatsApp
+  atômica;
+- `20260812172556_presenca_canonica_conflitos_acl`: revoga a leitura direta de
+  `anon`/`authenticated` sobre `aluno_presenca_conflitos`; RLS continua ativo e
+  a tabela não tem policy de navegador.
+
+Provas pós-aplicação, sem escrever dados: `Emusys/presente` fecha,
+`Emusys/ausente` não fecha, falta humana fecha; `anon` e `authenticated` não
+possuem `SELECT` na trilha de conflitos e `service_role` possui. O Report teve
+testes e build verdes; o banco local não iniciou por uma migration histórica
+anterior (`20260109_fase1_seed_dados.sql` referencia `professores` inexistente),
+portanto não se deve usar esse startup como prova nem tentar contorná-lo.
+
+**Migração concorrente a reconciliar:** o histórico remoto também registra
+`20260812171943_20260812150000_chamada_retroativa_fallback_emusys`, aplicada
+antes da canônica e ainda não presente no Git remoto. Não foi recriada nem
+reaplicada aqui. Antes de nova migration compartilhada, localizar o arquivo e
+o autor, compará-lo ao histórico remoto e registrá-lo no Git sem alterar seu
+conteúdo.
+
+**Bridge do Fábio publicado (12/08/2026):** a VPS
+`/home/fabio/fabio-chat-bridge/fabio_whatsapp_actions.py` foi comparada antes
+do deploy; o único diff eram as dez linhas desta correção. A versão anterior
+foi preservada em
+`/home/fabio/fabio-chat-bridge/backups/20260812-presenca-canonica-atomic-confirm/`.
+A cópia candidata compilou, foi movida atomicamente e o unit
+`fabio-chat-bridge` reiniciou `active` com PID `1384707`; o SHA-256 vivo é
+`c9d712947037a3ec2f9e68771da5a3a052af3c39c74b1ce4f296af84eec0a46b`.
+Nenhuma presença sintética, mensagem WhatsApp nem E2E foi disparado neste
+rollout. A confirmação de chamada agora chama
+`fabio_confirmar_chamada_acao`, que valida a ação, professor, expiração,
+shortlist e `wa_message_id` antes da escrita atômica.
+
+**Próximos gates desta frente:** consumir no LA Teacher os campos
+`origem_presenca` e `tem_conflito_presenca` como badges. Depois voltar ao
+formulário manual, em uma frente própria: microfone + caderno, rascunho por
+professor+aula+aluno, autosave/versionamento e cópias exclusivamente dentro do
+roster, jamais presença. Não tocar nas branches paralelas `fabio-whatsapp`,
+`fabio-pendencias-whatsapp` ou áudio.
+
+### Validação real posterior — conta Matheus Felipe / Recreio (12/08/2026)
+
+Foi feita leitura da conta autorizada do professor na prévia local ligada ao
+Supabase de produção, sem criar, editar, apagar ou “limpar” dado pedagógico. A
+unidade da conta é **Recreio** e, na segunda-feira 10/08/2026, a interface mostra
+cinco de cinco chamadas concluídas e cinco registros concluídos (Valentina,
+Amanda, Luiz, a turma Gustavo/Maria e Arthur). Portanto não havia uma pendência
+real, segura e reversível para uma simulação de presença: reabrir ou trocar uma
+dessas chamadas para depois apagar por SQL seria falsear uma ocorrência e
+contornaria a trilha auditável.
+
+O banco confirma que essas decisões já existem em `public.aluno_presenca` com
+origem `professor_la_teacher`; onde o pull chegou, a evidência bruta
+`emusys_presenca_bruta='presente'` permanece junto. LA Teacher e LA Report leem a
+mesma tabela canônica, portanto a decisão de um aparece no outro ao recarregar —
+não existe uma segunda replicação entre os dois sistemas. Isto **não** prova
+propagação instantânea do Emusys: `sync-presenca-emusys` continua sendo pull
+agendado. Também não existe, neste checkpoint, escrita de volta do LA Teacher
+para a API Emusys.
+
+O que ainda não pode ser anunciado como entregue: a interface publicada mostra
+somente “Registrar por voz” e “Regravar aula”. O segundo caminho, por ficha
+manual/caderno, continua apenas no design
+`docs/superpowers/specs/2026-08-12-registro-manual-ficha-individual-design.md`;
+não há botão, autosave, cópia ou persistência manual publicados.
+
+Achado aberto da mesma conferência: a fonte de agenda contém múltiplos eventos
+brutos para uma mesma faixa/mesma turma de 10/08 em Recreio, enquanto a tela os
+agrupa em cinco cards. Algumas linhas canônicas antigas associadas a esses eventos
+não trazem `espelhado_de_presenca_id`. Antes de usar um desses pares para teste
+de escrita, auditar a chave natural da aula e a relação entre eventos Emusys,
+agenda agrupada e presenças; não deduplicar nem corrigir dados históricos no
+escuro.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
@@ -1980,3 +2153,72 @@ Validação fresca no worktree da correção: `teste:presenca-null` verde com
 resíduos 0/0, `mutantes:presenca-null` matou 2/2 mutantes, Vitest 34/34 e
 `npm run build` verde. Próximo passo é publicar o branch/PR; não reabrir este
 incidente.
+
+## 12/08/2026 — aula operacional, Leonardo/Matheus e briefing
+
+**Decisão do Alf:** o card estático “Briefing do Fábio — em breve” fica oculto
+de todos os professores até existir conteúdo real; o botão/chat do Fábio não
+muda. A Home foi ajustada no worktree `codex/presenca-canonica`.
+
+**Causa-raiz medida:** o Emusys devolve eventos concorrentes do mesmo slot. No
+caso Leonardo/Guitarra 14h, há turma antiga vazia, turma atual com roster e
+individual do aluno. O áudio `58ffbe90-620e-41bd-b0f1-711f7815197e` foi ligado
+à vazia e falhou como transitório com `aula sem roster canônico`. No Matheus,
+17/08 às 18h, há turma vazia e individual reagendada com Arthur; a RPC escolhia
+“turma primeiro” e escondia o aluno. Não é atraso simples do sync.
+
+**Desenho e plano:**
+`docs/superpowers/specs/2026-08-12-aula-operacional-e-recuperacao-audio-design.md`
+e
+`docs/superpowers/plans/2026-08-12-aula-operacional-e-recuperacao-audio.md`.
+O raw `aulas_emusys` não é apagado. LA Report é o dono da migration
+`20260812210110_aula_operacional_prioriza_roster.sql`, que cria um resolvedor
+privado por roster e o liga à agenda, pendências, Fábio e fila de áudio. A
+recuperação de fila reutiliza `audit_log`, sem ledger paralelo.
+
+**Migração concorrente reconciliada no Git:** o arquivo já aplicado
+`20260812171943_chamada_retroativa_fallback_emusys.sql` foi localizado no
+worktree `fix/chamada-retroativa` (SHA-256
+`E36857902F327C7037A9EC6918B5D20D8422808594B858892789A0880C8C4339`) e
+cherry-picked sem alteração para a branch do LA Report no commit `0c3d1ee0`.
+Não reaplicar essa migration.
+
+**Banco aplicado no projeto principal, sem branch Supabase:** versões remotas
+`20260812210110_aula_operacional_prioriza_roster` e
+`20260812210328_recuperar_fila_aula_operacional_transitoria`. O helper resolve
+`217855 → 1373100` (Leonardo) e `300858 → 18092436` (Matheus), o índice
+`idx_aulas_emusys_slot_operacional` existe e a ACL é `anon=false`,
+`authenticated=false`, `service_role=true`. A segunda migration foi necessária
+porque um retry concorrente resumiu a mensagem da fila para
+`normalizacao_invalida`; a recuperação final usa a condição estrutural (erro
+transitório + destino canônico diferente + roster), não texto de erro.
+
+**Áudio do Leonardo recuperado:** a fila
+`58ffbe90-620e-41bd-b0f1-711f7815197e` foi religada de `217855` para `1373100`,
+com `audit_log.acao=relink_aula_roster`; o pipeline terminou em `normalizado`
+sem erro e gerou a raiz `96a47de5-2595-445a-b426-555a510925d5` mais a fatia do
+aluno, ambas `aguardando_confirmacao`. Nada foi confirmado automaticamente.
+
+**Sync corrigido:** `sync-presenca-emusys` v92 está ACTIVE, continua com
+`verify_jwt=false` e agora preenche o `aluno_nome` obrigatório ao auditar
+conflito de cancelamento humano. Depois da janela de indisponibilidade 522, a
+v92 voltou a responder 200 em execuções reais às 21:05 UTC.
+
+**Provas:** React/Vitest 46/46, contrato + fixture real PostgreSQL 17 verdes,
+build do LA Teacher e build do LA Report verdes. Na conta real do Matheus,
+17/08 mostra 5 chamadas; às 18h aparece Arthur de Carvalho Rodrigues Frota
+Almeida como Musicalização Preparatória individual. Abrir a chamada mostra o
+roster e a trava honesta de 15 minutos. Nenhum aluno/presença de teste foi
+criado, então não existe limpeza de dado produtivo. O briefing estático sumiu;
+o botão/chat funcional do Fábio permanece.
+
+Durante a leitura final dos logs apareceu outro contrato quebrado, fora da
+agenda mas dentro do mesmo ecossistema Emusys: o sincronizador de matrículas
+emitia `data_nascimento_divergente` e o `CHECK` da fila de divergências recusava
+o valor. A migration remota
+`20260812211712_alunos_atributos_data_nascimento_divergente` passou a aceitar e
+validar esse tipo mantendo a enumeração fechada.
+
+**Próximo passo:** publicar o frontend do LA Teacher, manter o preview na prova
+do Matheus e continuar a ficha manual aprovada na branch separada
+`codex/registro-manual` (microfone + caderno, copiar campo + duplicar ficha).

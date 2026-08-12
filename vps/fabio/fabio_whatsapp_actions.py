@@ -414,9 +414,13 @@ def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, An
             receipt["readback"] = readback
             return _result("confirmed", reply="Registro confirmado. Estou preparando seu carimbo.", action_id=str(action["id"]), receipt=receipt)
         aula_id = int(action["aula_id"])
-        committed = _call(backend, "fabio_registrar_presencas_aula", {"p_professor_id": int(context["professor_id"]), "p_aula_emusys_id": aula_id, "p_alunos_ausentes": action.get("payload", {}).get("alunos_ausentes", [])})
-        _event(backend, action, context, "confirmado", {"aula_id": aula_id})
-        return _result("confirmed_call", reply="Pronto: chamada registrada.", action_id=str(action["id"]), receipt=committed)
+        committed = _call(backend, "fabio_confirmar_chamada_acao", {
+            "p_acao_id": action["id"],
+            "p_professor_id": int(context["professor_id"]),
+            "p_wa_message_id": f"{context['wa_message_id']}:fabio:confirmado",
+        })
+        receipt = committed.get("escrita") if isinstance(committed.get("escrita"), dict) else committed
+        return _result("confirmed_call", reply="Pronto: chamada registrada.", action_id=str(action["id"]), aula_id=aula_id, receipt=receipt)
     return _result("pending_question", reply="Ainda não gravei. Você quer confirmar, corrigir, cancelar ou deixar para depois?", action_id=str(action["id"]))
 
 

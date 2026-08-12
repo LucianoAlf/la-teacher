@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, FabioCard, FabioMark, Skeleton, Toast, useToast } from '../../components/ui'
+import { Button, Card, EmptyState, FabioMark, Skeleton, Toast, useToast } from '../../components/ui'
 import { AppHeader } from './AppHeader'
 import { useAuth } from '../../lib/auth'
 import { formatDiaCurto, hojeBRT } from '../../lib/date'
@@ -94,16 +94,6 @@ export default function HomePage() {
 
         {/* Registros do Fábio esperando confirmação */}
         <AguardandoConfirmacao onAbrir={(id) => navigate(`/app/confirmar/${id}`)} />
-
-        {/* 2 · Briefing do Fábio (estático nesta fase) */}
-        <div className="mb-3">
-          <FabioCard tag="em breve">
-            <p>Seu copiloto chega no próximo sprint 🎙️</p>
-            <p className="text-text-secondary">
-              Aqui vão entrar o briefing pré-aula e os toques sobre cada aluno.
-            </p>
-          </FabioCard>
-        </div>
 
         {/* Seletor de dia */}
         <div className="mb-2 overflow-hidden rounded-lg border border-border-subtle bg-bg-surface">
