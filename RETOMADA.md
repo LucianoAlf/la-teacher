@@ -109,6 +109,11 @@ não cria dados sintéticos na produção.
 foi aplicada no projeto Supabase principal `ouqwbbermlzqqvtqwlul`, pelo worktree
 do LA Report, sem branch Supabase e sem fixture produtiva:
 
+- `20260812175508_presenca_canonica_confirmacao_respeita_falta_humana`:
+  preserva falta humana canonica na confirmacao final do registro. Rascunho,
+  autosave e copia nao escrevem chamada; apenas confirmar/gravar pode promover
+  presenca, e nao grava conteudo para aluno que secretaria/professor/Fabio ja
+  marcou como falta ou falta justificada.
 - `20260812172432_presenca_canonica_resolvedor_conflitos`: resolvedor
   status-aware, preservação do raw Emusys, conflito revisável, origem de
   espelho, consumidores de pendência/sessão/Fábio e confirmação WhatsApp
