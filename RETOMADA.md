@@ -2153,3 +2153,72 @@ Validação fresca no worktree da correção: `teste:presenca-null` verde com
 resíduos 0/0, `mutantes:presenca-null` matou 2/2 mutantes, Vitest 34/34 e
 `npm run build` verde. Próximo passo é publicar o branch/PR; não reabrir este
 incidente.
+
+## 12/08/2026 — aula operacional, Leonardo/Matheus e briefing
+
+**Decisão do Alf:** o card estático “Briefing do Fábio — em breve” fica oculto
+de todos os professores até existir conteúdo real; o botão/chat do Fábio não
+muda. A Home foi ajustada no worktree `codex/presenca-canonica`.
+
+**Causa-raiz medida:** o Emusys devolve eventos concorrentes do mesmo slot. No
+caso Leonardo/Guitarra 14h, há turma antiga vazia, turma atual com roster e
+individual do aluno. O áudio `58ffbe90-620e-41bd-b0f1-711f7815197e` foi ligado
+à vazia e falhou como transitório com `aula sem roster canônico`. No Matheus,
+17/08 às 18h, há turma vazia e individual reagendada com Arthur; a RPC escolhia
+“turma primeiro” e escondia o aluno. Não é atraso simples do sync.
+
+**Desenho e plano:**
+`docs/superpowers/specs/2026-08-12-aula-operacional-e-recuperacao-audio-design.md`
+e
+`docs/superpowers/plans/2026-08-12-aula-operacional-e-recuperacao-audio.md`.
+O raw `aulas_emusys` não é apagado. LA Report é o dono da migration
+`20260812210110_aula_operacional_prioriza_roster.sql`, que cria um resolvedor
+privado por roster e o liga à agenda, pendências, Fábio e fila de áudio. A
+recuperação de fila reutiliza `audit_log`, sem ledger paralelo.
+
+**Migração concorrente reconciliada no Git:** o arquivo já aplicado
+`20260812171943_chamada_retroativa_fallback_emusys.sql` foi localizado no
+worktree `fix/chamada-retroativa` (SHA-256
+`E36857902F327C7037A9EC6918B5D20D8422808594B858892789A0880C8C4339`) e
+cherry-picked sem alteração para a branch do LA Report no commit `0c3d1ee0`.
+Não reaplicar essa migration.
+
+**Banco aplicado no projeto principal, sem branch Supabase:** versões remotas
+`20260812210110_aula_operacional_prioriza_roster` e
+`20260812210328_recuperar_fila_aula_operacional_transitoria`. O helper resolve
+`217855 → 1373100` (Leonardo) e `300858 → 18092436` (Matheus), o índice
+`idx_aulas_emusys_slot_operacional` existe e a ACL é `anon=false`,
+`authenticated=false`, `service_role=true`. A segunda migration foi necessária
+porque um retry concorrente resumiu a mensagem da fila para
+`normalizacao_invalida`; a recuperação final usa a condição estrutural (erro
+transitório + destino canônico diferente + roster), não texto de erro.
+
+**Áudio do Leonardo recuperado:** a fila
+`58ffbe90-620e-41bd-b0f1-711f7815197e` foi religada de `217855` para `1373100`,
+com `audit_log.acao=relink_aula_roster`; o pipeline terminou em `normalizado`
+sem erro e gerou a raiz `96a47de5-2595-445a-b426-555a510925d5` mais a fatia do
+aluno, ambas `aguardando_confirmacao`. Nada foi confirmado automaticamente.
+
+**Sync corrigido:** `sync-presenca-emusys` v92 está ACTIVE, continua com
+`verify_jwt=false` e agora preenche o `aluno_nome` obrigatório ao auditar
+conflito de cancelamento humano. Depois da janela de indisponibilidade 522, a
+v92 voltou a responder 200 em execuções reais às 21:05 UTC.
+
+**Provas:** React/Vitest 46/46, contrato + fixture real PostgreSQL 17 verdes,
+build do LA Teacher e build do LA Report verdes. Na conta real do Matheus,
+17/08 mostra 5 chamadas; às 18h aparece Arthur de Carvalho Rodrigues Frota
+Almeida como Musicalização Preparatória individual. Abrir a chamada mostra o
+roster e a trava honesta de 15 minutos. Nenhum aluno/presença de teste foi
+criado, então não existe limpeza de dado produtivo. O briefing estático sumiu;
+o botão/chat funcional do Fábio permanece.
+
+Durante a leitura final dos logs apareceu outro contrato quebrado, fora da
+agenda mas dentro do mesmo ecossistema Emusys: o sincronizador de matrículas
+emitia `data_nascimento_divergente` e o `CHECK` da fila de divergências recusava
+o valor. A migration remota
+`20260812211712_alunos_atributos_data_nascimento_divergente` passou a aceitar e
+validar esse tipo mantendo a enumeração fechada.
+
+**Próximo passo:** publicar o frontend do LA Teacher, manter o preview na prova
+do Matheus e continuar a ficha manual aprovada na branch separada
+`codex/registro-manual` (microfone + caderno, copiar campo + duplicar ficha).

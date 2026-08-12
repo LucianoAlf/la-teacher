@@ -61,7 +61,8 @@ export function agruparSessoes(cruas: SessaoAula[]): SessaoAula[] {
   }
 
   const resultado: SessaoAula[] = []
-  for (const slot of porSlot.values()) {
+  for (const slotCru of porSlot.values()) {
+    const slot = reduzirDuplicatasOperacionais(slotCru)
     const turmas = slot.filter((s) => s.tipo === 'turma')
     const individuais = slot.filter((s) => s.tipo === 'individual')
     const absorvidas = new Set<number>()
@@ -117,6 +118,41 @@ export function agruparSessoes(cruas: SessaoAula[]): SessaoAula[] {
   return resultado.sort(
     (a, b) => a.data_hora_inicio.localeCompare(b.data_hora_inicio) || a.aula_id_ancora - b.aula_id_ancora,
   )
+}
+
+/**
+ * Defesa para payloads legados: o Emusys pode manter uma turma vazia antiga
+ * junto da aula atual do mesmo curso/horário. A RPC canônica já resolve isso no
+ * banco; esta redução impede que um cache ou cliente antigo volte a exibir a
+ * âncora vazia.
+ */
+function reduzirDuplicatasOperacionais(slot: SessaoAula[]): SessaoAula[] {
+  const porCursoEDuracao = new Map<string, SessaoAula[]>()
+  for (const sessao of slot) {
+    const chave = `${sessao.data_hora_fim ?? ''}\u0000${sessao.curso ?? ''}`
+    const candidatas = porCursoEDuracao.get(chave) ?? []
+    candidatas.push(sessao)
+    porCursoEDuracao.set(chave, candidatas)
+  }
+
+  return [...porCursoEDuracao.values()].flatMap((candidatas) => {
+    const turmas = candidatas.filter((sessao) => sessao.tipo === 'turma')
+    const individuais = candidatas.filter((sessao) => sessao.tipo === 'individual')
+    if (turmas.length === 0) return individuais
+
+    const melhorTurma = [...turmas].sort(
+      (a, b) => b.alunos.length - a.alunos.length || b.aula_id_ancora - a.aula_id_ancora,
+    )[0]
+    const maiorRosterIndividual = individuais.reduce(
+      (maior, sessao) => Math.max(maior, sessao.alunos.length),
+      0,
+    )
+
+    if (melhorTurma.alunos.length === 0 && maiorRosterIndividual > 0) {
+      return individuais
+    }
+    return [melhorTurma, ...individuais]
+  })
 }
 
 // ---------------------------------------------------------------------------
