@@ -43,8 +43,8 @@ _ALLOWED_FIELDS = _TEXTUAL_FIELDS | {"presenca"}
 _EXPLICIT_TIME_RE = re.compile(
     r"\b([01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)(?:\s*([0-5]\d))?(?!\s*\d)\b"
 )
-_TIME_MARKED_HOUR_RE = re.compile(
-    r"\b([01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)(?:\s*\d+)?\b"
+_TIME_MARKED_NUMBER_RE = re.compile(
+    r"\b([01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)(?:\s*(\d+))?\b"
 )
 
 
@@ -221,7 +221,12 @@ def interpretar_resposta_pendente(texto: str, acao: dict[str, Any]) -> dict[str,
         return {"tipo": "adiar"}
     candidates = [int(x) for x in (acao or {}).get("candidatas", []) if str(x).isdigit()]
     if tipo.startswith("escolher_aula"):
-        time_marked_hours = {int(match.group(1)) for match in _TIME_MARKED_HOUR_RE.finditer(normalized)}
+        time_marked_numbers = {
+            int(number)
+            for match in _TIME_MARKED_NUMBER_RE.finditer(normalized)
+            for number in match.groups()
+            if number is not None
+        }
         for candidate in candidates:
             if re.search(rf"\b(?:aula|opcao)\s+{candidate}\b", hay):
                 return {"tipo": "escolher_aula", "aula_id": candidate}
@@ -230,14 +235,14 @@ def interpretar_resposta_pendente(texto: str, acao: dict[str, Any]) -> dict[str,
             (
                 index for word, index in ordinals.items()
                 if re.search(rf"\b{word}\b", hay)
-                and not (word.isdigit() and int(word) in time_marked_hours)
+                and not (word.isdigit() and int(word) in time_marked_numbers)
             ),
             None,
         )
         if match is not None and match < len(candidates):
             return {"tipo": "escolher_aula", "aula_id": candidates[match]}
         for candidate in candidates:
-            if candidate not in time_marked_hours and re.search(rf"\b{candidate}\b", hay):
+            if candidate not in time_marked_numbers and re.search(rf"\b{candidate}\b", hay):
                 return {"tipo": "escolher_aula", "aula_id": candidate}
         return {"tipo": "perguntar", "motivo": "aula_nao_reconhecida"}
     if tipo in {"confirmar_registro", "confirmar_chamada"} and (

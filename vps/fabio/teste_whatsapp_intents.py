@@ -89,18 +89,18 @@ class WhatsappIntentsTest(unittest.TestCase):
                 self.assertIsNone(result["aula_id"])
 
     def test_pending_choice_does_not_treat_times_as_candidate_ids(self):
-        action = {"tipo": "escolher_aula_audio", "candidatas": [15, 101]}
-        for text in ("15 h", "15 horas", "15:30", "15 h 30"):
+        action = {"tipo": "escolher_aula_audio", "candidatas": [15, 30, 99, 101]}
+        for text in ("15 h", "15 horas", "15:30", "15 h 30", "15:99", "15 h 99"):
             with self.subTest(text=text):
                 self.assertEqual(
                     interpretar_resposta_pendente(text, action),
                     {"tipo": "perguntar", "motivo": "aula_nao_reconhecida"},
                 )
-        for text in ("aula 15", "opção 15", "15"):
+        for text, aula_id in (("aula 15", 15), ("opção 15", 15), ("aula 30", 30), ("opção 30", 30), ("15", 15)):
             with self.subTest(text=text):
                 self.assertEqual(
                     interpretar_resposta_pendente(text, action),
-                    {"tipo": "escolher_aula", "aula_id": 15},
+                    {"tipo": "escolher_aula", "aula_id": aula_id},
                 )
 
     def test_pending_response_never_defaults_to_confirmation(self):
