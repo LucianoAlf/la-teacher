@@ -1,25 +1,32 @@
 # RETOMADA — LA Teacher
 
-> **Checkpoint ativo — 12/08/2026 19h25 BRT · registro manual pronto para rollout.**
-> Worktree Git `D:\la-teacher-worktrees\registro-manual`, branch
-> `codex/registro-manual`; nenhuma branch Supabase foi criada. A implementação
-> adiciona microfone + caderno na agenda, formulário contínuo com tronco
-> opcional e uma ficha por aluno, copiar campo, duplicar ficha, IndexedDB,
-> autosave versionado e recuperação explícita de conflito. O preview reutiliza
-> a confirmação canônica e serializa texto + presença antes de confirmar.
-> A migration `20260812220500_registro_manual_ficha_individual.sql` reutiliza
-> `fabio_registros_aula` e `aluno_presenca`, distingue conteúdo manual por
-> `modo_entrada=manual`, grava conteúdo final com origem `texto` e presença com
-> origem `professor_la_teacher`; nunca cria uma segunda fonte de presença.
-> Proteções testadas: falta humana preservada, zero presença antes da
-> confirmação, whitelist de campos, professor/roster, versões, duas abas,
-> aluno novo/removido e resposta de presença concorrente. Evidência local:
-> 57/57 unitários, fixture PostgreSQL com rollback íntegro, build e
-> `git diff --check` verdes; revisão independente final = GO. Próximos gates:
-> commit/push, migration no projeto principal `ouqwbbermlzqqvtqwlul`, deploy
-> Vercel, teste real controlado com Matheus e atualização deste checkpoint com
-> os identificadores de produção. A simulação não confirma presença nem cria
-> aluno fictício: usa roster real e remove somente o rascunho controlado.
+> **Checkpoint ativo — 12/08/2026 19h38 BRT · registro manual publicado e
+> provado em produção.** A PR #7 foi integrada na `main` pelo merge
+> `d11840efe3036c0a9df08189a216009a6c6bbb15`; implementação-base
+> `4fedb794d436c27f629f62a7a2a31f4308b8a7d4`. O deploy Vercel Production
+> `dpl_h4NkwKDtNxodhyzAt1x2ybypsnkX` serve
+> `https://la-teacher.vercel.app/` com o bundle `index-C93PdeLd.js`. O card
+> estático “Briefing do Fábio — em breve” não aparece mais. A agenda mostra
+> microfone + caderno; o caderno tem tronco opcional, ficha por aluno, copiar
+> campo, duplicar ficha, autosave versionado, cache local e conflito explícito.
+> A migration local `20260812220500_registro_manual_ficha_individual.sql` foi
+> aplicada **diretamente no projeto principal** `ouqwbbermlzqqvtqwlul`, sem
+> branch Supabase, e ficou registrada remotamente como
+> `20260812222331 / 20260812220500_registro_manual_ficha_individual`.
+> Reutiliza `fabio_registros_aula` e `aluno_presenca`; conteúdo manual termina
+> com origem `texto` e presença confirmada pelo professor com origem
+> `professor_la_teacher`, sem fonte paralela. Evidência: 57/57 unitários,
+> fixture PostgreSQL transacional, build, `git diff --check` e revisão
+> independente final = GO. Prova real na conta do Matheus: 17/08 exibe cinco
+> chamadas, turma de dois alunos às 17h e Arthur na individual das 18h; o fluxo
+> completo foi exercitado numa turma real de três alunos de 11/08, incluindo
+> autosave, copiar campo, duplicar ficha e preview. Não houve confirmação nem
+> escrita de presença. O rascunho controlado
+> `c4efe283-beb7-4503-9897-8bb4d97b96d3` e as três fatias foram removidos; a
+> verificação final encontrou zero linha, zero texto de teste e zero presença
+> tocada. **Frente ainda aberta:** a qualidade semântica do normalizador de
+> áudio (nomes de músicas, “quarto sistema”, ordem e não redundância) não faz
+> parte desta entrega manual e não deve ser declarada resolvida.
 
 > **Checkpoint de rollout — 12/08/2026.** A frente de recibos e fila de áudio foi concluída e integrada pela PR #4 (merge `1d5e3c2`), após os commits `66d509b`, `074dbed`, `ea51cfd`, `193859a` e `197b1bb`. A migration `20260812163000` está aplicada e registrada; rollback preservou schema e 35 linhas, 28/28 mutantes SQL, 43 testes unitários e build passaram. Recibos originados no aplicativo não são enviados ao WhatsApp; ações originadas no WhatsApp continuam salvando no aplicativo e usam o retorno do canal. VPS e timer de recibo seguem ativos, sem jobs ativos/claims pendentes; Vercel Production está publicada e o login responde HTTP 200 sem erro de console. Não houve áudio real de professor, presença/falta, mensagem WhatsApp de saída, mensagem a responsável ou E2E com professor. Evidência: `docs/superpowers/evidence/2026-08-12-recibos-e-fila-audio.md`.
 
@@ -28,8 +35,8 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 12/08/2026 — presença canônica redesenhada após revisão
-> técnica; implementação ainda não iniciada.** G8 publicado com recibo desligado; E2E
+> **Última atualização: 12/08/2026 — presença canônica, aula operacional e
+> registro manual publicados; normalização semântica do áudio segue aberta.** G8 publicado com recibo desligado; E2E
 > funcional ainda pendente.** Radar telas no ar
 > (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
 > (`f00c96d`, aprovado). Deploy do Radar = **Vercel + Supabase** — a frente do
