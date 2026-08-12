@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Badge, Button, EmptyState, FabioMark, Fatia, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
 import {
   atualizarFatia,
+  ErroConflitoRascunho,
   responderPresenca,
   confirmarRegistro,
   ErroEscolhaModo,
   registroCompleto,
+  salvarRascunhoManual,
   type AulaContexto,
   type ConfirmacaoResultado,
   type ModoRegistro,
@@ -18,8 +20,10 @@ import { cx } from '../../lib/cx'
 import { formatDiaCurto, formatHoraBRT } from '../../lib/date'
 import { AppFrame } from '../../pages/app/AppFrame'
 import { CampoEditavel } from './CampoEditavel'
+import { continuarFila } from './filaSerial'
 import { repertorioIndividualVisivel } from './camposCanonicos'
 import { presencaDaFatia } from './texto'
+import { limparCamposManuais } from '../registroManual/modelo'
 
 // Campos extras do tronco (narrativa do professor) — mostrados só quando têm
 // conteúdo, pra não poluir. Nenhum campo preenchido fica escondido.
@@ -28,6 +32,16 @@ const EXTRAS_TRONCO: Array<{ chave: string; label: string; icon: string; cutucad
   { chave: 'repertorio', label: 'Repertório', icon: 'fa-solid fa-list-ol', cutucada: 'Repertório trabalhado? (opcional)' },
   { chave: 'marco_ref', label: 'Marco de referência', icon: 'fa-solid fa-flag', cutucada: 'Algum marco de referência? (opcional)' },
 ]
+
+const CAMPOS_TRONCO_MANUAL = ['atividades', 'objetivo', 'obs_gerais', 'repertorio', 'dever_casa'] as const
+
+function limparTroncoManual(campos: Record<string, unknown>): Record<string, string> {
+  return CAMPOS_TRONCO_MANUAL.reduce<Record<string, string>>((resultado, chave) => {
+    const valor = campos[chave]
+    if (typeof valor === 'string') resultado[chave] = valor
+    return resultado
+  }, {})
+}
 
 type Fase = 'carregando' | 'erro' | 'nao_encontrado' | 'ok' | 'confirmando' | 'sucesso'
 
@@ -51,6 +65,13 @@ export default function ConfirmarPage() {
   // Prontuário: esta aula já tem relatório? (o banco recusa 'novo' sobre texto existente)
   const [jaReg, setJaReg] = useState<{ ja: boolean; itens: RegistroJaFeito[] }>({ ja: false, itens: [] })
   const [escolhendoModo, setEscolhendoModo] = useState(false)
+  const [salvandoManual, setSalvandoManual] = useState(false)
+  const troncoAtualRef = useRef<RegistroRow | null>(null)
+  const fatiasAtuaisRef = useRef<RegistroRow[]>([])
+  const geracaoManualRef = useRef(0)
+  const filaManualRef = useRef<Promise<boolean>>(Promise.resolve(true))
+  const salvamentosManuaisRef = useRef(0)
+  const erroManualRef = useRef(false)
 
   const carregar = useCallback((silencioso = false) => {
     if (!registroId) return
@@ -61,6 +82,8 @@ export default function ConfirmarPage() {
           setFase('nao_encontrado')
           return
         }
+        troncoAtualRef.current = res.tronco
+        fatiasAtuaisRef.current = res.fatias
         setTronco(res.tronco)
         setFatias(res.fatias)
         setAula(res.aula)
@@ -76,12 +99,67 @@ export default function ConfirmarPage() {
 
   // ---- persistência das edições (regenera o texto no formato da Tese) ----
 
+  function enfileirarSalvamentoManual(): Promise<boolean> {
+    salvamentosManuaisRef.current += 1
+    setSalvandoManual(true)
+    const tarefa = continuarFila(filaManualRef.current, async () => {
+      const raiz = troncoAtualRef.current
+      if (!raiz) return false
+      const geracao = geracaoManualRef.current
+      const res = await salvarRascunhoManual(
+        raiz.id,
+        raiz.versao ?? 1,
+        limparTroncoManual(raiz.campos),
+        fatiasAtuaisRef.current.map((fatia) => ({
+          id: fatia.id,
+          campos: limparCamposManuais(fatia.campos) as Record<string, string>,
+        })),
+      )
+      erroManualRef.current = false
+      if (geracao === geracaoManualRef.current) {
+        troncoAtualRef.current = res.tronco
+        fatiasAtuaisRef.current = res.fatias
+        setTronco(res.tronco)
+        setFatias(res.fatias)
+      } else {
+        const novaVersao = res.tronco.versao ?? (raiz.versao ?? 1) + 1
+        troncoAtualRef.current = troncoAtualRef.current
+          ? { ...troncoAtualRef.current, versao: novaVersao }
+          : res.tronco
+        fatiasAtuaisRef.current = fatiasAtuaisRef.current.map((fatia) => ({ ...fatia, versao: novaVersao }))
+        setTronco((atual) => atual ? { ...atual, versao: novaVersao } : res.tronco)
+        setFatias((atuais) => atuais.map((fatia) => ({ ...fatia, versao: novaVersao })))
+      }
+      return true
+    }).catch((erro: unknown) => {
+      erroManualRef.current = true
+      show(erro instanceof ErroConflitoRascunho
+        ? 'A ficha mudou em outra aba. Sua edição continua na tela; volte ao caderno para comparar antes de confirmar.'
+        : 'Não consegui salvar esta edição. Ela continua na tela e não será confirmada até salvar.')
+      return false
+    }).finally(() => {
+      salvamentosManuaisRef.current -= 1
+      if (salvamentosManuaisRef.current === 0) setSalvandoManual(false)
+    })
+    filaManualRef.current = tarefa
+    return tarefa
+  }
+
   async function salvarCampoTronco(chave: string, valor: string | null) {
-    if (!tronco) return
-    const novosCampos = { ...tronco.campos, [chave]: valor }
-    setTronco({ ...tronco, campos: novosCampos })
+    const atual = troncoAtualRef.current ?? tronco
+    if (!atual) return
+    const novosCampos = { ...atual.campos, [chave]: valor }
+    const proximoTronco = { ...atual, campos: novosCampos }
+    troncoAtualRef.current = proximoTronco
+    setTronco(proximoTronco)
+    if (atual.modo_entrada === 'manual') {
+      geracaoManualRef.current += 1
+      erroManualRef.current = false
+      void enfileirarSalvamentoManual()
+      return
+    }
     try {
-      await atualizarFatia(tronco.id, null, { [chave]: valor })
+      await atualizarFatia(atual.id, null, { [chave]: valor })
       // o comum mudou → o texto final de TODAS as fatias presentes muda junto
       await carregar(true)
       show('Campo atualizado ✓')
@@ -93,29 +171,84 @@ export default function ConfirmarPage() {
 
   /** Marca uma falta declarada pelo professor antes da confirmação. */
   async function responder(registroAlvoId: string, presenca: 'presente' | 'ausente') {
-    try {
-      await responderPresenca(registroAlvoId, presenca)
-      // Otimista no card, e tira da lista de pendências pra ele ver o que falta
-      // encolher enquanto responde.
+    const aplicarLocal = () => {
       setFatias((atual) =>
         atual.map((f) => (f.id === registroAlvoId ? { ...f, campos: { ...f.campos, presenca } } : f)),
       )
-      if (tronco?.id === registroAlvoId) {
-        setTronco({ ...tronco, campos: { ...tronco.campos, presenca } })
+      fatiasAtuaisRef.current = fatiasAtuaisRef.current.map((f) =>
+        f.id === registroAlvoId ? { ...f, campos: { ...f.campos, presenca } } : f)
+      if (troncoAtualRef.current?.id === registroAlvoId) {
+        const atual = troncoAtualRef.current
+        const proximoTronco = { ...atual, campos: { ...atual.campos, presenca } }
+        troncoAtualRef.current = proximoTronco
+        setTronco(proximoTronco)
       }
       setPendencias((atual) => atual.filter((p) => p.registro_alvo_id !== registroAlvoId))
       show(presenca === 'presente' ? 'Marcado como presente ✓' : 'Marcado como falta ✓')
+    }
+
+    const ehManual = (troncoAtualRef.current ?? tronco)?.modo_entrada === 'manual'
+    if (ehManual) {
+      salvamentosManuaisRef.current += 1
+      setSalvandoManual(true)
+      const tarefa = continuarFila(filaManualRef.current, async () => {
+        const raiz = troncoAtualRef.current
+        if (!raiz) return false
+        const res = await salvarRascunhoManual(
+          raiz.id,
+          raiz.versao ?? 1,
+          limparTroncoManual(raiz.campos),
+          fatiasAtuaisRef.current.map((fatia) => ({
+            id: fatia.id,
+            campos: limparCamposManuais(fatia.campos) as Record<string, string>,
+          })),
+        )
+        const novaVersao = res.tronco.versao ?? (raiz.versao ?? 1) + 1
+        troncoAtualRef.current = { ...raiz, versao: novaVersao }
+        fatiasAtuaisRef.current = fatiasAtuaisRef.current.map((fatia) => ({ ...fatia, versao: novaVersao }))
+        setTronco((atual) => atual ? { ...atual, versao: novaVersao } : res.tronco)
+        setFatias((atuais) => atuais.map((fatia) => ({ ...fatia, versao: novaVersao })))
+        await responderPresenca(registroAlvoId, presenca)
+        erroManualRef.current = false
+        aplicarLocal()
+        return true
+      }).catch(() => {
+        erroManualRef.current = true
+        show('Não consegui salvar a presença. Nada será confirmado até tentar novamente.')
+        return false
+      }).finally(() => {
+        salvamentosManuaisRef.current -= 1
+        if (salvamentosManuaisRef.current === 0) setSalvandoManual(false)
+      })
+      filaManualRef.current = tarefa
+      await tarefa
+      return
+    }
+
+    try {
+      await responderPresenca(registroAlvoId, presenca)
+      aplicarLocal()
     } catch {
       show('Não consegui salvar a presença — tenta de novo')
     }
   }
 
   async function salvarCampoFatia(fatiaId: string, chave: string, valor: string | null) {
-    if (!tronco) return
-    const alvo = fatias.find((f) => f.id === fatiaId)
+    const raiz = troncoAtualRef.current ?? tronco
+    if (!raiz) return
+    const atuais = fatiasAtuaisRef.current.length > 0 ? fatiasAtuaisRef.current : fatias
+    const alvo = atuais.find((f) => f.id === fatiaId)
     if (!alvo) return
     const novosCampos = { ...alvo.campos, [chave]: valor }
-    setFatias(fatias.map((f) => (f.id === fatiaId ? { ...f, campos: novosCampos } : f)))
+    const proximasFatias = atuais.map((f) => (f.id === fatiaId ? { ...f, campos: novosCampos } : f))
+    fatiasAtuaisRef.current = proximasFatias
+    setFatias(proximasFatias)
+    if (raiz.modo_entrada === 'manual') {
+      geracaoManualRef.current += 1
+      erroManualRef.current = false
+      void enfileirarSalvamentoManual()
+      return
+    }
     try {
       await atualizarFatia(fatiaId, null, { [chave]: valor })
       await carregar(true)
@@ -129,14 +262,23 @@ export default function ConfirmarPage() {
   // ---- confirmar e gravar (por aluno) ----
 
   async function confirmar(modo: ModoRegistro) {
-    if (!tronco) return
+    const raiz = troncoAtualRef.current ?? tronco
+    if (!raiz) return
     setEscolhendoModo(false)
     setFase('confirmando')
     setPendencias([])
     try {
+      if (raiz.modo_entrada === 'manual') {
+        const tudoSalvo = await filaManualRef.current
+        if (!tudoSalvo || erroManualRef.current) {
+          setFase('ok')
+          show('Não confirmei: há uma edição que ainda não foi salva. Seu texto continua na tela.')
+          return
+        }
+      }
       // garante que TODA fatia presente vai gravar comum + individual
       // (regenera e persiste os textos finais antes da RPC de confirmação)
-      const res = await confirmarRegistro(tronco.id, modo)
+      const res = await confirmarRegistro(raiz.id, modo)
       if (res.pendencias.length > 0) {
         setPendencias(res.pendencias)
         setFase('ok')
@@ -212,10 +354,15 @@ export default function ConfirmarPage() {
   }
 
   if (fase === 'sucesso' && sucesso) {
-    return <TelaSucesso resultado={sucesso} fatias={fatias} temDever={Boolean(tronco.campos.dever_casa)} />
+    const temDever = Boolean(tronco.campos.dever_casa)
+      || fatias.some((fatia) => Boolean(String(fatia.campos.dever_casa ?? '').trim()))
+    return <TelaSucesso resultado={sucesso} fatias={fatias} temDever={temDever} entradaManual={tronco.modo_entrada === 'manual'} />
   }
 
   const temFatias = fatias.length > 0
+  const entradaManual = tronco.modo_entrada === 'manual'
+  const temTroncoManual = entradaManual && ['atividades', 'objetivo', 'obs_gerais', 'repertorio', 'dever_casa']
+    .some((chave) => typeof tronco.campos[chave] === 'string' && String(tronco.campos[chave]).trim())
   const sub = [aula?.curso, aula?.turma, aula?.data_aula && formatDiaCurto(aula.data_aula), aula?.hora && formatHoraBRT(aula.hora), `Molde ${tronco.molde}`]
     .filter(Boolean)
     .join(' · ')
@@ -228,7 +375,9 @@ export default function ConfirmarPage() {
         {/* selo do Fábio */}
         <div className="mx-4 mb-3 flex items-center gap-2 rounded-md border border-[color:var(--brand-border)] bg-brand-soft px-3 py-2 text-[12px] font-semibold text-brand-text">
           <FabioMark className="h-[17px] w-[17px] flex-none" knockout="var(--brand-soft)" />
-          Fábio organizou seu áudio — confira e confirme. Eu nunca invento: campo vazio é convite ✋
+          {entradaManual
+            ? 'Você preencheu durante a aula — confira cada aluno antes de gravar. Campo vazio continua opcional. ✋'
+            : 'Fábio organizou seu áudio — confira e confirme. Eu nunca invento: campo vazio é convite ✋'}
         </div>
 
         {/* prontuário: esta aula já tem relatório → confirmar exige escolher */}
@@ -277,10 +426,10 @@ export default function ConfirmarPage() {
         )}
 
         {/* TRONCO — bloco comum da turma */}
-        <div className="mx-4 mb-3 overflow-hidden rounded-lg border border-[color:var(--brand-border)] bg-bg-surface">
+        {(!entradaManual || temTroncoManual) && <div className="mx-4 mb-3 overflow-hidden rounded-lg border border-[color:var(--brand-border)] bg-bg-surface">
           <div className="flex items-center gap-[9px] border-b border-[color:var(--brand-border)] bg-brand-soft px-[14px] py-3">
             <i className="fa-solid fa-music text-brand-text" aria-hidden="true" />
-            <b className="text-[13px] uppercase tracking-[.5px]">O que a turma trabalhou</b>
+            <b className="text-[13px] uppercase tracking-[.5px]">{entradaManual ? 'Em comum para a turma' : 'O que a turma trabalhou'}</b>
             <Badge variant="brand" className="ml-auto">
               tronco
             </Badge>
@@ -326,7 +475,7 @@ export default function ConfirmarPage() {
           />
           {/* eixos NÃO é exibido: é classificação de sistema (fica em campos.eixos,
               gravado no backend, nunca renderizado pro professor — decisão do Alf). */}
-        </div>
+        </div>}
 
         {/* FATIAS — um card por aluno (só quando há) */}
         {temFatias && (
@@ -374,36 +523,47 @@ export default function ConfirmarPage() {
                       </button>
                     </div>
                   ) : (
-                    <>
-                      <CampoEditavel
-                        label="Progresso"
-                        icon="fa-solid fa-arrow-trend-up"
-                        value={(f.campos.progresso as string | null) ?? null}
-                        cutucada={`Não ouvi o progresso de ${primeiro} no áudio — toque pra completar (eu nunca invento ✋)`}
-                        onSave={(v) => void salvarCampoFatia(f.id, 'progresso', v)}
-                      />
-                      <CampoEditavel
-                        label="Repertório individual"
-                        icon="fa-solid fa-list-ol"
-                        value={repertorioParaEditar}
-                        cutucada={`Repertório individual de ${primeiro} não informado (opcional)`}
-                        onSave={(v) => void salvarCampoFatia(f.id, 'repertorio', v)}
-                      />
-                      <CampoEditavel
-                        label="Próximo passo"
-                        icon="fa-solid fa-route"
-                        value={(f.campos.proximo_passo as string | null) ?? null}
-                        cutucada={`Quer adicionar um próximo passo pra ${primeiro}? (opcional)`}
-                        onSave={(v) => void salvarCampoFatia(f.id, 'proximo_passo', v)}
-                      />
-                      <CampoEditavel
-                        label="Observação"
-                        icon="fa-solid fa-eye"
-                        value={(f.campos.observacao as string | null) ?? null}
-                        cutucada={`Alguma observação sobre ${primeiro}? (opcional)`}
-                        onSave={(v) => void salvarCampoFatia(f.id, 'observacao', v)}
-                      />
-                    </>
+                    entradaManual ? (
+                      <>
+                        <CampoEditavel label="Repertório" icon="fa-solid fa-list-ol" value={(f.campos.repertorio as string | null) ?? null} cutucada={`Repertório de ${primeiro} (opcional)`} onSave={(v) => void salvarCampoFatia(f.id, 'repertorio', v)} />
+                        <CampoEditavel label="Atividades" icon="fa-solid fa-music" value={(f.campos.atividades as string | null) ?? null} cutucada={`Atividades de ${primeiro} (opcional)`} onSave={(v) => void salvarCampoFatia(f.id, 'atividades', v)} />
+                        <CampoEditavel label="Objetivo" icon="fa-solid fa-bullseye" value={(f.campos.objetivo as string | null) ?? null} cutucada={`Objetivo de ${primeiro} (opcional)`} onSave={(v) => void salvarCampoFatia(f.id, 'objetivo', v)} />
+                        <CampoEditavel label="Observações" icon="fa-solid fa-comment-dots" value={(f.campos.observacao as string | null) ?? null} cutucada={`Observações sobre ${primeiro} (opcional)`} onSave={(v) => void salvarCampoFatia(f.id, 'observacao', v)} />
+                        <CampoEditavel label="Dever de casa" icon="fa-solid fa-house" value={(f.campos.dever_casa as string | null) ?? null} cutucada={`Dever de casa de ${primeiro} (opcional)`} dever onSave={(v) => void salvarCampoFatia(f.id, 'dever_casa', v)} />
+                        <CampoEditavel label="Progresso individual" icon="fa-solid fa-arrow-trend-up" value={(f.campos.progresso as string | null) ?? null} cutucada={`Progresso de ${primeiro} (opcional)`} onSave={(v) => void salvarCampoFatia(f.id, 'progresso', v)} />
+                      </>
+                    ) : (
+                      <>
+                        <CampoEditavel
+                          label="Progresso"
+                          icon="fa-solid fa-arrow-trend-up"
+                          value={(f.campos.progresso as string | null) ?? null}
+                          cutucada={`Não ouvi o progresso de ${primeiro} no áudio — toque pra completar (eu nunca invento ✋)`}
+                          onSave={(v) => void salvarCampoFatia(f.id, 'progresso', v)}
+                        />
+                        <CampoEditavel
+                          label="Repertório individual"
+                          icon="fa-solid fa-list-ol"
+                          value={repertorioParaEditar}
+                          cutucada={`Repertório individual de ${primeiro} não informado (opcional)`}
+                          onSave={(v) => void salvarCampoFatia(f.id, 'repertorio', v)}
+                        />
+                        <CampoEditavel
+                          label="Próximo passo"
+                          icon="fa-solid fa-route"
+                          value={(f.campos.proximo_passo as string | null) ?? null}
+                          cutucada={`Quer adicionar um próximo passo pra ${primeiro}? (opcional)`}
+                          onSave={(v) => void salvarCampoFatia(f.id, 'proximo_passo', v)}
+                        />
+                        <CampoEditavel
+                          label="Observação"
+                          icon="fa-solid fa-eye"
+                          value={(f.campos.observacao as string | null) ?? null}
+                          cutucada={`Alguma observação sobre ${primeiro}? (opcional)`}
+                          onSave={(v) => void salvarCampoFatia(f.id, 'observacao', v)}
+                        />
+                      </>
+                    )
                   )}
                 </Fatia>
               </div>
@@ -471,7 +631,11 @@ export default function ConfirmarPage() {
         >
           {fase === 'confirmando' ? (
             <>
-              <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Gravando…
+              <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> {salvandoManual ? 'Salvando e gravando…' : 'Gravando…'}
+            </>
+          ) : salvandoManual ? (
+            <>
+              <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Salvar e confirmar
             </>
           ) : (
             <>
@@ -585,10 +749,12 @@ function TelaSucesso({
   resultado,
   fatias,
   temDever,
+  entradaManual,
 }: {
   resultado: ConfirmacaoResultado
   fatias: RegistroRow[]
   temDever: boolean
+  entradaManual: boolean
 }) {
   const navigate = useNavigate()
 
@@ -610,14 +776,14 @@ function TelaSucesso({
           <Badge variant="brand">
             {fatias.length} {fatias.length === 1 ? 'fatia' : 'fatias'}
           </Badge>
-          {temDever && <Badge variant="warn">1 dever de casa</Badge>}
+          {temDever && <Badge variant="warn">Dever de casa registrado</Badge>}
           {resultado.ausentes_puladas > 0 && <Badge variant="danger">{resultado.ausentes_puladas} ausente</Badge>}
         </div>
         <Button block className="max-w-[290px]" onClick={() => navigate('/app')}>
           Voltar ao início
         </Button>
         <span className="font-mono text-[10.5px] tracking-[.3px] text-text-muted">
-          registrar_aula_fabio · {resultado.gravadas} {resultado.gravadas === 1 ? 'aula' : 'aulas'} · origem áudio
+          registrar_aula_fabio · {resultado.gravadas} {resultado.gravadas === 1 ? 'aula' : 'aulas'} · {entradaManual ? 'preenchimento manual' : 'origem áudio'}
         </span>
       </div>
     </AppFrame>

@@ -39,7 +39,7 @@ type ItemFilaPersistido = Omit<ItemFilaLocal, 'ownerUserId'> & { ownerUserId?: s
 
 const DB_NOME = 'la-teacher'
 const STORE = 'fila-audios'
-const VERSAO_DB = 3
+const VERSAO_DB = 4
 export const EVENTO_FILA = 'la-teacher:fila-audios-mudou'
 
 function normalizar(item: ItemFilaPersistido): ItemFilaPersistido {
@@ -97,6 +97,12 @@ function abrir(): Promise<IDBDatabase> {
       // mantém cada Blob gravado pela v1; a v3 apenas acrescenta metadados.
       if (!req.result.objectStoreNames.contains(STORE)) {
         req.result.createObjectStore(STORE, { keyPath: 'id' })
+      }
+      // A v4 acrescenta o cache de transporte da ficha manual. Criar os dois
+      // stores aqui também mantém instalações novas independentes da ordem em
+      // que áudio ou caderno sejam abertos pela primeira vez.
+      if (!req.result.objectStoreNames.contains('rascunhos-manuais')) {
+        req.result.createObjectStore('rascunhos-manuais', { keyPath: 'id' })
       }
     }
     req.onsuccess = () => resolve(req.result)

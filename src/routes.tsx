@@ -21,6 +21,7 @@ import FeedbackPage from './pages/app/Feedback'
 import GravarAulaPage from './features/registro/GravarAula'
 import ProcessandoPage from './features/registro/Processando'
 import ConfirmarPage from './features/registro/Confirmar'
+import RegistroManualPage from './features/registroManual/RegistroManual'
 import ChamadaPage from './features/chamada/Chamada'
 import ChatFabioPage from './features/fabio/ChatFabio'
 import DevolutivasPage from './pages/app/Devolutivas'
@@ -101,6 +102,7 @@ export const router = createBrowserRouter(
             { path: '/app/gravar/:aulaId', element: <GravarAulaPage /> },
             { path: '/app/processando/:audioId', element: <ProcessandoPage /> },
             { path: '/app/confirmar/:registroId', element: <ConfirmarPage /> },
+            { path: '/app/registro-manual/:aulaId', element: <RegistroManualPage /> },
           // Ciclo da aula experimental (migrations 034-047). A chave da rota é
           // o VÍNCULO lead↔aula, não a aula: é ele que amarra registro,
           // presença e aviso ao comercial.

@@ -13,11 +13,13 @@ interface Props {
   onAbrir: (sessao: SessaoAula) => void
   /** Gravar a aula direto da linha (botão de microfone quando na janela). */
   onGravar?: (sessao: SessaoAula) => void
+  /** Preencher a ficha manual individual direto da linha. */
+  onManual?: (sessao: SessaoAula) => void
   titulo?: string
 }
 
 /** Card com as SESSÕES de um dia (skeleton/erro/vazio/lista). Home e Agenda. */
-export function CardSessoesDoDia({ data, estado, onRetry, onAbrir, onGravar, titulo }: Props) {
+export function CardSessoesDoDia({ data, estado, onRetry, onAbrir, onGravar, onManual, titulo }: Props) {
   const tit = titulo ?? (isHoje(data) ? 'Hoje' : formatDiaCurto(data))
 
   if (estado.fase === 'carregando') {
@@ -95,7 +97,7 @@ export function CardSessoesDoDia({ data, estado, onRetry, onAbrir, onGravar, tit
       right={`${feitas} de ${sessoes.length} chamadas`}
     >
       {sessoes.map((s) => (
-        <SessaoRow key={s.aula_id_ancora} sessao={s} onAbrir={onAbrir} onGravar={onGravar} />
+        <SessaoRow key={s.aula_id_ancora} sessao={s} onAbrir={onAbrir} onGravar={onGravar} onManual={onManual} />
       ))}
     </Card>
   )
