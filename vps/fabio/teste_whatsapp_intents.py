@@ -64,6 +64,17 @@ class WhatsappIntentsTest(unittest.TestCase):
         self.assertEqual(result["status"], "selecionada")
         self.assertEqual(result["aula_id"], 101)
 
+    def test_shortlist_discriminates_spaced_hour_and_minutes(self):
+        result = reduzir_shortlist(
+            "Foi a aula das 15 h 30.",
+            [
+                {"aula_id": 101, "hora": "15:30"},
+                {"aula_id": 102, "hora": "16:00"},
+            ],
+        )
+        self.assertEqual(result["status"], "selecionada")
+        self.assertEqual(result["aula_id"], 101)
+
     def test_pending_response_never_defaults_to_confirmation(self):
         for case in self.cases["pendentes"]:
             with self.subTest(case=case["name"]):

@@ -136,7 +136,7 @@ def _candidate_values(candidate: dict[str, Any]) -> list[str]:
 
 
 def _explicit_time(text: str) -> str | None:
-    match = re.search(r"\b([01]?\d|2[0-3])(?:h| horas?|:)([0-5]\d)?\b", _norm(text))
+    match = re.search(r"\b([01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)\s*([0-5]\d)?\b", _norm(text))
     if not match:
         return None
     return f"{int(match.group(1)):02d}:{int(match.group(2) or 0):02d}"

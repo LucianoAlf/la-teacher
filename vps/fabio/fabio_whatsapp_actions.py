@@ -228,15 +228,33 @@ def _start_from_candidates(backend: FabioWhatsappBackend, context: dict[str, Any
     return _result("call_preview", reply="Encontrei a aula. Quem esteve presente? Confirma essa chamada?", action_id=str(action["id"]), aula_id=aula_id)
 
 
-def _looks_like_class_refinement(text: str) -> bool:
+def _mentions_candidate_student(text: str, candidates: list[dict[str, Any]]) -> bool:
+    hay = str(text or "").lower()
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        alunos = candidate.get("alunos") or candidate.get("alunos_sem_presenca_forte") or []
+        if not isinstance(alunos, list):
+            continue
+        for aluno in alunos:
+            if not isinstance(aluno, dict):
+                continue
+            nome = str(aluno.get("nome") or "").strip().lower()
+            if len(nome) >= 3 and re.search(rf"\b{re.escape(nome)}\b", hay):
+                return True
+    return False
+
+
+def _looks_like_class_refinement(text: str, candidates: list[dict[str, Any]] | None = None) -> bool:
     hay = str(text or "").lower()
     return bool(
-        re.search(r"\b(?:[01]?\d|2[0-3])(?:h| horas?|:[0-5]\d)\b", hay)
+        re.search(r"\b(?:[01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)\s*(?:[0-5]\d)?\b", hay)
         or re.search(r"\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b", hay)
         or any(word in hay for word in (
             "hoje", "ontem", "amanha", "amanhã", "turma", "curso",
             "piano", "teclado", "violao", "violão", "canto", "guitarra",
         ))
+        or _mentions_candidate_student(text, candidates or [])
     )
 
 
@@ -247,7 +265,8 @@ def _refine_pending_class(
 ) -> dict[str, Any] | None:
     if action.get("tipo") not in {"escolher_aula_audio", "escolher_aula_chamada"}:
         return None
-    if not _looks_like_class_refinement(context.get("text") or ""):
+    text = str(context.get("text") or "")
+    if not action.get("candidatas") and not _looks_like_class_refinement(text):
         return None
 
     fluxo = "registro" if action.get("tipo") == "escolher_aula_audio" else "chamada"
@@ -264,8 +283,10 @@ def _refine_pending_class(
             and str(candidate.get("aula_id")).isdigit()
             and int(candidate["aula_id"]) in allowed_ids
         ]
+        if not _looks_like_class_refinement(text, candidates):
+            return None
     shortlist = reduzir_shortlist(
-        str(context.get("text") or ""),
+        text,
         candidates,
     )
     if shortlist["status"] == "nenhuma":
