@@ -36,12 +36,15 @@ comportamentos são defeitos a corrigir, não premissas a preservar.
 
 | Repositório | Responsabilidade desta frente |
 |---|---|
-| `D:/la-teacher-worktrees/presenca-canonica` | migration canônica, resolvedor, conflitos, gêmeos, Fábio, agenda do professor, checkpoint |
-| `D:/2026/LA-performance-report/.worktrees/presenca-canonica` | RPC da chamada da secretaria, UX/badges, documentação da integração |
+| `D:/la-teacher-worktrees/presenca-canonica` | agenda do professor, tipos, badges, testes de cliente e checkpoint |
+| `D:/2026/LA-performance-report/.worktrees/presenca-canonica` | **única migration canônica** do banco compartilhado, RPCs, UX/badges da secretaria e documentação da integração |
 | VPS/Fábio | sem writer paralelo: consome somente a RPC endurecida deste banco |
 
 - Não criar cópia por aplicativo nem dar `INSERT`/`UPDATE` direto de
   `aluno_presenca` a `anon`, `authenticated`, bridge ou LLM.
+- Não criar migrations concorrentes nos dois repositórios: o LA Report contém o
+  histórico remoto mais recente (`20260812135824`) e é o dono desta migration
+  compartilhada. O LA Teacher recebe somente a mudança de contrato e cliente.
 - Não escrever na API Emusys até que haja endpoint, autenticação e idempotência externos
   documentados. O trabalho atual é convergência no banco já compartilhado.
 - Funções `SECURITY DEFINER` terão `search_path` fixo e grants explícitos; revogar `PUBLIC`
@@ -98,8 +101,9 @@ somente de Git: este worktree do LA Teacher e um worktree separado do LA Report.
 ### Task 2 — Escrever a prova de contrato antes da migration
 
 **Files:**
-- Create: migration e `.test.sql` geradas pelo CLI para a frente LA Teacher
-- Create: migration e `.test.sql` geradas pelo CLI para a frente LA Report
+- Create: uma migration e `.test.sql` geradas pelo CLI em
+  `D:/2026/LA-performance-report/.worktrees/presenca-canonica/supabase/migrations/`
+- Create: testes de cliente no LA Teacher somente para o contrato retornado pela RPC
 
 - [ ] Gerar os nomes pelo CLI, sem inventar timestamp, e escrever primeiro os testes de
   contrato ao lado da migration. Eles usam funções puras, inspeção de definição/ACL e,
@@ -134,10 +138,11 @@ somente de Git: este worktree do LA Teacher e um worktree separado do LA Report.
 ### Task 3 — Implementar contrato canônico, conflitos e Fábio
 
 **Files:**
-- Create: migration CLI-generated `presenca_canonica_resolvedor_conflitos` e par de testes
-  em `D:/la-teacher-worktrees/presenca-canonica/supabase/migrations/`
 - Modify: `src/lib/api.ts`, `src/features/agenda/sessao.ts`, `SessaoRow.tsx`
 - Create: `src/features/agenda/origemPresenca.ts` e testes
+
+**Dependência:** a migration canônica desta task é gerada e versionada no
+worktree do LA Report pela Task 2; não gerar arquivo SQL em `la-teacher`.
 
 - [ ] Criar `fn_presenca_fecha_chamada(text, text)` como função pura, imutável e com
   vocabulário fechado:
@@ -207,8 +212,8 @@ somente de Git: este worktree do LA Teacher e um worktree separado do LA Report.
 ### Task 4 — Corrigir a chamada da secretaria e o Report
 
 **Files:**
-- Create: migration CLI-generated `chamada_agenda_preserva_evidencia_emusys` e testes
-  em `D:/2026/LA-performance-report/.worktrees/presenca-canonica/supabase/migrations/`
+- Modify: a migration canônica já gerada pela Task 2, se a revisão do contrato exigir a
+  alteração de `app_registrar_chamada_agenda`
 - Modify: componentes de `src/components/App/Agenda/Chamada/` encontrados no worktree
 - Modify: `docs/CHAMADA-AGENDA.md`, `docs/REGRAS-DE-NEGOCIO.md`,
   `docs/MAPA-SISTEMA.md`, `docs/MAPA-INTEGRACAO-EMUSYS.md`
@@ -253,9 +258,9 @@ migration/RPC de rascunho e testes de estado/UX.
 
 **Files:** SPEC, `RETOMADA.md` e documentação de integração nos dois repos.
 
-- [ ] Aplicar primeiro a migration do Teacher e depois a do Report diretamente no projeto
-  principal, uma por vez. Depois de cada uma, conferir schema, funções, ACLs, conflitos e
-  leituras de registros reais; nunca criar presença de teste.
+- [ ] Aplicar a única migration canônica do LA Report diretamente no projeto principal.
+  Depois, conferir schema, funções, ACLs, conflitos e leituras de registros reais; nunca
+  criar presença de teste.
 - [ ] Rodar Security e Performance Advisors. Provar, por consulta, que `anon` e
   `authenticated` não executam helpers, que a porta Fábio mantém `service_role` e que nenhum
   `SECURITY DEFINER` novo ficou em `PUBLIC` por omissão.

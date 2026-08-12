@@ -50,6 +50,11 @@ de fontes.
 `codex/presenca-canonica-report`, baseado em `origin/main` no commit
 `3f850cc5`. Nenhuma branch Supabase foi criada.
 
+**Dono da migration compartilhada:** o LA Report. O snapshot remoto contém a
+migration `20260812135824`, que ainda não existe neste worktree do LA Teacher;
+por isso, uma migration em cada repo criaria duas histórias concorrentes para o
+mesmo banco. O LA Teacher recebe o contrato/RPC e os badges, sem SQL novo.
+
 **Fatos auditados antes do desenho:**
 
 - `fn_presenca_e_forte(respondido_por)` é a régua humana histórica; **não
@@ -86,7 +91,8 @@ de fontes.
 **Plano versionado:**
 `docs/superpowers/plans/2026-08-12-presenca-canonica.md`. Ele separa o contrato
 de presença do formulário manual e fixa a propriedade: LA Teacher mantém
-resolvedor/conflitos/gêmeos/Fábio/leitura; LA Report mantém a RPC e a UX da chamada.
+leitura/badges; LA Report mantém a migration canônica, RPC, resolvedor,
+conflitos, gêmeos, Fábio e UX da chamada.
 A auditoria remota confirmou que `fn_sincronizar_gemeos_presenca(integer)` ainda é
 `SECURITY DEFINER` executável por `PUBLIC`/`anon`/`authenticated`; a migration
 planejada revoga essas ACLs sem abrir outra porta de escrita. A porta do Fábio
