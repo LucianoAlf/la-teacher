@@ -1,432 +1,279 @@
-# Presença canônica entre Emusys, LA Report, LA Teacher e Fábio Implementation Plan
+# Presença canônica entre Emusys, LA Report, LA Teacher e Fábio — plano de implementação
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Para quem executar:** usar `superpowers:executing-plans`, trabalhar uma task por vez,
+> e não pular o RED/fixture da branch Supabase. Este plano não autoriza produção por si só.
 
-**Goal:** Fazer Emusys/presente, secretaria, professor no LA Teacher e professor no WhatsApp convergirem para uma única decisão em `public.aluno_presenca`, sem transformar ausência bruta em falta humana.
+**Objetivo:** Fazer Emusys/presente, secretaria, professor no LA Teacher e professor no
+WhatsApp convergirem para uma única decisão em `public.aluno_presenca`, sem transformar
+ausência bruta em falta humana e sem ocultar conflitos.
 
-**Architecture:** A regra nova é um resolvedor status-aware e não altera a régua histórica `fn_presenca_e_forte`. O LA Teacher é dono do resolvedor, da sincronização de gêmeos e da leitura do professor; o LA Report é dono da RPC e da UX da chamada da secretaria. Uma trigger interna cobre as duas origens que hoje não sincronizam os gêmeos (`emusys` positivo e `agenda_secretaria`), enquanto o núcleo já usado pelo professor e pelo Fábio continua seu único caminho de escrita.
+**Arquitetura:** `public.aluno_presenca` permanece a única linha operacional por
+`(aluno_id, aula_emusys_id)`. Uma trilha append-only de eventos registra a história; ela
+não é uma segunda fonte de verdade nem fecha chamada. Há duas regras diferentes e ambas
+devem ser usadas pelo consumidor correto:
 
-**Tech Stack:** PostgreSQL/Supabase RPCs (`SECURITY DEFINER` com ACL explícita), Edge sync Emusys existente, React/TypeScript/Vite nos dois repositórios, Vitest e testes SQL em branch Supabase descartável.
+| Pergunta do consumidor | Regra obrigatória |
+|---|---|
+| Houve decisão/evidência humana? | `fn_presenca_e_forte(respondido_por)` — sem alteração semântica |
+| A chamada está operacionalmente resolvida? | `fn_presenca_fecha_chamada(status_presenca, respondido_por)` |
 
----
+O resolvedor operacional só retorna `true` quando o status é `presente`, `falta` ou
+`falta_justificada`, e a origem é humana forte ou é `emusys` com `presente`. Portanto,
+humano + `NULL`, humano + `indeterminado`, Emusys ausente e origem desconhecida não
+fecham chamada.
 
-## Limites e propriedade dos arquivos
+**Fatos já auditados (12/08/2026):** o banco compartilhado é
+`ouqwbbermlzqqvtqwlul`; `app_minha_agenda_sessao`, `vw_presenca_pendencia`,
+`app_registrar_presencas_aula`, `fabio_aulas_candidatas` e
+`fabio_registrar_presencas_aula` ainda usam, ao menos em parte, a noção de fonte forte.
+`upsert_presenca_emusys_bruta` hoje descarta a mudança Emusys `presente → ausente`.
+`app_registrar_chamada_agenda(...indeterminado)` pode apagar a linha. Esses dois
+comportamentos são defeitos a corrigir, não premissas a preservar.
 
-| Repositório | Arquivos | Responsabilidade |
-|---|---|---|
-| `D:/la-teacher` | migration canônica, `app_minha_agenda_sessao`, `fn_sincronizar_gemeos_presenca`, tipos e agenda do professor | resolvedor, ACL, propagação de gêmeos, carimbo no Teacher e checkpoint vivo |
-| `D:/2026/LA-performance-report` | migration da RPC `app_registrar_chamada_agenda`, componentes de Chamada e documentação de integração | impedir toggle destrutivo sobre Emusys/presente e exibir origem na operação da secretaria |
-| VPS/Fábio | nenhum writer novo | continua chamando `fabio_registrar_presencas_aula`, já limitado a `service_role`, que chega em `fn_registrar_presencas_core` |
+## Limites, posse e segurança
 
-Não criar tabela de “fontes”, não copiar linhas entre aplicativos, não dar `INSERT`/`UPDATE` de `aluno_presenca` a `anon` ou `authenticated`, e não escrever de volta na API Emusys enquanto não houver endpoint externo documentado.
+| Repositório | Responsabilidade desta frente |
+|---|---|
+| `D:/la-teacher-worktrees/presenca-canonica` | migration canônica, ledger, resolvedor, gêmeos, Fábio, agenda do professor, checkpoint |
+| `D:/2026/LA-performance-report/.worktrees/presenca-canonica` | RPC da chamada da secretaria, UX/badges, documentação da integração |
+| VPS/Fábio | sem writer paralelo: consome somente a RPC endurecida deste banco |
+
+- Não criar cópia por aplicativo nem dar `INSERT`/`UPDATE` direto de
+  `aluno_presenca` a `anon`, `authenticated`, bridge ou LLM.
+- Não escrever na API Emusys até que haja endpoint, autenticação e idempotência externos
+  documentados. O trabalho atual é convergência no banco já compartilhado.
+- Funções `SECURITY DEFINER` terão `search_path` fixo e grants explícitos; revogar `PUBLIC`
+  explicitamente, porque `CREATE OR REPLACE` preserva privilégios.
+- Não usar o runner que abre `BEGIN/ROLLBACK` em produção. Fixtures e DDL só entram em uma
+  branch Supabase descartável, sem dados sintéticos em produção.
 
 ## Gate de ambiente obrigatório
 
-O runner SQL existente faz DML dentro de `BEGIN/ROLLBACK` contra produção. Ele não será usado neste trabalho, porque o pedido proíbe dados sintéticos na produção. Antes de qualquer DDL ou teste de fixture, criar uma branch Supabase efêmera a partir de `ouqwbbermlzqqvtqwlul`, aplicar nela as migrations pendentes e excluí-la após a evidência. A criação custa **US$ 0,01344/hora** e requer confirmação explícita do usuário pela API do Supabase.
+Uma branch temporária de banco do projeto custa **US$ 0,01344/hora**. Só criar depois de
+nova confirmação explícita do usuário para este custo. Ela nasce de `ouqwbbermlzqqvtqwlul`,
+deve ficar `ACTIVE_HEALTHY` e ser excluída ao fim da evidência. Nunca reutilizar as branches
+`diag-kpis-alunos-20260805`, `p01c-staging` ou
+`professores-health-score-gates-20260806`.
 
-### Task 1: Preparar branch de banco e worktrees sem drift
+### Task 1 — Congelar o ponto de partida e preparar ambientes isolados
 
 **Files:**
 - Modify: `D:/la-teacher-worktrees/presenca-canonica/RETOMADA.md`
-- Create: `D:/2026/LA-performance-report/.worktrees/presenca-canonica` (git worktree, branch `codex/presenca-canonica-report`)
+- Create: `D:/2026/LA-performance-report/.worktrees/presenca-canonica`
 
-- [ ] **Step 1: Confirmar custo e criar a branch efêmera do Supabase**
-
-  Use o `confirm_cost` retornado depois de apresentar o custo ao usuário:
-
-  ```text
-  organization: njrgwvvrtnflugavghdk
-  project: ouqwbbermlzqqvtqwlul
-  branch name: presenca-canonica-20260812
-  ```
-
-  Verificar que o status final é `ACTIVE_HEALTHY` e guardar o `project_ref` no checkpoint. Não usar as branches existentes `diag-kpis-alunos-20260805`, `p01c-staging` ou `professores-health-score-gates-20260806`, pois pertencem a outras frentes.
-
-- [ ] **Step 2: Verificar migration history e hashes antes de escrever**
-
-  Rodar em produção, somente leitura:
+- [ ] Confirmar o custo, criar `presenca-canonica-20260812`, aguardar
+  `ACTIVE_HEALTHY` e anotar o `project_ref` efêmero no checkpoint.
+- [ ] Em produção, somente leitura, registrar `schema_migrations` a partir de
+  `20260811000000`, assinaturas/MD5/ACL de todas as funções abaixo e o schema real de
+  `aluno_presenca` e das tabelas de ações do Fábio:
 
   ```sql
-  select version, name
-  from supabase_migrations.schema_migrations
-  where version >= '20260811000000'
-  order by version;
-
-  select p.proname,
-         pg_get_function_identity_arguments(p.oid) as args,
-         md5(pg_get_functiondef(p.oid)) as definition_md5,
-         p.proacl
+  select p.proname, pg_get_function_identity_arguments(p.oid) as args,
+         md5(pg_get_functiondef(p.oid)) as definition_md5, p.proacl
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
     and p.proname in (
       'app_minha_agenda_sessao', 'app_registrar_chamada_agenda',
-      'app_registrar_presencas_aula', 'fabio_registrar_presencas_aula',
-      'fn_registrar_presencas_core', 'fn_sincronizar_gemeos_presenca',
-      'upsert_presenca_emusys_bruta', 'fn_presenca_e_forte'
+      'app_registrar_presencas_aula', 'fabio_aulas_candidatas',
+      'fabio_registrar_presencas_aula', 'fn_registrar_presencas_core',
+      'fn_sincronizar_gemeos_presenca', 'upsert_presenca_emusys_bruta',
+      'fn_presenca_e_forte'
     )
   order by p.proname;
   ```
 
-  Esperado: a fonte local contém a migration aplicada `20260812135033_fix_presence_json_null_confirmation`; `fn_sincronizar_gemeos_presenca` ainda tem ACL pública e, portanto, é corrigida pela Task 3.
-
-- [ ] **Step 3: Criar e checar o worktree do LA Report**
-
-  Run:
+- [ ] Verificar que a migration aplicada
+  `20260812135033_fix_presence_json_null_confirmation` está no ancestral local. Checar
+  migrations não commitadas nos worktrees principais antes de gerar qualquer timestamp.
+- [ ] Criar o worktree do Report a partir de `origin/main`, sem aproveitar uma frente de
+  áudio/WhatsApp concorrente:
 
   ```powershell
   git -C D:\2026\LA-performance-report fetch --prune origin
   git -C D:\2026\LA-performance-report worktree add -b codex/presenca-canonica-report D:\2026\LA-performance-report\.worktrees\presenca-canonica origin/main
-  git -C D:\2026\LA-performance-report\.worktrees\presenca-canonica status --short --branch
   ```
 
-  Expected: worktree limpo, baseado no mesmo `origin/main` conferido; nenhuma branch de WhatsApp/áudio é reutilizada.
+- [ ] Atualizar `RETOMADA.md` somente com fatos medidos: refs, SHAs, hashes, schema,
+  `project_ref` e status da branch. Não marcar migration/UI como pronta.
 
-- [ ] **Step 4: Atualizar o checkpoint com fatos, não intenção**
-
-  Acrescentar em `RETOMADA.md` o `project_ref` efêmero, commit SHA remoto de cada repo e os hashes acima. Não marcar migration como aplicada nem UI como pronta nesta etapa.
-
-### Task 2: Escrever o teste SQL vermelho do contrato canônico
+### Task 2 — Escrever a prova SQL vermelha antes da migration
 
 **Files:**
-- Create: the `.test.sql` paired with the CLI-generated `presenca_canonica_resolvedor_gemeos.sql` migration in `D:/la-teacher-worktrees/presenca-canonica/supabase/migrations/`
-- Create: the `.test.sql` paired with the CLI-generated `chamada_agenda_preserva_emusys.sql` migration in `D:/2026/LA-performance-report/.worktrees/presenca-canonica/supabase/migrations/`
+- Create: migration e `.test.sql` geradas pelo CLI para a frente LA Teacher
+- Create: migration e `.test.sql` geradas pelo CLI para a frente LA Report
 
-- [ ] **Step 1: Gerar os nomes de migration pelo CLI, sem inventar timestamp**
+- [ ] Gerar os nomes pelo CLI, sem inventar timestamp, e criar a fixture descartável na
+  branch: unidade, professor, roster, aula de turma e individuais gêmeas no mesmo horário.
+- [ ] A fixture deve fazer cada write em statement separado antes da asserção seguinte;
+  nunca chamar RPC que escreve dentro de `WHERE`/subconsulta que leia snapshot anterior.
+- [ ] Provar RED para a regra ainda ausente, com ao menos estes casos:
 
-  Run em cada repositório:
+  1. humano + `NULL` e humano + `indeterminado` não fecham;
+  2. Emusys `presente` fecha, Emusys `ausente`/`NULL` não;
+  3. Emusys `presente → ausente` preserva a decisão anterior, atualiza a evidência bruta e
+     abre conflito de revisão — nunca é descartado, nunca vira falta humana;
+  4. decisão Secretaria, Teacher e Fábio promove evidência fraca sem apagar raw Emusys;
+  5. espelho turma↔individual leva o vínculo da decisão e não pisa em humano; conflito de
+     humanos é contado e auditado, não sobrescrito;
+  6. `vw_presenca_pendencia`, `fabio_aulas_candidatas` e guards de “já enviado” tratam
+     Emusys/presente como resolvido e Emusys/ausente como pendente;
+  7. `indeterminado` em `app_registrar_chamada_agenda` não apaga linha nem raw Emusys;
+  8. chamada Fábio sem ação pendente, nonce, telefone, shortlist, expiração ou idempotência
+     válidos é recusada e gera evento de tentativa;
+  9. cada mutação/espelho/conflito escreve exatamente um evento append-only; e
+  10. `anon`/`authenticated` não executam helpers internos, enquanto apenas a porta Fábio
+      continua executável por `service_role`.
 
-  ```powershell
-  supabase migration new presenca_canonica_resolvedor_gemeos
-  supabase migration new chamada_agenda_preserva_emusys
-  ```
+- [ ] Rodar apenas na branch efêmera e registrar a falha de contrato, não uma falha de
+  fixture/permissão. Corrigir a fixture até o vermelho demonstrar a regra ausente.
 
-  Renomear apenas os dois arquivos vazios gerados para o par `.sql`/`.test.sql`, preservando o timestamp emitido pelo CLI e mantendo a ordem: migration do LA Teacher antes da migration do LA Report.
-
-- [ ] **Step 2: Escrever a fixture descartável e as expectativas antes da migration**
-
-  A fixture deve criar uma unidade, professor, dois alunos, uma aula de turma e as individuais gêmeas no mesmo horário. Terminar com o resumo que o runner de teste da branch exige:
-
-  ```sql
-  select json_build_object(
-    'falhas', (select count(*) from _presenca_resultados where not ok),
-    'detalhe', coalesce(
-      (select json_agg(json_build_object('passo', caso, 'obtido', detalhe))
-         from _presenca_resultados where not ok),
-      '[]'::json
-    )
-  ) as resumo;
-  ```
-
-  Casos mínimos do teste do LA Teacher:
-
-  ```sql
-  -- a origem sozinha não é suficiente: ausente do Emusys NÃO fecha.
-  perform checar(
-    'emusys ausente permanece pendente',
-    not public.fn_presenca_fecha_chamada(null, 'emusys'),
-    'esperava false'
-  );
-
-  -- presença positiva do Emusys fecha e é copiada para o gêmeo.
-  perform public.upsert_presenca_emusys_bruta(
-    v_aluno_id, v_turma_id, v_professor_id, v_unidade_id,
-    v_inicio::date, (v_inicio at time zone 'America/Sao_Paulo')::time,
-    'presente', v_tag || '_curso', v_tag || '_turma', null, now()
-  );
-  perform checar(
-    'emusys presente fecha e espelha',
-    public.fn_presenca_fecha_chamada('presente', 'emusys')
-      and exists (select 1 from public.aluno_presenca
-                  where aluno_id = v_aluno and aula_emusys_id = v_individual
-                    and respondido_por = 'emusys' and status_presenca = 'presente'),
-    'gêmeo Emusys presente ausente'
-  );
-  ```
-
-  Acrescentar testes para `agenda_secretaria` em turma→individual, proteção de
-  decisão humana já existente no gêmeo, ACL negativa de `fn_sincronizar_gemeos_presenca` para `anon` e `authenticated`, e a manutenção do acesso `service_role` somente à porta do Fábio.
-
-- [ ] **Step 3: Rodar o teste no banco efêmero e comprovar RED**
-
-  Run usando o `project_ref` efêmero, numa transação da branch e não em produção:
-
-  ```text
-  migration SQL atual + o teste gerado no Step 1 para `presenca_canonica_resolvedor_gemeos`
-  ```
-
-  Expected: falha por `fn_presenca_fecha_chamada` inexistente e por ausência de espelho `agenda_secretaria`/Emusys positivo. Se falhar por fixture ou permissão de setup, corrigir apenas a fixture até a falha representar a regra ausente.
-
-### Task 3: Implementar o resolvedor, a sincronização e a leitura do LA Teacher
+### Task 3 — Implementar contrato canônico, conflitos, ledger e Fábio
 
 **Files:**
-- Create: the CLI-generated `presenca_canonica_resolvedor_gemeos.sql` migration in `D:/la-teacher-worktrees/presenca-canonica/supabase/migrations/`
-- Modify: `D:/la-teacher-worktrees/presenca-canonica/src/lib/api.ts:26-72`
-- Modify: `D:/la-teacher-worktrees/presenca-canonica/src/features/agenda/sessao.ts:127-168`
-- Modify: `D:/la-teacher-worktrees/presenca-canonica/src/features/agenda/SessaoRow.tsx:1-151`
-- Create: `D:/la-teacher-worktrees/presenca-canonica/src/features/agenda/origemPresenca.ts`
-- Create: `D:/la-teacher-worktrees/presenca-canonica/src/features/agenda/origemPresenca.test.ts`
+- Create: migration CLI-generated `presenca_canonica_resolvedor_conflitos` e par de testes
+  em `D:/la-teacher-worktrees/presenca-canonica/supabase/migrations/`
+- Modify: `src/lib/api.ts`, `src/features/agenda/sessao.ts`, `SessaoRow.tsx`
+- Create: `src/features/agenda/origemPresenca.ts` e testes
 
-- [ ] **Step 1: Implementar o resolvedor puro com vocabulário fechado**
-
-  A migration define exatamente esta semântica, sem substituir
-  `fn_presenca_e_forte`:
+- [ ] Criar `fn_presenca_fecha_chamada(text, text)` como função pura, imutável e com
+  vocabulário fechado:
 
   ```sql
-  create or replace function public.fn_presenca_fecha_chamada(
-    p_status_presenca text,
-    p_respondido_por text
-  ) returns boolean
-  language sql
-  immutable
-  parallel safe
-  set search_path = pg_catalog, public
-  as $$
-    select public.fn_presenca_e_forte(p_respondido_por)
-        or (p_respondido_por = 'emusys' and p_status_presenca = 'presente')
-  $$;
+  select p_status_presenca in ('presente', 'falta', 'falta_justificada')
+     and (
+       public.fn_presenca_e_forte(p_respondido_por)
+       or (p_respondido_por = 'emusys' and p_status_presenca = 'presente')
+     )
   ```
 
-  Recriar `fn_sincronizar_gemeos_presenca(integer)` para selecionar somente
-  linhas que passam por essa função. A condição de conflito continua permitindo
-  atualizar apenas `NULL`, `emusys` e `sistema`; nunca uma origem humana forte.
+  Não alterar `fn_presenca_e_forte` nem usar `respondido_por` sozinho em decisão
+  operacional.
 
-- [ ] **Step 2: Cobrir as duas portas que não passam pelo core**
+- [ ] Criar `aluno_presenca_eventos` como ledger append-only com a chave da linha canônica,
+  tipo de evento, estado/origem antes e depois, raw Emusys antes/depois, instante, ator ou
+  ação Fábio quando houver e referência da decisão de origem. Confirmar os tipos exatos a
+  partir do snapshot da Task 1; ativar RLS e não conceder escrita direta a cliente. Helpers
+  internos são as únicas inserções permitidas. O ledger não alimenta `pendência` nem o
+  booleano de chamada.
 
-  Criar uma função de trigger interna e um `AFTER INSERT OR UPDATE OF
-  status_presenca, respondido_por` em `public.aluno_presenca`:
+- [ ] Estender a linha canônica somente com o mínimo para tornar conflitos consultáveis
+  pela RPC: vínculo da decisão de origem no espelho, instante da última evidência Emusys e
+  indicador/referência de conflito aberto. Ao receber `presente → ausente`,
+  `upsert_presenca_emusys_bruta` deve gravar o raw e evento novo, manter a decisão resolvida
+  já existente e abrir conflito. Uma correção humana explícita resolve o conflito e cria
+  novo evento; duas decisões humanas incompatíveis não são escolhidas em silêncio.
 
-  ```sql
-  if pg_trigger_depth() > 1 then
-    return new;
-  end if;
+- [ ] Recriar `fn_sincronizar_gemeos_presenca` e seu gatilho interno para propagar somente
+  decisões que passam pelo resolvedor. O espelho deve transportar origem, referência da
+  decisão, raw Emusys e instante; devolver ou registrar separadamente
+  `sincronizados`, `mantidos_por_precedencia` e `conflitos_para_revisao`. O guard de
+  profundidade evita recursão, mas não pode suprimir o evento de espelho.
 
-  if new.respondido_por in ('emusys', 'agenda_secretaria')
-     and public.fn_presenca_fecha_chamada(new.status_presenca, new.respondido_por) then
-    perform public.fn_sincronizar_gemeos_presenca(new.aula_emusys_id);
-  end if;
-  return new;
-  ```
+- [ ] Aplicar a matriz de consumidores: trocar por `fn_presenca_fecha_chamada` a view
+  `vw_presenca_pendencia`, `app_minha_agenda_sessao`, `fabio_aulas_candidatas` e os guards
+  de idempotência/“já enviado” em `app_registrar_presencas_aula` e
+  `fabio_registrar_presencas_aula`. Manter `fn_presenca_e_forte` onde a pergunta é autoria
+  humana, auditoria humana ou métrica analítica.
 
-  Isso evita reescrever `upsert_presenca_emusys_bruta` e evita duplicar a
-  chamada que `fn_registrar_presencas_core` já faz para Teacher/Fábio. O guard
-  de profundidade impede recursão ao inserir o gêmeo.
+- [ ] Endurecer o Fábio sobre o mecanismo de ações já existente: a RPC de registro recebe
+  uma ação pendente de presença, valida `nonce` de uso único, professor resolvido pelo
+  telefone, shortlist aula/aluno, expiração e chave idempotente, registra tentativa aceita
+  ou recusada no ledger e só então chega em `fn_registrar_presencas_core` com origem
+  `professor_whatsapp`. A assinatura final é decidida após o snapshot das tabelas/RPCs de
+  ação; nunca acrescentar uma RPC que aceite IDs arbitrários do bridge.
 
-- [ ] **Step 3: Fechar as ACLs de helpers internos**
+- [ ] Fechar ACLs explicitamente após os `CREATE OR REPLACE`: revogar `PUBLIC`, `anon` e
+  `authenticated` dos helpers de resolver, ledger e gêmeos; não conceder helper ao
+  `service_role` se somente RPC interna precisa dele. Manter grants existentes apenas nas
+  portas públicas autenticadas e na porta Fábio `service_role`; testar com
+  `has_function_privilege`.
 
-  A migration precisa conter, após todas as definições:
+- [ ] Fazer `app_minha_agenda_sessao` devolver `tem_presenca_registrada` calculado pelo
+  resolvedor, origem, data, raw Emusys, conflito aberto e a contagem relevante. O Teacher
+  consome somente esses campos; rótulos puros devem cobrir Emusys, Secretaria, Teacher e
+  WhatsApp, inclusive a mensagem de conflito sem fingir “falta confirmada”.
 
-  ```sql
-  revoke all on function public.fn_sincronizar_gemeos_presenca(integer)
-    from public, anon, authenticated, service_role;
-  revoke all on function public.fn_propagar_gemeo_por_presenca()
-    from public, anon, authenticated, service_role;
-  revoke all on function public.fn_presenca_fecha_chamada(text, text)
-    from public, anon, authenticated;
-  grant execute on function public.fn_presenca_fecha_chamada(text, text)
-    to service_role;
-  ```
+- [ ] Aplicar GREEN na branch e depois localmente: testes SQL, teste unitário novo,
+  TypeScript e build. Registrar de forma separada qualquer falha preexistente de Vitest; não
+  chamá-la de verde global.
 
-  `app_*` mantêm seus grants atuais; `fabio_registrar_presencas_aula` permanece
-  apenas `service_role`. Consultar `has_function_privilege` nos testes para
-  provar tanto a negação quanto o grant esperado.
-
-- [ ] **Step 4: Mudar a RPC da agenda para devolver decisão e origem**
-
-  No `jsonb_agg` de `app_minha_agenda_sessao`, trocar ambas as ocorrências de
-  `fn_presenca_e_forte(ap.respondido_por)` por
-  `fn_presenca_fecha_chamada(ap.status_presenca, ap.respondido_por)` e devolver:
-
-  ```sql
-  'presenca_origem', ap.respondido_por,
-  'presenca_respondido_em', ap.respondido_em,
-  'emusys_presenca_bruta', ap.emusys_presenca_bruta,
-  'tem_presenca_registrada', ap.id is not null
-    and public.fn_presenca_fecha_chamada(ap.status_presenca, ap.respondido_por)
-  ```
-
-  Não alterar o fallback visual de `presenca`; a ausência Emusys já vira
-  `a_confirmar` porque sua `status_presenca` é nula.
-
-- [ ] **Step 5: Escrever primeiro o teste unitário dos rótulos**
-
-  `origemPresenca.test.ts` deve falhar antes do módulo existir:
-
-  ```ts
-  import { describe, expect, it } from 'vitest'
-  import { rotuloOrigemPresenca } from './origemPresenca'
-
-  describe('rotuloOrigemPresenca', () => {
-    it('identifica presença positiva do Emusys sem dizer que foi o professor', () => {
-      expect(rotuloOrigemPresenca('emusys', 'presente')).toEqual('Emusys')
-    })
-
-    it('nomeia a origem do professor e da secretaria', () => {
-      expect(rotuloOrigemPresenca('professor_la_teacher', 'presente')).toEqual('Professor · LA Teacher')
-      expect(rotuloOrigemPresenca('agenda_secretaria', 'falta')).toEqual('Secretaria · LA Report')
-    })
-  })
-  ```
-
-- [ ] **Step 6: Fazer o cliente consumir somente a decisão do banco**
-
-  Adicionar em `AlunoSessao` os campos opcionais retornados pela RPC:
-
-  ```ts
-  presenca_origem?: string | null
-  presenca_respondido_em?: string | null
-  emusys_presenca_bruta?: 'presente' | 'ausente' | null
-  ```
-
-  Criar `rotuloOrigemPresenca` como função pura, usar o rótulo nos alunos da
-  sessão e atualizar o comentário de `tem_presenca_registrada` para “decisão
-  que fecha chamada”, nunca “fonte forte”. O `chamadaCompleta` continua lendo
-  somente esse booleano devolvido pela RPC.
-
-- [ ] **Step 7: Rodar GREEN e fazer commit focado**
-
-  Run na branch efêmera: teste SQL completo. Run local:
-
-  ```powershell
-  node node_modules\vitest\vitest.mjs run src/features/agenda/origemPresenca.test.ts
-  node node_modules\typescript\bin\tsc
-  node node_modules\vite\bin\vite.js build
-  ```
-
-  Expected: teste novo verde; TypeScript e build verdes. Registrar o teste
-  unitário legado com erro de sintaxe separadamente se ele ainda falhar, sem
-  atribuí-lo a esta mudança. Commit somente migration, teste e arquivos
-  Teacher desta tarefa.
-
-### Task 4: Preservar Emusys/presente na chamada do LA Report
+### Task 4 — Corrigir a chamada da secretaria e o Report
 
 **Files:**
-- Create: the CLI-generated `chamada_agenda_preserva_emusys.sql` migration in `D:/2026/LA-performance-report/.worktrees/presenca-canonica/supabase/migrations/`
-- Modify: `D:/2026/LA-performance-report/.worktrees/presenca-canonica/src/components/App/Agenda/Chamada/chamadaUtils.ts`
-- Modify: `D:/2026/LA-performance-report/.worktrees/presenca-canonica/src/components/App/Agenda/Chamada/ChamadaAlunoCard.tsx`
-- Modify: `D:/2026/LA-performance-report/.worktrees/presenca-canonica/src/components/App/Agenda/Chamada/ChamadaDrawer.tsx`
-- Modify: `D:/2026/LA-performance-report/.worktrees/presenca-canonica/src/components/App/Agenda/Chamada/useChamadaAcoes.ts`
-- Create: `D:/2026/LA-performance-report/.worktrees/presenca-canonica/src/components/App/Agenda/Chamada/chamadaUtils.test.ts`
+- Create: migration CLI-generated `chamada_agenda_preserva_evidencia_emusys` e testes
+  em `D:/2026/LA-performance-report/.worktrees/presenca-canonica/supabase/migrations/`
+- Modify: componentes de `src/components/App/Agenda/Chamada/` encontrados no worktree
+- Modify: `docs/CHAMADA-AGENDA.md`, `docs/REGRAS-DE-NEGOCIO.md`,
+  `docs/MAPA-SISTEMA.md`, `docs/MAPA-INTEGRACAO-EMUSYS.md`
 
-- [ ] **Step 1: Escrever os testes de estado e ação antes da UI**
+- [ ] Primeiro, extrair e testar funções puras de badge/ação. Emusys/presente retorna
+  `manter`; Emusys/ausente retorna `pendente`; origem humana só retorna ação de revisão
+  quando houver intenção explícita, não toggle implícito.
+- [ ] Recriar `app_registrar_chamada_agenda(jsonb)` para que `indeterminado` nunca delete
+  a linha. Para raw Emusys existente, ele restaura a evidência preservada ou marca estado
+  operacional pendente conforme o contrato; para Emusys/presente ativo ele devolve
+  `presenca_emusys_ativa` e não remove nada. Falta/justificada são correções humanas
+  explícitas, preservam raw e geram evento/retificação. A função deve usar o mesmo
+  resolvedor e abrir/resolver conflito quando aplicável.
+- [ ] Mostrar badges exatos: **Emusys**, **Secretaria · LA Report**,
+  **Professor · LA Teacher** e **Professor · WhatsApp/Fábio**. Emusys/presente é passivo
+  (“Confirmado no Emusys”); falta e justificada são correções explicitamente nomeadas. Raw
+  Emusys contraditório mostra “revisar divergência”, nunca substituição silenciosa.
+- [ ] Rodar RED/GREEN da mudança, `npm ci`, comando de teste real descoberto pelo projeto e
+  build. Commitar somente migration, testes, chamada e documentação do Report.
 
-  Extrair uma função pura `acaoDoBotaoPresente(aluno)` para que o teste prove
-  as três ações:
+### Task 5 — Implementar formulário manual sem misturar dados individuais
 
-  ```ts
-  expect(acaoDoBotaoPresente({ status_presenca: 'presente', respondido_por: 'emusys' })).toEqual('manter')
-  expect(acaoDoBotaoPresente({ status_presenca: 'presente', respondido_por: 'agenda_secretaria' })).toEqual('indeterminado')
-  expect(acaoDoBotaoPresente({ status_presenca: null, respondido_por: 'emusys' })).toEqual('presente')
-  ```
+**Files (a confirmar por descoberta após brainstorming):** agenda/registro do LA Teacher,
+migration/RPC de rascunho e testes de estado/UX.
 
-  Rodar e observar RED por símbolo inexistente. Não testar JSX por classes; o
-  teste deve validar a intenção de domínio usada pelos dois componentes.
+- [ ] Fazer uma mini-SPEC de implementação antes da tela, baseada no mockup aprovado: dois
+  botões diretos na agenda (microfone e caderno), sem menu; caderno abre a ficha completa.
+- [ ] Criar RPCs de criar/atualizar rascunho com chave `professor + aula + aluno`, versão de
+  concorrência e RLS. A UI faz autosave com estado de conexão explícito, não confirma save
+  offline; ao reconectar, compara versões e oferece resolver o conflito áudio/manual.
+- [ ] Em turma, renderizar um cartão por aluno com ordem **repertório, atividades, objetivo,
+  observações, dever de casa, progresso individual**. “Tronco” é opcional e não substitui os
+  campos por aluno.
+- [ ] Implementar os dois atalhos aprovados: copiar campo e duplicar ficha. Ambos só listam
+  alunos do roster da mesma aula, exibem os campos a substituir, exigem confirmação se houver
+  conteúdo e nunca copiam presença. Testar repertório/dever/progresso diferentes em alunos
+  da mesma turma.
+- [ ] Versionar a conversão rascunho→preview final e testar colisão áudio/manual, recuperação
+  de rede e overwrite. Só então integrar ao núcleo de confirmação do registro de aula.
 
-- [ ] **Step 2: Tornar a RPC resistente a chamada direta destrutiva**
+### Task 6 — Prova integrada, publicação em gates e checkpoint
 
-  Recriar `app_registrar_chamada_agenda(jsonb)` no migration do Report. No ramo
-  `v_status = 'indeterminado'`, quando a linha existente for
-  `respondido_por='emusys'` e `status_presenca='presente'`, não apagar a linha:
+**Files:** SPEC, `RETOMADA.md` e documentação de integração nos dois repos.
 
-  ```sql
-  if v_existente.respondido_por = 'emusys'
-     and v_existente.status_presenca = 'presente' then
-    v_erros := v_erros || jsonb_build_object(
-      'aluno_id', v_aluno_id,
-      'aula_emusys_id', v_aula.id,
-      'erro', 'presenca_emusys_ativa'
-    );
-    continue;
-  end if;
-  ```
+- [ ] Aplicar primeiro a migration do Teacher e depois a do Report na branch temporária;
+  reexecutar as fixtures completas e conferir gêmeos, ledger, raw, conflito e ACLs depois de
+  cada transição.
+- [ ] Rodar Security e Performance Advisors. Provar, por consulta, que `anon` e
+  `authenticated` não executam helpers, que a porta Fábio mantém `service_role` e que nenhum
+  `SECURITY DEFINER` novo ficou em `PUBLIC` por omissão.
+- [ ] Carregar interfaces autenticadas em 390×844 e 1400×900: Emusys/presente fechado,
+  Emusys/ausente pendente, conflito aberto, correção humana com origem e formulário manual
+  por aluno. HTTP 200 não é validação interativa.
+- [ ] Publicar em gates: PR/merge do Teacher, migration Teacher, PR/merge do Report,
+  migration Report, deploys e consulta de produção sem fixture. Parar a cada gate se houver
+  migration concorrente ou divergência de hash.
+- [ ] Atualizar `RETOMADA.md` com SHA, versions de migration, funções/ACL efetivas, links de
+  evidência, conflito conhecido e próximo gate. Excluir a branch temporária somente após a
+  prova e registrar a exclusão. Rollback é migration corretiva/feature flag; nunca apagar a
+  trilha de presença.
 
-  O restante do toggle humano é preservado. O botão de falta continua sendo a
-  correção explícita: promove a linha a `agenda_secretaria`, conserva
-  `emusys_presenca_bruta` e deixa retificação quando aplicável. Acrescentar
-  `presenca_emusys_ativa` ao mapa de erros.
+## Critérios de aceite
 
-- [ ] **Step 3: Implementar UX sem clique enganoso**
-
-  `rotuloOrigem` passa a mostrar exatamente **“Secretaria · LA Report”**,
-  **“Professor · LA Teacher”**, **“Professor · WhatsApp/Fábio”** e **“Emusys”**.
-  Nos dois componentes, Emusys/presente fica com badge passivo e o botão
-  Presente desabilitado/rotulado “Confirmado no Emusys”; Falta e Justificada
-  continuam disponíveis como correção humana explícita. O texto de conflito
-  distingue “evidência Emusys” de “decisão humana” sem apagar nenhuma das duas.
-
-- [ ] **Step 4: Rodar GREEN em Report e commit focado**
-
-  Run:
-
-  ```powershell
-  npm ci
-  npm run test -- src/components/App/Agenda/Chamada/chamadaUtils.test.ts
-  npm run build
-  ```
-
-  Expected: teste novo verde e build sem erro de tipo. Se o projeto usar outro
-  comando de teste, descobrir primeiro com `npm run`; não trocar o script por
-  suposição. Commit somente migration, testes e arquivos da chamada.
-
-### Task 5: Provar integração, revisar segurança e publicar em ordem
-
-**Files:**
-- Modify: `D:/la-teacher-worktrees/presenca-canonica/docs/superpowers/specs/2026-08-12-presenca-canonica-e-entrada-manual-design.md`
-- Modify: `D:/la-teacher-worktrees/presenca-canonica/RETOMADA.md`
-- Modify: `D:/2026/LA-performance-report/.worktrees/presenca-canonica/docs/CHAMADA-AGENDA.md`
-- Modify: `D:/2026/LA-performance-report/.worktrees/presenca-canonica/docs/REGRAS-DE-NEGOCIO.md`
-- Modify: `D:/2026/LA-performance-report/.worktrees/presenca-canonica/docs/MAPA-SISTEMA.md`
-- Modify: `D:/2026/LA-performance-report/.worktrees/presenca-canonica/docs/MAPA-INTEGRACAO-EMUSYS.md`
-
-- [ ] **Step 1: Aplicar as migrations na branch Supabase e repetir a prova de integração**
-
-  Aplicar primeiro a migration do LA Teacher, depois a do LA Report. Reexecutar
-  as fixtures nas seguintes transições: Emusys/presente, Emusys/ausente,
-  secretaria/presente, Teacher/falta e WhatsApp/presente. Conferir a linha
-  gêmea, a origem, a evidência bruta e as permissões depois de cada caso.
-
-- [ ] **Step 2: Conferir Advisor e ACLs**
-
-  Rodar Security e Performance Advisors na branch; consultar explicitamente:
-
-  ```sql
-  select has_function_privilege('anon', 'public.fn_sincronizar_gemeos_presenca(integer)', 'execute') as anon,
-         has_function_privilege('authenticated', 'public.fn_sincronizar_gemeos_presenca(integer)', 'execute') as authenticated,
-         has_function_privilege('service_role', 'public.fabio_registrar_presencas_aula(integer,integer,integer[])', 'execute') as fabio_service_role;
-  ```
-
-  Expected: `anon=false`, `authenticated=false`, `fabio_service_role=true`.
-  Não aceitar novo aviso de `SECURITY DEFINER` exposto sem justificativa e
-  teste de autorização.
-
-- [ ] **Step 3: Verificar interfaces renderizadas nos dois tamanhos**
-
-  Abrir a agenda do LA Teacher e a Chamada do Report em **390×844** e
-  **1400×900**. Registrar screenshots que mostrem, respectivamente, Emusys
-  presente fechado com carimbo, Emusys ausente pendente, e a correção humana
-  com origem preservada. HTTP 200 não substitui esse teste interativo.
-
-- [ ] **Step 4: Publicar em gates e validar produção sem criar fixture**
-
-  Só após PRs revisados: merge do LA Teacher, deploy da migration do Teacher;
-  merge do LA Report, deploy da migration do Report; deploys de frontend; e
-  observação de um caso real controlado já existente. Não enviar WhatsApp
-  automático nem produzir presença sintética. Se a API Emusys não documentar
-  uma escrita idempotente, manter explicitamente o fluxo local-only.
-
-- [ ] **Step 5: Atualizar documentação e checkpoint final**
-
-  Documentar o resolvedor, origem, limite de saída Emusys, migrations, hashes,
-  URL/commit de cada PR, status de branch e evidência de produção. Alterar o
-  status da SPEC para refletir somente fatos medidos. Fazer commits separados
-  de documentação em cada repositório e push antes de encerrar.
-
-## Plano separado: entrada manual por aluno
-
-O formulário manual é um subsistema independente de presença e será executado
-em `docs/superpowers/plans/2026-08-12-entrada-manual-registro-aula.md`, em
-worktree `codex/entrada-manual-registro-aula`. Ele só poderá usar as mesmas
-RPCs de rascunho/confirmar do motor de áudio; não cria nova tabela pedagógica,
-nem mistura tronco comum com repertório, dever ou progresso individual. Antes
-de iniciar, auditar as assinaturas de `app_criar_registro_*`,
-`fn_atualizar_fatia_core` e `app_confirmar_registro` e escrever testes RED para
-rascunho automático, copiar campo, duplicar ficha e confirmação de sobrescrita.
+1. Emusys/presente fecha Teacher e Report com badge Emusys; Emusys/ausente permanece
+   pendência humana.
+2. O mesmo conceito operacional é usado em sessão, fila, Fábio e guards, enquanto métricas
+   humanas continuam em `fn_presenca_e_forte`.
+3. Mudança Emusys `presente → ausente` e qualquer conflito humano são visíveis, auditados e
+   não fabricam falta humana nem descartam evidência.
+4. Espelhos carregam proveniência e devolvem contadores de sincronização, manutenção e
+   conflito.
+5. Fábio só escreve dentro de ação WhatsApp válida, única e idempotente.
+6. A trilha append-only registra cada evento relevante sem virar fonte operacional paralela.
+7. O professor pode escolher áudio ou ficha manual, com rascunho, versão, recuperação de
+   conexão e campos realmente individuais em turma.
