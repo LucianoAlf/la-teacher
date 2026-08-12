@@ -17,6 +17,7 @@ import { AppFrame } from '../../pages/app/AppFrame'
 import { useAuth } from '../../lib/auth'
 import { descartarItemFila, enviarAudio, tentarNovamenteItemFila } from './uploadAudio'
 import { descreverFalhaFila, LIMITE_TENTATIVAS_AUTOMATICAS } from './camposCanonicos'
+import { destinoAceiteFila } from './fluxoFila'
 import { useRecorder, LIMITE_SEGUNDOS } from './useRecorder'
 import { SOMENTE_LEITURA } from '../../lib/config'
 
@@ -161,7 +162,13 @@ function Gravador({ aulaId }: { aulaId: number }) {
       registroId: registroCorrecao,
     })
     if (r.ok) {
-      navigate(`/app/processando/${r.audioId}`, { state: { aulaLabel: titulo } })
+      const destino = destinoAceiteFila(r.resultado)
+      if (destino?.tela === 'confirmar') navigate(`/app/confirmar/${destino.registroId}`)
+      else if (destino?.tela === 'processando') navigate(`/app/processando/${destino.audioId}`, { state: { aulaLabel: titulo } })
+      else {
+        setErroEnvio('O sistema aceitou o áudio, mas não informou onde acompanhá-lo.')
+        setEnvio('erro_envio')
+      }
     } else if ('erroGravacao' in r) {
       setErroGrav(r.erroGravacao)
       setEnvio('erro_gravacao')
@@ -181,7 +188,13 @@ function Gravador({ aulaId }: { aulaId: number }) {
     try {
       const resultado = await tentarNovamenteItemFila(filaLocal.id, session?.user.id)
       if (resultado.ok) {
-        navigate(`/app/processando/${resultado.audioId}`, { state: { aulaLabel: titulo } })
+        const destino = destinoAceiteFila(resultado.resultado)
+        if (destino?.tela === 'confirmar') navigate(`/app/confirmar/${destino.registroId}`)
+        else if (destino?.tela === 'processando') navigate(`/app/processando/${destino.audioId}`, { state: { aulaLabel: titulo } })
+        else {
+          setErroEnvio('O sistema aceitou o áudio, mas não informou onde acompanhá-lo.')
+          setEnvio('erro_envio')
+        }
         return
       }
       setFilaLocal({
