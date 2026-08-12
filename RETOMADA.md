@@ -131,11 +131,22 @@ reaplicada aqui. Antes de nova migration compartilhada, localizar o arquivo e
 o autor, compará-lo ao histórico remoto e registrá-lo no Git sem alterar seu
 conteúdo.
 
-**Próximos gates desta frente:** publicar o bridge do Fábio que troca a escrita
-direta por `fabio_confirmar_chamada_acao`, com backup, hash e restart
-verificados; consumir no LA Teacher os campos `origem_presenca` e
-`tem_conflito_presenca` como badges. Só depois voltar ao formulário manual,
-em uma frente própria: microfone + caderno, rascunho por
+**Bridge do Fábio publicado (12/08/2026):** a VPS
+`/home/fabio/fabio-chat-bridge/fabio_whatsapp_actions.py` foi comparada antes
+do deploy; o único diff eram as dez linhas desta correção. A versão anterior
+foi preservada em
+`/home/fabio/fabio-chat-bridge/backups/20260812-presenca-canonica-atomic-confirm/`.
+A cópia candidata compilou, foi movida atomicamente e o unit
+`fabio-chat-bridge` reiniciou `active` com PID `1384707`; o SHA-256 vivo é
+`c9d712947037a3ec2f9e68771da5a3a052af3c39c74b1ce4f296af84eec0a46b`.
+Nenhuma presença sintética, mensagem WhatsApp nem E2E foi disparado neste
+rollout. A confirmação de chamada agora chama
+`fabio_confirmar_chamada_acao`, que valida a ação, professor, expiração,
+shortlist e `wa_message_id` antes da escrita atômica.
+
+**Próximos gates desta frente:** consumir no LA Teacher os campos
+`origem_presenca` e `tem_conflito_presenca` como badges. Depois voltar ao
+formulário manual, em uma frente própria: microfone + caderno, rascunho por
 professor+aula+aluno, autosave/versionamento e cópias exclusivamente dentro do
 roster, jamais presença. Não tocar nas branches paralelas `fabio-whatsapp`,
 `fabio-pendencias-whatsapp` ou áudio.
