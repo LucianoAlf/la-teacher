@@ -160,6 +160,92 @@ class BridgeIntegrationTest(unittest.TestCase):
         self.assertTrue(delete_mock.call_args.args[0].endswith("/storage/v1/object/fabio-audios"))
         self.assertEqual(delete_mock.call_args.kwargs["json"], {"prefixes": ["whatsapp/25/e2e.ogg"]})
 
+    def test_preview_outbox_replay_does_not_send_twice(self):
+        backend = bridge.FabioBridgeBackend("fabio-audios")
+        existing = [{
+            "id": "chat-preview-1",
+            "role": "fabio",
+            "professor_id": 25,
+            "channel": "whatsapp",
+            "content": "preview canonico",
+            "fabio_done_at": "2026-08-12T00:00:00+00:00",
+            "wa_message_id": "fabio-preview:acao-1",
+        }]
+        with patch.object(bridge, "sb_get", return_value=existing), \
+             patch.object(bridge, "send_whatsapp_text") as send_mock:
+            result = backend.send_preview("acao-1", 25, "preview canonico")
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["ja_enviado"])
+        send_mock.assert_not_called()
+
+    def test_preview_outbox_uncertain_delivery_never_resends(self):
+        backend = bridge.FabioBridgeBackend("fabio-audios")
+        existing = [{
+            "id": "chat-preview-uncertain",
+            "role": "fabio",
+            "professor_id": 25,
+            "channel": "whatsapp",
+            "content": "preview canonico",
+            "fabio_done_at": None,
+            "wa_message_id": "fabio-preview:acao-uncertain",
+        }]
+        with patch.object(bridge, "sb_get", return_value=existing), \
+             patch.object(bridge, "send_whatsapp_text") as send_mock:
+            with self.assertRaisesRegex(RuntimeError, "preview_entrega_incerta"):
+                backend.send_preview("acao-uncertain", 25, "preview canonico")
+        send_mock.assert_not_called()
+
+    def test_preview_outbox_persists_sends_and_marks_done(self):
+        backend = bridge.FabioBridgeBackend("fabio-audios")
+        inserted = [{
+            "id": "chat-preview-2",
+            "role": "fabio",
+            "professor_id": 25,
+            "channel": "whatsapp",
+            "content": "preview canonico",
+            "wa_message_id": "fabio-preview:acao-2",
+            "fabio_done_at": None,
+        }]
+        post_response = type("Response", (), {
+            "status_code": 201,
+            "text": "",
+            "json": lambda self: inserted,
+        })()
+        patch_response = type("Response", (), {"status_code": 200, "text": ""})()
+        with patch.object(bridge, "sb_get", return_value=[]), \
+             patch.object(bridge, "sb_post", return_value=post_response) as post_mock, \
+             patch.object(bridge, "send_whatsapp_text", return_value="wa-out-2") as send_mock, \
+             patch.object(bridge, "sb_patch", return_value=patch_response) as patch_mock:
+            result = backend.send_preview("acao-2", 25, "preview canonico")
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["ja_enviado"])
+        self.assertEqual(post_mock.call_args.args[1]["wa_message_id"], "fabio-preview:acao-2")
+        send_mock.assert_called_once_with(25, "preview canonico")
+        self.assertEqual(patch_mock.call_args.args[1], {"id": "eq.chat-preview-2"})
+        self.assertIn("fabio_done_at", patch_mock.call_args.args[2])
+
+    def test_preview_outbox_concurrent_insert_loser_never_sends(self):
+        backend = bridge.FabioBridgeBackend("fabio-audios")
+        concurrent = [{
+            "id": "chat-preview-race",
+            "role": "fabio",
+            "professor_id": 25,
+            "channel": "whatsapp",
+            "content": "preview canonico",
+            "fabio_done_at": "2026-08-12T10:35:00+00:00",
+            "wa_message_id": "fabio-preview:acao-race",
+        }]
+        conflict = type("Response", (), {
+            "status_code": 409,
+            "text": "conflict",
+        })()
+        with patch.object(bridge, "sb_get", side_effect=[[], concurrent]), \
+             patch.object(bridge, "sb_post", return_value=conflict), \
+             patch.object(bridge, "send_whatsapp_text") as send_mock:
+            result = backend.send_preview("acao-race", 25, "preview canonico")
+        self.assertTrue(result["ja_enviado"])
+        send_mock.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

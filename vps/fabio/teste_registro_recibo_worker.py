@@ -29,8 +29,8 @@ def registro_fixture():
                 "aluno_id": 7,
                 "aluno_nome": "Lucas",
                 "status": "gravado_emusys",
-                "campos": {"presenca": "presente"},
-                "texto_consolidado": "Trabalhou leitura de partitura.",
+                "campos": {"presenca": "presente", "progresso": "Avancou na leitura individual."},
+                "texto_consolidado": "Leitura de partitura e escalas. Avancou na leitura individual.",
                 "devolutiva": {"texto_normal": "Lucas avançou na leitura."},
             },
             {
@@ -44,8 +44,8 @@ def registro_fixture():
                 "aluno_id": 9,
                 "aluno_nome": "Nathalia",
                 "status": "gravado_emusys",
-                "campos": {"presenca": "presente"},
-                "texto_consolidado": "Trabalhou escalas maiores.",
+                "campos": {"presenca": "presente", "progresso": "Trabalhou escalas maiores."},
+                "texto_consolidado": "Leitura de partitura e escalas. Trabalhou escalas maiores.",
                 "devolutiva": {"texto_normal": "Nathalia manteve bom foco."},
             },
         ],
@@ -147,6 +147,8 @@ class RegistroReciboWorkerTest(unittest.TestCase):
         self.assertIn("Rascunho de devolutiva", text)
         self.assertIn("Lucas avançou", text)
         self.assertIn("Nathalia manteve", text)
+        self.assertIn("Progresso: Avancou na leitura individual.", text)
+        self.assertEqual(text.count("Leitura de partitura e escalas"), 1)
         self.assertNotIn("telefone", text.lower())
         self.assertNotIn("token", text.lower())
         self.assertNotIn("família", text.lower())

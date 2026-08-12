@@ -28,6 +28,77 @@ class FabioWhatsappBackend(Protocol):
 
     def remove_audio(self, storage_path: str) -> None: ...
 
+    def send_preview(self, action_id: str, professor_id: int, content: str) -> dict[str, Any]: ...
+
+
+def _preview_text(value: Any) -> str:
+    return str(value or "").strip() or "—"
+
+
+def _preview_date(value: Any) -> str:
+    text = str(value or "").strip()
+    parts = text[:10].split("-")
+    if len(parts) == 3 and all(parts):
+        return f"{parts[2]}/{parts[1]}/{parts[0]}"
+    return text or "—"
+
+
+def _preview_presence(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"ausente", "faltou", "falta", "nao", "não"}:
+        return "❌ Falta"
+    if text in {"presente", "veio", "sim"}:
+        return "✅ Presente"
+    return "✅ Presente (padrão ao confirmar)"
+
+
+def format_registro_preview(readback: dict[str, Any]) -> str:
+    """Render only the guarded canonical read-back, including honest blanks."""
+    if not isinstance(readback, dict) or readback.get("ok") is False:
+        raise ValueError("readback_invalido")
+    aula = readback.get("aula") if isinstance(readback.get("aula"), dict) else {}
+    tronco = readback.get("tronco") if isinstance(readback.get("tronco"), dict) else {}
+    comum = tronco.get("campos") if isinstance(tronco.get("campos"), dict) else {}
+    fatias = readback.get("fatias") if isinstance(readback.get("fatias"), list) else []
+    if not tronco.get("id") or not fatias:
+        raise ValueError("readback_incompleto")
+
+    curso = _preview_text(aula.get("curso") or aula.get("nome") or "Aula")
+    turma = _preview_text(aula.get("turma") or aula.get("turma_nome"))
+    hora = _preview_text(aula.get("hora") or aula.get("horario"))
+    if hora != "—":
+        hora = hora[:5]
+    linhas = [
+        "📋 *Preview do registro*",
+        f"📚 {curso} • {turma}",
+        f"🗓️ {_preview_date(aula.get('data_aula') or aula.get('data'))} • {hora}",
+        "",
+        "🧩 *Conteúdo da aula*",
+        f"🎯 Objetivo: {_preview_text(comum.get('objetivo'))}",
+        f"📖 Conteúdo: {_preview_text(comum.get('atividades') or comum.get('conteudo'))}",
+        f"🎵 Repertório: {_preview_text(comum.get('repertorio'))}",
+        f"🏠 Dever de casa: {_preview_text(comum.get('dever_casa'))}",
+        f"💬 Observações: {_preview_text(comum.get('obs_gerais') or comum.get('observacoes'))}",
+        "",
+        "👥 *Por aluno*",
+    ]
+    for fatia in fatias:
+        if not isinstance(fatia, dict):
+            continue
+        campos = fatia.get("campos") if isinstance(fatia.get("campos"), dict) else {}
+        linhas.extend([
+            f"👤 *{_preview_text(fatia.get('aluno_nome') or fatia.get('nome'))}*",
+            f"   Presença: {_preview_presence(fatia.get('presenca') or campos.get('presenca'))}",
+            f"   Progresso: {_preview_text(campos.get('progresso'))}",
+            f"   Observação: {_preview_text(campos.get('observacao'))}",
+            f"   Próximo passo: {_preview_text(campos.get('proximo_passo'))}",
+        ])
+    linhas.extend([
+        "",
+        "Se estiver certo, responda *sim*. Para ajustar, diga o aluno e o campo.",
+    ])
+    return "\n".join(linhas)
+
 
 def _result(code: str, *, handled: bool = True, reply: str | None = None,
             forward: bool = False, action_id: str | None = None, **extra: Any) -> dict[str, Any]:
@@ -278,10 +349,22 @@ def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, An
         return _result("correction_applied", reply="Atualizei o rascunho. Ainda não gravei no prontuário; quer confirmar?", action_id=str(action["id"]), readback=updated)
     if kind == "confirmar":
         if action.get("tipo") == "confirmar_registro":
-            committed = _call(backend, "fabio_confirmar_registro", {"p_professor_id": int(context["professor_id"]), "p_registro_id": action["registro_id"], "p_modo": "novo"})
-            readback = _call(backend, "fabio_registro_completo", {"p_professor_id": int(context["professor_id"]), "p_registro_id": action["registro_id"]})
+            readback_before = _call(backend, "fabio_registro_completo", {"p_professor_id": int(context["professor_id"]), "p_registro_id": action["registro_id"]})
+            trunk_before = readback_before.get("tronco") if isinstance(readback_before.get("tronco"), dict) else {}
+            status_before = trunk_before.get("status")
+            recovered = status_before in {"confirmado", "gravado_emusys"}
+            if recovered:
+                committed = {"registro_id": action["registro_id"], "recuperado_pos_commit": True}
+                readback = readback_before
+            elif status_before in {"rascunho", "aguardando_confirmacao"}:
+                committed = _call(backend, "fabio_confirmar_registro", {"p_professor_id": int(context["professor_id"]), "p_registro_id": action["registro_id"], "p_modo": "novo"})
+                readback = _call(backend, "fabio_registro_completo", {"p_professor_id": int(context["professor_id"]), "p_registro_id": action["registro_id"]})
+            else:
+                raise RuntimeError("status_registro_nao_confirmavel")
             _event(backend, action, context, "confirmado", {"registro_id": action["registro_id"]})
             receipt = {key: committed.get(key) for key in ("registro_id", "gravadas", "ausentes_pulados", "presenca") if key in committed}
+            if recovered:
+                receipt["recuperado_pos_commit"] = True
             receipt["readback"] = readback
             return _result("confirmed", reply="Registro confirmado. Estou preparando seu carimbo.", action_id=str(action["id"]), receipt=receipt)
         aula_id = int(action["aula_id"])

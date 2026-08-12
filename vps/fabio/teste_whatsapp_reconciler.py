@@ -44,6 +44,14 @@ class FakeBackend:
         self.calls.append(("remove_audio", {"storage_path": storage_path}))
         self.removals.append(storage_path)
 
+    def send_preview(self, action_id, professor_id, content):
+        self.calls.append(("send_preview", {
+            "action_id": action_id,
+            "professor_id": professor_id,
+            "content": content,
+        }))
+        return {"ok": True, "wa_message_id": f"preview:{action_id}"}
+
 
 def action(*, attempts=0, action_id="acao-1"):
     return {
@@ -65,7 +73,17 @@ class WhatsappReconcilerTest(unittest.TestCase):
         backend = FakeBackend(
             process_items=[process_item()],
             audio={"ok": True, "status": "normalizado", "registro_id": "reg-1"},
-            readback={"ok": True, "tronco": {"id": "reg-1", "status": "aguardando_confirmacao"}},
+            readback={
+                "ok": True,
+                "aula": {"curso": "Piano T", "turma": "P_Qui_19", "data_aula": "2026-08-06", "hora": "19:00:00"},
+                "tronco": {
+                    "id": "reg-1",
+                    "status": "aguardando_confirmacao",
+                    "campos": {"objetivo": "Coordenar as duas maos", "atividades": "Jingle Bells", "repertorio": "Jingle Bells", "dever_casa": None, "obs_gerais": None},
+                },
+                "fatias": [{"aluno_id": 7, "aluno_nome": "Pedro", "presenca": None, "campos": {"progresso": "Tocou com as duas maos", "observacao": None, "proximo_passo": None}}],
+                "incertezas": [],
+            },
         )
 
         result = reconcile_once(backend, limit=7)
@@ -76,6 +94,14 @@ class WhatsappReconcilerTest(unittest.TestCase):
         self.assertEqual(conclusion["p_dados"]["registro_id"], "reg-1")
         self.assertEqual(conclusion["p_lease_token"], "lease-1")
         self.assertEqual(backend.calls[0][1]["p_limite"], 7)
+        names = [name for name, _ in backend.calls]
+        self.assertLess(names.index("send_preview"), names.index("fabio_concluir_reconciliacao"))
+        preview = next(payload for name, payload in backend.calls if name == "send_preview")
+        self.assertIn("Preview do registro", preview["content"])
+        self.assertIn("Objetivo: Coordenar as duas maos", preview["content"])
+        self.assertIn("Dever de casa: —", preview["content"])
+        self.assertIn("Pedro", preview["content"])
+        self.assertIn("Presente (padrão ao confirmar)", preview["content"])
 
     def test_draft_not_ready_is_temporary_then_terminal_at_bound(self):
         item = process_item(action(attempts=0))
@@ -118,7 +144,7 @@ class WhatsappReconcilerTest(unittest.TestCase):
         backend = FakeBackend(
             process_items=[process_item()],
             audio={"ok": True, "status": "normalizado", "registro_id": "reg-1"},
-            readback={"ok": True, "tronco": {"status": "aguardando_confirmacao"}},
+            readback={"ok": True, "tronco": {"id": "reg-1", "status": "aguardando_confirmacao"}, "fatias": [{"aluno_nome": "Aluno", "campos": {}}]},
             reconcile_result={"ok": False, "codigo": "lease_invalido"},
         )
 
@@ -156,7 +182,7 @@ class WhatsappReconcilerTest(unittest.TestCase):
         backend = FakeBackend(
             process_items=[process_item()],
             audio={"ok": True, "status": "normalizado", "registro_id": "reg-1"},
-            readback={"ok": True, "tronco": {"status": "aguardando_confirmacao"}},
+            readback={"ok": True, "tronco": {"id": "reg-1", "status": "aguardando_confirmacao"}, "fatias": [{"aluno_nome": "Aluno", "campos": {}}]},
         )
 
         first = reconcile_once(backend)

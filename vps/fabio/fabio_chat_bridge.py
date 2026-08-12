@@ -288,6 +288,89 @@ class FabioBridgeBackend(FabioWhatsappBackend):
         if response.status_code not in {200, 204, 404}:
             raise RuntimeError(f"storage_remove_failed_{response.status_code}")
 
+    def send_preview(self, action_id: str, professor_id: int, content: str) -> dict[str, Any]:
+        """Persist and deliver one canonical preview, replay-safe by action id."""
+        action_id = str(action_id or "").strip()
+        content = str(content or "").strip()
+        if not action_id or not content:
+            raise RuntimeError("preview_invalido")
+        professor_id = int(professor_id)
+        dedupe_key = f"fabio-preview:{action_id}"
+
+        def existing_rows() -> list[dict[str, Any]]:
+            return sb_get("/rest/v1/fabio_chat_mensagens", {
+                "select": "id,role,professor_id,channel,content,wa_message_id,fabio_done_at",
+                "wa_message_id": f"eq.{dedupe_key}",
+                "limit": "1",
+            })
+
+        rows = existing_rows()
+        persisted_before_this_attempt = bool(rows)
+        if rows:
+            row = rows[0]
+            if (
+                row.get("role") != "fabio"
+                or int(row.get("professor_id") or 0) != professor_id
+                or row.get("channel") != "whatsapp"
+                or str(row.get("content") or "") != content
+            ):
+                raise RuntimeError("preview_contexto_conflitante")
+            if row.get("fabio_done_at"):
+                return {"ok": True, "ja_enviado": True, "wa_message_id": dedupe_key}
+            # The row is durable before transport. On replay an unfinished row
+            # can mean "sent, crashed before close", so never send it again.
+            if persisted_before_this_attempt:
+                raise RuntimeError("preview_entrega_incerta")
+        else:
+            response = sb_post(
+                "/rest/v1/fabio_chat_mensagens",
+                {
+                    "identidade_tipo": "professor",
+                    "role": "fabio",
+                    "kind": "text",
+                    "content": content,
+                    "channel": "whatsapp",
+                    "professor_id": professor_id,
+                    "wa_message_id": dedupe_key,
+                },
+                prefer="return=representation",
+            )
+            if response.status_code == 409:
+                rows = existing_rows()
+                if not rows:
+                    raise RuntimeError("preview_outbox_conflito")
+                row = rows[0]
+                if (
+                    row.get("role") != "fabio"
+                    or int(row.get("professor_id") or 0) != professor_id
+                    or row.get("channel") != "whatsapp"
+                    or str(row.get("content") or "") != content
+                ):
+                    raise RuntimeError("preview_contexto_conflitante")
+                if row.get("fabio_done_at"):
+                    return {"ok": True, "ja_enviado": True, "wa_message_id": dedupe_key}
+                raise RuntimeError("preview_entrega_incerta")
+            elif response.status_code >= 400:
+                raise RuntimeError(f"preview_outbox_failed_{response.status_code}")
+            else:
+                data = response.json()
+                row = data[0] if isinstance(data, list) and data else None
+            if not isinstance(row, dict) or not row.get("id"):
+                raise RuntimeError("preview_outbox_incompleto")
+
+        transport_id = send_whatsapp_text(professor_id, content)
+        if not transport_id:
+            raise RuntimeError("preview_transporte_sem_id")
+        marked = sb_patch(
+            "/rest/v1/fabio_chat_mensagens",
+            {"id": f"eq.{row['id']}"},
+            {"fabio_done_at": now_iso()},
+            prefer="return=representation",
+        )
+        if marked.status_code >= 400:
+            raise RuntimeError(f"preview_outbox_close_failed_{marked.status_code}")
+        return {"ok": True, "ja_enviado": False, "wa_message_id": dedupe_key, "transport_id": transport_id}
+
 
 def get_data(body: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(body.get("messages"), list) and body["messages"]:

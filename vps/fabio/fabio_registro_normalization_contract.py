@@ -23,11 +23,13 @@ _SLICE_KEYS = {"aluno_id", "presenca", "campos"}
 _PRESENCAS = {None, "presente", "ausente"}
 _LEGACY_TOP_LEVEL_KEYS = {
     "audio_id", "aula_id", "professor_id", "origem", "molde", "tronco",
-    "fatias", "transcricao", "texto_consolidado",
+    "fatias", "transcricao", "texto_consolidado", "modo",
+    "checkpoint_sugerido", "avisos", "qualidade",
 }
 _LEGACY_TRUNK_KEYS = {"campos", "texto", "texto_consolidado"}
 _LEGACY_COMMON_FIELDS = {
     "objetivo", "atividades", "repertorio", "dever_casa", "obs_gerais", "observacoes",
+    "materiais", "marco_ref", "eixos",
 }
 _LEGACY_SLICE_KEYS = {
     "aula_id", "aluno_id", "presenca", "texto", "texto_consolidado", "campos",
@@ -97,6 +99,44 @@ def _ambiguous_observation(value: str | None) -> bool:
     return "sistema" in terms and "quadro" in terms
 
 
+_UNCERTAIN_MUSIC_REFERENCE = re.compile(
+    r"\s+(?:da|a)\s+m[úu]sica\s+mencionada"
+    r"(?:\s+na\s+transcri(?:ç|c)[ãa]o)?\s+como\s+"
+    r"(?:[\"'“][^\"'”]+[\"'”]|[^,.;]+?)"
+    r"(?=\s*(?:,|\be\b|\.|$))",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_uncertain_transcription(
+    value: str | None,
+    *,
+    path: str,
+    uncertainties: list[dict[str, str]],
+) -> str | None:
+    if not value:
+        return value
+    terms = _tokens(value)
+    mentioned = "mencionada" in terms or "mencionado" in terms
+    uncertain = mentioned and (
+        "transcricao" in terms
+        or "confirmar" in terms
+        or "como" in terms
+    )
+    if not uncertain:
+        return value
+    uncertainties.append({"campo": path, "motivo": "transcricao_incerta"})
+    if path.endswith(".repertorio"):
+        return None
+    cleaned = _UNCERTAIN_MUSIC_REFERENCE.sub("", value)
+    cleaned = re.sub(r"\s+,", ",", cleaned)
+    cleaned = re.sub(r",\s*,+", ",", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" ,;-")
+    if cleaned:
+        cleaned = cleaned[0].upper() + cleaned[1:]
+    return cleaned or None
+
+
 def _clean_fields(
     value: Any,
     *,
@@ -110,6 +150,11 @@ def _clean_fields(
     cleaned: dict[str, str | None] = {}
     for field in fields:
         text = _text(value.get(field), f"{path}.{field}")
+        text = _sanitize_uncertain_transcription(
+            text,
+            path=f"{path}.{field}",
+            uncertainties=uncertainties,
+        )
         if field == "observacoes" and _ambiguous_observation(text):
             text = None
             uncertainties.append({"campo": f"{path}.{field}", "motivo": "termo_ambiguo"})
@@ -293,7 +338,7 @@ def adaptar_contrato_para_payload_rpc(
     """Converte apenas dados já validados para o formato legado da RPC."""
     if not isinstance(normalized, dict):
         raise NormalizationContractError("normalizacao_invalida")
-    if origem != "app" or not isinstance(molde, str) or not molde.strip():
+    if origem not in {"app", "whatsapp"} or not isinstance(molde, str) or not molde.strip():
         raise NormalizationContractError("metadados_rpc_invalidos")
     common = normalized.get("comum")
     slices = normalized.get("fatias")
@@ -354,15 +399,32 @@ def sanear_readback_para_preview(
         raw_slices = readback.get("fatias")
         if not isinstance(trunk, dict) or not isinstance(raw_slices, list) or not raw_slices:
             raise NormalizationContractError("readback_incompleto")
+        trunk_fields = trunk.get("campos") if isinstance(trunk.get("campos"), dict) else {}
         legacy = {
             "aula_id": trunk.get("aula_id"),
             "professor_id": trunk.get("professor_id"),
-            "tronco": {"campos": trunk.get("campos")},
+            # Read-back carries operational stamps in `campos` after commit.
+            # Project only the persisted pedagogical contract before applying
+            # the strict normalizer; never expose or reinterpret motor metadata.
+            "tronco": {"campos": {
+                "objetivo": trunk_fields.get("objetivo"),
+                "atividades": trunk_fields.get("atividades") or trunk_fields.get("conteudo"),
+                "repertorio": trunk_fields.get("repertorio"),
+                "dever_casa": trunk_fields.get("dever_casa"),
+                "observacoes": trunk_fields.get("observacoes", trunk_fields.get("obs_gerais")),
+            }},
             "fatias": [
                 {
                     "aluno_id": slice_.get("aluno_id") if isinstance(slice_, dict) else None,
                     "presenca": slice_.get("presenca") if isinstance(slice_, dict) else None,
-                    "campos": slice_.get("campos") if isinstance(slice_, dict) else None,
+                    "campos": {
+                        "progresso": (slice_.get("campos") or {}).get("progresso"),
+                        "repertorio": (slice_.get("campos") or {}).get("repertorio"),
+                        "proximo_passo": (slice_.get("campos") or {}).get("proximo_passo"),
+                        "observacao": (slice_.get("campos") or {}).get(
+                            "observacao", (slice_.get("campos") or {}).get("observacoes")
+                        ),
+                    } if isinstance(slice_, dict) and isinstance(slice_.get("campos"), dict) else None,
                 }
                 for slice_ in raw_slices
             ],

@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fabio_registro_normalization_contract import (  # noqa: E402
     NormalizationContractError,
+    sanear_readback_para_preview,
     validar_e_sanear_normalizacao,
 )
 
@@ -210,8 +211,13 @@ class _FakeResponse:
 
 
 def _carregar_tool_real():
+    registrations = []
     registry_module = types.ModuleType("tools.registry")
-    registry_module.registry = type("Registry", (), {"register": staticmethod(lambda **_kwargs: None)})()
+    registry_module.registry = type(
+        "Registry",
+        (),
+        {"register": staticmethod(lambda **kwargs: registrations.append(kwargs))},
+    )()
     tools_module = types.ModuleType("tools")
     tools_module.registry = registry_module
     sys.modules["tools"] = tools_module
@@ -221,10 +227,20 @@ def _carregar_tool_real():
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     spec.loader.exec_module(module)
+    module._captured_registrations = registrations
     return module
 
 
 class RegistroNormalizationConsumerTest(unittest.TestCase):
+    @staticmethod
+    def _audio_queue(*, origem="app", aula_id=101, professor_id=25):
+        return {
+            "id": "audio-1",
+            "aula_id": aula_id,
+            "professor_id": professor_id,
+            "origem": origem,
+        }
+
     def _legacy_payload(self, *, aluno_id=7):
         return {
             "audio_id": "audio-1",
@@ -251,6 +267,7 @@ class RegistroNormalizationConsumerTest(unittest.TestCase):
         tool = _carregar_tool_real()
         roster = [{"aluno_id": 7, "aluno_nome": "Lucas", "aula_id": 101}]
         with patch.object(tool, "_headers", return_value={}), \
+             patch.object(tool, "_buscar_audio_fila", return_value=self._audio_queue()), \
              patch.object(tool, "_buscar_roster_aula", return_value=(roster, {"ok": True, "qtd_contexto": 1})), \
              patch.object(tool.requests, "get", return_value=_FakeResponse([])), \
              patch.object(tool.requests, "post", return_value=_FakeResponse({"status": "criado"})) as post_mock, \
@@ -277,12 +294,13 @@ class RegistroNormalizationConsumerTest(unittest.TestCase):
 
     def test_tool_timeout_no_roster_falha_sem_post_ou_status_audio(self):
         tool = _carregar_tool_real()
-        with patch.object(tool, "_buscar_roster_aula", side_effect=tool.requests.Timeout("tempo")), \
+        with patch.object(tool, "_buscar_audio_fila", return_value=self._audio_queue()), \
+             patch.object(tool, "_buscar_roster_aula", side_effect=tool.requests.Timeout("tempo")), \
              patch.object(tool.requests, "post") as post_mock, \
              patch.object(tool, "fabio_atualizar_status_audio") as status_mock:
             result = json.loads(tool.fabio_criar_registro_aula(self._legacy_payload()))
         self.assertFalse(result["ok"])
-        self.assertEqual(result["error"], "roster_indisponivel")
+        self.assertEqual(result["error"], "fila_ou_roster_indisponivel")
         post_mock.assert_not_called()
         status_mock.assert_not_called()
 
@@ -300,12 +318,60 @@ class RegistroNormalizationConsumerTest(unittest.TestCase):
         get_mock.assert_not_called()
         post_mock.assert_not_called()
 
+    def test_schema_exige_audio_id_da_fila_no_topo(self):
+        tool = _carregar_tool_real()
+        registration = next(
+            item
+            for item in tool._captured_registrations
+            if item.get("name") == "fabio_criar_registro_aula"
+        )
+        parameters = registration["schema"]["parameters"]
+        self.assertIn("audio_id", parameters["required"])
+        description = parameters["properties"]["audio_id"]["description"].lower()
+        self.assertIn("fila", description)
+        self.assertIn("nunca use registro_id", description)
+
+    def test_transcricao_resolve_storage_pelo_audio_id_sem_url_do_modelo(self):
+        tool = _carregar_tool_real()
+        queue = _FakeResponse([{
+            "id": "audio-1",
+            "storage_path": "whatsapp/25/audio-1.webm",
+        }])
+        signed = _FakeResponse({
+            "signedURL": "/object/sign/fabio-audios/whatsapp/25/audio-1.webm?token=seguro",
+        })
+        with patch.object(tool, "_headers", return_value={"Authorization": "Bearer seguro"}), \
+             patch.object(tool.requests, "get", return_value=queue) as get_mock, \
+             patch.object(tool.requests, "post", return_value=signed) as post_mock, \
+             patch.object(tool, "fabio_transcrever_audio_url", return_value='{"ok": true}') as transcribe_mock:
+            result = json.loads(tool.fabio_transcrever_audio_fila("audio-1", "pt"))
+
+        self.assertTrue(result["ok"])
+        self.assertIn("/rest/v1/fabio_fila_audios", get_mock.call_args.args[0])
+        self.assertEqual(get_mock.call_args.kwargs["params"]["id"], "eq.audio-1")
+        self.assertIn("/storage/v1/object/sign/fabio-audios/", post_mock.call_args.args[0])
+        self.assertEqual(post_mock.call_args.kwargs["json"], {"expiresIn": 600})
+        called_url = transcribe_mock.call_args.args[0]
+        self.assertIn("/storage/v1/object/sign/fabio-audios/", called_url)
+        self.assertNotIn("audio_url", called_url)
+
+        registration = next(
+            item
+            for item in tool._captured_registrations
+            if item.get("name") == "fabio_transcrever_audio_fila"
+        )
+        self.assertEqual(
+            registration["schema"]["parameters"]["required"],
+            ["audio_id"],
+        )
+
     def test_tool_rejeita_fatias_vazias_sem_chamar_rpc(self):
         tool = _carregar_tool_real()
         roster = [{"aluno_id": 7, "aluno_nome": "Lucas", "aula_id": 101}]
         payload = self._legacy_payload()
         payload["fatias"] = []
         with patch.object(tool, "_headers", return_value={}), \
+             patch.object(tool, "_buscar_audio_fila", return_value=self._audio_queue()), \
              patch.object(tool, "_buscar_roster_aula", return_value=(roster, {"ok": True, "qtd_contexto": 1})) as roster_mock, \
              patch.object(tool.requests, "get", return_value=_FakeResponse([])), \
              patch.object(tool.requests, "post", return_value=_FakeResponse({"status": "criado"})) as post_mock, \
@@ -320,6 +386,7 @@ class RegistroNormalizationConsumerTest(unittest.TestCase):
         tool = _carregar_tool_real()
         roster = [{"aluno_id": 7, "aluno_nome": "Lucas", "aula_id": 101}]
         with patch.object(tool, "_headers", return_value={}), \
+             patch.object(tool, "_buscar_audio_fila", return_value=self._audio_queue()), \
              patch.object(tool, "_buscar_roster_aula", return_value=(roster, {"ok": True, "qtd_contexto": 2, "qtd_roster": 1})), \
              patch.object(tool.requests, "get", return_value=_FakeResponse([])) as get_mock, \
              patch.object(tool.requests, "post", return_value=_FakeResponse({"status": "criado"})) as post_mock, \
@@ -335,6 +402,7 @@ class RegistroNormalizationConsumerTest(unittest.TestCase):
         tool = _carregar_tool_real()
         roster = [{"aluno_id": 7, "aluno_nome": "Lucas", "aula_id": 101}]
         with patch.object(tool, "_headers", return_value={}), \
+             patch.object(tool, "_buscar_audio_fila", return_value=self._audio_queue()), \
              patch.object(tool, "_buscar_roster_aula", return_value=(roster, {"ok": True, "qtd_contexto": 1})), \
              patch.object(tool.requests, "get", return_value=_FakeResponse([])), \
              patch.object(tool.requests, "post", return_value=_FakeResponse({"status": "criado"})) as post_mock, \
@@ -348,6 +416,78 @@ class RegistroNormalizationConsumerTest(unittest.TestCase):
         self.assertNotIn("texto_consolidado", persisted["tronco"])
         self.assertTrue(result["aguardando_confirmacao"])
         self.assertEqual(result["incertezas"], [{"campo": "comum.observacoes", "motivo": "termo_ambiguo"}])
+
+    def test_tool_projeta_saida_completa_da_skill_e_remove_transcricao_incerta(self):
+        tool = _carregar_tool_real()
+        roster = [{"aluno_id": 7, "aluno_nome": "Lucas", "aula_id": 101}]
+        payload = self._legacy_payload()
+        payload.update({
+            "modo": "novo",
+            "checkpoint_sugerido": None,
+            "avisos": ["O nome da musica foi transcrito como ingobels; confirmar o titulo."],
+            "qualidade": {"faltando": {"7": ["proximo_passo"]}},
+        })
+        payload["tronco"]["campos"].update({
+            "materiais": None,
+            "marco_ref": None,
+            "eixos": ["CoordenacaoMotora"],
+        })
+        payload["tronco"]["campos"]["atividades"] = (
+            "Execucao com as duas maos da musica mencionada como ingobels, "
+            "improvisacao com a mao direita."
+        )
+        payload["fatias"][0]["campos"]["progresso"] = (
+            "Tocou com as duas maos a musica mencionada como ingobels e improvisou."
+        )
+        payload["fatias"][0]["campos"]["repertorio"] = (
+            "Musica mencionada na transcricao como ingobels (nome a confirmar)."
+        )
+
+        with patch.object(tool, "_headers", return_value={}), \
+             patch.object(tool, "_buscar_audio_fila", return_value=self._audio_queue()), \
+             patch.object(tool, "_buscar_roster_aula", return_value=(roster, {"ok": True, "qtd_contexto": 1})), \
+             patch.object(tool.requests, "get", return_value=_FakeResponse([])), \
+             patch.object(tool.requests, "post", return_value=_FakeResponse({"status": "criado"})) as post_mock, \
+             patch.object(tool, "fabio_atualizar_status_audio", return_value="{}"):
+            result = json.loads(tool.fabio_criar_registro_aula(payload))
+
+        self.assertTrue(result["ok"])
+        persisted = post_mock.call_args.kwargs["json"]["p_payload"]
+        self.assertEqual(
+            set(persisted["tronco"]["campos"]),
+            {"objetivo", "atividades", "repertorio", "dever_casa", "observacoes"},
+        )
+        self.assertNotIn("mencionada", persisted["tronco"]["campos"]["atividades"].lower())
+        self.assertNotIn("mencionada", persisted["fatias"][0]["campos"]["progresso"].lower())
+        self.assertIsNone(persisted["fatias"][0]["campos"]["repertorio"])
+        self.assertTrue(result["aguardando_confirmacao"])
+        self.assertTrue(
+            any(item["motivo"] == "transcricao_incerta" for item in result["incertezas"])
+        )
+
+    def test_tool_deriva_origem_e_identidade_da_fila_e_nao_do_modelo(self):
+        tool = _carregar_tool_real()
+        payload = self._legacy_payload()
+        payload.update({"aula_id": 999, "professor_id": 999, "origem": "app"})
+        roster = [{"aluno_id": 7, "aluno_nome": "Lucas", "aula_id": 101}]
+        with patch.object(tool, "_headers", return_value={}), \
+             patch.object(
+                 tool,
+                 "_buscar_audio_fila",
+                 return_value=self._audio_queue(origem="whatsapp"),
+             ), \
+             patch.object(tool, "_buscar_roster_aula", return_value=(roster, {"ok": True, "qtd_contexto": 1})) as roster_mock, \
+             patch.object(tool.requests, "get", return_value=_FakeResponse([])), \
+             patch.object(tool.requests, "post", return_value=_FakeResponse({"status": "criado"})) as post_mock, \
+             patch.object(tool, "fabio_atualizar_status_audio", return_value="{}"):
+            result = json.loads(tool.fabio_criar_registro_aula(payload))
+
+        self.assertTrue(result["ok"])
+        roster_mock.assert_called_once_with(101, 25)
+        persisted = post_mock.call_args.kwargs["json"]["p_payload"]
+        self.assertEqual(persisted["aula_id"], 101)
+        self.assertEqual(persisted["professor_id"], 25)
+        self.assertEqual(persisted["origem"], "whatsapp")
 
     def test_bridge_sanea_readback_antes_do_preview_das_actions(self):
         import fabio_chat_bridge as bridge
@@ -405,6 +545,35 @@ class RegistroNormalizationConsumerTest(unittest.TestCase):
                 "professor_id": "eq.25",
             },
         )
+
+    def test_bridge_sanea_readback_pos_confirmacao_sem_expor_metadados_do_motor(self):
+        raw = {
+            "aula": {"data_aula": "2026-08-06", "hora": "19:00:00", "turma": "P_Qui_19", "curso": "Piano T", "tipo": "turma"},
+            "tronco": {
+                "id": "reg-1", "aula_id": 202499, "professor_id": 10, "status": "gravado_emusys",
+                "campos": {
+                    "objetivo": "Coordenar as duas maos", "atividades": "Jingle Bells",
+                    "repertorio": "Jingle Bells", "dever_casa": None, "observacoes": None,
+                    "presenca_emitida": True, "presenca_aplicado": True,
+                    "presenca_emitida_em": "2026-08-12T00:37:52Z", "presenca_erro": None,
+                },
+            },
+            "fatias": [{
+                "id": "fat-1", "aula_id": 202500, "professor_id": 10, "aluno_id": 1629,
+                "aluno_nome": "Pedro", "status": "gravado_emusys", "presenca": "presente",
+                "campos": {
+                    "presenca": "presente", "progresso": "Tocou com as duas maos",
+                    "observacao": None, "proximo_passo": None, "aula_alvo_resolvida": 202500,
+                },
+            }],
+        }
+        result = sanear_readback_para_preview(raw, professor_id=10, roster_ids={1629})
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["tronco"]["status"], "gravado_emusys")
+        self.assertEqual(result["fatias"][0]["presenca"], "presente")
+        serialized = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn("presenca_emitida", serialized)
+        self.assertNotIn("aula_alvo_resolvida", serialized)
 
     def test_bridge_recusa_fatia_fora_do_roster_real(self):
         import fabio_chat_bridge as bridge

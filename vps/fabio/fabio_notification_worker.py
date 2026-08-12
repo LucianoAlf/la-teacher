@@ -1145,6 +1145,22 @@ def _recibo_content(row: Dict[str, Any]) -> str:
     return ""
 
 
+def _recibo_student_content(row: Dict[str, Any]) -> str:
+    """Renderiza apenas a fatia individual, sem repetir o tronco comum."""
+    fields = row.get("campos") if isinstance(row.get("campos"), dict) else {}
+    parts = []
+    for key, label in (
+        ("progresso", "Progresso"),
+        ("observacao", "Observação"),
+        ("proximo_passo", "Próximo passo"),
+        ("repertorio", "Repertório"),
+    ):
+        cleaned = _clean_text(fields.get(key))
+        if cleaned:
+            parts.append(f"{label}: {_encurtar(cleaned, 300)}")
+    return "\n   ".join(parts)
+
+
 def _recibo_draft(row: Dict[str, Any]) -> str:
     raw = row.get("devolutiva")
     if raw is None:
@@ -1178,9 +1194,9 @@ def format_registro_recibo(registro: Dict[str, Any], titulo: str = "Registro con
             continue
         nome = _clean_text(fatia.get("aluno_nome") or fatia.get("nome") or "Aluno")
         linhas.append(f"👤 *{nome}* — {_recibo_presence(fatia)}")
-        conteudo = _recibo_content(fatia)
+        conteudo = _recibo_student_content(fatia)
         if conteudo:
-            linhas.append(f"   Conteúdo: {conteudo}")
+            linhas.append(f"   {conteudo}")
         devolutiva = _recibo_draft(fatia)
         if devolutiva:
             linhas.append(f"   📝 Rascunho de devolutiva: {devolutiva}")

@@ -9,13 +9,14 @@ from fabio_whatsapp_actions import tratar_mensagem_professor  # noqa: E402
 
 
 class FakeBackend:
-    def __init__(self, action=None, candidates=None):
+    def __init__(self, action=None, candidates=None, readback_status="aguardando_confirmacao"):
         self.action = action
         self.candidates = candidates or []
         self.calls = []
         self.uploads = []
         self.removals = []
         self.action_id = "acao-1"
+        self.readback_status = readback_status
 
     def rpc(self, name, payload):
         self.calls.append((name, payload))
@@ -37,6 +38,14 @@ class FakeBackend:
         if name == "fabio_enfileirar_audio":
             return {"ok": True, "audio_id": "audio-1", "status": "pendente"}
         if name == "fabio_registro_completo":
+            return {
+                "ok": True,
+                "registro_id": payload["p_registro_id"],
+                "aula": {"data": "2026-08-11", "hora": "14:00"},
+                "tronco": {"id": payload["p_registro_id"], "status": self.readback_status},
+                "fatias": [{"aluno_id": 7, "texto_consolidado": "apoio"}],
+            }
+        if name == "fabio_registro_completo_legacy":
             return {"ok": True, "registro_id": payload["p_registro_id"], "aula": {"data": "2026-08-11", "hora": "14:00"}, "tronco": {"texto_consolidado": "respiração"}, "fatias": [{"aluno_id": 7, "texto_consolidado": "apoio"}]}
         if name == "fabio_confirmar_registro":
             return {"ok": True, "registro_id": payload["p_registro_id"], "gravadas": 1, "ausentes_pulados": 0}
@@ -219,9 +228,21 @@ class WhatsappActionsTest(unittest.TestCase):
         result = tratar_mensagem_professor(professor_context(text="sim"), backend)
         self.assertEqual(result["code"], "confirmed")
         names = [name for name, _ in backend.calls]
-        self.assertLess(names.index("fabio_confirmar_registro"), names.index("fabio_registro_completo"))
+        self.assertLess(names.index("fabio_registro_completo"), names.index("fabio_confirmar_registro"))
+        self.assertEqual(names.count("fabio_registro_completo"), 2)
         self.assertIn("gravadas", result["receipt"])
         self.assertNotIn("fabio_devolutivas", names)
+
+    def test_confirm_replay_recovers_post_commit_without_writing_twice(self):
+        action = {"id": "acao-1", "professor_id": 25, "wa_message_id": "old", "tipo": "confirmar_registro", "estado": "aberta", "registro_id": "reg-1", "payload": {}}
+        backend = FakeBackend(action=action, readback_status="gravado_emusys")
+        result = tratar_mensagem_professor(professor_context(text="sim"), backend)
+        self.assertEqual(result["code"], "confirmed")
+        names = [name for name, _ in backend.calls]
+        self.assertNotIn("fabio_confirmar_registro", names)
+        event = next(payload for name, payload in backend.calls if name == "fabio_aplicar_evento_acao")
+        self.assertEqual(event["p_evento"], "confirmado")
+        self.assertTrue(result["receipt"]["recuperado_pos_commit"])
 
     def test_replay_same_message_does_not_upload_or_start_again(self):
         action = {"id": "acao-1", "professor_id": 25, "wa_message_id": "wa-1", "tipo": "processando_audio", "estado": "processando", "storage_path": "whatsapp/25/wa-1.ogg", "payload": {}}

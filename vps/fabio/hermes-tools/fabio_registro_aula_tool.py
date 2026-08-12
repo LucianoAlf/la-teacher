@@ -14,7 +14,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from datetime import datetime
 
 import requests
@@ -352,6 +352,55 @@ def fabio_transcrever_audio_url(audio_url: str, language: str | None = "pt") -> 
                 pass
 
 
+def fabio_transcrever_audio_fila(audio_id: str, language: str | None = "pt") -> str:
+    """Resolve the queue object by audio_id, signs it internally, and transcribes it."""
+    audio_id = str(audio_id or "").strip()
+    if not audio_id:
+        return json.dumps({"ok": False, "error": "audio_id_obrigatorio"}, ensure_ascii=False)
+
+    queue_resp = requests.get(
+        f"{_supabase_url()}/rest/v1/fabio_fila_audios",
+        headers=_headers(),
+        params={"id": f"eq.{audio_id}", "select": "id,storage_path", "limit": "1"},
+        timeout=_HTTP_TIMEOUT,
+    )
+    queue_data = _safe_json_response(queue_resp)
+    if queue_resp.status_code >= 400:
+        return json.dumps(
+            {"ok": False, "status_code": queue_resp.status_code, "error": queue_data},
+            ensure_ascii=False,
+        )
+    if not isinstance(queue_data, list) or len(queue_data) != 1:
+        return json.dumps({"ok": False, "error": "audio_nao_encontrado"}, ensure_ascii=False)
+
+    storage_path = str(queue_data[0].get("storage_path") or "").strip().replace("\\", "/")
+    path_parts = [part for part in storage_path.split("/") if part]
+    if not storage_path or storage_path.startswith("/") or ".." in path_parts:
+        return json.dumps({"ok": False, "error": "storage_path_invalido"}, ensure_ascii=False)
+
+    sign_resp = requests.post(
+        f"{_supabase_url()}/storage/v1/object/sign/fabio-audios/{quote(storage_path, safe='/')}",
+        headers=_headers(),
+        json={"expiresIn": 600},
+        timeout=_HTTP_TIMEOUT,
+    )
+    sign_data = _safe_json_response(sign_resp)
+    if sign_resp.status_code >= 400:
+        return json.dumps(
+            {"ok": False, "status_code": sign_resp.status_code, "error": sign_data},
+            ensure_ascii=False,
+        )
+
+    signed_path = None
+    if isinstance(sign_data, dict):
+        signed_path = sign_data.get("signedURL") or sign_data.get("signedUrl")
+    if not isinstance(signed_path, str) or not signed_path.strip():
+        return json.dumps({"ok": False, "error": "signed_url_ausente"}, ensure_ascii=False)
+    signed_path = signed_path.strip()
+    signed_url = signed_path if signed_path.startswith("https://") else f"{_supabase_url()}/storage/v1{signed_path}"
+    return fabio_transcrever_audio_url(signed_url, language)
+
+
 def fabio_atualizar_status_audio(audio_id: str, status: str, erro: str | None = None, transcricao: str | None = None) -> str:
     """Update only the queue status for one Fábio audio row.
 
@@ -413,17 +462,43 @@ def _has_pedagogical_content(value: Any) -> bool:
     return False
 
 
+def _buscar_audio_fila(audio_id: str) -> Dict[str, Any]:
+    """Resolve registration authority from the durable queue row."""
+    response = requests.get(
+        f"{_supabase_url()}/rest/v1/fabio_fila_audios",
+        headers=_headers(),
+        params={
+            "id": f"eq.{audio_id}",
+            "select": "id,aula_id,professor_id,origem",
+            "limit": "1",
+        },
+        timeout=_HTTP_TIMEOUT,
+    )
+    data = _safe_json_response(response)
+    if response.status_code >= 400:
+        raise requests.RequestException(f"audio_fila_http_{response.status_code}")
+    if not isinstance(data, list) or len(data) != 1 or not isinstance(data[0], dict):
+        raise ValueError("audio_fila_invalida")
+    row = data[0]
+    if (
+        isinstance(row.get("aula_id"), bool)
+        or not isinstance(row.get("aula_id"), int)
+        or isinstance(row.get("professor_id"), bool)
+        or not isinstance(row.get("professor_id"), int)
+        or row.get("origem") not in {"app", "whatsapp"}
+    ):
+        raise ValueError("audio_fila_invalida")
+    return row
+
+
 def fabio_criar_registro_aula(p_payload: Dict[str, Any]) -> str:
     """Call only public.fabio_criar_registro(p_payload jsonb) via Supabase REST."""
     if not isinstance(p_payload, dict):
         return json.dumps({"ok": False, "error": "p_payload must be an object"}, ensure_ascii=False)
-    required = ["aula_id", "professor_id", "origem", "molde", "tronco", "fatias"]
+    required = ["molde", "tronco", "fatias"]
     missing = [k for k in required if k not in p_payload]
     if missing:
         return json.dumps({"ok": False, "error": "missing required keys", "missing": missing}, ensure_ascii=False)
-    if p_payload.get("origem") != "app":
-        return json.dumps({"ok": False, "error": "origem must be 'app' for this route"}, ensure_ascii=False)
-
     raw_audio_id = p_payload.get("audio_id")
     if not isinstance(raw_audio_id, str) or not raw_audio_id.strip():
         return json.dumps({"ok": False, "error": "audio_id_obrigatorio"}, ensure_ascii=False)
@@ -433,6 +508,14 @@ def fabio_criar_registro_aula(p_payload: Dict[str, Any]) -> str:
         return json.dumps({"ok": False, "error": "normalizacao_invalida"}, ensure_ascii=False)
 
     try:
+        queue_row = _buscar_audio_fila(audio_id)
+        # The model organizes pedagogy; queue data owns identity and channel.
+        p_payload = {
+            **p_payload,
+            "aula_id": queue_row["aula_id"],
+            "professor_id": queue_row["professor_id"],
+            "origem": queue_row["origem"],
+        }
         aula_id = p_payload.get("aula_id")
         professor_id = p_payload.get("professor_id")
         if (
@@ -474,7 +557,7 @@ def fabio_criar_registro_aula(p_payload: Dict[str, Any]) -> str:
             roster_ids=roster_ids,
         )
     except requests.RequestException:
-        return json.dumps({"ok": False, "error": "roster_indisponivel"}, ensure_ascii=False)
+        return json.dumps({"ok": False, "error": "fila_ou_roster_indisponivel"}, ensure_ascii=False)
     except (NormalizationContractError, TypeError, ValueError):
         return json.dumps({"ok": False, "error": "normalizacao_invalida"}, ensure_ascii=False)
 
@@ -621,6 +704,28 @@ registry.register(
 )
 
 registry.register(
+    name="fabio_transcrever_audio_fila",
+    toolset=_TOOLSET,
+    description="Transcreve um audio da fila pelo audio_id; resolve storage_path e URL assinada internamente.",
+    emoji="audio",
+    requires_env=["LAREPORT_SUPABASE_SERVICE_ROLE"],
+    check_fn=check_requirements,
+    schema={
+        "name": "fabio_transcrever_audio_fila",
+        "description": "Busca exclusivamente o objeto de fabio_fila_audios pelo audio_id e o transcreve sem receber ou expor audio_url.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "audio_id": {"type": "string", "description": "UUID exato do audio na fabio_fila_audios"},
+                "language": {"type": "string", "description": "Codigo do idioma para Whisper; padrao pt"},
+            },
+            "required": ["audio_id"],
+        },
+    },
+    handler=lambda args, **kw: fabio_transcrever_audio_fila(args.get("audio_id", ""), args.get("language", "pt")),
+)
+
+registry.register(
     name="fabio_atualizar_status_audio",
     toolset=_TOOLSET,
     description="Atualiza status e, quando disponível, persiste a transcrição de um áudio na fila Fábio.",
@@ -657,13 +762,19 @@ registry.register(
         "parameters": {
             "type": "object",
             "properties": {
-                "audio_id": {"type": "string", "description": "UUID do áudio na fila; opcional no topo, o tool injeta no p_payload se faltar."},
+                "audio_id": {
+                    "type": "string",
+                    "description": (
+                        "UUID exato do áudio na fabio_fila_audios recebido no payload bruto; "
+                        "nunca use registro_id como audio_id. O tool injeta este valor no p_payload."
+                    ),
+                },
                 "p_payload": {
                     "type": "object",
-                    "description": "Payload completo com audio_id, aula_id, professor_id, origem='app', molde, tronco, fatias e, quando origem áudio, transcricao integral.",
+                    "description": "Payload pedagogico com molde, tronco, fatias e transcricao. Aula, professor e origem sao derivados da linha autoritativa de fabio_fila_audios.",
                 }
             },
-            "required": ["p_payload"],
+            "required": ["audio_id", "p_payload"],
         },
     },
     handler=lambda args, **kw: fabio_criar_registro_aula({

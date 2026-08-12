@@ -11,7 +11,7 @@ import os
 import json
 from typing import Any
 
-from fabio_whatsapp_actions import FabioWhatsappBackend
+from fabio_whatsapp_actions import FabioWhatsappBackend, format_registro_preview
 
 
 DEFAULT_MAX_ATTEMPTS = 3
@@ -102,21 +102,24 @@ def _fail_or_retry(
         counters["retentativas"] += 1
 
 
-def _record_status(backend: FabioWhatsappBackend, action: dict[str, Any], audio: dict[str, Any]) -> str | None:
+def _record_readback(
+    backend: FabioWhatsappBackend,
+    action: dict[str, Any],
+    audio: dict[str, Any],
+) -> tuple[str | None, dict[str, Any] | None]:
     direct = audio.get("registro_status")
-    if isinstance(direct, str):
-        return direct
     registro_id = audio.get("registro_id")
     if not registro_id:
-        return None
+        return (direct if isinstance(direct, str) else None), None
     readback = _one(backend.rpc("fabio_registro_completo", {
         "p_professor_id": action.get("professor_id"),
         "p_registro_id": registro_id,
     }))
     if not readback or readback.get("ok") is False:
-        return None
+        return (direct if isinstance(direct, str) else None), None
     tronco = readback.get("tronco")
-    return tronco.get("status") if isinstance(tronco, dict) else None
+    status = tronco.get("status") if isinstance(tronco, dict) else None
+    return (status if isinstance(status, str) else direct if isinstance(direct, str) else None), readback
 
 
 def reconcile_once(backend: FabioWhatsappBackend, limit: int = 10) -> dict[str, Any]:
@@ -168,8 +171,23 @@ def reconcile_once(backend: FabioWhatsappBackend, limit: int = 10) -> dict[str, 
             _fail_or_retry(backend, action, str(lease_token), "registro_ainda_nao_criado", _attempts(action), counters)
             continue
 
-        record_status = _record_status(backend, action, audio)
+        record_status, readback = _record_readback(backend, action, audio)
         if record_status == READY_RECORD_STATUS:
+            if not readback:
+                _fail_or_retry(backend, action, str(lease_token), "readback_preview_indisponivel", _attempts(action), counters)
+                continue
+            try:
+                preview = format_registro_preview(readback)
+                delivery = backend.send_preview(
+                    str(action["id"]),
+                    int(action["professor_id"]),
+                    preview,
+                )
+                if not isinstance(delivery, dict) or delivery.get("ok") is not True:
+                    raise RuntimeError("preview_nao_entregue")
+            except Exception:
+                _fail_or_retry(backend, action, str(lease_token), "preview_envio_falhou", _attempts(action), counters)
+                continue
             code = _conclude(
                 backend,
                 action,
