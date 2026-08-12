@@ -40,6 +40,12 @@ _TEXTUAL_FIELDS = {
     "devolutiva_familia", "proximos_passos", "leitura_de_conversao",
 }
 _ALLOWED_FIELDS = _TEXTUAL_FIELDS | {"presenca"}
+_EXPLICIT_TIME_RE = re.compile(
+    r"\b([01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)(?:\s*([0-5]\d))?(?!\s*\d)\b"
+)
+_TIME_MARKED_NUMBER_RE = re.compile(
+    r"\b([01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)(?:\s*(\d+))?\b"
+)
 
 
 def _norm(value: Any) -> str:
@@ -136,7 +142,7 @@ def _candidate_values(candidate: dict[str, Any]) -> list[str]:
 
 
 def _explicit_time(text: str) -> str | None:
-    match = re.search(r"\b([01]?\d|2[0-3])(?:h|:)([0-5]\d)?\b", _norm(text))
+    match = _EXPLICIT_TIME_RE.search(_norm(text))
     if not match:
         return None
     return f"{int(match.group(1)):02d}:{int(match.group(2) or 0):02d}"
@@ -201,7 +207,8 @@ def reduzir_shortlist(texto: str, candidatas: list[dict[str, Any]]) -> dict[str,
 
 
 def interpretar_resposta_pendente(texto: str, acao: dict[str, Any]) -> dict[str, Any]:
-    hay = re.sub(r"[^a-z0-9áéíóúãõç ]", " ", _norm(texto))
+    normalized = _norm(texto)
+    hay = re.sub(r"[^a-z0-9áéíóúãõç ]", " ", normalized)
     hay = re.sub(r"\s+", " ", hay).strip()
     tipo = str((acao or {}).get("tipo") or "")
     if not hay:
@@ -214,12 +221,28 @@ def interpretar_resposta_pendente(texto: str, acao: dict[str, Any]) -> dict[str,
         return {"tipo": "adiar"}
     candidates = [int(x) for x in (acao or {}).get("candidatas", []) if str(x).isdigit()]
     if tipo.startswith("escolher_aula"):
+        time_marked_numbers = {
+            int(number)
+            for match in _TIME_MARKED_NUMBER_RE.finditer(normalized)
+            for number in match.groups()
+            if number is not None
+        }
+        for candidate in candidates:
+            if re.search(rf"\b(?:aula|opcao)\s+{candidate}\b", hay):
+                return {"tipo": "escolher_aula", "aula_id": candidate}
         ordinals = {"primeira": 0, "1": 0, "segunda": 1, "2": 1, "terceira": 2, "3": 2}
-        match = next((index for word, index in ordinals.items() if re.search(rf"\b{word}\b", hay)), None)
+        match = next(
+            (
+                index for word, index in ordinals.items()
+                if re.search(rf"\b{word}\b", hay)
+                and not (word.isdigit() and int(word) in time_marked_numbers)
+            ),
+            None,
+        )
         if match is not None and match < len(candidates):
             return {"tipo": "escolher_aula", "aula_id": candidates[match]}
         for candidate in candidates:
-            if re.search(rf"\b{candidate}\b", hay):
+            if candidate not in time_marked_numbers and re.search(rf"\b{candidate}\b", hay):
                 return {"tipo": "escolher_aula", "aula_id": candidate}
         return {"tipo": "perguntar", "motivo": "aula_nao_reconhecida"}
     if tipo in {"confirmar_registro", "confirmar_chamada"} and (
