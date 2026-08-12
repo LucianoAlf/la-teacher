@@ -116,8 +116,7 @@ const SQL_IMPRESSAO = `
   select json_build_object(
     'linhas',  (select count(*) from dados),
     'dados',   (select coalesce(md5(string_agg(linha,'|' order by linha)),'vazio') from dados),
-    'objetos', (select coalesce(md5(string_agg(item, '|' order by item)),'vazio') from objetos),
-    'amostra', (select coalesce(json_agg(left(linha,240) order by linha),'[]'::json) from dados)
+    'objetos', (select coalesce(md5(string_agg(item, '|' order by item)),'vazio') from objetos)
   ) as impressao`
 
 async function impressao() {
@@ -174,9 +173,6 @@ if (depois?.erro) {
     console.error('\n✗ ROLLBACK NÃO RESTAUROU as linhas vivas — o ensaio alterou produção.')
     console.error(`  antes:  ${antes.linhas} linha(s), digest ${antes.dados}`)
     console.error(`  depois: ${depois.linhas} linha(s), digest ${depois.dados}`)
-    const so = (a, b) => (a ?? []).filter((x) => !(b ?? []).includes(x))
-    for (const l of so(antes.amostra, depois.amostra)) console.error(`  − ${l}`)
-    for (const l of so(depois.amostra, antes.amostra)) console.error(`  + ${l}`)
     falhou = true
   } else {
     console.log(`✓ linhas vivas idênticas antes e depois — ${depois.linhas} linha(s), digest ${depois.dados.slice(0, 12)}…`)

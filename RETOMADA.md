@@ -1962,3 +1962,19 @@ commitado — o log não enxerga. Antes de numerar:
 | `RETOMADA.md` | O que **muda**: onde estamos, o que vem agora, armadilhas frescas |
 | `~/.claude/.../memory/` | O que eu aprendi e não pode se perder entre projetos |
 | `docs/superpowers/specs/` | Design aprovado, por funcionalidade |
+## 12/08/2026 — incidente Daiana/Elisete encerrado
+
+O relato da professora Daiana foi confirmado como bug de confirmação parcial:
+`campos.presenca` existia como JSON `null`, então a raiz era confirmada mas a
+fatia da Elisete permanecia pendente. A migration
+`20260812135033_fix_presence_json_null_confirmation.sql` foi aplicada e
+registrada no histórico remoto. A ocorrência foi reconciliada pelo core em
+transação guardada: raiz e fatia gravadas no alvo individual, presença da
+Elisete criada, duas faltas explícitas preservadas, devolutiva/recibo/log
+emitidos e a aula removida das pendências. Backup antes/depois e hashes estão
+em `docs/superpowers/evidence/2026-08-12-daiana-elisete-presenca-null.md`.
+
+Validação fresca no worktree da correção: `teste:presenca-null` verde com
+resíduos 0/0, `mutantes:presenca-null` matou 2/2 mutantes, Vitest 34/34 e
+`npm run build` verde. Próximo passo é publicar o branch/PR; não reabrir este
+incidente.
