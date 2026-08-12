@@ -15,6 +15,7 @@ import { horaSessao, JANELA_POS_AULA_DIAS, tituloSessao } from '../../features/a
 import { descreverFalhaFila } from '../../features/registro/camposCanonicos'
 import { itemPodeSerReenviado, type ItemFilaLocal, useFilaOffline } from '../../features/registro/filaOffline'
 import { descartarItemFila, tentarNovamenteItemFila } from '../../features/registro/uploadAudio'
+import { destinoAceiteFila, rotuloPendencia } from '../../features/registro/fluxoFila'
 import { CardFeedbackHome } from '../../features/feedback'
 import { AppFrame } from './AppFrame'
 import { AppNav } from './AppNav'
@@ -39,7 +40,10 @@ export default function HomePage() {
     try {
       const resultado = await tentarNovamenteItemFila(item.id, session?.user.id)
       if (resultado.ok) {
-        navigate(`/app/processando/${resultado.audioId}`, { state: { aulaLabel: item.aulaLabel } })
+        const destino = destinoAceiteFila(resultado.resultado)
+        if (destino?.tela === 'confirmar') navigate(`/app/confirmar/${destino.registroId}`)
+        else if (destino?.tela === 'processando') navigate(`/app/processando/${destino.audioId}`, { state: { aulaLabel: item.aulaLabel } })
+        else show('O sistema aceitou o áudio, mas não informou onde acompanhá-lo.')
         return
       }
       show(`Ainda não enviei: ${resultado.mensagem}`)
@@ -215,7 +219,7 @@ function AguardandoConfirmacao({ onAbrir }: { onAbrir: (registroId: string) => v
         >
           <FabioMark className="h-[18px] w-[18px] flex-none" />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">
-            {(r.campos.turma as string) ?? 'Registro de aula'}
+            {rotuloPendencia(r.campos)}
           </span>
           <span className="text-xs text-text-secondary">conferir</span>
           <i className="fa-solid fa-chevron-right text-[11px] text-text-muted" aria-hidden="true" />
