@@ -5,7 +5,8 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 11/08/2026 — G8 publicado com recibo desligado; E2E
+> **Última atualização: 12/08/2026 — presença canônica desenhada em branch
+> isolada; implementação ainda não iniciada.** G8 publicado com recibo desligado; E2E
 > funcional ainda pendente.** Radar telas no ar
 > (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
 > (`f00c96d`, aprovado). Deploy do Radar = **Vercel + Supabase** — a frente do
@@ -16,6 +17,49 @@
 > somente os flags de recibo desligados, sem restart. O G8 posterior publicou o
 > contrato e o timer com barreira `off`; E2E funcional continua pendente. Quem mais lê: o
 > Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
+
+## 🧭 12/08 — presença canônica e entrada manual: checkpoint ativo
+
+**Pedido aprovado pelo Alf:** Emusys, LA Report, LA Teacher e Fábio/WhatsApp
+precisam usar `public.aluno_presenca` como mesma decisão local, mostrando a
+origem. O Emusys é válido quando marca **presente**; `ausente` vindo dele segue
+como pendência operacional até decisão humana. A equipe pode resolver no LA
+Report, o professor no app ou WhatsApp/Fábio. Nenhuma dessas portas pode apagar
+evidência bruta do Emusys, criar uma segunda fonte, ou abrir escrita direta por
+RLS.
+
+**Fonte de verdade do desenho:**
+`docs/superpowers/specs/2026-08-12-presenca-canonica-e-entrada-manual-design.md`.
+Ela também preserva a segunda frente aprovada: agenda com microfone **e**
+caderno; formulário manual completo, rascunho automático e campos individuais
+por aluno; copiar campo + duplicar ficha inteira com confirmação de
+sobrescrita.
+
+**Branch isolada criada:**
+`D:\la-teacher-worktrees\presenca-canonica`, branch
+`codex/presenca-canonica`, baseada em `origin/main` no commit `57e70be`.
+Esse commit já contém a migration produtiva `20260812135033` (presença JSON
+nula). Ela é apenas pré-requisito de histórico e **não** resolve a convergência
+de fontes.
+
+**Fatos auditados antes do desenho:**
+
+- `fn_presenca_e_forte(respondido_por)` é a régua humana histórica; **não
+  alterar** para incluir Emusys, pois isso fecharia `ausente` bruto como se fosse
+  decisão.
+- O próximo contrato é uma função status-aware, usada por
+  `app_minha_agenda_sessao` e pelas portas de escrita, por exemplo
+  `fn_presenca_fecha_chamada(status_presenca, respondido_por)`.
+- `sync-presenca-emusys` conhecido é pull-only. LA Teacher/Report convergem já
+  pelo banco compartilhado; escrita de volta na API Emusys fica bloqueada até
+  endpoint externo, autenticação e idempotência verificáveis.
+- Fábio continua por RPC server-side com `professor_whatsapp`; não receberá
+  grant direto de tabela nem acesso SQL no chat.
+
+**PRÓXIMO PASSO desta frente:** revisar a SPEC aprovada; só depois escrever o
+plano em gates, inventariar assinaturas/ACLs remotas de novo e implementar
+migration + testes sem criar dados de teste na produção. Não tocar nas branches
+paralelas `fabio-whatsapp`, `fabio-pendencias-whatsapp` ou áudio.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
