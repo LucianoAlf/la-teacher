@@ -156,6 +156,40 @@ professor+aula+aluno, autosave/versionamento e cópias exclusivamente dentro do
 roster, jamais presença. Não tocar nas branches paralelas `fabio-whatsapp`,
 `fabio-pendencias-whatsapp` ou áudio.
 
+### Validação real posterior — conta Matheus Felipe / Recreio (12/08/2026)
+
+Foi feita leitura da conta autorizada do professor na prévia local ligada ao
+Supabase de produção, sem criar, editar, apagar ou “limpar” dado pedagógico. A
+unidade da conta é **Recreio** e, na segunda-feira 10/08/2026, a interface mostra
+cinco de cinco chamadas concluídas e cinco registros concluídos (Valentina,
+Amanda, Luiz, a turma Gustavo/Maria e Arthur). Portanto não havia uma pendência
+real, segura e reversível para uma simulação de presença: reabrir ou trocar uma
+dessas chamadas para depois apagar por SQL seria falsear uma ocorrência e
+contornaria a trilha auditável.
+
+O banco confirma que essas decisões já existem em `public.aluno_presenca` com
+origem `professor_la_teacher`; onde o pull chegou, a evidência bruta
+`emusys_presenca_bruta='presente'` permanece junto. LA Teacher e LA Report leem a
+mesma tabela canônica, portanto a decisão de um aparece no outro ao recarregar —
+não existe uma segunda replicação entre os dois sistemas. Isto **não** prova
+propagação instantânea do Emusys: `sync-presenca-emusys` continua sendo pull
+agendado. Também não existe, neste checkpoint, escrita de volta do LA Teacher
+para a API Emusys.
+
+O que ainda não pode ser anunciado como entregue: a interface publicada mostra
+somente “Registrar por voz” e “Regravar aula”. O segundo caminho, por ficha
+manual/caderno, continua apenas no design
+`docs/superpowers/specs/2026-08-12-registro-manual-ficha-individual-design.md`;
+não há botão, autosave, cópia ou persistência manual publicados.
+
+Achado aberto da mesma conferência: a fonte de agenda contém múltiplos eventos
+brutos para uma mesma faixa/mesma turma de 10/08 em Recreio, enquanto a tela os
+agrupa em cinco cards. Algumas linhas canônicas antigas associadas a esses eventos
+não trazem `espelhado_de_presenca_id`. Antes de usar um desses pares para teste
+de escrita, auditar a chave natural da aula e a relação entre eventos Emusys,
+agenda agrupada e presenças; não deduplicar nem corrigir dados históricos no
+escuro.
+
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
 > **Cursor** pra continuar. Este arquivo é o prompt de retomada — quem abrir aí
