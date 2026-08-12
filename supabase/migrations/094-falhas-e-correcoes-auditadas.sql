@@ -263,7 +263,10 @@ begin
 end
 $function$;
 
-create table public.fabio_registro_correcoes (
+-- `IF NOT EXISTS` mantém esta migration histórica replayável pelo runner
+-- transacional contra um schema que já recebeu a 094. A definição abaixo
+-- continua sendo a fonte declarativa do primeiro deploy.
+create table if not exists public.fabio_registro_correcoes (
   id uuid primary key default gen_random_uuid(),
   registro_id uuid not null references public.fabio_registros_aula(id),
   professor_id integer not null references public.professores(id),
@@ -275,7 +278,7 @@ create table public.fabio_registro_correcoes (
   criado_em timestamptz not null default now()
 );
 
-create table public.fabio_devolutiva_edicoes (
+create table if not exists public.fabio_devolutiva_edicoes (
   id uuid primary key default gen_random_uuid(),
   devolutiva_id uuid not null references public.fabio_devolutivas(id),
   professor_id integer not null references public.professores(id),
@@ -291,7 +294,7 @@ create table public.fabio_devolutiva_edicoes (
 -- wa_message_id da mensagem humana; para app, a chave duravel da acao. A
 -- unicidade por tipo impede que o mesmo replay repita uma correcao, sem
 -- confundir uma correcao de registro com uma edicao de devolutiva.
-create table public.fabio_correcoes_acoes (
+create table if not exists public.fabio_correcoes_acoes (
   id uuid primary key default gen_random_uuid(),
   tipo text not null check (tipo in ('registro_confirmado', 'devolutiva_rascunho')),
   acao_id text not null check (nullif(btrim(acao_id), '') is not null),
