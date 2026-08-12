@@ -231,7 +231,7 @@ def _start_from_candidates(backend: FabioWhatsappBackend, context: dict[str, Any
 def _looks_like_class_refinement(text: str) -> bool:
     hay = str(text or "").lower()
     return bool(
-        re.search(r"\b(?:[01]?\d|2[0-3])(?:h|:[0-5]\d)\b", hay)
+        re.search(r"\b(?:[01]?\d|2[0-3])(?:h| horas?|:[0-5]\d)\b", hay)
         or re.search(r"\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b", hay)
         or any(word in hay for word in (
             "hoje", "ontem", "amanha", "amanhã", "turma", "curso",
@@ -247,17 +247,34 @@ def _refine_pending_class(
 ) -> dict[str, Any] | None:
     if action.get("tipo") not in {"escolher_aula_audio", "escolher_aula_chamada"}:
         return None
-    if action.get("candidatas"):
-        return None
     if not _looks_like_class_refinement(context.get("text") or ""):
         return None
 
     fluxo = "registro" if action.get("tipo") == "escolher_aula_audio" else "chamada"
+    candidates = _pool(backend, context, fluxo)
+    if action.get("candidatas"):
+        allowed_ids = {
+            int(candidate_id)
+            for candidate_id in action["candidatas"]
+            if str(candidate_id).isdigit()
+        }
+        candidates = [
+            candidate for candidate in candidates
+            if isinstance(candidate, dict)
+            and str(candidate.get("aula_id")).isdigit()
+            and int(candidate["aula_id"]) in allowed_ids
+        ]
     shortlist = reduzir_shortlist(
         str(context.get("text") or ""),
-        _pool(backend, context, fluxo),
+        candidates,
     )
     if shortlist["status"] == "nenhuma":
+        if action.get("candidatas"):
+            return _result(
+                "choose_audio_class" if fluxo == "registro" else "choose_call_class",
+                reply="Não consegui identificar uma única aula com segurança. Qual das opções que enviei foi?",
+                action_id=str(action["id"]),
+            )
         return _result(
             "no_candidate",
             reply="Ainda não encontrei uma aula compatível com esse dia, horário ou turma. Não gravei nada.",

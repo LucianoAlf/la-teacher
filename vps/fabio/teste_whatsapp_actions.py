@@ -182,6 +182,35 @@ class WhatsappActionsTest(unittest.TestCase):
         shortlist = next(payload for name, payload in backend.calls if name == "fabio_aplicar_evento_acao" and payload["p_evento"] == "shortlist_definida")
         self.assertEqual(shortlist["p_dados"]["candidatas"], [101, 102])
 
+    def test_pending_audio_choice_accepts_natural_reply_only_within_shortlist(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [101, 102],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15", "alunos": [{"nome": "Beatriz Ohana"}]},
+            {"aula_id": 102, "data": "2026-08-06", "hora": "20:00", "curso": "Canto T", "turma": "C_Qui_20", "alunos": [{"nome": "Outra Aluna"}]},
+            {"aula_id": 103, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15", "alunos": [{"nome": "Beatriz Ohana"}]},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                wa_message_id="selecao-natural",
+                kind="audio",
+                text="Estou falando da Beatriz Ohana, das 15 horas, da Unidade Barra.",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        enqueue = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertEqual(enqueue["p_aula_id"], 101)
+        self.assertNotEqual(enqueue["p_aula_id"], 103)
+
     def test_mixed_text_asks_intention_without_call_pool(self):
         backend = FakeBackend(candidates=[{"aula_id": 101}])
         result = tratar_mensagem_professor(professor_context(text="A Sofia faltou e trabalhamos respiração"), backend)
