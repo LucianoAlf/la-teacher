@@ -133,7 +133,9 @@
     "teste:094": "node scripts/rodar-teste-sql.mjs supabase/migrations/093-presenca-padrao-e-fatias-canonicas.sql supabase/migrations/094-falhas-e-correcoes-auditadas.sql supabase/migrations/094-falhas-e-correcoes-auditadas.test.sql",
     "mutantes:094": "node scripts/mutantes-094.mjs",
     "teste:095": "node scripts/rodar-teste-sql.mjs supabase/migrations/093-presenca-padrao-e-fatias-canonicas.sql supabase/migrations/094-falhas-e-correcoes-auditadas.sql supabase/migrations/095-recibo-de-registro-no-whatsapp.sql supabase/migrations/095-recibo-de-registro-no-whatsapp.test.sql",
-    "mutantes:095": "node scripts/mutantes-095.mjs"
+    "mutantes:095": "node scripts/mutantes-095.mjs",
+    "teste:presenca-null": "node scripts/verificar-residuos-presenca-null.mjs",
+    "mutantes:presenca-null": "node scripts/mutantes-20260812135033.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
