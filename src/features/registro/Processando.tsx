@@ -55,7 +55,11 @@ export default function ProcessandoPage() {
       }
       if (st) {
         setStatus(st.status)
-        const proximoEstado = estadoProcessamento({ status: st.status, temErro: st.tem_erro })
+        const proximoEstado = estadoProcessamento({
+          status: st.status,
+          temErro: st.tem_erro,
+          tentativas: st.tentativas,
+        })
         setEstadoErro(proximoEstado)
         if (proximoEstado === 'erro_terminal') {
           parar = true

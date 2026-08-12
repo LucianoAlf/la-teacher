@@ -11,9 +11,10 @@ describe('fluxo autoritativo da fila de audio', () => {
   })
 
   it('nao considera erro historico como falha atual', () => {
-    expect(estadoProcessamento({ status: 'normalizado', temErro: false })).toBe('andamento')
-    expect(estadoProcessamento({ status: 'erro', temErro: true })).toBe('erro_recuperavel')
-    expect(estadoProcessamento({ status: 'erro_terminal', temErro: false })).toBe('erro_terminal')
+    expect(estadoProcessamento({ status: 'normalizado', temErro: false, tentativas: 9 })).toBe('andamento')
+    expect(estadoProcessamento({ status: 'erro', temErro: true, tentativas: 2 })).toBe('erro_recuperavel')
+    expect(estadoProcessamento({ status: 'erro', temErro: true, tentativas: 3 })).toBe('erro_terminal')
+    expect(estadoProcessamento({ status: 'erro_terminal', temErro: false, tentativas: 1 })).toBe('erro_terminal')
   })
 
   it('rotula pendencias somente com contexto textual ja presente', () => {

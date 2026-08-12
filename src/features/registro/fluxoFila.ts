@@ -20,8 +20,17 @@ export function pollingAtivo(parar: boolean, jaNavegou: boolean): boolean {
 }
 
 /** Erro histórico só importa se o status atual ainda for `erro`. */
-export function estadoProcessamento({ status, temErro }: { status: StatusFila; temErro: boolean }): EstadoProcessamento {
+export function estadoProcessamento({
+  status,
+  temErro,
+  tentativas,
+}: {
+  status: StatusFila
+  temErro: boolean
+  tentativas: number
+}): EstadoProcessamento {
   if (status === 'erro_terminal') return 'erro_terminal'
+  if (status === 'erro' && temErro && tentativas >= 3) return 'erro_terminal'
   if (status === 'erro' && temErro) return 'erro_recuperavel'
   return 'andamento'
 }
