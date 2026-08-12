@@ -51,6 +51,8 @@ export default function AgendaPage() {
   }
   const gravarAula = (sessao: SessaoAula) =>
     navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
+  const preencherAula = (sessao: SessaoAula) =>
+    navigate(`/app/registro-manual/${sessao.aula_id_ancora}`, { state: { sessao } })
 
   return (
     <AppFrame>
@@ -70,6 +72,7 @@ export default function AgendaPage() {
             onRetry={recarregar}
             onAbrir={abrirSessao}
             onGravar={gravarAula}
+            onManual={preencherAula}
           />
         </div>
       </div>

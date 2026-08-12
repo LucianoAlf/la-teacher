@@ -236,6 +236,10 @@ export interface RegistroRow {
   texto_consolidado: string | null
   status: string
   origem: string
+  /** Meio de preenchimento pedagógico; `origem` continua sendo o canal app/WhatsApp. */
+  modo_entrada?: 'audio' | 'manual'
+  /** Concorrência otimista dos rascunhos manuais. */
+  versao?: number
   criado_em: string
   /**
    * Enriquecimento POR FATIA (app_registro_completo) — nome e foto do aluno.
@@ -336,6 +340,61 @@ export async function atualizarFatia(
   })
   if (error) throw error
   return res as unknown as RegistroRow
+}
+
+export interface RegistroManualCompleto extends RegistroCompleto {
+  modo_entrada: 'manual'
+  audio_aberto_registro_id?: string | null
+}
+
+export class ErroConflitoRascunho extends Error {
+  constructor() {
+    super('conflito_de_versao')
+    this.name = 'ErroConflitoRascunho'
+  }
+}
+
+function erroConflito(error: { message?: string; details?: string; hint?: string }): never {
+  const bruto = [error.message, error.details, error.hint].filter(Boolean).join(' ')
+  if (bruto.includes('conflito_de_versao')) throw new ErroConflitoRascunho()
+  throw error
+}
+
+/** Abre ou retoma a única ficha manual aberta da aula; não marca presença. */
+export async function abrirRascunhoManual(aulaId: number): Promise<RegistroManualCompleto> {
+  const { data, error } = await rpcSolta('app_abrir_rascunho_manual', { p_aula_id: aulaId })
+  if (error) throw error
+  return data as unknown as RegistroManualCompleto
+}
+
+/** Salva raiz + todas as fatias num único commit versionado. */
+export async function salvarRascunhoManual(
+  registroId: string,
+  versao: number,
+  troncoCampos: Record<string, string>,
+  fatias: Array<{ id: string; campos: Record<string, string> }>,
+): Promise<RegistroManualCompleto> {
+  const { data, error } = await rpcSolta('app_salvar_rascunho_manual', {
+    p_registro_id: registroId,
+    p_versao: versao,
+    p_tronco_campos: troncoCampos,
+    p_fatias: fatias,
+  })
+  if (error) erroConflito(error)
+  return data as unknown as RegistroManualCompleto
+}
+
+/** Fecha a edição contínua e envia a mesma raiz para o preview canônico. */
+export async function prepararRascunhoManual(
+  registroId: string,
+  versao: number,
+): Promise<RegistroManualCompleto> {
+  const { data, error } = await rpcSolta('app_preparar_rascunho_manual', {
+    p_registro_id: registroId,
+    p_versao: versao,
+  })
+  if (error) erroConflito(error)
+  return data as unknown as RegistroManualCompleto
 }
 
 // ---------------------------------------------------------------------------

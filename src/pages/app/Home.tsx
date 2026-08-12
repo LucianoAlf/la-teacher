@@ -34,6 +34,8 @@ export default function HomePage() {
     navigate(`/app/chamada/${sessao.aula_id_ancora}`, { state: { sessao } })
   const gravarAula = (sessao: SessaoAula) =>
     navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
+  const preencherAula = (sessao: SessaoAula) =>
+    navigate(`/app/registro-manual/${sessao.aula_id_ancora}`, { state: { sessao } })
 
   const tentarFila = async (item: ItemFilaLocal) => {
     setItemFilaEmAcao(item.id)
@@ -108,6 +110,7 @@ export default function HomePage() {
             onRetry={recarregar}
             onAbrir={abrirChamada}
             onGravar={gravarAula}
+            onManual={preencherAula}
           />
         </div>
 
@@ -115,7 +118,7 @@ export default function HomePage() {
         <DevolutivasCard onAbrir={() => navigate('/app/devolutivas')} />
 
         {/* 4 · Chamadas pendentes de ontem */}
-        <PendenciasCard onAbrir={abrirChamada} onGravar={gravarAula} />
+        <PendenciasCard onAbrir={abrirChamada} onGravar={gravarAula} onManual={preencherAula} />
 
         {/* 5 · Minha semana (isca: o que já foi dado hoje) */}
         <PontoHojeCard onAbrir={() => navigate('/app/ponto')} />
@@ -299,9 +302,11 @@ function AlertaChamadaHoje({ onAbrir }: { onAbrir: (sessao: SessaoAula) => void 
 function PendenciasCard({
   onAbrir,
   onGravar,
+  onManual,
 }: {
   onAbrir: (sessao: SessaoAula) => void
   onGravar: (sessao: SessaoAula) => void
+  onManual: (sessao: SessaoAula) => void
 }) {
   const [estado, setEstado] = useState<'carregando' | 'ok' | 'erro'>('carregando')
   const [pend, setPend] = useState<Pendencias | null>(null)
@@ -347,7 +352,7 @@ function PendenciasCard({
   return (
     <Card title="Chamadas pendentes" icon="fa-solid fa-bell" right={formatDiaCurto(pend.data)}>
       {pend.sessoes.map((s) => (
-        <SessaoRow key={s.aula_id_ancora} sessao={s} onAbrir={onAbrir} onGravar={onGravar} />
+        <SessaoRow key={s.aula_id_ancora} sessao={s} onAbrir={onAbrir} onGravar={onGravar} onManual={onManual} />
       ))}
       <p className="mt-[9px] flex items-start gap-2 text-[12.5px] leading-relaxed text-text-secondary">
         <i className="fa-solid fa-clock mt-[3px] text-brand-text" aria-hidden="true" />

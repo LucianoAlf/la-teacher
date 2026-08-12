@@ -20,6 +20,8 @@ interface Props {
   onAbrir?: (sessao: SessaoAula) => void
   /** Gravar a aula direto da linha (mostra o botão de microfone quando na janela). */
   onGravar?: (sessao: SessaoAula) => void
+  /** Preencher a ficha individual durante a aula. */
+  onManual?: (sessao: SessaoAula) => void
 }
 
 /**
@@ -28,7 +30,7 @@ interface Props {
  * do aluno — o que o professor pode destruir sem querer, então grita igual).
  * Verde = feito, âmbar = falta. Só a partir do momento em que a aula começa.
  */
-export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props) {
+export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar, onManual }: Props) {
   const status = statusSessao(sessao, now)
   // A experimental não é uma aula como as outras: é alguém que nunca pisou
   // aqui, cuja família está decidindo se fica. Ela se anuncia antes de
@@ -36,6 +38,7 @@ export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props
   const ehExperimental = sessao.experimental === true
   const parcial = sessao.n_registradas > 0 && sessao.n_registradas < sessao.n_alunos
   const mostrarGravar = onGravar != null && podeGravar(sessao, now)
+  const mostrarManual = onManual != null && podeGravar(sessao, now)
   const registrada = aulaRegistrada(sessao)
   const temRascunho = sessao.tem_rascunho === true
   const rotuloDoRegistro = rotuloRegistro({ temRegistro: registrada, temRascunho })
@@ -121,22 +124,40 @@ export function SessaoRow({ sessao, now = new Date(), onAbrir, onGravar }: Props
       }
       status={status === 'futura' ? 'next' : undefined}
       action={
-        mostrarGravar ? (
-          <button
-            type="button"
-            aria-label={`${registrada ? 'Regravar' : 'Gravar'} aula — ${tituloSessao(sessao)}`}
-            title={registrada ? 'Regravar — esta aula já tem relatório do Fábio' : 'Gravar aula'}
-            className={cx(
-              'flex h-8 w-8 flex-none items-center justify-center rounded-full transition-transform active:scale-90',
-              registrada ? 'border border-brand text-brand-text' : 'bg-brand-soft text-brand-text',
+        mostrarGravar || mostrarManual ? (
+          <span className="flex flex-none overflow-hidden rounded-full border border-brand text-brand-text">
+            {mostrarGravar && (
+              <button
+                type="button"
+                aria-label={`${registrada ? 'Regravar' : 'Gravar'} aula — ${tituloSessao(sessao)}`}
+                title={registrada ? 'Regravar — esta aula já tem relatório do Fábio' : 'Gravar por áudio'}
+                className="flex h-8 w-8 items-center justify-center bg-transparent transition-colors active:bg-brand-soft"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onGravar!(sessao)
+                }}
+              >
+                <i className="fa-solid fa-microphone text-[13px]" aria-hidden="true" />
+              </button>
             )}
-            onClick={(e) => {
-              e.stopPropagation()
-              onGravar!(sessao)
-            }}
-          >
-            <i className="fa-solid fa-microphone text-[13px]" aria-hidden="true" />
-          </button>
+            {mostrarManual && (
+              <button
+                type="button"
+                aria-label={`Preencher aula — ${tituloSessao(sessao)}`}
+                title="Preencher durante a aula"
+                className={cx(
+                  'flex h-8 w-8 items-center justify-center bg-transparent transition-colors active:bg-brand-soft',
+                  mostrarGravar && 'border-l border-brand',
+                )}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onManual!(sessao)
+                }}
+              >
+                <i className="fa-solid fa-pen-to-square text-[13px]" aria-hidden="true" />
+              </button>
+            )}
+          </span>
         ) : undefined
       }
       onClick={onAbrir ? () => onAbrir(sessao) : undefined}
