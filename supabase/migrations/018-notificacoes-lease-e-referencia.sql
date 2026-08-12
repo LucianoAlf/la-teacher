@@ -124,7 +124,14 @@ alter table public.fabio_notificacoes
     'reagendamento','outro',
     'devolutiva_pronta',      -- <<< 018: a oferta da devolutiva ao professor
     'devolutiva_destinatario' -- <<< 018: "pra quem é essa devolutiva?" (spec §4.5)
-  ]));
+  ])) not valid;
+
+-- `NOT VALID` é deliberado para a migration histórica continuar replayável
+-- dentro do runner transacional depois que migrations posteriores adicionarem
+-- novos tipos. PostgreSQL ainda aplica o CHECK a toda linha nova/alterada pela
+-- 018; apenas não revalida, durante esse replay, linhas legítimas criadas pelo
+-- vocabulário mais novo. As migrations posteriores substituem este CHECK pelo
+-- conjunto vigente.
 
 -- =====================================================================================
 -- 2) Chave por REFERÊNCIA — para notificação que não é "uma por professor/dia".
@@ -133,10 +140,12 @@ alter table public.fabio_notificacoes
 -- =====================================================================================
 create unique index if not exists uq_fabio_notif_por_referencia
   on public.fabio_notificacoes (referencia_tipo, referencia_id, canal)
-  where referencia_tipo is not null and referencia_id is not null;
+  where referencia_tipo is not null
+    and referencia_id is not null
+    and tipo <> 'registro_recibo';
 
 comment on index public.uq_fabio_notif_por_referencia is
-  'Uma notificação por (referência, canal). Par obrigatório do ON CONFLICT de fabio_claim_notificacao_por_referencia — mexeu num, mexe no outro.';
+  'Uma notificação legada por (referência, canal). registro_recibo usa sua chave própria. Par obrigatório do ON CONFLICT de fabio_claim_notificacao_por_referencia — mexeu num, mexe no outro.';
 
 -- =====================================================================================
 -- 3) Claim por referência. RPC PRÓPRIA, e não um parâmetro na existente, porque
@@ -175,7 +184,9 @@ begin
      p_referencia_tipo, p_referencia_id,
      'processando', 1, v_token, now() + make_interval(mins => p_lease_minutos))
   on conflict (referencia_tipo, referencia_id, canal)
-    where referencia_tipo is not null and referencia_id is not null
+    where referencia_tipo is not null
+      and referencia_id is not null
+      and tipo <> 'registro_recibo'
   do update set
     status               = 'processando',
     tentativas           = fabio_notificacoes.tentativas + 1,
