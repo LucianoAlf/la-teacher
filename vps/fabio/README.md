@@ -8,6 +8,7 @@ O repo é a fonte de leitura; **a VPS é onde executa**. Ao editar aqui, subir c
 | `fabio_auditoria.py` | Auditoria: diagnostica, **conserta o que dá**, reporta o resto | `fabio-auditoria.timer` → 7h e 21h (BRT) |
 | `hermes-platform-toolsets.yaml.txt` | Fragmento do `~/.hermes/config.yaml`: **a fronteira entre professor e admin** | gateway do Hermes |
 | `hermes-plugins/la-skills-leitura/` | Plugin que registra o toolset `skills_leitura` (skill sem `skill_manage`) | `~/.hermes/plugins/` |
+| `hermes-tools/fabio_registro_aula_tool.py` | Espelho auditável da ferramenta customizada de registro | `~/.hermes/hermes-agent/tools/` |
 
 ## A fronteira professor × admin é o CANAL (09/08/2026)
 
@@ -71,6 +72,81 @@ O `ExecStart` do service **não** usa `--send` — a saída fica no journal
 `FABIO_AUDIT_WHATSAPP` (número do Alf) no service e acrescentar `--send`.
 Regra permanente: **envio real só com OK explícito do Alf.**
 
+## Registro de aula pelo WhatsApp — fluxo e piloto
+
+### Valores-modelo de documentação — nunca copiar para runtime
+
+Este bloco descreve valores-modelo e não representa a configuração ativa. Ele
+**nunca** deve ser copiado, aplicado ou usado como instrução de alteração:
+
+```dotenv
+FABIO_WHATSAPP_REGISTRO_MODE=off
+FABIO_WHATSAPP_REGISTRO_PILOT_IDS=
+FABIO_WHATSAPP_REGISTRO_MAX_AUDIO_BYTES=26214400
+FABIO_REGISTRO_RECIBO_MODE=off
+FABIO_REGISTRO_RECIBO_PILOT_IDS=
+```
+
+### Estado runtime conhecido — pilot, allowlist preservada, valores omitidos
+
+O runtime conhecido segue em `pilot`, com a allowlist existente preservada e
+seus valores omitidos desta documentação. As flags `FABIO_REGISTRO_RECIBO_*`
+foram aplicadas à VPS com `FABIO_REGISTRO_RECIBO_MODE=off`; o timer está
+instalado e habilitado, mas a barreira impede qualquer claim ou envio.
+
+Os modos são `off` (Hermes atual), `shadow` (classifica e mede, sem abrir
+ação), `pilot` (somente os `professor_id` da allowlist) e `on` (professores
+identificados). Entrada de áudio primeiro grava uma linha idempotente no inbox;
+transcrição e upload acontecem somente depois do claim do poller. O bridge chama
+apenas as RPCs `fabio_*`; não há SQL direto nem chave service-role em log.
+
+O reconciliador é um ciclo limitado por lease e roda pelo unit/timer
+`fabio-whatsapp-reconciler`. Ele faz read-back do registro, deixa o professor
+confirmar antes da gravação final e prova no banco a limpeza do Storage antes de
+remover um blob.
+
+### G6 — paridade de fonte registrada; operação separada (11/08/2026)
+
+Há um piloto restrito já configurado na VPS. A allowlist existente não pode ser
+ampliada durante esta fase. O recibo posterior à confirmação está publicado com
+configuração runtime desligada; as flags de recibo permanecem documentadas para
+uma futura ativação controlada.
+
+O bloqueio de localização foi resolvido sem mudar o runtime: a Edge
+`fabio-registro-aula` chega ao gateway Hermes de usuário na porta 8644, cujo
+adaptador Webhook upstream valida HMAC antes da rota dinâmica
+`registro-aula`. Os dois artefatos customizados do caminho estão espelhados:
+`hermes-skills/registro-aula-audio-la-music/SKILL.md` e
+`hermes-tools/fabio_registro_aula_tool.py`. A ferramenta Python ainda é
+VPS-owned e não está rastreada no checkout Hermes; o Git deste projeto é espelho
+de auditoria, não origem automática de deploy.
+
+**Estado atual:** G8 publicado com recibo desligado. O próximo gate é o E2E
+funcional restrito, que exige aprovação própria; não ampliar a allowlist nem
+ligar o recibo geral antes de comparar banco, app e WhatsApp. Hashes, caminhos e
+contrato estão nas evidências
+`docs/superpowers/evidence/2026-08-11-registro-aula-source-parity.md` e
+`docs/superpowers/evidence/2026-08-11-registro-unificado-g8-rollout.md`.
+
+### Estado local do G7/G8 — pronto para preflight, ainda sem rollout
+
+As tarefas locais do recibo canônico estão implementadas e versionadas nos
+commits `8ea5fa2`, `aa19113` e `93bb675`; o artefato do timer fica neste
+checkout. Isso não significa que a migration 095 foi aplicada ou que qualquer
+arquivo foi copiado para a VPS.
+
+O worker usa uma barreira antes do claim: `FABIO_REGISTRO_RECIBO_MODE=off`
+retorna `claimed=0` e `sent=0`; `pilot` só reivindica o professor permitido por
+`FABIO_REGISTRO_RECIBO_PILOT_IDS`; `on` habilita o fluxo para todos os
+professores resolvidos. O timer `fabio-registro-recibo.timer` está apenas
+versionado e não está instalado/habilitado.
+
+O dono do carimbo é o `fabio_notification_worker`; o bridge só responde com o
+estado curto e o contexto de saída fica auditado. Para rollback, desligar
+somente o ingress/timer do recibo e preservar outbox, auditoria e o
+reconciliador com ações abertas. Instalação, migration, restart, E2E e rollout
+ficam no G8 e exigem autorização operacional separada.
+
 ## Timers do usuário `fabio`
 
 | Timer | Quando | O quê |
@@ -78,6 +154,7 @@ Regra permanente: **envio real só com OK explícito do Alf.**
 | `fabio-auditoria.timer` | 7h e 21h BRT | esta auditoria |
 | `fabio-briefing-matheus.timer` | 8h BRT | briefing matinal (piloto prof. 25) |
 | `fabio-notification-worker.timer` | — | worker genérico (disabled) |
+| `fabio-registro-recibo.timer` | a cada 20s (versionado, **não instalado**) | entrega o carimbo canônico após confirmação |
 | `fabio-feedback.timer` | 9h30/12h30/15h30 BRT — 3 passes de recuperação, 1 cobrança (criado, **não habilitado**) | cobra o feedback mensal do professor (lembrete/reforço) e entrega a lista de quem não fechou ao grupo da coordenação no dia 1º — ver `fabio-feedback.systemd.txt` |
 
 ⚠️ **A VPS roda em UTC.** Os units usam `America/Sao_Paulo` no `OnCalendar`, então o

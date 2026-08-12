@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test:unit": "vitest run src",
+    "test:unit:watch": "vitest src",
     "teste:018": "node scripts/rodar-teste-sql.mjs supabase/migrations/018-notificacoes-lease-e-referencia.sql supabase/migrations/018-notificacoes-lease-e-referencia.test.sql",
     "teste:019": "node scripts/rodar-teste-sql.mjs supabase/migrations/019-presenca-declarada-e-pendencia-por-alvo.sql supabase/migrations/019-presenca-declarada-e-pendencia-por-alvo.test.sql",
     "teste:020": "node scripts/rodar-teste-sql.mjs supabase/migrations/020-devolutiva-aula-fila-e-skill.sql supabase/migrations/020-devolutiva-aula-fila-e-skill.test.sql",
@@ -120,7 +122,18 @@
     "teste:088": "node scripts/rodar-teste-sql.mjs supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.sql supabase/migrations/088-a-falta-seguida-e-o-quinto-sinal.test.sql",
     "mutantes:088": "node scripts/mutantes-088.mjs",
     "teste:089": "node scripts/rodar-teste-sql.mjs supabase/migrations/089-a-foto-do-aluno-no-radar.sql supabase/migrations/089-a-foto-do-aluno-no-radar.test.sql",
-    "mutantes:089": "node scripts/mutantes-089.mjs"
+    "mutantes:089": "node scripts/mutantes-089.mjs",
+    "teste:090": "node scripts/rodar-teste-sql.mjs supabase/migrations/090-fabio-whatsapp-acoes.sql supabase/migrations/090-fabio-whatsapp-acoes.test.sql",
+    "mutantes:090": "node scripts/mutantes-090.mjs",
+    "teste:091": "node scripts/rodar-teste-sql.mjs supabase/migrations/091-as-cinco-portas-do-whatsapp.sql supabase/migrations/091-as-cinco-portas-do-whatsapp.test.sql",
+    "mutantes:091": "node scripts/mutantes-091.mjs",
+    "teste:092": "node scripts/rodar-teste-sql.mjs supabase/migrations/092-fecha-contrato-do-reconciliador.sql supabase/migrations/092-fecha-contrato-do-reconciliador.test.sql",
+    "teste:093": "node scripts/rodar-teste-sql.mjs supabase/migrations/093-presenca-padrao-e-fatias-canonicas.sql supabase/migrations/093-presenca-padrao-e-fatias-canonicas.test.sql",
+    "mutantes:093": "node scripts/mutantes-093.mjs",
+    "teste:094": "node scripts/rodar-teste-sql.mjs supabase/migrations/093-presenca-padrao-e-fatias-canonicas.sql supabase/migrations/094-falhas-e-correcoes-auditadas.sql supabase/migrations/094-falhas-e-correcoes-auditadas.test.sql",
+    "mutantes:094": "node scripts/mutantes-094.mjs",
+    "teste:095": "node scripts/rodar-teste-sql.mjs supabase/migrations/093-presenca-padrao-e-fatias-canonicas.sql supabase/migrations/094-falhas-e-correcoes-auditadas.sql supabase/migrations/095-recibo-de-registro-no-whatsapp.sql supabase/migrations/095-recibo-de-registro-no-whatsapp.test.sql",
+    "mutantes:095": "node scripts/mutantes-095.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
@@ -145,6 +158,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.10"
   }
 }

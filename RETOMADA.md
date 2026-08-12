@@ -5,11 +5,17 @@
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o
 > que já foi decidido.
 >
-> **Última atualização: 10/08/2026, ~22h (BRT) — Cursor.** Radar telas no ar
+> **Última atualização: 11/08/2026 — G8 publicado com recibo desligado; E2E
+> funcional ainda pendente.** Radar telas no ar
 > (Tasks 5–9 mergeadas) + foto (`bcf995c`, 089) + tooltip do score organizado
-> (`f00c96d`, aprovado). Deploy desta frente = **Vercel + Supabase** — VPS do
-> Fábio não entra. Frente “Fábio escreve no WhatsApp” = SPEC só, sem código no
-> bridge. Quem mais lê: o Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
+> (`f00c96d`, aprovado). Deploy do Radar = **Vercel + Supabase** — a frente do
+> Fábio usa a VPS própria. Frente “Fábio escreve no WhatsApp” = SPEC aprovada + plano
+> em gates; 10/08-G0/G1 concluídos, schema 090/091/092 publicado no Supabase e
+> 10/08-G4 publicado em `shadow` na VPS. O 10/08-G5 passou a piloto restrito;
+> a fonte do callback foi correlacionada e espelhada e o G6 operacional aplicou
+> somente os flags de recibo desligados, sem restart. O G8 posterior publicou o
+> contrato e o timer com barreira `off`; E2E funcional continua pendente. Quem mais lê: o
+> Alf, o Hugo, o Alfredo. Escrever pra eles, não pra mim.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
 > do Claude Code, só volta quinta-feira (13/08). Ele vai abrir este repo no
@@ -28,20 +34,207 @@
 > e a frente inteira está na seção logo abaixo. Confirmo o combinado: não toco
 > na 081/082 nem no plano do Radar.)_
 
+## ESTADO AUTORITATIVO ATUAL — G7 local concluído; G8 ainda não executado
+
+Em 11/08/2026, a implementação local do recibo canônico foi concluída em
+`D:\la-teacher-worktrees\fabio-whatsapp`, branch `codex/fabio-whatsapp`:
+
+- `095-recibo-de-registro-no-whatsapp.sql` e seu teste estático fecham outbox,
+  claim filtrável, read-back, lease, replay, contexto outbound e ACLs.
+- O worker é o único emissor do carimbo; o bridge não duplica o texto e a
+  revisão de devolutiva passa pela RPC auditada.
+- O timer foi apenas versionado. `off` é o padrão e bloqueia o claim antes de
+  qualquer chamada de transporte; `pilot` exige allowlist explícita.
+- Commits locais de G7: `8ea5fa2`, `aa19113`, `93bb675`; o artefato e a
+  documentação de G8 local estão no mesmo branch, sem efeito operacional.
+
+O preflight confirmou o projeto correto e saudável. As migrations 093, 094 e
+095 foram aplicadas em sequência pelo script definitivo do repositório e
+verificadas por consultas de assinatura/ACL; o runner SQL descartável não foi
+usado porque aponta para o banco remoto. O backup remoto foi criado em
+`/home/fabio/fabio-chat-bridge/backups/20260811-registro-recibo-g8-20260811230107/`.
+Os arquivos versionados foram publicados, compilados na VPS e o bridge foi
+reiniciado ativo. O timer `fabio-registro-recibo.timer` está habilitado e
+executou com `status=disabled`, `claimed=0`, `sent=0`; o banco permanece com
+zero recibos pendentes/enviados. Não houve envio WhatsApp nem E2E funcional.
+O próximo gate é o piloto E2E restrito, não a expansão.
+
 ---
 
+## ✅ Histórico — 10/08-G3 local fechado; 10/08-G4 shadow publicado
+
+No worktree `D:\la-teacher-worktrees\fabio-whatsapp`, branch
+`codex/fabio-whatsapp`, a frente local avançou até o fim do 10/08-G3:
+
+- 092 fecha o contrato do reconciliador: `registro_id` no read-back, validação
+  do rascunho por professor/áudio, tentativas persistidas e prova de limpeza do
+  Storage; a migration 092 foi aplicada em definitivo pelo runner do repositório.
+- Reconciliador one-shot com claim/lease, retry limitado, stale-token,
+  read-back, expiração e limpeza protegida; unidade/timer systemd versionado.
+- Bridge com inbox durável antes do ACK, hidratação depois do claim, modos
+  `off|shadow|pilot|on`, allowlist de piloto, interceptação depois do batching e
+  antes do Hermes, e CAPACIDADE_PROFESSOR honesta.
+- Evidência local fresca: `teste:092`, 5 testes de intenções, 11 de ações, 7 do
+  reconciliador, 10 do bridge, 10/10 mutantes mortos, 25 casos de carimbo,
+  `py_compile` e `diff --check` verdes.
+
+Commits locais desta sequência: `b4fd73c` (reconciliador/092) e `001c4ef`
+(bridge/10/08-G3). O 10/08-G4 foi autorizado e publicado em shadow; o
+10/08-G5 (piloto real) e o **10/08-G6 rollout geral** eram os gates seguintes
+daquele plano e estão históricos/superados como instrução operacional.
+
+## ✅ Histórico — 10/08-G4 shadow publicado na VPS
+
+O preflight confirmou acesso SSH, Python 3.12.3, bridge antigo ativo e ausência
+dos quatro módulos novos. Foi criado backup recuperável em
+`/home/fabio/fabio-chat-bridge/backups/20260811-fabio-whatsapp-g4/` contendo o
+bridge anterior e o `.env` protegido. A 092 foi aplicada antes do deploy e a
+releitura confirmou `registro_id` no retorno de `fabio_status_audio_fila`, prova
+de limpeza presente e ACLs apenas para `service_role` nas novas portas.
+
+Na VPS foram publicados `fabio_chat_bridge.py`, os três módulos do fluxo e a
+unidade/timer do reconciliador. O modo efetivo ficou
+`FABIO_WHATSAPP_REGISTRO_MODE=shadow`; o bridge reiniciou ativo e o timer ficou
+habilitado/ativo. O primeiro ciclo do reconciliador terminou com
+`claimed=0`, `falhas=0`; não houve erro recente no log do bridge. Os quatro
+hashes SHA-256 vivos coincidem com o worktree local.
+
+Snapshot read-only pós-deploy: `fabio_acoes_pendentes=0`, ações ativas `0` e
+`fabio_fila_audios.origem='whatsapp'=0`. Portanto: **código e worker publicados;
+entrada de escrita continua em shadow; nenhum piloto ou fluxo real foi
+executado**. Rollback preservado pelo backup datado e pelo modo `off`.
+
+## ✅ Histórico — 10/08-G5 preparado para teste real, Isaque em pilot
+
+O Alf escolheu Isaque Mendes da Silva (`professor_id=10`) e confirmou dois casos
+reais. O primeiro caso sugerido (`202774`) foi rejeitado no preflight porque já
+tinha 2 registros e 1 áudio pendente do app. O caso de registro foi substituído
+por `202679` (Teclado T, T_Sáb_14, 08/08 14h); o caso de chamada é `202702`
+(Violão T, V_Sáb_15, 08/08 15h).
+
+Snapshot imediatamente antes da ativação: as duas aulas continuavam elegíveis;
+ambas tinham 0 registros, 0 filas, 0 logs e 0 devolutivas; Isaque tinha 0 ações
+ativas. Depois da ativação, a releitura continuou em 0 ações, 0 filas WhatsApp,
+0 registros no caso de conteúdo, 0 logs no caso de chamada e 0 devolutivas.
+
+O bridge foi configurado com `FABIO_WHATSAPP_REGISTRO_MODE=pilot` e
+`FABIO_WHATSAPP_REGISTRO_PILOT_IDS=10`, reiniciado e confirmado ativo. O timer
+do reconciliador continua ativo; o último ciclo terminou com `claimed=0` e
+`falhas=0`; não há erro recente no log do bridge. **Nenhuma mensagem real foi
+enviada ainda; G5 E2E continua pendente do áudio/texto do professor.**
+
+## ✅ 11/08-G6 — paridade da fonte e configuração mínima do piloto concluídas
+
+Evidência completa: `docs/superpowers/evidence/2026-08-11-registro-aula-source-parity.md`.
+
+- O worktree `D:\la-teacher-worktrees\fabio-whatsapp` começou limpo. A Edge
+  ativa `fabio-registro-aula` foi baixada somente para auditoria: versão 17,
+  SHA-256 `B3B062BDD86EEF3AA04081A1C7E0DDE3ADCD79F987600BF26E0C90558DE7BF81`.
+- A Edge recebe `audio_id`, repassa os identificadores já resolvidos e uma URL
+  temporária, e assina o corpo em HMAC. Ela não contém a implementação que
+  recebe o callback ou normaliza o registro.
+- O callback foi correlacionado com o gateway Hermes de usuário na porta 8644:
+  o adaptador Webhook upstream valida o HMAC e entrega a rota dinâmica
+  `registro-aula`. O listener não é Nginx nem o bridge de conversa.
+- A skill viva foi espelhada em
+  `vps/fabio/hermes-skills/registro-aula-audio-la-music/SKILL.md`
+  (SHA-256 `145bb5f6cff2bfd3aec753c7a20ddee93481aaff9e0c51e8ea47a82b170427a3`).
+  A ferramenta Python viva, que é untracked no checkout Hermes, foi espelhada
+  em `vps/fabio/hermes-tools/fabio_registro_aula_tool.py`
+  (SHA-256 `c76a3600df7a368c2d9b9a6766e7559dfdaddb035e2c98e79cb167b35efa5e8a`).
+- O runtime segue VPS-owned; os espelhos são trilha de auditoria, não origem
+  automática de deploy. Em seguida, o G6 operacional alterou somente
+  `/home/fabio/.hermes/.env` por substituição atômica: criou backup privado em
+  `~/fabio-chat-bridge/backups/20260811-registro-unificado/` e gravou os dois
+  flags de recibo. Arquivo e backup foram verificados em `0600`; as chaves de
+  recibo ocorrem exatamente uma vez, `recibo_mode=off` e a contagem da
+  allowlist copiada é `1`, igual à origem. Valores foram omitidos.
+- O bridge permaneceu ativo com o mesmo `MainPID` e timestamp de início. Não
+  houve restart, reload ou sinal; os flags só terão efeito em futuro restart
+  explicitamente aprovado. A allowlist do piloto não mudou e não houve
+  Supabase, Edge, WhatsApp, E2E, dado pedagógico ou mudança de fonte.
+- Os comandos `teste:090`, `teste:091` e `teste:092` não rodaram: o runner abre
+  transação no banco produtivo e executa DDL/DML antes do rollback, contrariando
+  o escopo somente leitura desta tarefa.
+
+**ÚNICO PRÓXIMO PASSO ATIVO DA FRENTE WHATSAPP:** nenhuma nova task está
+autorizada. O `11/08-G6 operacional` terminou com o recibo desligado e sem
+restart. **G7 continua proibido** até uma nova autorização explícita; o piloto
+não expande e não há novo E2E.
+
 ## 🧭 DUAS FRENTES ABERTAS AGORA (10/08 noite) — leia as duas antes de escolher
+
+> **Nota somente da frente WhatsApp:** os próximos passos de 10/08-G0/G3 e
+> posteriores são históricos/superados. A paridade e o G6 operacional do 11/08
+> foram concluídos; G7 segue bloqueado até autorização própria. Esta nota não
+> altera o estado da frente do Radar.
 
 1. **Radar do aluno** — backend no ar + telas no ar. Tooltip do score
    organizado (aprovado). **Próximo com calma (combinado com o Alf):** cabeçalho
    único da mesa no desktop (hoje os rótulos FALTAS/ABSENTEÍSMO/… repetem em
    cada linha) — tentativa anterior saiu feia e foi **revertida**; não reabrir
    sem ele. Fechamento do plano (menores do backend) não bloqueia.
-2. **Fábio escreve no WhatsApp** — SPEC escrita, **ainda sem aprovação do
-   Alf e sem plano**. Não é pra codar ainda — é pra ele ler
-   `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`
-   primeiro. Ver seção "Brainstorming feito, SPEC escrita", mais abaixo (dentro
-   do histórico do incidente da Daiana, 10/08 tarde).
+2. **Fábio escreve no WhatsApp** — SPEC **aprovada pelo Alf** e plano escrito em
+   `docs/superpowers/plans/2026-08-10-fabio-escreve-no-whatsapp.md`.
+   10/08-G0/G1 foram concluídos no worktree
+   `D:\la-teacher-worktrees\fabio-whatsapp`; 10/08-G2 publicou as migrations
+   090/091. A indicação original de seguir para 10/08-G3 e depois 10/08-G4/G5/
+   **10/08-G6 rollout geral** é histórica/superada; vale somente o G6
+   operacional separado do 11/08, após a revisão de paridade.
+
+---
+
+## ✅ 11/08, ~01h BRT — G2 publicado, WhatsApp novo ainda desligado
+
+**Aplicação definitiva, em ordem, pelo runner do repositório:**
+
+```text
+supabase/migrations/090-fabio-whatsapp-acoes.sql       ok
+supabase/migrations/091-as-cinco-portas-do-whatsapp.sql ok
+```
+
+O preflight imediatamente anterior confirmou o projeto correto, ausência de
+drift nos 17 hashes capturados no G0, ausência dos objetos novos e ausência de
+conflito com o histórico remoto timestamped. O snapshot pós-aplicação registrou
+`2026-08-11 04:02:28 UTC` (`01:02:28 BRT`): as duas tabelas novas estão vazias e
+com RLS habilitado; não há grant de tabela para `anon` ou `authenticated`; as
+portas `fabio_*` ficaram executáveis só por `service_role`; e as assinaturas
+`app_*` permaneceram inalteradas. O `fn_registrar_presencas_core` live contém
+`professor_whatsapp` e preserva o sincronizador de gêmeos.
+
+**Hashes live principais (MD5 de `pg_get_functiondef`):**
+
+```text
+fabio_aulas_candidatas       2b1b361225e546f936ac2e4e221126a4
+fabio_shortlist_valida       583d8d9450c13b9039ff96a356ceb653
+fabio_iniciar_acao           95cc0e293c6d89f754de8d1957b757c5
+fabio_aplicar_evento_acao    d7068bd8fc6865246fe8e9ff85113696
+fn_enfileirar_audio_core     2d2f2a2bd1efd649ebd84e6006f5d005 / 06c2cb7bbabc500696e3b7b5bf3f83c8
+fn_atualizar_fatia_core      2035017ce5b98426880703966880034f
+fn_responder_presenca_core   0859c37f0f94634abd59dd15a923b61e
+fn_confirmar_registro_core   641f9cee39bf5b222a119ef03396610f
+fn_registrar_presencas_core  8633fdf54cfe647bf8881dac659d1172
+```
+
+**Verificação funcional sem escrita:** chamada ao RPC de candidatas via
+`service_role` para um professor existente retornou 21 candidatas, todas com
+`aula_id` pertencente ao professor. Não foram criadas ação, evento, blob,
+fila, registro, presença ou devolutiva.
+
+**Advisors:** o Security Advisor apontou somente os dois avisos INFO esperados
+para tabelas RPC-only com RLS sem policies; como não há grants a `anon`/
+`authenticated`, isso não abre leitura direta. O Performance Advisor apontou
+índices/FKs novos ainda não usados; fica registrado para revisão antes de carga
+real, sem bloquear este gate. O bridge novo não foi publicado: na VPS o serviço
+antigo está ativo, mas `fabio_whatsapp_intents.py`,
+`fabio_whatsapp_reconciler.py`, `fabio_whatsapp_state.py` e referências às novas
+ações estão ausentes. Portanto: **schema published; WhatsApp ingress still off;
+no real flow enabled.**
+
+**Histórico: 10/08-G2 fechado.** A indicação de seguir para 10/08-G3 local e
+depois para shadow, piloto ou **10/08-G6 rollout geral** está superada; não é
+autorização operacional. Vale o G6 operacional do 11/08, separado e pendente
+de revisão.
 
 ---
 
@@ -149,8 +342,10 @@ hex/cor arbitrária em `src/features/coordenacao` volta **vazio**.
 
 ## ✅ 10/08 NOITE (Cursor) — Radar telas verificadas + shell sem tarja preta
 
-**PRÓXIMO PASSO literal:** (1) Alf lê a SPEC do Fábio no WhatsApp e diz o que
-muda — **não codar** essa frente ainda. (2) No Radar, só com pedido dele:
+**HISTÓRICO/SUPERADO (10/08):** (1) Na frente do Fábio, a SPEC já tinha sido
+aprovada e o plano em gates mandava começar pelo 10/08-G0. Essa instrução foi
+superada pelo G6 operacional do 11/08, separado e pendente de revisão. (2) No
+Radar, só com pedido dele:
 cabeçalho único da mesa no desktop (rótulos hoje repetem por linha; tentativa
 anterior revertida). Menores do backend ficam pro fechamento do plano e **não
 bloqueiam**. Deploy do que já entrou: Vercel (`f00c96d` em Production) +
@@ -349,7 +544,7 @@ genérico; a fatia veio sem `presenca` — o áudio só descreve conteúdo).
 1`) — a 086 funcionando ao vivo pela primeira vez em produção. Pendência da
 Daiana: **0**.
 
-### ▶ Brainstorming feito, SPEC escrita (`5b6f5d6`)
+### ▶ Brainstorming e SPEC aprovados; plano em gates escrito
 
 `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`.
 Escopo: registro de aula por áudio + chamada avulsa, sempre com leitura-e-
@@ -363,10 +558,12 @@ chamar a RPC) é código determinístico no bridge, mesma lógica que já proteg
 `allowlist-de-ferramenta-vence-aprovacao`). Fora do escopo, anotado no spec:
 pedido de liberação de prazo à coordenação e correção pós-confirmação.
 
-**PRÓXIMO PASSO desta frente:** o Alf lê a spec inteira e diz o que muda.
-Aprovada → invocar `superpowers:writing-plans` pra virar plano de execução (o
-mesmo formato que o Radar já usou, com SQL/TS/testes por task). Ainda não
-comecei a implementação — nenhuma migration nova, nenhum código do bridge.
+**HISTÓRICO/SUPERADO desta frente (10/08):** executar o 10/08-G0 do plano para
+consolidar estes docs, criar worktree próprio e congelar o contrato vivo antes
+de extrair qualquer miolo. As passagens produtivas 10/08-G2 (banco),
+10/08-G4 (shadow na VPS), 10/08-G5 (piloto) e **10/08-G6 rollout geral** não
+são próximos passos ativos; o único é o G6 operacional do 11/08, separado e
+pendente de revisão.
 
 ---
 
@@ -687,7 +884,7 @@ A ordem verdadeira, **hoje**, é esta (a tabela antiga que dizia “faltam Tasks
 |---|---|---|---|
 | ~~1~~ | ~~Semáforo do professor~~ | **FECHADO em 09/08 à noite.** Banco (073–080), mesa do professor, tela da coordenação, cobrança no timer, e o Fábio lendo. O texto abaixo desta tabela é HISTÓRIA — não reabrir | ✅ |
 | **1** | **Radar do aluno** | **Backend + telas no ar** (Tasks 1–10). Foto na linha (089, `bcf995c`); tooltip do score organizado (`f00c96d`, Alf aprovou). Deploy = **Vercel Production + Supabase** — **VPS do Fábio não entra** nesta frente. Próximo só com pedido do Alf: cabeçalho único da mesa no desktop (não reabrir sozinho). Menores do backend não bloqueiam | topo deste arquivo + seções ✅ da noite 10/08 |
-| **2** | **Fábio escreve no WhatsApp** | **SPEC escrita** (`5b6f5d6` / `docs/superpowers/specs/2026-08-10-fabio-escreve-no-whatsapp-design.md`), **ainda sem aprovação do Alf e sem plano**. Nenhum código novo no bridge — **nada pra deployar na VPS** até a spec fechar. Não começar implementação sem ele ler | "Brainstorming feito, SPEC escrita" |
+| **2** | **Fábio escreve no WhatsApp** | **Histórico/superado:** plano de 10/08 (`10/08-G0` até `10/08-G6 rollout geral`) já avançou até piloto restrito. A paridade de fonte do 11/08-G6 foi registrada; o único passo ativo é o **G6 operacional**, separado e pendente de revisão. Não retomar G0/G3 antigos | topo deste arquivo + evidência 11/08-G6 |
 | 3 | **Fila offline no feedback** | O ✓ é honesto (alerta + reenviar), mas o toque se perde se o app fechar. Janela abre 25/08 | "Ainda aberto" |
 | ~~4~~ | ~~Parede de texto do escalonamento~~ | **FECHADO em 10/08** (`146a593`): índice + uma mensagem por unidade, 9/9 mutantes | seção do topo |
 | 4 | **Registro de presença em Campo Grande** | **NOVO, medido em 10/08:** 126 alunos com 2+ faltas seguidas e zero presença afirmada, concentrados em CG (28–50% da carteira de alguns professores). É o que segura o cartão "Sumiu da escola" do Radar | spec do Radar, §3 |

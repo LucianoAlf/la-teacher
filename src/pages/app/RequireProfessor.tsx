@@ -5,7 +5,7 @@ import { useAuth } from '../../lib/auth'
 import { isSemVinculo, minhaAgendaSessao, professoresParaLiberar } from '../../lib/api'
 import { introVisto } from '../../features/onboarding/introState'
 import { OnboardingGate } from '../../features/onboarding/OnboardingGate'
-import { iniciarSincronizacaoFila } from '../../features/registro/uploadAudio'
+import { iniciarSincronizacaoFila, pararSincronizacaoFila } from '../../features/registro/uploadAudio'
 import { AppFrame } from './AppFrame'
 import VinculoPendentePage from './VinculoPendente'
 
@@ -72,8 +72,13 @@ export function RequireProfessor() {
   // Professor autenticado e vinculado → liga o reenvio automático da fila
   // offline (gravações feitas sem rede sobem sozinhas).
   useEffect(() => {
-    if (estado === 'ok') iniciarSincronizacaoFila()
-  }, [estado])
+    if (estado !== 'ok' || !userId) {
+      pararSincronizacaoFila()
+      return
+    }
+    iniciarSincronizacaoFila()
+    return pararSincronizacaoFila
+  }, [estado, userId])
 
   if (loading) return <Carregando />
   // Sem sessão: primeira vez no dispositivo vê o intro; quem já viu vai pro login.

@@ -1,0 +1,73 @@
+{
+  "audio": [
+    {"name": "conversa", "transcricao": "Como foi seu dia, Fabio?", "expected": "conversa"},
+    {"name": "registro", "transcricao": "Na aula de hoje trabalhei respiração e a Sofia fez o exercício de apoio", "expected": "registro"},
+    {"name": "registro com conteúdo", "transcricao": "Fizemos a atividade de ritmo e depois cantamos a música nova", "expected": "registro"},
+    {"name": "ambiguo", "transcricao": "A aula foi boa e a Sofia faltou", "expected": "ambiguo"},
+    {"name": "audio invalido", "transcricao": "qualquer coisa", "llm_json": "{\"intencao\":\"inventado\"}", "expected": "ambiguo"}
+  ],
+  "texto": [
+    {"name": "chamada direta", "texto": "Só a Sofia faltou, todo mundo veio", "expected": "chamada"},
+    {"name": "todos presentes", "texto": "Pode bater a chamada: todos vieram", "expected": "chamada"},
+    {"name": "conversa", "texto": "Como preparo a próxima aula?", "expected": "conversa"},
+    {"name": "ambiguo", "texto": "A Sofia faltou e trabalhamos respiração", "expected": "ambiguo"},
+    {"name": "presença incerta", "texto": "Acho que a Sofia não veio", "expected": "ambiguo"},
+    {"name": "json desconhecido", "texto": "oi", "llm_json": "{\"intencao\":\"registro\"}", "expected": "ambiguo"}
+  ],
+  "shortlist": [
+    {
+      "name": "uma candidata compatível",
+      "texto": "foi a aula de piano de hoje às 14h",
+      "candidatas": [
+        {"aula_id": 101, "data": "2026-08-11", "hora": "14:00", "curso": "Piano", "turma": "A"}
+      ],
+      "expected_status": "selecionada",
+      "expected_aula_id": 101
+    },
+    {
+      "name": "duas candidatas perguntam",
+      "texto": "foi a aula de hoje",
+      "candidatas": [
+        {"aula_id": 101, "data": "2026-08-11", "hora": "14:00", "curso": "Piano", "turma": "A"},
+        {"aula_id": 102, "data": "2026-08-11", "hora": "16:00", "curso": "Piano", "turma": "B"}
+      ],
+      "expected_status": "perguntar",
+      "expected_ids": [101, 102]
+    },
+    {
+      "name": "mais de três faz pergunta discriminante",
+      "texto": "foi uma aula de hoje",
+      "candidatas": [
+        {"aula_id": 101, "data": "2026-08-11", "hora": "10:00", "curso": "Piano"},
+        {"aula_id": 102, "data": "2026-08-11", "hora": "12:00", "curso": "Piano"},
+        {"aula_id": 103, "data": "2026-08-11", "hora": "14:00", "curso": "Piano"},
+        {"aula_id": 104, "data": "2026-08-11", "hora": "16:00", "curso": "Piano"}
+      ],
+      "expected_status": "discriminante",
+      "expected_ids": []
+    },
+    {
+      "name": "contradição elimina candidata",
+      "texto": "foi a aula de canto",
+      "candidatas": [
+        {"aula_id": 101, "data": "2026-08-11", "hora": "14:00", "curso": "Piano"},
+        {"aula_id": 102, "data": "2026-08-11", "hora": "16:00", "curso": "Canto"}
+      ],
+      "expected_status": "selecionada",
+      "expected_aula_id": 102
+    }
+  ],
+  "pendentes": [
+    {"name": "confirmar", "texto": "sim, pode gravar", "acao": {"tipo": "confirmar_registro"}, "expected": "confirmar"},
+    {"name": "cancelar", "texto": "deixa pra lá", "acao": {"tipo": "confirmar_registro"}, "expected": "cancelar"},
+    {"name": "adiar", "texto": "depois eu vejo isso", "acao": {"tipo": "confirmar_registro"}, "expected": "adiar"},
+    {"name": "conversa paralela", "texto": "qual é a minha agenda amanhã?", "acao": {"tipo": "confirmar_registro"}, "expected": "conversa"},
+    {"name": "correção", "texto": "não, a Sofia veio", "acao": {"tipo": "confirmar_registro"}, "expected": "correcao"},
+    {"name": "escolha ordinal", "texto": "a segunda", "acao": {"tipo": "escolher_aula_audio", "candidatas": [101, 102]}, "expected": "escolher_aula", "expected_aula_id": 102}
+  ],
+  "correcoes": [
+    {"name": "patch permitido", "saida": {"registro_id": "fat-1", "aluno_id": 7, "campos": {"presenca": "presente"}}, "rascunho": {"id": "fat-1", "aluno_id": 7, "status": "aguardando_confirmacao"}, "expected": true},
+    {"name": "campo desconhecido", "saida": {"registro_id": "fat-1", "aluno_id": 7, "campos": {"professor_id": 99}}, "rascunho": {"id": "fat-1", "aluno_id": 7, "status": "aguardando_confirmacao"}, "expected": false},
+    {"name": "aluno fora do roster", "saida": {"registro_id": "fat-1", "aluno_id": 8, "campos": {"presenca": "presente"}}, "rascunho": {"id": "fat-1", "aluno_id": 8, "status": "aguardando_confirmacao"}, "expected": false}
+  ]
+}

@@ -47,6 +47,12 @@ DEFAULT_WINDOW_MINUTES = int(os.getenv("FABIO_NOTIFY_WINDOW_MINUTES", "15"))
 DEFAULT_CHANNEL = os.getenv("FABIO_NOTIFY_CHANNEL", "whatsapp")
 SEND_EMPTY_BRIEFING = os.getenv("FABIO_NOTIFY_EMPTY_BRIEFING", "false").lower() in {"1", "true", "yes", "sim"}
 MAX_PROFESSORS = int(os.getenv("FABIO_NOTIFY_MAX_PROFESSORS", "0"))
+REGISTRO_RECIBO_MODE = os.getenv("FABIO_REGISTRO_RECIBO_MODE", "off").strip().lower()
+REGISTRO_RECIBO_PILOT_IDS = {
+    int(value.strip())
+    for value in os.getenv("FABIO_REGISTRO_RECIBO_PILOT_IDS", "").split(",")
+    if value.strip().isdigit()
+}
 
 
 @dataclass(frozen=True)
@@ -1104,14 +1110,244 @@ def mark_failed(notification_id: str, error: str, lease_token: Optional[str] = N
     return bool(rpc("fabio_marcar_notificacao_falhou", corpo))
 
 
-def deliver(pid: int, channel: str, content: str) -> None:
+def deliver(pid: int, channel: str, content: str) -> Any:
     if channel == "whatsapp":
-        bridge.send_whatsapp_text(pid, content)
-        return
+        return bridge.send_whatsapp_text(pid, content)
     if channel == "app":
-        bridge.insert_fabio_response(pid, content, "app")
-        return
+        return bridge.insert_fabio_response(pid, content, "app")
     raise ValueError(f"unsupported channel: {channel}")
+
+
+def _recibo_field(row: Dict[str, Any], key: str) -> Any:
+    fields = row.get("campos") if isinstance(row.get("campos"), dict) else {}
+    return row.get(key) if row.get(key) not in (None, "") else fields.get(key)
+
+
+def _recibo_presence(row: Dict[str, Any]) -> str:
+    value = str(_recibo_field(row, "presenca") or "").strip().lower()
+    if value in {"ausente", "faltou", "falta", "nao", "não"}:
+        return "❌ Falta"
+    if value in {"presente", "veio", "sim", ""}:
+        return "✅ Presença" if value else "⚠️ Presença não informada"
+    return "⚠️ Presença não informada"
+
+
+def _recibo_content(row: Dict[str, Any]) -> str:
+    fields = row.get("campos") if isinstance(row.get("campos"), dict) else {}
+    for value in (
+        row.get("texto_consolidado"),
+        fields.get("conteudo"),
+        fields.get("atividades"),
+    ):
+        cleaned = _clean_text(value)
+        if cleaned:
+            return _encurtar(cleaned, 360)
+    return ""
+
+
+def _recibo_student_content(row: Dict[str, Any]) -> str:
+    """Renderiza apenas a fatia individual, sem repetir o tronco comum."""
+    fields = row.get("campos") if isinstance(row.get("campos"), dict) else {}
+    parts = []
+    for key, label in (
+        ("progresso", "Progresso"),
+        ("observacao", "Observação"),
+        ("proximo_passo", "Próximo passo"),
+        ("repertorio", "Repertório"),
+    ):
+        cleaned = _clean_text(fields.get(key))
+        if cleaned:
+            parts.append(f"{label}: {_encurtar(cleaned, 300)}")
+    return "\n   ".join(parts)
+
+
+def _recibo_draft(row: Dict[str, Any]) -> str:
+    raw = row.get("devolutiva")
+    if raw is None:
+        raw = row.get("devolutivas")
+    if isinstance(raw, list):
+        raw = raw[0] if raw else None
+    if isinstance(raw, dict):
+        raw = raw.get("texto_normal") or raw.get("texto") or raw.get("corpo")
+    return _encurtar(_clean_text(raw), 420)
+
+
+def format_registro_recibo(registro: Dict[str, Any], titulo: str = "Registro confirmado") -> str:
+    """Renderiza o read-back canônico; não inventa campos ausentes."""
+    aula = registro.get("aula") if isinstance(registro.get("aula"), dict) else {}
+    data = _format_date_br(aula.get("data") or aula.get("data_aula") or aula.get("dia")) or "data não informada"
+    hora_raw = _clean_text(aula.get("hora") or aula.get("horario")) or "horário não informado"
+    hora = f"{_relogio(hora_raw)} {hora_raw}"
+    curso = _clean_text(aula.get("curso") or aula.get("nome") or "Aula")
+    turma = _clean_text(aula.get("turma") or aula.get("turma_nome"))
+    linhas = [f"✅ {titulo}", f"📚 {curso}{f' • {turma}' if turma else ''}", f"🕒 {data} • {hora}"]
+
+    tronco = registro.get("tronco") if isinstance(registro.get("tronco"), dict) else {}
+    comum = _recibo_content(tronco)
+    if comum:
+        linhas.extend(["", "📖 Conteúdo comum", comum])
+
+    linhas.extend(["", "👥 Por aluno"])
+    fatias = registro.get("fatias") if isinstance(registro.get("fatias"), list) else []
+    for fatia in fatias:
+        if not isinstance(fatia, dict):
+            continue
+        nome = _clean_text(fatia.get("aluno_nome") or fatia.get("nome") or "Aluno")
+        linhas.append(f"👤 *{nome}* — {_recibo_presence(fatia)}")
+        conteudo = _recibo_student_content(fatia)
+        if conteudo:
+            linhas.append(f"   {conteudo}")
+        devolutiva = _recibo_draft(fatia)
+        if devolutiva:
+            linhas.append(f"   📝 Rascunho de devolutiva: {devolutiva}")
+    return "\n".join(linhas)
+
+
+def _transport_receipt(value: Any) -> Optional[str]:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, dict):
+        for key in ("id", "message_id", "messageid", "wa_message_id"):
+            candidate = value.get(key)
+            if candidate:
+                return str(candidate)
+        nested = value.get("key")
+        if isinstance(nested, dict) and nested.get("id"):
+            return str(nested["id"])
+    return None
+
+
+def _concluir_recibo_com_retry(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Retry only the idempotent close, never the WhatsApp send."""
+    last_error: Exception | None = None
+    for _ in range(2):
+        try:
+            result = rpc("fabio_concluir_registro_recibo", payload) or {}
+            if result.get("ok") is True or result.get("ja_enviado") is True:
+                return result
+            last_error = RuntimeError(str(result.get("codigo") or "recibo_nao_concluido"))
+        except Exception as exc:
+            last_error = exc
+    raise last_error or RuntimeError("recibo_nao_concluido")
+
+
+def _registro_recibo_habilitado(professor_id: Optional[int]) -> bool:
+    if REGISTRO_RECIBO_MODE == "on":
+        return True
+    if REGISTRO_RECIBO_MODE == "pilot":
+        return professor_id is not None and int(professor_id) in REGISTRO_RECIBO_PILOT_IDS
+    return False
+
+
+def _run_registro_recibos_for_professor(channel: str, dry_run: bool, professor_id: Optional[int] = None) -> list[Dict[str, Any]]:
+    """Claim, deliver and close receipt outbox items exactly once per lease."""
+    if not _registro_recibo_habilitado(professor_id):
+        return [{"event": "registro_recibo", "status": "disabled", "claimed": 0, "sent": 0}]
+    if dry_run:
+        return [{"event": "registro_recibo", "status": "dry_run_skipped", "reason": "claim cria lease"}]
+    claim_payload: Dict[str, Any] = {"p_limite": 20}
+    if professor_id is not None:
+        claim_payload["p_professor_id"] = int(professor_id)
+    claim = rpc("fabio_claim_registro_recibo", claim_payload) or {}
+    if isinstance(claim, list):
+        claim = claim[0] if claim and isinstance(claim[0], dict) else {}
+    if claim.get("ok") is False:
+        return [{"event": "registro_recibo", "status": "claim_failed", "error": str(claim.get("codigo") or "claim_falhou")[:500]}]
+
+    lease_token = claim.get("lease_token")
+    itens = claim.get("itens") if isinstance(claim.get("itens"), list) else []
+    resultados: list[Dict[str, Any]] = []
+    for item in itens:
+        if not isinstance(item, dict):
+            continue
+        pid = int(item.get("professor_id") or professor_id or 0)
+        registro_id = item.get("registro_id")
+        notificacao_id = item.get("notificacao_id")
+        resultado: Dict[str, Any] = {
+            "event": "registro_recibo",
+            "professor_id": pid,
+            "registro_id": registro_id,
+            "notificacao_id": notificacao_id,
+            "status": "init",
+        }
+        if not pid or not registro_id or not notificacao_id or not lease_token:
+            resultado.update(status="failed", error="claim_incompleto")
+            resultados.append(resultado)
+            continue
+        entregue = False
+        try:
+            registro = rpc("fabio_registro_recibo_dados", {
+                "p_professor_id": pid,
+                "p_registro_id": registro_id,
+            }) or {}
+            if isinstance(registro, list):
+                registro = registro[0] if registro and isinstance(registro[0], dict) else {}
+            if not registro or registro.get("ok") is False:
+                raise RuntimeError("registro_completo_indisponivel")
+            devolutivas = registro.get("devolutivas") if isinstance(registro.get("devolutivas"), list) else []
+            por_fatia = {
+                str(item.get("registro_fatia_id")): item
+                for item in devolutivas
+                if isinstance(item, dict) and item.get("registro_fatia_id")
+            }
+            for fatia in registro.get("fatias") if isinstance(registro.get("fatias"), list) else []:
+                if isinstance(fatia, dict) and not fatia.get("devolutiva"):
+                    fatia_devolutiva = por_fatia.get(str(fatia.get("id")))
+                    if fatia_devolutiva:
+                        fatia["devolutiva"] = fatia_devolutiva
+            corpo = format_registro_recibo(registro, str(item.get("titulo") or "Registro confirmado"))
+            resposta_transporte = deliver(pid, channel, corpo)
+            entregue = True
+            envio = _transport_receipt(resposta_transporte)
+            if not envio:
+                raise RuntimeError("recibo_transporte_sem_id")
+            concluido = _concluir_recibo_com_retry({
+                "p_notificacao_id": notificacao_id,
+                "p_lease_token": lease_token,
+                "p_envio_recibo": envio,
+                "p_corpo": corpo,
+            })
+            resultado.update(status="sent", envio_recibo=envio)
+        except Exception as exc:
+            if entregue:
+                log("registro_recibo_entregue_mas_nao_fechado", professor_id=pid,
+                    notificacao_id=str(notificacao_id), error=str(exc)[:300])
+                resultado.update(status="delivered_unclosed", error=str(exc)[:500])
+                resultados.append(resultado)
+                continue
+            try:
+                rpc("fabio_falhar_registro_recibo", {
+                    "p_notificacao_id": notificacao_id,
+                    "p_lease_token": lease_token,
+                    "p_erro": str(exc)[:1000],
+                })
+            except Exception as failure_exc:
+                log("registro_recibo_falha_nao_carimbada", professor_id=pid,
+                    notificacao_id=str(notificacao_id), error=str(failure_exc)[:300])
+            finally:
+                resultado.update(status="failed", error=str(exc)[:500])
+        resultados.append(resultado)
+    return resultados
+
+
+def run_registro_recibos(channel: str, dry_run: bool, professor_id: Optional[int] = None) -> list[Dict[str, Any]]:
+    """Run the receipt worker for one target or every explicitly allowlisted pilot."""
+    if REGISTRO_RECIBO_MODE == "off":
+        return [{"event": "registro_recibo", "status": "disabled", "claimed": 0, "sent": 0}]
+    if REGISTRO_RECIBO_MODE == "pilot":
+        if professor_id is not None:
+            targets = [int(professor_id)] if int(professor_id) in REGISTRO_RECIBO_PILOT_IDS else []
+        else:
+            targets = sorted(REGISTRO_RECIBO_PILOT_IDS)
+    else:
+        targets = [professor_id]
+    if not targets:
+        return [{"event": "registro_recibo", "status": "disabled", "claimed": 0, "sent": 0}]
+
+    resultados: list[Dict[str, Any]] = []
+    for target in targets:
+        resultados.extend(_run_registro_recibos_for_professor(channel, dry_run, target))
+    return resultados
 
 
 def run_event(event: str, prof: Dict[str, Any], channel: str, dry_run: bool, target_date: Optional[str] = None) -> Dict[str, Any]:
@@ -1335,7 +1571,7 @@ def run_devolutivas(channel: str, dry_run: bool, professor_id: Optional[int] = N
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "escalonamento", "feedback", "all"], default="all")
+    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "registro_recibo", "registro-recibo", "escalonamento", "feedback", "all"], default="all")
     parser.add_argument("--professor-id", type=int)
     parser.add_argument("--channel", choices=["whatsapp", "app"], default=DEFAULT_CHANNEL)
     parser.add_argument("--dry-run", action="store_true")
@@ -1350,12 +1586,27 @@ def main() -> int:
         "'--event feedback --date YYYY-MM-DD' WITHOUT --dry-run reserves and "
         "sends a REAL WhatsApp message dated for that day. Defaults to today."))
     args = parser.parse_args()
+    if args.event == "registro-recibo":
+        args.event = "registro_recibo"
 
     now = datetime.now(BRT)
     target_date = args.date or now.date().isoformat()
     selected = ["briefing", "pendencia", "devolutiva"] if args.event == "all" else [args.event]
 
     results = []
+
+    if "registro_recibo" in selected:
+        try:
+            recibo_results = run_registro_recibos(args.channel, args.dry_run, args.professor_id)
+        except Exception as exc:
+            recibo_results = [{"event": "registro_recibo", "status": "error", "error": str(exc)[:500]}]
+        for r in recibo_results:
+            log("event_result", **r)
+        results.extend(recibo_results)
+        if args.event == "registro_recibo":
+            payload = {"ok": True, "results": results}
+            print(json.dumps(payload, ensure_ascii=False) if args.json else payload)
+            return 0
 
     # A devolutiva sai da lógica de horário: varre a fila sempre que rodar.
     if "devolutiva" in selected:

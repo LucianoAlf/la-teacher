@@ -5,13 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { meuPerfil } from '../../lib/api'
 import { BotaoTema, Toast, useToast } from '../../components/ui'
 import { dataLonga } from '../../lib/datas'
-
-function primeiroNome(email?: string, nome?: string): string {
-  if (nome) return nome.split(' ')[0]
-  if (!email) return 'professor'
-  const local = email.split('@')[0].split(/[._-]/)[0]
-  return local.charAt(0).toUpperCase() + local.slice(1)
-}
+import { nomeCabecalho } from '../../features/registro/camposCanonicos'
 
 /**
  * Header das telas internas — padrão da família LA (espelha o LA Organizer):
@@ -25,6 +19,7 @@ export function AppHeader() {
   const [menu, setMenu] = useState(false)
   const [modalSenha, setModalSenha] = useState(false)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  const [nomePerfil, setNomePerfil] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Foto real do professor (mesma do Meu perfil) — a sessão só tem e-mail/nome.
@@ -32,7 +27,9 @@ export function AppHeader() {
     let vivo = true
     meuPerfil()
       .then((perfil) => {
-        if (vivo) setFotoUrl(perfil?.foto_url ?? null)
+        if (!vivo) return
+        setFotoUrl(perfil?.foto_url ?? null)
+        setNomePerfil(perfil?.nome?.trim() || null)
       })
       .catch(() => {})
     return () => {
@@ -52,8 +49,9 @@ export function AppHeader() {
     return () => document.removeEventListener('pointerdown', fechar)
   }, [menu])
 
-  const nomeCompleto = (session?.user.user_metadata?.name as string | undefined) ?? undefined
-  const nome = primeiroNome(session?.user.email, nomeCompleto)
+  const nomeMetadata = (session?.user.user_metadata?.name as string | undefined) ?? undefined
+  const nomeCompleto = nomePerfil ?? nomeMetadata
+  const nome = nomeCabecalho({ nome: nomeCompleto, email: session?.user.email })
   const inicial = nome.charAt(0).toUpperCase()
 
   return (

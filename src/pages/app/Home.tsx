@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, EmptyState, FabioCard, FabioMark, Skeleton, Toast, useToast } from '../../components/ui'
+import { Button, Card, EmptyState, FabioCard, FabioMark, Skeleton, Toast, useToast } from '../../components/ui'
 import { AppHeader } from './AppHeader'
+import { useAuth } from '../../lib/auth'
 import { formatDiaCurto, hojeBRT } from '../../lib/date'
 import { devolutivasPendentes, meuPonto, registrosPendentes, type PontoDia, type RegistroRow, type SessaoAula } from '../../lib/api'
 import { fmtMinutos } from './Ponto'
@@ -11,7 +12,9 @@ import { DateNav } from '../../features/agenda/DateNav'
 import { useSessoes } from '../../features/agenda/useSessoes'
 import { buscarPendencias, buscarPendentesHoje, type Pendencias } from '../../features/agenda/pendencias'
 import { horaSessao, JANELA_POS_AULA_DIAS, tituloSessao } from '../../features/agenda/sessao'
-import { useFilaOfflineCount } from '../../features/registro/filaOffline'
+import { descreverFalhaFila } from '../../features/registro/camposCanonicos'
+import { itemPodeSerReenviado, type ItemFilaLocal, useFilaOffline } from '../../features/registro/filaOffline'
+import { descartarItemFila, tentarNovamenteItemFila } from '../../features/registro/uploadAudio'
 import { CardFeedbackHome } from '../../features/feedback'
 import { AppFrame } from './AppFrame'
 import { AppNav } from './AppNav'
@@ -19,15 +22,49 @@ import { AppNav } from './AppNav'
 /** /app — Home do professor (tela 1 do protótipo) com dados vivos do LA Report. */
 export default function HomePage() {
   const { message, visible, show } = useToast()
+  const { session } = useAuth()
   const navigate = useNavigate()
   const [data, setData] = useState<string>(hojeBRT())
 
   const { estado, recarregar } = useSessoes(data)
-  const filaOffline = useFilaOfflineCount()
+  const { itens: filaOffline } = useFilaOffline(session?.user.id)
+  const [itemFilaEmAcao, setItemFilaEmAcao] = useState<string | null>(null)
   const abrirChamada = (sessao: SessaoAula) =>
     navigate(`/app/chamada/${sessao.aula_id_ancora}`, { state: { sessao } })
   const gravarAula = (sessao: SessaoAula) =>
     navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
+
+  const tentarFila = async (item: ItemFilaLocal) => {
+    setItemFilaEmAcao(item.id)
+    try {
+      const resultado = await tentarNovamenteItemFila(item.id, session?.user.id)
+      if (resultado.ok) {
+        navigate(`/app/processando/${resultado.audioId}`, { state: { aulaLabel: item.aulaLabel } })
+        return
+      }
+      show(`Ainda não enviei: ${resultado.mensagem}`)
+    } catch {
+      show('Não consegui acessar a fila local agora')
+    } finally {
+      setItemFilaEmAcao(null)
+    }
+  }
+
+  const descartarFila = async (item: ItemFilaLocal) => {
+    setItemFilaEmAcao(item.id)
+    try {
+      const descartado = await descartarItemFila(item.id, session?.user.id)
+      if (!descartado.ok) {
+        show(descartado.mensagem)
+        return
+      }
+      show('Áudio descartado só deste aparelho')
+    } catch {
+      show('Não consegui descartar o áudio local agora')
+    } finally {
+      setItemFilaEmAcao(null)
+    }
+  }
 
   return (
     <AppFrame>
@@ -42,12 +79,13 @@ export default function HomePage() {
         <AlertaChamadaHoje onAbrir={abrirChamada} />
 
         {/* Áudios aguardando conexão (fila offline) */}
-        {filaOffline > 0 && (
-          <div className="mb-3 flex items-center gap-2 rounded-md border border-border-subtle bg-warning-soft px-3 py-[10px] text-[12.5px] font-semibold text-warning-text">
-            <i className="fa-solid fa-cloud-arrow-up" aria-hidden="true" />
-            {filaOffline === 1 ? '1 áudio na fila' : `${filaOffline} áudios na fila`} — envio automático
-            quando a conexão voltar
-          </div>
+        {filaOffline.length > 0 && (
+          <FilaAudios
+            itens={filaOffline}
+            itemEmAcao={itemFilaEmAcao}
+            onTentar={(item) => void tentarFila(item)}
+            onDescartar={(item) => void descartarFila(item)}
+          />
         )}
 
         {/* Registros do Fábio esperando confirmação */}
@@ -96,6 +134,56 @@ export default function HomePage() {
 }
 
 // ---------------------------------------------------------------------------
+
+function FilaAudios({
+  itens,
+  itemEmAcao,
+  onTentar,
+  onDescartar,
+}: {
+  itens: ItemFilaLocal[]
+  itemEmAcao: string | null
+  onTentar: (item: ItemFilaLocal) => void
+  onDescartar: (item: ItemFilaLocal) => void
+}) {
+  return (
+    <div className="mb-3 overflow-hidden rounded-md border border-border-subtle bg-warning-soft text-warning-text">
+      <div className="flex items-center gap-2 px-3 py-[10px] text-[12.5px] font-semibold">
+        <i className="fa-solid fa-cloud-arrow-up" aria-hidden="true" />
+        {itens.length === 1 ? '1 áudio preservado neste aparelho' : `${itens.length} áudios preservados neste aparelho`}
+      </div>
+      <div className="border-t border-border-subtle bg-bg-surface">
+        {itens.map((item) => {
+          const emAcao = itemEmAcao === item.id
+          const podeReenviar = itemPodeSerReenviado(item)
+          return (
+            <div key={item.id} className="border-b border-border-subtle px-3 py-[10px] last:border-b-0">
+              <b className="block truncate text-[12.5px] text-text-primary">{item.aulaLabel}</b>
+              <p className="mt-1 text-[11.5px] leading-relaxed text-text-secondary">
+                {descreverFalhaFila(item)}
+                {!podeReenviar
+                  ? ` · o lançamento foi recusado${item.codigoFalhaTerminal ? ` (${item.codigoFalhaTerminal})` : ''}; o áudio está preservado para descarte consciente`
+                  : item.retryAutomatico
+                  ? ' · nova tentativa automática habilitada'
+                  : ' · preciso da sua decisão; não vou tentar sozinho'}
+              </p>
+              <div className="mt-2 flex gap-2">
+                {podeReenviar && (
+                  <Button size="sm" disabled={emAcao} onClick={() => onTentar(item)}>
+                    <i className="fa-solid fa-rotate-right" aria-hidden="true" /> {emAcao ? 'Tentando…' : 'Tentar agora'}
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" disabled={emAcao} onClick={() => onDescartar(item)}>
+                  Descartar
+                </Button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 /** Atalho: registros que o Fábio estruturou e esperam o "confere e confirma". */
 function AguardandoConfirmacao({ onAbrir }: { onAbrir: (registroId: string) => void }) {

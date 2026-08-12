@@ -18,7 +18,8 @@ import { cx } from '../../lib/cx'
 import { formatDiaCurto, formatHoraBRT } from '../../lib/date'
 import { AppFrame } from '../../pages/app/AppFrame'
 import { CampoEditavel } from './CampoEditavel'
-import { presencaDaFatia, textoFatia, textoTronco } from './texto'
+import { repertorioIndividualVisivel } from './camposCanonicos'
+import { presencaDaFatia } from './texto'
 
 // Campos extras do tronco (narrativa do professor) — mostrados só quando têm
 // conteúdo, pra não poluir. Nenhum campo preenchido fica escondido.
@@ -51,9 +52,9 @@ export default function ConfirmarPage() {
   const [jaReg, setJaReg] = useState<{ ja: boolean; itens: RegistroJaFeito[] }>({ ja: false, itens: [] })
   const [escolhendoModo, setEscolhendoModo] = useState(false)
 
-  const carregar = useCallback(() => {
+  const carregar = useCallback((silencioso = false) => {
     if (!registroId) return
-    setFase('carregando')
+    if (!silencioso) setFase('carregando')
     registroCompleto(registroId)
       .then((res) => {
         if ('erro' in res) {
@@ -69,7 +70,9 @@ export default function ConfirmarPage() {
       .catch(() => setFase('erro'))
   }, [registroId])
 
-  useEffect(carregar, [carregar])
+  useEffect(() => {
+    void carregar()
+  }, [carregar])
 
   // ---- persistência das edições (regenera o texto no formato da Tese) ----
 
@@ -78,11 +81,9 @@ export default function ConfirmarPage() {
     const novosCampos = { ...tronco.campos, [chave]: valor }
     setTronco({ ...tronco, campos: novosCampos })
     try {
-      await atualizarFatia(tronco.id, textoTronco(aula, novosCampos), { [chave]: valor })
+      await atualizarFatia(tronco.id, null, { [chave]: valor })
       // o comum mudou → o texto final de TODAS as fatias presentes muda junto
-      for (const f of fatias.filter((f) => presencaDaFatia(f) !== 'ausente')) {
-        await atualizarFatia(f.id, textoFatia(aula, novosCampos, f.campos), null)
-      }
+      await carregar(true)
       show('Campo atualizado ✓')
     } catch {
       show('Não consegui salvar — recarregando')
@@ -90,7 +91,7 @@ export default function ConfirmarPage() {
     }
   }
 
-  /** Resposta do professor à pergunta de presença — grava e some da pendência. */
+  /** Marca uma falta declarada pelo professor antes da confirmação. */
   async function responder(registroAlvoId: string, presenca: 'presente' | 'ausente') {
     try {
       await responderPresenca(registroAlvoId, presenca)
@@ -116,7 +117,8 @@ export default function ConfirmarPage() {
     const novosCampos = { ...alvo.campos, [chave]: valor }
     setFatias(fatias.map((f) => (f.id === fatiaId ? { ...f, campos: novosCampos } : f)))
     try {
-      await atualizarFatia(fatiaId, textoFatia(aula, tronco.campos, novosCampos), { [chave]: valor })
+      await atualizarFatia(fatiaId, null, { [chave]: valor })
+      await carregar(true)
       show('Campo atualizado ✓')
     } catch {
       show('Não consegui salvar — recarregando')
@@ -134,10 +136,6 @@ export default function ConfirmarPage() {
     try {
       // garante que TODA fatia presente vai gravar comum + individual
       // (regenera e persiste os textos finais antes da RPC de confirmação)
-      await atualizarFatia(tronco.id, textoTronco(aula, tronco.campos), null)
-      for (const f of fatias.filter((f) => presencaDaFatia(f) !== 'ausente')) {
-        await atualizarFatia(f.id, textoFatia(aula, tronco.campos, f.campos), null)
-      }
       const res = await confirmarRegistro(tronco.id, modo)
       if (res.pendencias.length > 0) {
         setPendencias(res.pendencias)
@@ -198,7 +196,7 @@ export default function ConfirmarPage() {
             }
             action={
               fase === 'erro' ? (
-                <Button size="sm" onClick={carregar}>
+                <Button size="sm" onClick={() => void carregar()}>
                   <i className="fa-solid fa-rotate-right" aria-hidden="true" /> Tentar de novo
                 </Button>
               ) : (
@@ -217,7 +215,6 @@ export default function ConfirmarPage() {
     return <TelaSucesso resultado={sucesso} fatias={fatias} temDever={Boolean(tronco.campos.dever_casa)} />
   }
 
-  const presentes = fatias.filter((f) => presencaDaFatia(f) !== 'ausente')
   const temFatias = fatias.length > 0
   const sub = [aula?.curso, aula?.turma, aula?.data_aula && formatDiaCurto(aula.data_aula), aula?.hora && formatHoraBRT(aula.hora), `Molde ${tronco.molde}`]
     .filter(Boolean)
@@ -267,12 +264,10 @@ export default function ConfirmarPage() {
                     <b className="text-text-primary">{nome}</b>{' '}
                     {p.motivo === 'sem texto' ? 'sem conteúdo pra gravar' : p.motivo}
                     {pergunta && (
-                      <div className="mt-[6px]">
-                        <PerguntaPresenca
-                          nome={nome}
-                          onResponder={(v) => void responder(p.registro_alvo_id, v)}
-                        />
-                      </div>
+                      <p className="mt-[6px] text-[12px] leading-relaxed text-text-secondary">
+                        A presença sem falta declarada é materializada pelo motor na confirmação. Atualize o rascunho
+                        antes de tentar de novo; nada foi marcado nesta tentativa.
+                      </p>
                     )}
                   </li>
                 )
@@ -350,23 +345,34 @@ export default function ConfirmarPage() {
             const foto = (f.aluno_foto_url as string | null) ?? null
             const declarada = presencaDaFatia(f)
             const ausente = declarada === 'ausente'
-            const perguntar = declarada === 'nao_informada'
+            const semFaltaDeclarada = declarada === 'nao_informada'
+            const repertorioDaTurma = typeof tronco.campos.repertorio === 'string' ? tronco.campos.repertorio : null
+            const repertorioIndividual = typeof f.campos.repertorio === 'string' ? f.campos.repertorio : null
+            const repertorioParaEditar = repertorioIndividualVisivel(repertorioDaTurma, repertorioIndividual)
+              ? repertorioIndividual
+              : null
             return (
               <div key={f.id} className={cx(ausente && 'opacity-60')}>
                 <Fatia
                   nome={nomeCompleto}
                   fotoUrl={foto}
-                  presenca={ausente ? 'faltou' : perguntar ? 'perguntar' : 'presente'}
+                  presenca={ausente ? 'faltou' : 'presente'}
                   defaultOpen={!ausente}
-                  // A pergunta vem ANTES do Confirmar, no card onde ele já está
-                  // olhando — e não numa lista de erro depois que a gravação
-                  // falhou. Pendência é a rede; o caminho normal é este.
-                  acao={perguntar ? <PerguntaPresenca nome={primeiro} onResponder={(v) => void responder(f.id, v)} /> : undefined}
+                  acao={
+                    semFaltaDeclarada ? <PresencaPadrao nome={primeiro} onMarcarFalta={() => void responder(f.id, 'ausente')} /> : undefined
+                  }
                 >
                   {ausente ? (
-                    <p className="px-[14px] py-[11px] text-sm text-text-secondary">
-                      Ausente — nada será gravado pra {primeiro}. Nada foi inventado. ✋
-                    </p>
+                    <div className="px-[14px] py-[11px] text-sm text-text-secondary">
+                      <p>Falta declarada — nada será gravado pra {primeiro}. Nada foi inventado. ✋</p>
+                      <button
+                        type="button"
+                        className="mt-2 text-[12.5px] font-bold text-brand-text underline"
+                        onClick={() => void responder(f.id, 'presente')}
+                      >
+                        Desfazer falta
+                      </button>
+                    </div>
                   ) : (
                     <>
                       <CampoEditavel
@@ -375,6 +381,13 @@ export default function ConfirmarPage() {
                         value={(f.campos.progresso as string | null) ?? null}
                         cutucada={`Não ouvi o progresso de ${primeiro} no áudio — toque pra completar (eu nunca invento ✋)`}
                         onSave={(v) => void salvarCampoFatia(f.id, 'progresso', v)}
+                      />
+                      <CampoEditavel
+                        label="Repertório individual"
+                        icon="fa-solid fa-list-ol"
+                        value={repertorioParaEditar}
+                        cutucada={`Repertório individual de ${primeiro} não informado (opcional)`}
+                        onSave={(v) => void salvarCampoFatia(f.id, 'repertorio', v)}
                       />
                       <CampoEditavel
                         label="Próximo passo"
@@ -415,31 +428,28 @@ export default function ConfirmarPage() {
           >
             <i className={cx('fa-solid fa-chevron-down transition-transform', verTextoFinal && 'rotate-180')} aria-hidden="true" />
             {verTextoFinal
-              ? 'Esconder texto final'
+              ? 'Esconder prévia canônica'
               : temFatias
-                ? 'Ver o texto final que será gravado (por aluno)'
-                : 'Ver o texto final que será gravado'}
+                ? 'Ver a prévia canônica (por aluno)'
+                : 'Ver a prévia canônica'}
           </button>
           {verTextoFinal && (
             <div className="mt-2 space-y-2">
-              {temFatias ? (
-                presentes.map((f) => (
-                  <div key={f.id} className="rounded-md border border-border-subtle bg-bg-inset px-3 py-[10px]">
-                    <div className="mb-1 text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">
-                      aula do(a) {(f.aluno_nome as string | null) ?? 'aluno'}
-                    </div>
-                    <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-text-primary">
-                      {textoFatia(aula, tronco.campos, f.campos)}
-                    </pre>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-md border border-border-subtle bg-bg-inset px-3 py-[10px]">
-                  <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-text-primary">
-                    {textoTronco(aula, tronco.campos)}
-                  </pre>
-                </div>
-              )}
+                <PreviaCanonico
+                  titulo="Tronco da turma"
+                  registro={tronco}
+                  presenca={temFatias ? undefined : presencaDaFatia(tronco)}
+                />
+              {temFatias &&
+                fatias.map((f) => (
+                  <PreviaCanonico
+                    key={f.id}
+                    titulo={`Aula de ${(f.aluno_nome as string | null) ?? 'aluno'}`}
+                    registro={f}
+                    presenca={presencaDaFatia(f)}
+                    repertorioTurma={typeof tronco.campos.repertorio === 'string' ? tronco.campos.repertorio : null}
+                  />
+                ))}
             </div>
           )}
         </div>
@@ -508,6 +518,65 @@ export default function ConfirmarPage() {
   )
 }
 
+function PreviaCanonico({
+  titulo,
+  registro,
+  presenca,
+  repertorioTurma,
+}: {
+  titulo: string
+  registro: RegistroRow
+  presenca?: ReturnType<typeof presencaDaFatia>
+  repertorioTurma?: string | null
+}) {
+  const destino = typeof registro.campos.destino_devolutiva === 'string' ? registro.campos.destino_devolutiva : null
+  const situacaoPresenca =
+    presenca === 'presente'
+      ? 'Presente'
+      : presenca === 'ausente'
+        ? 'Faltou — este aluno não receberá lançamento'
+        : presenca
+          ? 'Será marcada como presente ao confirmar'
+          : null
+  const camposEsperados = registro.parent_id
+    ? [
+        ['progresso', 'progresso'],
+        ['repertorio', 'repertório individual'],
+        ['proximo_passo', 'próximo passo'],
+        ['observacao', 'observação'],
+      ]
+    : [
+        ['atividades', 'atividades'],
+        ['objetivo', 'objetivo'],
+        ['materiais', 'materiais'],
+        ['repertorio', 'repertório'],
+        ['obs_gerais', 'observações'],
+        ['dever_casa', 'dever de casa'],
+      ]
+  const camposVazios = camposEsperados
+    .filter(([chave]) => {
+      const valor = typeof registro.campos[chave] === 'string' ? String(registro.campos[chave]) : null
+      return chave === 'repertorio' && registro.parent_id
+        ? !repertorioIndividualVisivel(repertorioTurma, valor)
+        : !valor?.trim()
+    })
+    .map(([, rotulo]) => rotulo)
+
+  return (
+    <div className="rounded-md border border-border-subtle bg-bg-inset px-3 py-[10px]">
+      <div className="mb-1 text-[11px] font-bold uppercase tracking-[.5px] text-text-secondary">{titulo}</div>
+      <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-text-primary">
+        {registro.texto_consolidado?.trim() || '— sem conteúdo no rascunho canônico —'}
+      </pre>
+      {situacaoPresenca && <p className="mt-2 text-[11.5px] text-text-secondary">Presença: {situacaoPresenca}</p>}
+      {camposVazios.length > 0 && <p className="mt-1 text-[11.5px] text-text-secondary">Em branco: {camposVazios.join(', ')}</p>}
+      <p className="mt-1 text-[11.5px] text-text-secondary">
+        Devolutiva: {destino ?? 'rascunho para sua revisão; nunca é enviada automaticamente'}
+      </p>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Sucesso (tela 5 do protótipo) — com o retorno REAL da RPC
 // ---------------------------------------------------------------------------
@@ -572,43 +641,23 @@ function Confetes() {
 }
 
 /**
- * A pergunta que faltava.
- *
- * Até 03/08/2026 o app afirmava "presente" pra qualquer aluno cujo campo de
- * presença não tivesse chegado — e 31 de 31 registros do sistema nunca tiveram
- * esse campo. O professor lia o selo verde, entendia que o sistema sabia, e
- * confirmava. Aqui ele responde em vez de endossar.
+ * O motor 093 torna presente toda fatia sem falta declarada apenas no commit.
+ * A UI explica o efeito e oferece a única exceção explícita; ela nunca pergunta
+ * se o aluno esteve nem faz uma segunda regra de presença.
  */
-function PerguntaPresenca({
-  nome,
-  onResponder,
-}: {
-  nome: string
-  onResponder: (v: 'presente' | 'ausente') => void
-}) {
-  const botao =
-    'flex-1 rounded-md border px-3 py-[9px] text-[13px] font-bold transition-colors'
+function PresencaPadrao({ nome, onMarcarFalta }: { nome: string; onMarcarFalta: () => void }) {
   return (
     <div>
       <p className="mb-[7px] text-[13px] text-text-secondary">
-        Não recebi a presença — <b className="text-text-primary">{nome}</b> esteve nessa aula?
+        Sem falta declarada — <b className="text-text-primary">{nome}</b> será marcado como presente ao confirmar.
       </p>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => onResponder('presente')}
-          className={cx(botao, 'border-success-text text-success-text hover:bg-success-soft')}
-        >
-          <i className="fa-solid fa-check" aria-hidden="true" /> Esteve
-        </button>
-        <button
-          type="button"
-          onClick={() => onResponder('ausente')}
-          className={cx(botao, 'border-danger-text text-danger-text hover:bg-danger-soft')}
-        >
-          <i className="fa-solid fa-xmark" aria-hidden="true" /> Faltou
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={onMarcarFalta}
+        className="rounded-md border border-danger-text px-3 py-[8px] text-[12.5px] font-bold text-danger-text hover:bg-danger-soft"
+      >
+        <i className="fa-solid fa-xmark" aria-hidden="true" /> Marcar falta
+      </button>
     </div>
   )
 }

@@ -1,0 +1,36 @@
+# Artefato versionado do timer do recibo; instalar somente no gate G8 aprovado.
+# E um user unit do usuario fabio: nao usar sudo nem User= neste arquivo.
+#
+# Instalar em ~/.config/systemd/user/ como:
+#   fabio-registro-recibo.service
+#   fabio-registro-recibo.timer
+# Depois, com aprovacao operacional:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now fabio-registro-recibo.timer
+
+# --- ~/.config/systemd/user/fabio-registro-recibo.service ------------------
+[Unit]
+Description=Fabio - entrega o carimbo canonico do registro
+Documentation=https://github.com/LucianoAlf/la-teacher
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+EnvironmentFile=/home/fabio/.hermes/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/flock -n /tmp/fabio-registro-recibo.lock /usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event registro-recibo --channel whatsapp --json
+
+# --- ~/.config/systemd/user/fabio-registro-recibo.timer --------------------
+[Unit]
+Description=Verifica o outbox do recibo do registro a cada 20 segundos
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=20s
+AccuracySec=5s
+Persistent=true
+Unit=fabio-registro-recibo.service
+
+[Install]
+WantedBy=timers.target
