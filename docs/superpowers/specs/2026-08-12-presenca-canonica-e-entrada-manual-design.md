@@ -15,9 +15,10 @@ Os quatro pontos de contato devem ler a mesma decisão local de presença:
 
 Não será criada uma cópia por sistema nem um segundo motor operacional de
 presença. `public.aluno_presenca` continua sendo o registro canônico, uma linha
-por `(aluno_id, aula_emusys_id)`. A exceção deliberada é uma trilha
-**append-only de eventos**, obrigatória para auditoria e conflitos: ela nunca
-fecha chamada, nunca é lida como estado atual e não concorre com a linha
+por `(aluno_id, aula_emusys_id)`. A auditoria mínima reutiliza
+`aluno_presenca_retificacoes` para decisões humanas e `fabio_acao_eventos` para
+WhatsApp; uma tabela nova só é justificada para **conflitos abertos** que não
+cabem nesses contratos. Ela nunca fecha chamada nem concorre com a linha
 canônica. O carimbo visível informa a origem da decisão: **Emusys**,
 **Secretaria · LA Report**, **Professor · LA Teacher** ou **Professor ·
 WhatsApp/Fábio**.
@@ -68,18 +69,23 @@ operacionais e perguntas do Fábio usam `fn_presenca_fecha_chamada`.
    navegador ou LLM.
 3. **Precedência sem apagar prova nem mudança.** Uma resposta humana promove
    uma linha fraca do Emusys e conserva `emusys_presenca_bruta` como evidência.
-   Toda alteração recebida do Emusys é registrada, inclusive
-   `presente → ausente`: ela atualiza a evidência bruta e abre conflito de
-   revisão, mas não troca silenciosamente a decisão já resolvida por uma falta.
-   Se duas decisões humanas divergem, o estado não é “escolhido” por uma regra
-   oculta; ambas ficam auditadas e a UI pede revisão explícita.
-4. **Gêmeos com proveniência.** Uma propagação leva a origem, o vínculo da
-   decisão que a causou, a evidência Emusys relevante e seu momento de leitura.
-   Ela não sobrescreve decisão humana já existente. Para Emusys, apenas
-   `presente` é propagável: ausência bruta não cria falta “confirmada” nem fecha
-   pendência do gêmeo. O retorno da operação distingue `sincronizados`,
-   `mantidos_por_precedencia` e `conflitos_para_revisao`; não reporta sucesso
-   genérico se houve conflito.
+   Uma alteração Emusys `presente → ausente` nunca é descartada: se a presença
+   anterior também era automática, a linha volta a pendência e guarda o valor
+   bruto anterior/instante de mudança; se já há decisão humana, o raw é
+   atualizado e abre divergência para revisão, sem fabricar falta. Conflito só
+   existe quando há duas decisões incompatíveis ou raw Emusys contra decisão
+   humana — não por toda alteração automática. Duas decisões humanas
+   incompatíveis não são resolvidas por regra oculta: a primeira fica canônica
+   até revisão explícita, e a tentativa posterior fica auditada como conflito.
+4. **Gêmeos com proveniência, sem falsificar raw.** Uma propagação leva a
+   referência da decisão que a causou (`espelhado_de_presenca_id` ou equivalente)
+   e a origem, mas **não copia** `emusys_presenca_bruta` nem seu timestamp: cada
+   aula Emusys mantém sua própria evidência; a UI navega para a origem quando
+   precisar explicá-la. Ela não sobrescreve decisão humana já existente. Para
+   Emusys, apenas `presente` é propagável: ausência bruta não cria falta
+   “confirmada” nem fecha pendência do gêmeo. O retorno da operação distingue
+   `sincronizados`, `mantidos_por_precedencia` e `conflitos_para_revisao`; não
+   reporta sucesso genérico se houve conflito.
 5. **Sem promessa de escrita no Emusys.** Hoje a integração conhecida é
    pull-only (`sync-presenca-emusys` lê `/v1/aulas/`). LA Teacher e LA Report
    passam a convergir imediatamente porque usam o mesmo banco. O caminho
@@ -92,20 +98,22 @@ operacionais e perguntas do Fábio usam `fn_presenca_fecha_chamada`.
 - As tabelas permanecem RPC-only; não se abre `INSERT` ou `UPDATE` diretamente
   para `authenticated`, `anon` ou para o bridge.
 - A porta do Fábio permanece `service_role`, mas não aceita mais somente
-  `professor_id + aula_id`. Ela exige uma ação pendente emitida para aquele
-  telefone/professor, com nonce, shortlist de aulas/alunos, expiração e
-  idempotência; uma resposta fora desse contexto é recusada e auditada.
+  `professor_id + aula_id`. Ela entra pela máquina de ações já existente
+  (`fabio_acoes_pendentes`/`fabio_acao_eventos`), que já fornece `acao_id`,
+  `wa_message_id` idempotente, shortlist e expiração. Não será criado nonce
+  paralelo. A resolução telefone→professor continua sendo responsabilidade do
+  bridge autenticado que abre a ação; o banco valida que a resposta pertence à
+  ação e à shortlist, pois `service_role` sozinho não consegue provar a origem
+  física de uma mensagem WhatsApp.
 - A porta da secretaria mantém a checagem de usuário, unidade e permissão
   `agenda.chamada`; cada correção humana preserva a trilha de retificação.
-- `aluno_presenca_eventos` entra no Gate 1 como trilha append-only e sem grants
-  diretos. Só pode ser reutilizada uma tabela equivalente que já exista no
-  snapshot do schema; caso contrário, este é o único nome novo autorizado para
-  o ledger. Cada evento guarda a
-  chave da linha canônica, tipo (`evidencia_emusys_criada/alterada`,
-  `decisao_humana_promovida/corrigida`, `espelho_propagado`,
-  `tentativa_fabio`, `conflito_rejeitado`), antes/depois, origem, ator ou ação
-  quando houver, e vínculo da decisão de origem. A tabela é auditável, não uma
-  fonte de verdade para leitura operacional.
+- `aluno_presenca_retificacoes` já cobre decisão humana de secretaria,
+  `fabio_acao_eventos` já cobre a conversa WhatsApp. O Gate 1 cria apenas
+  `aluno_presenca_conflitos` se o snapshot confirmar que não existe equivalente:
+  chave da linha canônica, decisão/evidência divergente, origem, instante,
+  estado aberto/resolvido e ato de resolução. A mudança raw automática comum
+  fica na própria linha pelos campos atual/anterior/timestamp; não criaremos um
+  ledger universal de cada sync nem uma terceira fonte de auditoria paralela.
 
 ## UX obrigatória
 
@@ -164,14 +172,15 @@ priorizada:
 1. Criar a migration versionada com o resolvedor status-aware, a matriz de
    consumidores e as mudanças mínimas nas RPCs/leitura, sem alterar a
    semântica de `fn_presenca_e_forte`.
-2. Criar a trilha append-only de eventos e gravar nela cada mutação, espelho,
-   conflito e tentativa WhatsApp antes de liberar UI.
+2. Reutilizar as trilhas existentes de retificação e ação WhatsApp; criar apenas
+   o registro de conflito aberto/resolvido se não houver estrutura equivalente.
 3. Fazer cada porta de escrita chamar o sincronizador de gêmeos uma vez, sob a
    mesma precedência, inclusive a secretaria; preservar vínculos de origem e
    retornar contadores de sincronização e conflito.
-4. Estender/rever a porta WhatsApp com ação pendente, nonce, expiração,
-   shortlist e idempotência, sem abrir RLS de tabela. Revogar grants públicos
-   de helpers internos e conceder somente os papéis já necessários.
+4. Estender a transição de chamada da máquina WhatsApp existente com ação
+   pendente, `wa_message_id` idempotente, expiração e shortlist, sem abrir RLS
+   de tabela ou criar nonce paralelo. Revogar grants públicos de helpers
+   internos e conceder somente os papéis já necessários.
 
 ### Gate 2 — cliente e Report
 
@@ -185,21 +194,23 @@ priorizada:
 
 ### Gate 3 — prova
 
-Testes SQL com fixtures descartáveis ou ambiente de integração, nunca inserções
-de teste na produção, cobrem ao menos:
+Testes de contrato SQL, revisão de migration e consultas somente leitura em
+registros reais existentes cobrem ao menos os itens abaixo. Não criar fixtures
+ou presenças sintéticas na produção.
 
 - Emusys/presente fecha a chamada nos dois clientes e exibe a origem;
 - Emusys/ausente permanece pendência no Report e no Teacher;
 - secretaria, professor app e WhatsApp promovem estado fraco sem apagar a
   evidência Emusys;
-- `presente → ausente` no Emusys preserva a decisão resolvida, muda a evidência
-  bruta e abre conflito de revisão;
-- a decisão propagável chega ao gêmeo com vínculo de origem, não pisa em
+- `presente → ausente` no Emusys atualiza a evidência: sem humano, reabre
+  pendência; com humano divergente, abre revisão sem alterar a decisão humana;
+- a decisão propagável chega ao gêmeo com referência de origem, não copia raw,
+  não pisa em
   decisão humana já feita e reporta separadamente sync, manutenção e conflito;
-- tentativa WhatsApp sem ação pendente válida, nonce, telefone, expiração ou
-  idempotência é recusada e vira evento auditável;
-- toda mutação relevante produz exatamente um evento append-only; não há
-  escrita direta de navegador/bridge nas tabelas;
+- tentativa WhatsApp fora de ação pendente, `wa_message_id`, shortlist ou
+  expiração válidos é recusada pela máquina de ações existente;
+- retificação humana, ação WhatsApp e conflito ficam auditados pelas trilhas
+  específicas; não há escrita direta de navegador/bridge nas tabelas;
 - um clique na presença Emusys positiva não destrói a linha;
 - cards individuais, copiar campo e duplicar ficha preservam os dados
   individuais, não copiam presença e pedem confirmação para sobrescrita;
@@ -223,8 +234,8 @@ presença.
    revisão; nenhuma falta humana é fabricada ou escolhida silenciosamente.
 5. Fábio consulta e escreve pelo mesmo contrato, só dentro de ação WhatsApp
    válida, sem acesso SQL direto ou RLS ampliada.
-6. Toda mutação e tentativa relevante fica na trilha append-only, sem criar uma
-   segunda fonte operacional.
+6. Retificações humanas, ações WhatsApp e conflitos têm trilha auditável sem
+   criar um ledger universal ou segunda fonte operacional.
 7. O professor pode escolher áudio ou formulário manual, e turmas mantêm
    repertório, tarefa e progresso de cada aluno com rascunho, versão e proteção
    contra cópia indevida.

@@ -1,16 +1,18 @@
 # Presença canônica entre Emusys, LA Report, LA Teacher e Fábio — plano de implementação
 
 > **Para quem executar:** usar `superpowers:executing-plans`, trabalhar uma task por vez,
-> e não pular o RED/fixture da branch Supabase. Este plano não autoriza produção por si só.
+> e não criar branch Supabase nem fixture sintética em produção. As migrations desta frente
+> são aplicadas diretamente no projeto principal após auditoria e revisão local.
 
 **Objetivo:** Fazer Emusys/presente, secretaria, professor no LA Teacher e professor no
 WhatsApp convergirem para uma única decisão em `public.aluno_presenca`, sem transformar
 ausência bruta em falta humana e sem ocultar conflitos.
 
 **Arquitetura:** `public.aluno_presenca` permanece a única linha operacional por
-`(aluno_id, aula_emusys_id)`. Uma trilha append-only de eventos registra a história; ela
-não é uma segunda fonte de verdade nem fecha chamada. Há duas regras diferentes e ambas
-devem ser usadas pelo consumidor correto:
+`(aluno_id, aula_emusys_id)`. A auditoria reutiliza `aluno_presenca_retificacoes` e
+`fabio_acao_eventos`; uma estrutura nova só registra conflitos ainda abertos. Não será
+criado um ledger universal de sync, e nenhuma trilha fecha chamada. Há duas regras diferentes
+e ambas devem ser usadas pelo consumidor correto:
 
 | Pergunta do consumidor | Regra obrigatória |
 |---|---|
@@ -34,7 +36,7 @@ comportamentos são defeitos a corrigir, não premissas a preservar.
 
 | Repositório | Responsabilidade desta frente |
 |---|---|
-| `D:/la-teacher-worktrees/presenca-canonica` | migration canônica, ledger, resolvedor, gêmeos, Fábio, agenda do professor, checkpoint |
+| `D:/la-teacher-worktrees/presenca-canonica` | migration canônica, resolvedor, conflitos, gêmeos, Fábio, agenda do professor, checkpoint |
 | `D:/2026/LA-performance-report/.worktrees/presenca-canonica` | RPC da chamada da secretaria, UX/badges, documentação da integração |
 | VPS/Fábio | sem writer paralelo: consome somente a RPC endurecida deste banco |
 
@@ -44,16 +46,15 @@ comportamentos são defeitos a corrigir, não premissas a preservar.
   documentados. O trabalho atual é convergência no banco já compartilhado.
 - Funções `SECURITY DEFINER` terão `search_path` fixo e grants explícitos; revogar `PUBLIC`
   explicitamente, porque `CREATE OR REPLACE` preserva privilégios.
-- Não usar o runner que abre `BEGIN/ROLLBACK` em produção. Fixtures e DDL só entram em uma
-  branch Supabase descartável, sem dados sintéticos em produção.
+- Não usar o runner que abre `BEGIN/ROLLBACK` em produção. Não inserir fixtures sintéticas;
+  a validação usa leitura do schema, provas puras, migração versionada e observação de
+  registros reais existentes sem alterá-los fora do caminho oficial.
 
 ## Gate de ambiente obrigatório
 
-Uma branch temporária de banco do projeto custa **US$ 0,01344/hora**. Só criar depois de
-nova confirmação explícita do usuário para este custo. Ela nasce de `ouqwbbermlzqqvtqwlul`,
-deve ficar `ACTIVE_HEALTHY` e ser excluída ao fim da evidência. Nunca reutilizar as branches
-`diag-kpis-alunos-20260805`, `p01c-staging` ou
-`professores-health-score-gates-20260806`.
+O projeto Supabase principal `ouqwbbermlzqqvtqwlul` é o alvo autorizado. Não criar branch
+Supabase, não pedir custo e não reutilizar nenhuma branch de banco existente. O isolamento é
+somente de Git: este worktree do LA Teacher e um worktree separado do LA Report.
 
 ### Task 1 — Congelar o ponto de partida e preparar ambientes isolados
 
@@ -61,9 +62,7 @@ deve ficar `ACTIVE_HEALTHY` e ser excluída ao fim da evidência. Nunca reutiliz
 - Modify: `D:/la-teacher-worktrees/presenca-canonica/RETOMADA.md`
 - Create: `D:/2026/LA-performance-report/.worktrees/presenca-canonica`
 
-- [ ] Confirmar o custo, criar `presenca-canonica-20260812`, aguardar
-  `ACTIVE_HEALTHY` e anotar o `project_ref` efêmero no checkpoint.
-- [ ] Em produção, somente leitura, registrar `schema_migrations` a partir de
+- [x] Em produção, somente leitura, registrar `schema_migrations` a partir de
   `20260811000000`, assinaturas/MD5/ACL de todas as funções abaixo e o schema real de
   `aluno_presenca` e das tabelas de ações do Fábio:
 
@@ -82,10 +81,10 @@ deve ficar `ACTIVE_HEALTHY` e ser excluída ao fim da evidência. Nunca reutiliz
   order by p.proname;
   ```
 
-- [ ] Verificar que a migration aplicada
+- [x] Verificar que a migration aplicada
   `20260812135033_fix_presence_json_null_confirmation` está no ancestral local. Checar
   migrations não commitadas nos worktrees principais antes de gerar qualquer timestamp.
-- [ ] Criar o worktree do Report a partir de `origin/main`, sem aproveitar uma frente de
+- [x] Criar o worktree do Report a partir de `origin/main`, sem aproveitar uma frente de
   áudio/WhatsApp concorrente:
 
   ```powershell
@@ -93,41 +92,46 @@ deve ficar `ACTIVE_HEALTHY` e ser excluída ao fim da evidência. Nunca reutiliz
   git -C D:\2026\LA-performance-report worktree add -b codex/presenca-canonica-report D:\2026\LA-performance-report\.worktrees\presenca-canonica origin/main
   ```
 
-- [ ] Atualizar `RETOMADA.md` somente com fatos medidos: refs, SHAs, hashes, schema,
-  `project_ref` e status da branch. Não marcar migration/UI como pronta.
+- [x] Atualizar `RETOMADA.md` somente com fatos medidos: refs, SHAs, hashes, schema e
+  status dos worktrees. Não marcar migration/UI como pronta.
 
-### Task 2 — Escrever a prova SQL vermelha antes da migration
+### Task 2 — Escrever a prova de contrato antes da migration
 
 **Files:**
 - Create: migration e `.test.sql` geradas pelo CLI para a frente LA Teacher
 - Create: migration e `.test.sql` geradas pelo CLI para a frente LA Report
 
-- [ ] Gerar os nomes pelo CLI, sem inventar timestamp, e criar a fixture descartável na
-  branch: unidade, professor, roster, aula de turma e individuais gêmeas no mesmo horário.
-- [ ] A fixture deve fazer cada write em statement separado antes da asserção seguinte;
-  nunca chamar RPC que escreve dentro de `WHERE`/subconsulta que leia snapshot anterior.
-- [ ] Provar RED para a regra ainda ausente, com ao menos estes casos:
+- [ ] Gerar os nomes pelo CLI, sem inventar timestamp, e escrever primeiro os testes de
+  contrato ao lado da migration. Eles usam funções puras, inspeção de definição/ACL e,
+  quando houver evidência real já existente, somente `SELECT` sobre ela. Não criar fixture
+  nem chamar writer de presença fora do fluxo real.
+- [ ] A prova não pode chamar RPC que escreve dentro de `WHERE`/subconsulta que leia snapshot
+  anterior. Para a mudança de estado, a prova mínima é a lógica SQL testável isoladamente e
+  a inspeção de que a migration substituiu o ramo sticky correto.
+- [ ] Cobrir, no código e nas consultas de contrato, ao menos estes casos:
 
   1. humano + `NULL` e humano + `indeterminado` não fecham;
   2. Emusys `presente` fecha, Emusys `ausente`/`NULL` não;
-  3. Emusys `presente → ausente` preserva a decisão anterior, atualiza a evidência bruta e
-     abre conflito de revisão — nunca é descartado, nunca vira falta humana;
+  3. Emusys `presente → ausente` é aplicado: sem decisão humana, reabre pendência; com
+     decisão humana divergente, atualiza raw e abre conflito — nunca é descartado, nunca
+     vira falta humana;
   4. decisão Secretaria, Teacher e Fábio promove evidência fraca sem apagar raw Emusys;
   5. espelho turma↔individual leva o vínculo da decisão e não pisa em humano; conflito de
      humanos é contado e auditado, não sobrescrito;
   6. `vw_presenca_pendencia`, `fabio_aulas_candidatas` e guards de “já enviado” tratam
      Emusys/presente como resolvido e Emusys/ausente como pendente;
   7. `indeterminado` em `app_registrar_chamada_agenda` não apaga linha nem raw Emusys;
-  8. chamada Fábio sem ação pendente, nonce, telefone, shortlist, expiração ou idempotência
-     válidos é recusada e gera evento de tentativa;
-  9. cada mutação/espelho/conflito escreve exatamente um evento append-only; e
+  8. chamada Fábio fora da ação pendente existente, `wa_message_id`, shortlist ou expiração
+     válidos é recusada pela máquina de ações; e
+  9. retificações humanas, ações WhatsApp e conflitos usam trilhas específicas sem criar
+     evento universal para cada sync; e
   10. `anon`/`authenticated` não executam helpers internos, enquanto apenas a porta Fábio
       continua executável por `service_role`.
 
-- [ ] Rodar apenas na branch efêmera e registrar a falha de contrato, não uma falha de
-  fixture/permissão. Corrigir a fixture até o vermelho demonstrar a regra ausente.
+- [ ] Rodar a prova local/readonly e registrar a ausência atual como baseline. Não usar o
+  projeto principal para fabricar RED/fixture.
 
-### Task 3 — Implementar contrato canônico, conflitos, ledger e Fábio
+### Task 3 — Implementar contrato canônico, conflitos e Fábio
 
 **Files:**
 - Create: migration CLI-generated `presenca_canonica_resolvedor_conflitos` e par de testes
@@ -149,23 +153,23 @@ deve ficar `ACTIVE_HEALTHY` e ser excluída ao fim da evidência. Nunca reutiliz
   Não alterar `fn_presenca_e_forte` nem usar `respondido_por` sozinho em decisão
   operacional.
 
-- [ ] Criar `aluno_presenca_eventos` como ledger append-only com a chave da linha canônica,
-  tipo de evento, estado/origem antes e depois, raw Emusys antes/depois, instante, ator ou
-  ação Fábio quando houver e referência da decisão de origem. Confirmar os tipos exatos a
-  partir do snapshot da Task 1; ativar RLS e não conceder escrita direta a cliente. Helpers
-  internos são as únicas inserções permitidas. O ledger não alimenta `pendência` nem o
-  booleano de chamada.
+- [ ] Reutilizar `aluno_presenca_retificacoes` para correções humanas e
+  `fabio_acao_eventos` para a conversa. Criar `aluno_presenca_conflitos` somente para
+  divergência ainda aberta, com RLS sem grants diretos: chave canônica, snapshot da decisão
+  e da evidência divergente, origem, instante, estado e resolução autorizada. Ela não
+  alimenta pendência nem o booleano de chamada.
 
-- [ ] Estender a linha canônica somente com o mínimo para tornar conflitos consultáveis
-  pela RPC: vínculo da decisão de origem no espelho, instante da última evidência Emusys e
-  indicador/referência de conflito aberto. Ao receber `presente → ausente`,
-  `upsert_presenca_emusys_bruta` deve gravar o raw e evento novo, manter a decisão resolvida
-  já existente e abrir conflito. Uma correção humana explícita resolve o conflito e cria
-  novo evento; duas decisões humanas incompatíveis não são escolhidas em silêncio.
+- [ ] Estender a linha canônica somente com o mínimo para tornar mudança Emusys e espelho
+  consultáveis pela RPC: raw anterior/instante de mudança, `espelhado_de_presenca_id` e
+  referência de conflito aberto. Ao receber `presente → ausente`,
+  `upsert_presenca_emusys_bruta` atualiza o raw: se era automático, remove a decisão
+  automática e reabre pendência; se existe decisão humana, mantém-na e abre conflito. Uma
+  correção humana explícita resolve conflito; duas decisões humanas incompatíveis não são
+  escolhidas em silêncio.
 
 - [ ] Recriar `fn_sincronizar_gemeos_presenca` e seu gatilho interno para propagar somente
-  decisões que passam pelo resolvedor. O espelho deve transportar origem, referência da
-  decisão, raw Emusys e instante; devolver ou registrar separadamente
+  decisões que passam pelo resolvedor. O espelho transporta origem e referência da decisão,
+  mas não copia raw Emusys de uma aula para a outra; devolver ou registrar separadamente
   `sincronizados`, `mantidos_por_precedencia` e `conflitos_para_revisao`. O guard de
   profundidade evita recursão, mas não pode suprimir o evento de espelho.
 
@@ -175,15 +179,16 @@ deve ficar `ACTIVE_HEALTHY` e ser excluída ao fim da evidência. Nunca reutiliz
   `fabio_registrar_presencas_aula`. Manter `fn_presenca_e_forte` onde a pergunta é autoria
   humana, auditoria humana ou métrica analítica.
 
-- [ ] Endurecer o Fábio sobre o mecanismo de ações já existente: a RPC de registro recebe
-  uma ação pendente de presença, valida `nonce` de uso único, professor resolvido pelo
-  telefone, shortlist aula/aluno, expiração e chave idempotente, registra tentativa aceita
-  ou recusada no ledger e só então chega em `fn_registrar_presencas_core` com origem
-  `professor_whatsapp`. A assinatura final é decidida após o snapshot das tabelas/RPCs de
-  ação; nunca acrescentar uma RPC que aceite IDs arbitrários do bridge.
+- [ ] Endurecer o Fábio reaproveitando o mecanismo de ações existente:
+  `fabio_acoes_pendentes` já contém ação, shortlist e expiração, e
+  `fabio_acao_eventos.wa_message_id` já dá idempotência. A confirmação de chamada entra
+  como transição dessa máquina, valida professor da ação e shortlist, e só então chega em
+  `fn_registrar_presencas_core` com origem `professor_whatsapp`. Não criar nonce paralelo
+  nem RPC que aceite IDs arbitrários do bridge. A resolução telefone→professor é auditada
+  na borda bridge e deve ser verificada antes de alterar seu contrato.
 
 - [ ] Fechar ACLs explicitamente após os `CREATE OR REPLACE`: revogar `PUBLIC`, `anon` e
-  `authenticated` dos helpers de resolver, ledger e gêmeos; não conceder helper ao
+  `authenticated` dos helpers de resolver, conflito e gêmeos; não conceder helper ao
   `service_role` se somente RPC interna precisa dele. Manter grants existentes apenas nas
   portas públicas autenticadas e na porta Fábio `service_role`; testar com
   `has_function_privilege`.
@@ -193,7 +198,9 @@ deve ficar `ACTIVE_HEALTHY` e ser excluída ao fim da evidência. Nunca reutiliz
   consome somente esses campos; rótulos puros devem cobrir Emusys, Secretaria, Teacher e
   WhatsApp, inclusive a mensagem de conflito sem fingir “falta confirmada”.
 
-- [ ] Aplicar GREEN na branch e depois localmente: testes SQL, teste unitário novo,
+- [ ] Depois da revisão local e do diff da migration, aplicar no projeto principal pela
+  ferramenta de migration e verificar sem fixture: schema, ACL, definição, explicação do
+  plano e leituras de registros reais. Rodar também teste unitário novo,
   TypeScript e build. Registrar de forma separada qualquer falha preexistente de Vitest; não
   chamá-la de verde global.
 
@@ -246,9 +253,9 @@ migration/RPC de rascunho e testes de estado/UX.
 
 **Files:** SPEC, `RETOMADA.md` e documentação de integração nos dois repos.
 
-- [ ] Aplicar primeiro a migration do Teacher e depois a do Report na branch temporária;
-  reexecutar as fixtures completas e conferir gêmeos, ledger, raw, conflito e ACLs depois de
-  cada transição.
+- [ ] Aplicar primeiro a migration do Teacher e depois a do Report diretamente no projeto
+  principal, uma por vez. Depois de cada uma, conferir schema, funções, ACLs, conflitos e
+  leituras de registros reais; nunca criar presença de teste.
 - [ ] Rodar Security e Performance Advisors. Provar, por consulta, que `anon` e
   `authenticated` não executam helpers, que a porta Fábio mantém `service_role` e que nenhum
   `SECURITY DEFINER` novo ficou em `PUBLIC` por omissão.
@@ -259,9 +266,8 @@ migration/RPC de rascunho e testes de estado/UX.
   migration Report, deploys e consulta de produção sem fixture. Parar a cada gate se houver
   migration concorrente ou divergência de hash.
 - [ ] Atualizar `RETOMADA.md` com SHA, versions de migration, funções/ACL efetivas, links de
-  evidência, conflito conhecido e próximo gate. Excluir a branch temporária somente após a
-  prova e registrar a exclusão. Rollback é migration corretiva/feature flag; nunca apagar a
-  trilha de presença.
+  evidência, conflito conhecido e próximo gate. Rollback é migration corretiva/feature flag;
+  nunca apagar a trilha de presença.
 
 ## Critérios de aceite
 
@@ -269,11 +275,12 @@ migration/RPC de rascunho e testes de estado/UX.
    pendência humana.
 2. O mesmo conceito operacional é usado em sessão, fila, Fábio e guards, enquanto métricas
    humanas continuam em `fn_presenca_e_forte`.
-3. Mudança Emusys `presente → ausente` e qualquer conflito humano são visíveis, auditados e
-   não fabricam falta humana nem descartam evidência.
-4. Espelhos carregam proveniência e devolvem contadores de sincronização, manutenção e
-   conflito.
-5. Fábio só escreve dentro de ação WhatsApp válida, única e idempotente.
-6. A trilha append-only registra cada evento relevante sem virar fonte operacional paralela.
+3. Mudança Emusys `presente → ausente` reabre pendência automática ou abre conflito apenas
+   quando contradiz decisão humana; nunca fabrica falta nem descarta raw.
+4. Espelhos carregam referência de proveniência, sem copiar raw entre aulas, e devolvem
+   contadores de sincronização, manutenção e conflito.
+5. Fábio só escreve pela ação WhatsApp existente, válida, única e idempotente.
+6. Retificações humanas, ações WhatsApp e conflitos têm trilhas específicas, sem ledger
+   universal ou fonte operacional paralela.
 7. O professor pode escolher áudio ou ficha manual, com rascunho, versão, recuperação de
    conexão e campos realmente individuais em turma.

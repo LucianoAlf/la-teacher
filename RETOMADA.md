@@ -25,9 +25,9 @@ precisam usar `public.aluno_presenca` como mesma decisão local, mostrando a
 origem. O Emusys é válido quando marca **presente**; `ausente` vindo dele segue
 como pendência operacional até decisão humana. A equipe pode resolver no LA
 Report, o professor no app ou WhatsApp/Fábio. Nenhuma dessas portas pode apagar
-evidência bruta do Emusys ou abrir escrita direta por RLS. A única tabela nova
-admitida é uma trilha append-only de eventos: ela é auditoria, não uma segunda
-fonte operacional.
+evidência bruta do Emusys ou abrir escrita direta por RLS. A auditoria reutiliza
+retificações humanas e ações WhatsApp; só uma estrutura focada em conflitos
+abertos é admitida, se não existir equivalente no schema.
 
 **Fonte de verdade do desenho:**
 `docs/superpowers/specs/2026-08-12-presenca-canonica-e-entrada-manual-design.md`.
@@ -45,6 +45,11 @@ Esse commit já contém a migration produtiva `20260812135033` (presença JSON
 nula). Ela é apenas pré-requisito de histórico e **não** resolve a convergência
 de fontes.
 
+**Worktree complementar criado (somente Git):**
+`D:\2026\LA-performance-report\.worktrees\presenca-canonica`, branch
+`codex/presenca-canonica-report`, baseado em `origin/main` no commit
+`3f850cc5`. Nenhuma branch Supabase foi criada.
+
 **Fatos auditados antes do desenho:**
 
 - `fn_presenca_e_forte(respondido_por)` é a régua humana histórica; **não
@@ -57,43 +62,48 @@ de fontes.
 - A matriz de consumidores é parte do contrato: `fn_presenca_e_forte` continua
   para autoria/evidência humana; pendências, sessão, Fábio e guards de chamada
   usam o novo resolvedor. Não trocar uma pela outra por grep genérico.
+- O snapshot remoto confirmou as trilhas existentes: `aluno_presenca_retificacoes`
+  para retificação humana, `fabio_acoes_pendentes` para a ação WhatsApp e
+  `fabio_acao_eventos` para idempotência por `wa_message_id`. Não criar ledger
+  universal; criar somente conflito aberto/resolvido se não houver equivalente.
 - `upsert_presenca_emusys_bruta` hoje descarta `presente → ausente`, e
   `app_registrar_chamada_agenda(...indeterminado)` pode apagar a linha. Ambos
-  são comportamentos a corrigir na branch efêmera: registrar raw novo, manter a
-  decisão anterior, abrir conflito revisável e deixar evento append-only.
-- Espelhos precisam carregar a referência da decisão que os originou, raw e
-  instante Emusys; devolvem/registram sincronizados, mantidos por precedência e
-  conflitos. Conflitos humanos nunca são decididos silenciosamente.
+  são comportamentos a corrigir no projeto principal: atualização automática
+  reabre pendência; só divergência contra humano abre conflito revisável.
+- Espelhos precisam carregar a referência da decisão que os originou, mas nunca
+  copiar raw Emusys entre aulas. Devolvem/registram sincronizados, mantidos por
+  precedência e conflitos. Conflitos humanos nunca são decididos silenciosamente.
 - `sync-presenca-emusys` conhecido é pull-only. LA Teacher/Report convergem já
   pelo banco compartilhado; escrita de volta na API Emusys fica bloqueada até
   endpoint externo, autenticação e idempotência verificáveis.
 - Fábio continua por RPC server-side com `professor_whatsapp`; não receberá
-  grant direto de tabela nem acesso SQL no chat. Antes de escrever, a RPC deve
-  validar ação pendente vinculada ao telefone/professor, nonce de uso único,
-  shortlist, expiração e idempotência; tentativas recusadas também são
-  auditadas.
+  grant direto de tabela nem acesso SQL no chat. Ação pendente, shortlist,
+  expiração e idempotência já existem em `fabio_acoes_pendentes` e
+  `fabio_acao_eventos`; a correção deve reaproveitá-las, não inventar nonce
+  paralelo. A identidade telefone→professor é prova do bridge, não algo que
+  `service_role` sozinho possa provar dentro do Postgres.
 
 **Plano versionado:**
 `docs/superpowers/plans/2026-08-12-presenca-canonica.md`. Ele separa o contrato
 de presença do formulário manual e fixa a propriedade: LA Teacher mantém
-resolvedor/ledger/gêmeos/Fábio/leitura; LA Report mantém a RPC e a UX da chamada.
+resolvedor/conflitos/gêmeos/Fábio/leitura; LA Report mantém a RPC e a UX da chamada.
 A auditoria remota confirmou que `fn_sincronizar_gemeos_presenca(integer)` ainda é
 `SECURITY DEFINER` executável por `PUBLIC`/`anon`/`authenticated`; a migration
 planejada revoga essas ACLs sem abrir outra porta de escrita. A porta do Fábio
 `fabio_registrar_presencas_aula` permanece exclusiva de `service_role`, mas a
 autorização contextual WhatsApp ainda precisa ser implementada/testada.
 
-**Gate pendente, antes de qualquer fixture ou DDL:** criar branch Supabase
-efêmera do projeto `ouqwbbermlzqqvtqwlul`. O custo consultado é US$ 0,01344/hora
-e requer confirmação explícita do Alf na ferramenta. O runner SQL atual abre
-uma transação contra produção; não usá-lo aqui, mesmo com rollback, pois esta
-frente não cria dados sintéticos na produção.
+**Alvo de banco decidido pelo Alf:** aplicar as migrations diretamente no projeto
+Supabase principal `ouqwbbermlzqqvtqwlul`; não criar branch Supabase e não pedir
+custo. O isolamento desta frente é somente de Git. O runner SQL atual abre uma
+transação contra produção; não usá-lo aqui, mesmo com rollback, pois esta frente
+não cria dados sintéticos na produção.
 
-**PRÓXIMO PASSO desta frente:** após a confirmação do custo, criar a branch
-efêmera e o worktree `codex/presenca-canonica-report`, revalidar migrations,
-schema de ações do Fábio e ACLs, escrever os testes RED para resolvedor,
-`presente → ausente`, ledger, espelhos e autorização contextual WhatsApp; só
-então implementar. Não tocar nas branches paralelas `fabio-whatsapp`,
+**PRÓXIMO PASSO desta frente:** criar somente o worktree
+`codex/presenca-canonica-report`, revalidar migrations, schema de ações do
+Fábio e ACLs, escrever as provas de contrato sem fixtures para resolvedor,
+`presente → ausente`, conflitos, espelhos e autorização contextual WhatsApp; só
+então implementar e aplicar as migrations no projeto principal. Não tocar nas branches paralelas `fabio-whatsapp`,
 `fabio-pendencias-whatsapp` ou áudio.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
