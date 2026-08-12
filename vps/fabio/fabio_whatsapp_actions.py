@@ -228,15 +228,33 @@ def _start_from_candidates(backend: FabioWhatsappBackend, context: dict[str, Any
     return _result("call_preview", reply="Encontrei a aula. Quem esteve presente? Confirma essa chamada?", action_id=str(action["id"]), aula_id=aula_id)
 
 
-def _looks_like_class_refinement(text: str) -> bool:
+def _mentions_candidate_student(text: str, candidates: list[dict[str, Any]]) -> bool:
+    hay = str(text or "").lower()
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        alunos = candidate.get("alunos") or candidate.get("alunos_sem_presenca_forte") or []
+        if not isinstance(alunos, list):
+            continue
+        for aluno in alunos:
+            if not isinstance(aluno, dict):
+                continue
+            nome = str(aluno.get("nome") or "").strip().lower()
+            if len(nome) >= 3 and re.search(rf"\b{re.escape(nome)}\b", hay):
+                return True
+    return False
+
+
+def _looks_like_class_refinement(text: str, candidates: list[dict[str, Any]] | None = None) -> bool:
     hay = str(text or "").lower()
     return bool(
-        re.search(r"\b(?:[01]?\d|2[0-3])(?:h|:[0-5]\d)\b", hay)
+        re.search(r"\b(?:[01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)(?:\s*[0-5]\d)?(?!\s*\d)\b", hay)
         or re.search(r"\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b", hay)
         or any(word in hay for word in (
             "hoje", "ontem", "amanha", "amanhã", "turma", "curso",
             "piano", "teclado", "violao", "violão", "canto", "guitarra",
         ))
+        or _mentions_candidate_student(text, candidates or [])
     )
 
 
@@ -247,17 +265,37 @@ def _refine_pending_class(
 ) -> dict[str, Any] | None:
     if action.get("tipo") not in {"escolher_aula_audio", "escolher_aula_chamada"}:
         return None
-    if action.get("candidatas"):
-        return None
-    if not _looks_like_class_refinement(context.get("text") or ""):
+    text = str(context.get("text") or "")
+    if not action.get("candidatas") and not _looks_like_class_refinement(text):
         return None
 
     fluxo = "registro" if action.get("tipo") == "escolher_aula_audio" else "chamada"
+    candidates = _pool(backend, context, fluxo)
+    if action.get("candidatas"):
+        allowed_ids = {
+            int(candidate_id)
+            for candidate_id in action["candidatas"]
+            if str(candidate_id).isdigit()
+        }
+        candidates = [
+            candidate for candidate in candidates
+            if isinstance(candidate, dict)
+            and str(candidate.get("aula_id")).isdigit()
+            and int(candidate["aula_id"]) in allowed_ids
+        ]
+        if not _looks_like_class_refinement(text, candidates):
+            return None
     shortlist = reduzir_shortlist(
-        str(context.get("text") or ""),
-        _pool(backend, context, fluxo),
+        text,
+        candidates,
     )
     if shortlist["status"] == "nenhuma":
+        if action.get("candidatas"):
+            return _result(
+                "choose_audio_class" if fluxo == "registro" else "choose_call_class",
+                reply="Não consegui identificar uma única aula com segurança. Qual das opções que enviei foi?",
+                action_id=str(action["id"]),
+            )
         return _result(
             "no_candidate",
             reply="Ainda não encontrei uma aula compatível com esse dia, horário ou turma. Não gravei nada.",
@@ -269,14 +307,22 @@ def _refine_pending_class(
         _event(backend, action, context, "pergunta_refinada", {})
         return _result("refine_class", reply=shortlist["pergunta"], action_id=str(action["id"]))
 
-    _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
     if shortlist["status"] == "perguntar":
+        if action.get("candidatas"):
+            return _result(
+                "choose_audio_class" if fluxo == "registro" else "choose_call_class",
+                reply=shortlist["pergunta"],
+                action_id=str(action["id"]),
+            )
+        _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
         return _result(
             "choose_audio_class" if fluxo == "registro" else "choose_call_class",
             reply=shortlist["pergunta"],
             action_id=str(action["id"]),
         )
 
+    if not action.get("candidatas"):
+        _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
     aula_id = int(shortlist["aula_id"])
     if fluxo == "registro":
         return _select_and_enqueue_audio(backend, context, action, aula_id)
@@ -315,14 +361,14 @@ def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, An
     if kind == "adiar":
         _event(backend, action, context, "adiado", {})
         return _result("deferred", reply="Tudo bem. Deixei para depois sem renovar o prazo.", action_id=str(action["id"]))
-    refined = _refine_pending_class(backend, context, action)
-    if refined is not None:
-        return refined
     if kind == "escolher_aula":
         if action.get("tipo") == "escolher_aula_audio":
             return _select_and_enqueue_audio(backend, context, action, int(response["aula_id"]))
         _event(backend, action, context, "aula_escolhida", {"aula_id": int(response["aula_id"])})
         return _result("call_preview", reply="Encontrei a aula. Confirma essa chamada?", action_id=str(action["id"]), aula_id=int(response["aula_id"]))
+    refined = _refine_pending_class(backend, context, action)
+    if refined is not None:
+        return refined
     if kind == "confirmar_intencao":
         if action.get("tipo") == "confirmar_intencao_audio":
             _event(backend, action, context, "intencao_confirmada", {})

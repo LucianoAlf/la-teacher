@@ -184,6 +184,276 @@ class WhatsappActionsTest(unittest.TestCase):
         shortlist = next(payload for name, payload in backend.calls if name == "fabio_aplicar_evento_acao" and payload["p_evento"] == "shortlist_definida")
         self.assertEqual(shortlist["p_dados"]["candidatas"], [101, 102])
 
+    def test_pending_audio_choice_accepts_natural_reply_only_within_shortlist(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [101, 102],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15", "alunos": [{"nome": "Beatriz Ohana"}]},
+            {"aula_id": 102, "data": "2026-08-06", "hora": "20:00", "curso": "Canto T", "turma": "C_Qui_20", "alunos": [{"nome": "Outra Aluna"}]},
+            {"aula_id": 103, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15", "alunos": [{"nome": "Beatriz Ohana"}]},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                wa_message_id="selecao-natural",
+                kind="audio",
+                text="Estou falando da Beatriz Ohana, das 15 horas, da Unidade Barra.",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        enqueue = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertEqual(enqueue["p_aula_id"], 101)
+        self.assertNotEqual(enqueue["p_aula_id"], 103)
+
+    def test_pending_audio_choice_ambiguous_natural_reply_does_not_mutate_shortlist(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [101, 102],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+            {"aula_id": 102, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                wa_message_id="selecao-natural-ambigua",
+                kind="audio",
+                text="Foi a aula das 15 horas.",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "choose_audio_class")
+        names = [name for name, _ in backend.calls]
+        self.assertNotIn("fabio_aplicar_evento_acao", names)
+        self.assertNotIn("fabio_enfileirar_audio", names)
+
+    def test_pending_audio_choice_natural_hour_selects_without_shortlist_event(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [101, 102],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+            {"aula_id": 102, "data": "2026-08-12", "hora": "16:00", "curso": "Canto T", "turma": "C_Qua_16"},
+            {"aula_id": 103, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                wa_message_id="selecao-natural-horario",
+                kind="audio",
+                text="Foi a aula das 15 horas.",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        enqueue = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertEqual(enqueue["p_aula_id"], 101)
+        events = [
+            payload["p_evento"] for name, payload in backend.calls
+            if name == "fabio_aplicar_evento_acao"
+        ]
+        self.assertEqual(events, ["aula_escolhida", "audio_enfileirado"])
+
+    def test_pending_audio_choice_spaced_hour_selects_within_shortlist(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [101, 102],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+            {"aula_id": 102, "data": "2026-08-12", "hora": "16:00", "curso": "Canto T", "turma": "C_Qua_16"},
+            {"aula_id": 103, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                wa_message_id="selecao-natural-horario-espacado",
+                kind="audio",
+                text="Foi a aula das 15 h.",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        enqueue = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertEqual(enqueue["p_aula_id"], 101)
+        self.assertNotEqual(enqueue["p_aula_id"], 103)
+
+    def test_pending_audio_choice_time_does_not_select_matching_id(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [15, 101],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 15, "data": "2026-08-12", "hora": "16:00", "curso": "Canto T", "turma": "C_Qua_16"},
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+            {"aula_id": 103, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                wa_message_id="selecao-natural-horario-id-15",
+                kind="audio",
+                text="Foi a aula das 15 h.",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        enqueue = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertEqual(enqueue["p_aula_id"], 101)
+        self.assertNotEqual(enqueue["p_aula_id"], 15)
+        self.assertNotEqual(enqueue["p_aula_id"], 103)
+
+    def test_pending_audio_choice_time_minutes_refine_instead_of_selecting_id(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [30, 101],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        candidates = [
+            {"aula_id": 30, "data": "2026-08-12", "hora": "16:00", "curso": "Canto T", "turma": "C_Qua_16"},
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:30", "curso": "Canto T", "turma": "C_Qua_1530"},
+            {"aula_id": 103, "data": "2026-08-12", "hora": "15:30", "curso": "Canto T", "turma": "C_Qua_1530"},
+        ]
+        for text in ("Foi a aula das 15 h 30.", "Foi a aula das 15:30."):
+            with self.subTest(text=text):
+                backend = FakeBackend(action=dict(action), candidates=candidates)
+                result = tratar_mensagem_professor(
+                    professor_context(
+                        wa_message_id=f"selecao-natural-horario-minuto-{text}",
+                        kind="audio",
+                        text=text,
+                    ),
+                    backend,
+                )
+                self.assertEqual(result["code"], "audio_enqueued")
+                self.assertIn("fabio_aulas_candidatas", [name for name, _ in backend.calls])
+                enqueue = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")
+                self.assertEqual(enqueue["p_aula_id"], 101)
+                self.assertNotEqual(enqueue["p_aula_id"], 30)
+                self.assertNotEqual(enqueue["p_aula_id"], 103)
+
+    def test_pending_audio_choice_invalid_time_minutes_do_not_enqueue_candidate_id(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [99, 101],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        candidates = [
+            {"aula_id": 99, "data": "2026-08-12", "hora": "16:00", "curso": "Canto T", "turma": "C_Qua_16"},
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+        ]
+        for text in ("Foi a aula das 15 h 99.", "Foi a aula das 15:99."):
+            with self.subTest(text=text):
+                backend = FakeBackend(action=dict(action), candidates=candidates)
+                result = tratar_mensagem_professor(
+                    professor_context(
+                        wa_message_id=f"selecao-natural-horario-invalido-{text}",
+                        kind="audio",
+                        text=text,
+                    ),
+                    backend,
+                )
+                self.assertEqual(result["code"], "pending_question")
+                names = [name for name, _ in backend.calls]
+                self.assertNotIn("fabio_aplicar_evento_acao", names)
+                self.assertNotIn("fabio_enfileirar_audio", names)
+
+    def test_pending_audio_choice_known_student_name_selects_within_shortlist(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [101, 102],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "alunos": [{"nome": "Beatriz Ohana"}]},
+            {"aula_id": 102, "data": "2026-08-12", "hora": "16:00", "curso": "Canto T", "alunos": [{"nome": "Outra Aluna"}]},
+            {"aula_id": 103, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "alunos": [{"nome": "Beatriz Ohana"}]},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                wa_message_id="selecao-natural-aluna",
+                kind="audio",
+                text="Foi a Beatriz Ohana.",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        enqueue = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertEqual(enqueue["p_aula_id"], 101)
+        self.assertNotEqual(enqueue["p_aula_id"], 103)
+
+    def test_pending_audio_choice_explicit_id_overrides_conflicting_natural_time(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [101, 102],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+            {"aula_id": 102, "data": "2026-08-12", "hora": "16:00", "curso": "Canto T", "turma": "C_Qua_16"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                wa_message_id="selecao-explicita-conflitante",
+                kind="audio",
+                text="A aula 102, às 15 horas.",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        enqueue = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertEqual(enqueue["p_aula_id"], 102)
+
     def test_mixed_text_asks_intention_without_call_pool(self):
         backend = FakeBackend(candidates=[{"aula_id": 101}])
         result = tratar_mensagem_professor(professor_context(text="A Sofia faltou e trabalhamos respiração"), backend)
