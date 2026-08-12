@@ -211,6 +211,34 @@ class WhatsappActionsTest(unittest.TestCase):
         self.assertEqual(enqueue["p_aula_id"], 101)
         self.assertNotEqual(enqueue["p_aula_id"], 103)
 
+    def test_pending_audio_choice_ambiguous_natural_reply_does_not_mutate_shortlist(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [101, 102],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+            {"aula_id": 102, "data": "2026-08-12", "hora": "15:00", "curso": "Canto T", "turma": "C_Qua_15"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                wa_message_id="selecao-natural-ambigua",
+                kind="audio",
+                text="Foi a aula das 15 horas.",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "choose_audio_class")
+        names = [name for name, _ in backend.calls]
+        self.assertNotIn("fabio_aplicar_evento_acao", names)
+        self.assertNotIn("fabio_enfileirar_audio", names)
+
     def test_mixed_text_asks_intention_without_call_pool(self):
         backend = FakeBackend(candidates=[{"aula_id": 101}])
         result = tratar_mensagem_professor(professor_context(text="A Sofia faltou e trabalhamos respiração"), backend)

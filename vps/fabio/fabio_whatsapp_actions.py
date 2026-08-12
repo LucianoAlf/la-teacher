@@ -286,14 +286,21 @@ def _refine_pending_class(
         _event(backend, action, context, "pergunta_refinada", {})
         return _result("refine_class", reply=shortlist["pergunta"], action_id=str(action["id"]))
 
-    _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
     if shortlist["status"] == "perguntar":
+        if action.get("candidatas"):
+            return _result(
+                "choose_audio_class" if fluxo == "registro" else "choose_call_class",
+                reply=shortlist["pergunta"],
+                action_id=str(action["id"]),
+            )
+        _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
         return _result(
             "choose_audio_class" if fluxo == "registro" else "choose_call_class",
             reply=shortlist["pergunta"],
             action_id=str(action["id"]),
         )
 
+    _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
     aula_id = int(shortlist["aula_id"])
     if fluxo == "registro":
         return _select_and_enqueue_audio(backend, context, action, aula_id)
