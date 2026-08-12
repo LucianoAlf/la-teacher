@@ -21,20 +21,28 @@ const bootstrap = `
     id integer primary key,
     professor_id integer not null,
     unidade_id uuid not null,
-    cancelada boolean not null default false
+    cancelada boolean not null default false,
+    data_hora_inicio timestamptz not null default now() - interval '1 hour',
+    data_hora_fim timestamptz,
+    anotacoes_fabio text
   );
   create table public.aula_alunos_emusys (
     aula_emusys_id integer not null,
     aluno_id integer not null
   );
   create table public.fabio_fila_audios (
-    id uuid primary key,
+    id uuid primary key default gen_random_uuid(),
     professor_id integer not null,
     aula_id integer not null,
     unidade_id uuid not null,
-    origem text,
+    storage_path text not null,
+    duracao_segundos integer,
+    origem text not null default 'app',
     status text not null,
+    tentativas integer not null default 0,
+    erro text,
     erro_tipo text,
+    criado_em timestamptz not null default now(),
     atualizado_em timestamptz not null default now()
   );
   create table public.fabio_registros_aula (
@@ -84,6 +92,14 @@ const bootstrap = `
     registro_fatia_id uuid not null,
     status text not null
   );
+  create table public.alunos (
+    id integer primary key,
+    nome text not null
+  );
+  create table public.aula_registros_fabio_log (
+    aula_id integer not null,
+    criado_em timestamptz not null default now()
+  );
   create function public.fn_presenca_declarada(jsonb)
   returns text language sql immutable as $$ select $1 ->> 'presenca' $$;
   create function public.fn_compor_texto_prontuario(jsonb, jsonb)
@@ -92,6 +108,15 @@ const bootstrap = `
   returns jsonb language sql immutable as $$ select coalesce($2, '{}'::jsonb) $$;
   create function public.fn_aula_individual_do_aluno(integer, integer)
   returns integer language sql immutable as $$ select $1 $$;
+  create function public.fn_janela_registro_dias()
+  returns integer language sql immutable as $$ select 7 $$;
+  create function public.fn_professor_do_usuario()
+  returns integer language sql stable as $$ select 702 $$;
+  create function public.fn_enfileirar_audio_core(
+    integer, text, integer, uuid, text, integer
+  ) returns jsonb language sql as $$ select '{}'::jsonb $$;
+  revoke all on function public.fn_enfileirar_audio_core(integer, text, integer, uuid, text, integer)
+    from public, anon, authenticated, service_role;
 `
 
 const mutantes = [
@@ -193,6 +218,141 @@ const mutantes = [
     nome: 'M11 normalizacao sem audio deixa de usar app seguro',
     ancora: "  v_origem text := 'app';",
     substituicao: '  v_origem text := null;',
+  },
+  {
+    nome: 'M12 status volta a tratar texto de erro historico como erro atual',
+    ancora: "case when f.status = 'erro' then true else false end",
+    substituicao: 'case when f.erro is not null then true else false end',
+  },
+  {
+    nome: 'M13 status passa a tratar erro terminal como retryavel',
+    ancora: "case when f.status = 'erro' then true else false end",
+    substituicao: "case when f.status in ('erro', 'erro_terminal') then true else false end",
+  },
+  {
+    nome: 'M14 fila pendente deixa de bloquear nova gravacao',
+    ancora: "and f.status in ('pendente', 'transcrevendo', 'transcrito', 'erro')",
+    substituicao: "and f.status in ('transcrevendo', 'transcrito', 'erro')",
+  },
+  {
+    nome: 'M15 fila transcrevendo deixa de bloquear nova gravacao',
+    ancora: "and f.status in ('pendente', 'transcrevendo', 'transcrito', 'erro')",
+    substituicao: "and f.status in ('pendente', 'transcrito', 'erro')",
+  },
+  {
+    nome: 'M16 fila transcrito deixa de bloquear nova gravacao',
+    ancora: "and f.status in ('pendente', 'transcrevendo', 'transcrito', 'erro')",
+    substituicao: "and f.status in ('pendente', 'transcrevendo', 'erro')",
+  },
+  {
+    nome: 'M17 fila com erro retryavel deixa de bloquear nova gravacao',
+    ancora: "and f.status in ('pendente', 'transcrevendo', 'transcrito', 'erro')",
+    substituicao: "and f.status in ('pendente', 'transcrevendo', 'transcrito')",
+  },
+  {
+    nome: 'M18 nova gravacao perde a serializacao por aula',
+    ancora: "'fabio-fila-audio-aula:' || p_professor_id::text || ':' || p_aula_id::text",
+    substituicao: "'fabio-fila-audio-path:' || p_professor_id::text || ':' || v_storage_path",
+  },
+  {
+    nome: 'M19 novas gravacoes deixam de consultar a fila viva e o rascunho',
+    ancora: '  if p_registro_id is null then\n    select * into v_fila_viva',
+    substituicao: '  if false then\n    select * into v_fila_viva',
+  },
+  {
+    nome: 'M20 registro confirmado volta a bloquear nova gravacao',
+    ancora: "and r.status in ('rascunho', 'aguardando_confirmacao')",
+    substituicao: "and r.status in ('rascunho', 'aguardando_confirmacao', 'gravado_emusys', 'confirmado')",
+  },
+  {
+    nome: 'M21 retorno de rascunho deixa de sinalizar que ja existe',
+    ancora: "'rascunho_existente', true",
+    substituicao: "'rascunho_existente', false",
+  },
+  {
+    nome: 'M22 dedupe por storage path e removido',
+    ancora: '     and storage_path = v_storage_path',
+    substituicao: '     and false -- M22: storage_path ignorado',
+  },
+  {
+    nome: 'M23 complemento deixa de anexar o novo audio ao rascunho',
+    ancora: [
+      '  if p_registro_id is not null then',
+      '    update public.fabio_registros_aula',
+      "       set campos = campos || jsonb_build_object('audio_complemento_id', v_id)",
+      '     where id = p_registro_id;',
+      '  end if;',
+    ].join('\n'),
+    substituicao: '  perform 1; -- M23: complemento nao fica vinculado ao registro',
+  },
+  {
+    nome: 'M24 janela de gravacao encerrada deixa de ser recusada',
+    ancora: "    raise exception 'janela_de_gravacao_encerrada';",
+    substituicao: '      null; -- M24: janela expirada aceita',
+  },
+  {
+    nome: 'M25 ACL do status deixa PUBLIC executar',
+    ancora: [
+      'revoke all on function public.app_status_audio_fila(uuid)',
+      '  from public, anon, authenticated, service_role;',
+    ].join('\n'),
+    substituicao: [
+      'revoke all on function public.app_status_audio_fila(uuid)',
+      '  from anon, authenticated, service_role;',
+    ].join('\n'),
+  },
+  {
+    nome: 'M26 ACL do status remove acesso autenticado',
+    ancora: [
+      'grant execute on function public.app_status_audio_fila(uuid)',
+      '  to authenticated, service_role;',
+    ].join('\n'),
+    substituicao: [
+      'grant execute on function public.app_status_audio_fila(uuid)',
+      '  to service_role;',
+    ].join('\n'),
+  },
+  {
+    nome: 'M27 ACL do status remove acesso service_role',
+    ancora: [
+      'grant execute on function public.app_status_audio_fila(uuid)',
+      '  to authenticated, service_role;',
+    ].join('\n'),
+    substituicao: [
+      'grant execute on function public.app_status_audio_fila(uuid)',
+      '  to authenticated;',
+    ].join('\n'),
+  },
+  {
+    nome: 'M28 status de audio perde search_path seguro',
+    ancora: [
+      'create or replace function public.app_status_audio_fila(p_audio_id uuid)',
+      'returns table(',
+      '  audio_id uuid,',
+      '  status text,',
+      '  tentativas integer,',
+      '  tem_erro boolean,',
+      '  criado_em timestamptz,',
+      '  atualizado_em timestamptz',
+      ')',
+      'language sql',
+      'security definer',
+      'set search_path = pg_catalog, public',
+    ].join('\n'),
+    substituicao: [
+      'create or replace function public.app_status_audio_fila(p_audio_id uuid)',
+      'returns table(',
+      '  audio_id uuid,',
+      '  status text,',
+      '  tentativas integer,',
+      '  tem_erro boolean,',
+      '  criado_em timestamptz,',
+      '  atualizado_em timestamptz',
+      ')',
+      'language sql',
+      'security definer',
+      'set search_path = public',
+    ].join('\n'),
   },
 ]
 

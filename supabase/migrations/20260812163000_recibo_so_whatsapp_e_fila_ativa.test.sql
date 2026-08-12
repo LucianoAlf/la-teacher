@@ -180,6 +180,117 @@ begin
 end
 $function$;
 
+do $function$
+declare
+  v_status regprocedure := to_regprocedure('public.app_status_audio_fila(uuid)');
+  v_core regprocedure := to_regprocedure(
+    'public.fn_enfileirar_audio_core(integer,text,integer,uuid,text,integer)'
+  );
+  v_status_def text;
+  v_core_def text;
+  v_status_norm text;
+  v_core_norm text;
+begin
+  if v_status is null then
+    perform pg_temp.checar_20260812163000(
+      'status de audio existe para expor apenas erro atual', false,
+      'app_status_audio_fila(uuid) ausente'
+    );
+  else
+    select pg_get_functiondef(v_status) into v_status_def;
+    v_status_norm := lower(regexp_replace(v_status_def, '[[:space:]]+', ' ', 'g'));
+    perform pg_temp.checar_20260812163000(
+      'status de audio marca erro somente enquanto o estado atual e erro e preserva o status',
+      position('case when f.status = ''erro'' then true else false end' in v_status_norm) > 0
+        and position('f.erro is not null' in v_status_norm) = 0
+        and position('select f.id, f.status, f.tentativas,' in v_status_norm) > 0,
+      left(coalesce(v_status_def, ''), 500)
+    );
+    perform pg_temp.checar_20260812163000(
+      'status de audio SECURITY DEFINER fixa search_path seguro',
+      position('security definer' in v_status_norm) > 0
+        and position('set search_path to ''pg_catalog'', ''public''' in v_status_norm) > 0,
+      left(coalesce(v_status_def, ''), 500)
+    );
+    perform pg_temp.checar_20260812163000(
+      'ACL do status de audio bloqueia anon e permite app e service role',
+      not has_function_privilege(
+        'anon', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+      )
+        and has_function_privilege(
+          'authenticated', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+        )
+        and has_function_privilege(
+          'service_role', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+        ),
+      'anon=' || has_function_privilege(
+        'anon', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+      )::text
+        || ', authenticated=' || has_function_privilege(
+          'authenticated', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+        )::text
+        || ', service_role=' || has_function_privilege(
+          'service_role', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+        )::text
+    );
+  end if;
+
+  if v_core is null then
+    perform pg_temp.checar_20260812163000(
+      'core de audio existe para proteger nova gravacao', false,
+      'fn_enfileirar_audio_core(integer,text,integer,uuid,text,integer) ausente'
+    );
+  else
+    select pg_get_functiondef(v_core) into v_core_def;
+    v_core_norm := lower(regexp_replace(v_core_def, '[[:space:]]+', ' ', 'g'));
+    perform pg_temp.checar_20260812163000(
+      'nova gravacao trava a aula, devolve fila viva e preserva os quatro estados retryaveis',
+      position('if p_registro_id is null then' in v_core_norm) > 0
+        and position('fabio-fila-audio-aula:' in v_core_norm) > 0
+        and position(
+          'and f.status in (''pendente'', ''transcrevendo'', ''transcrito'', ''erro'')'
+          in v_core_norm
+        ) > 0
+        and position('''audio_id'', v_fila_viva.id' in v_core_norm) > 0
+        and position('''status'', v_fila_viva.status' in v_core_norm) > 0
+        and position('''ja_em_processamento'', true' in v_core_norm) > 0,
+      left(coalesce(v_core_def, ''), 1600)
+    );
+    perform pg_temp.checar_20260812163000(
+      'nova gravacao sem fila viva devolve somente rascunho raiz pendente',
+      position('from public.fabio_registros_aula r' in v_core_norm) > 0
+        and position('and r.parent_id is null' in v_core_norm) > 0
+        and position('and r.status in (''rascunho'', ''aguardando_confirmacao'')' in v_core_norm) > 0
+        and position('''registro_id'', v_rascunho.id' in v_core_norm) > 0
+        and position('''rascunho_existente'', true' in v_core_norm) > 0,
+      left(coalesce(v_core_def, ''), 2400)
+    );
+    perform pg_temp.checar_20260812163000(
+      'core preserva dedupe por path, complemento, janela e ACL interna',
+      position('and storage_path = v_storage_path' in v_core_norm) > 0
+        and position('if p_registro_id is not null then' in v_core_norm) > 0
+        and position('gravacao_ainda_nao_disponivel' in v_core_norm) > 0
+        and position('janela_de_gravacao_encerrada' in v_core_norm) > 0
+        and not has_function_privilege(
+          'authenticated',
+          'public.fn_enfileirar_audio_core(integer,text,integer,uuid,text,integer)',
+          'EXECUTE'
+        ),
+      jsonb_build_object(
+        'dedupe_path', position('and storage_path = v_storage_path' in v_core_norm) > 0,
+        'complemento', position('if p_registro_id is not null then' in v_core_norm) > 0,
+        'janela', position('janela_de_gravacao_encerrada' in v_core_norm) > 0,
+        'authenticated_core', has_function_privilege(
+          'authenticated',
+          'public.fn_enfileirar_audio_core(integer,text,integer,uuid,text,integer)',
+          'EXECUTE'
+        )
+      )::text
+    );
+  end if;
+end
+$function$;
+
 select json_build_object(
   'falhas', (select count(*) from pg_temp._fabio_20260812163000_res where not ok),
   'detalhe', coalesce((
@@ -225,9 +336,10 @@ begin
   insert into public.aula_alunos_emusys (aula_emusys_id, aluno_id)
   values (v_aula, 17001);
   insert into public.fabio_fila_audios (
-    id, professor_id, aula_id, unidade_id, origem, status, erro_tipo
+    id, professor_id, aula_id, unidade_id, storage_path, origem, status, erro_tipo
   ) values (
-    v_audio_app, v_professor, v_aula, v_unidade, 'app', 'transcrito', 'transitorio'
+    v_audio_app, v_professor, v_aula, v_unidade, 'task1/audio-app.webm',
+    'app', 'transcrito', 'transitorio'
   );
 
   v_criado := public.fabio_criar_registro(jsonb_build_object(
@@ -373,6 +485,226 @@ begin
       'whatsapp_bloqueado', (select jsonb_build_object('status', status, 'lease_token', lease_token)
         from public.fabio_notificacoes where referencia_id = v_raiz_whatsapp_bloqueada::text)
     )::text
+  );
+end
+$docker$;
+
+do $docker$
+declare
+  v_unidade uuid := '00000000-0000-0000-0000-000000000002';
+  v_professor integer := 702;
+  v_status_normalizado uuid := '00000000-0000-0000-0000-000000000301';
+  v_status_terminal uuid := '00000000-0000-0000-0000-000000000302';
+  v_status_erro uuid := '00000000-0000-0000-0000-000000000303';
+  v_aula_rascunho integer := 2705;
+  v_audio_normalizado uuid := '00000000-0000-0000-0000-000000000304';
+  v_rascunho uuid := '00000000-0000-0000-0000-000000000305';
+  v_aula_confirmada integer := 2706;
+  v_confirmado uuid := '00000000-0000-0000-0000-000000000306';
+  v_aula_complemento integer := 2707;
+  v_registro_complemento uuid := '00000000-0000-0000-0000-000000000307';
+  v_audio_complemento_existente uuid := '00000000-0000-0000-0000-000000000308';
+  v_aula_dedupe integer := 2708;
+  v_caso record;
+  v_status jsonb;
+  v_resposta jsonb;
+  v_primeiro jsonb;
+  v_segundo jsonb;
+  v_audio_novo uuid;
+begin
+  perform pg_temp.checar_20260812163000(
+    'ACL dinamica do status de audio bloqueia anon e permite app e service role',
+    not has_function_privilege(
+      'anon', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+    )
+      and has_function_privilege(
+        'authenticated', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+      )
+      and has_function_privilege(
+        'service_role', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+      ),
+    'anon=' || has_function_privilege(
+      'anon', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+    )::text
+      || ', authenticated=' || has_function_privilege(
+        'authenticated', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+      )::text
+      || ', service_role=' || has_function_privilege(
+        'service_role', 'public.app_status_audio_fila(uuid)', 'EXECUTE'
+      )::text
+  );
+
+  insert into public.aulas_emusys (
+    id, professor_id, unidade_id, cancelada, data_hora_inicio, data_hora_fim
+  ) values
+    (2601, v_professor, v_unidade, false, now() - interval '1 hour', now()),
+    (2602, v_professor, v_unidade, false, now() - interval '1 hour', now()),
+    (2603, v_professor, v_unidade, false, now() - interval '1 hour', now()),
+    (2701, v_professor, v_unidade, false, now() - interval '1 hour', now()),
+    (2702, v_professor, v_unidade, false, now() - interval '1 hour', now()),
+    (2703, v_professor, v_unidade, false, now() - interval '1 hour', now()),
+    (2704, v_professor, v_unidade, false, now() - interval '1 hour', now()),
+    (v_aula_rascunho, v_professor, v_unidade, false, now() - interval '1 hour', now()),
+    (v_aula_confirmada, v_professor, v_unidade, false, now() - interval '1 hour', now()),
+    (v_aula_complemento, v_professor, v_unidade, false, now() - interval '1 hour', now()),
+    (v_aula_dedupe, v_professor, v_unidade, false, now() - interval '1 hour', now());
+
+  insert into public.fabio_fila_audios (
+    id, professor_id, aula_id, unidade_id, storage_path, origem, status, erro
+  ) values
+    (v_status_normalizado, v_professor, 2601, v_unidade, 'task2/status-normalizado.webm',
+     'app', 'normalizado', 'falha historica ja resolvida'),
+    (v_status_terminal, v_professor, 2602, v_unidade, 'task2/status-terminal.webm',
+     'app', 'erro_terminal', 'falha terminal preservada'),
+    (v_status_erro, v_professor, 2603, v_unidade, 'task2/status-erro.webm',
+     'app', 'erro', 'falha atual retryavel');
+
+  select to_jsonb(s) into v_status
+    from public.app_status_audio_fila(v_status_normalizado) s;
+  perform pg_temp.checar_20260812163000(
+    'normalizado com texto de erro historico nao expõe erro atual',
+    v_status ->> 'status' = 'normalizado'
+      and coalesce((v_status ->> 'tem_erro')::boolean, true) = false,
+    coalesce(v_status, '{}'::jsonb)::text
+  );
+
+  select to_jsonb(s) into v_status
+    from public.app_status_audio_fila(v_status_terminal) s;
+  perform pg_temp.checar_20260812163000(
+    'erro terminal continua exposto como status sem virar erro retryavel',
+    v_status ->> 'status' = 'erro_terminal'
+      and coalesce((v_status ->> 'tem_erro')::boolean, true) = false,
+    coalesce(v_status, '{}'::jsonb)::text
+  );
+
+  select to_jsonb(s) into v_status
+    from public.app_status_audio_fila(v_status_erro) s;
+  perform pg_temp.checar_20260812163000(
+    'erro atual retryavel continua exposto como erro',
+    v_status ->> 'status' = 'erro'
+      and coalesce((v_status ->> 'tem_erro')::boolean, false),
+    coalesce(v_status, '{}'::jsonb)::text
+  );
+
+  for v_caso in
+    select * from (values
+      ('pendente'::text, 2701, '00000000-0000-0000-0000-000000000311'::uuid),
+      ('transcrevendo'::text, 2702, '00000000-0000-0000-0000-000000000312'::uuid),
+      ('transcrito'::text, 2703, '00000000-0000-0000-0000-000000000313'::uuid),
+      ('erro'::text, 2704, '00000000-0000-0000-0000-000000000314'::uuid)
+    ) as fila(status, aula_id, audio_id)
+  loop
+    insert into public.fabio_fila_audios (
+      id, professor_id, aula_id, unidade_id, storage_path, origem, status
+    ) values (
+      v_caso.audio_id, v_professor, v_caso.aula_id, v_unidade,
+      'task2/viva-' || v_caso.status || '.webm', 'app', v_caso.status
+    );
+    select public.fn_enfileirar_audio_core(
+      v_caso.aula_id, 'task2/nova-' || v_caso.status || '.webm', 12, null, 'app', v_professor
+    ) into v_resposta;
+    perform pg_temp.checar_20260812163000(
+      'fila viva ' || v_caso.status || ' impede segunda gravacao da mesma aula',
+      v_resposta ->> 'audio_id' = v_caso.audio_id::text
+        and v_resposta ->> 'status' = v_caso.status
+        and coalesce((v_resposta ->> 'ja_em_processamento')::boolean, false)
+        and (select count(*) = 1 from public.fabio_fila_audios f
+              where f.professor_id = v_professor and f.aula_id = v_caso.aula_id),
+      coalesce(v_resposta, '{}'::jsonb)::text
+    );
+  end loop;
+
+  insert into public.fabio_fila_audios (
+    id, professor_id, aula_id, unidade_id, storage_path, origem, status, erro
+  ) values (
+    v_audio_normalizado, v_professor, v_aula_rascunho, v_unidade,
+    'task2/normalizado-com-rascunho.webm', 'app', 'normalizado', 'falha historica'
+  );
+  insert into public.fabio_registros_aula (
+    id, aula_id, unidade_id, parent_id, professor_id, campos, status, origem
+  ) values (
+    v_rascunho, v_aula_rascunho, v_unidade, null, v_professor, '{}'::jsonb,
+    'aguardando_confirmacao', 'app'
+  );
+  select public.fn_enfileirar_audio_core(
+    v_aula_rascunho, 'task2/depois-do-normalizado.webm', 12, null, 'app', v_professor
+  ) into v_resposta;
+  perform pg_temp.checar_20260812163000(
+    'normalizado com rascunho devolve o rascunho sem criar nova fila',
+    v_resposta ->> 'registro_id' = v_rascunho::text
+      and coalesce((v_resposta ->> 'rascunho_existente')::boolean, false)
+      and (select count(*) = 1 from public.fabio_fila_audios f
+            where f.professor_id = v_professor and f.aula_id = v_aula_rascunho),
+    coalesce(v_resposta, '{}'::jsonb)::text
+  );
+
+  insert into public.fabio_registros_aula (
+    id, aula_id, unidade_id, parent_id, professor_id, campos, status, origem, confirmado_em
+  ) values (
+    v_confirmado, v_aula_confirmada, v_unidade, null, v_professor, '{}'::jsonb,
+    'gravado_emusys', 'app', now()
+  );
+  select public.fn_enfileirar_audio_core(
+    v_aula_confirmada, 'task2/depois-do-confirmado.webm', 12, null, 'app', v_professor
+  ) into v_resposta;
+  perform pg_temp.checar_20260812163000(
+    'registro confirmado nao bloqueia nova gravacao',
+    v_resposta ->> 'status' = 'pendente'
+      and not coalesce((v_resposta ->> 'rascunho_existente')::boolean, false)
+      and not coalesce((v_resposta ->> 'ja_em_processamento')::boolean, false)
+      and (select count(*) = 1 from public.fabio_fila_audios f
+            where f.professor_id = v_professor and f.aula_id = v_aula_confirmada),
+    coalesce(v_resposta, '{}'::jsonb)::text
+  );
+
+  insert into public.fabio_registros_aula (
+    id, aula_id, unidade_id, parent_id, professor_id, campos, status, origem
+  ) values (
+    v_registro_complemento, v_aula_complemento, v_unidade, null, v_professor,
+    '{}'::jsonb, 'rascunho', 'app'
+  );
+  insert into public.fabio_fila_audios (
+    id, professor_id, aula_id, unidade_id, storage_path, origem, status
+  ) values (
+    v_audio_complemento_existente, v_professor, v_aula_complemento, v_unidade,
+    'task2/complemento-existente.webm', 'app', 'transcrito'
+  );
+  select public.fn_enfileirar_audio_core(
+    v_aula_complemento, 'task2/complemento-novo.webm', 12,
+    v_registro_complemento, 'app', v_professor
+  ) into v_resposta;
+  v_audio_novo := (v_resposta ->> 'audio_id')::uuid;
+  perform pg_temp.checar_20260812163000(
+    'complemento preserva caminho atual mesmo com fila viva da aula',
+    v_audio_novo is not null
+      and v_audio_novo is distinct from v_audio_complemento_existente
+      and v_resposta ->> 'modo' = 'complementar'
+      and v_resposta ->> 'registro_id' = v_registro_complemento::text
+      and not coalesce((v_resposta ->> 'ja_em_processamento')::boolean, false)
+      and not coalesce((v_resposta ->> 'rascunho_existente')::boolean, false)
+      and (select count(*) = 2 from public.fabio_fila_audios f
+            where f.professor_id = v_professor and f.aula_id = v_aula_complemento)
+      and (select campos ->> 'audio_complemento_id' = v_audio_novo::text
+             from public.fabio_registros_aula where id = v_registro_complemento),
+    coalesce(v_resposta, '{}'::jsonb)::text
+  );
+
+  select public.fn_enfileirar_audio_core(
+    v_aula_dedupe, 'task2/path-repetido.webm', 12, null, 'app', v_professor
+  ) into v_primeiro;
+  update public.fabio_fila_audios
+     set status = 'normalizado'
+   where id = (v_primeiro ->> 'audio_id')::uuid;
+  select public.fn_enfileirar_audio_core(
+    v_aula_dedupe, 'task2/path-repetido.webm', 12, null, 'app', v_professor
+  ) into v_segundo;
+  perform pg_temp.checar_20260812163000(
+    'dedupe por storage path continua antes de inserir nova fila',
+    v_primeiro ->> 'audio_id' = v_segundo ->> 'audio_id'
+      and coalesce((v_segundo ->> 'deduplicado')::boolean, false)
+      and (select count(*) = 1 from public.fabio_fila_audios f
+            where f.professor_id = v_professor and f.aula_id = v_aula_dedupe),
+    jsonb_build_object('primeiro', v_primeiro, 'segundo', v_segundo)::text
   );
 end
 $docker$;
