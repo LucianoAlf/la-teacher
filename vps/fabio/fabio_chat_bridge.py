@@ -90,6 +90,10 @@ WHATSAPP_REGISTRO_PILOT_IDS = _pilot_ids(os.getenv("FABIO_WHATSAPP_REGISTRO_PILO
 WHATSAPP_REGISTRO_MAX_AUDIO_BYTES = _int_env("FABIO_WHATSAPP_REGISTRO_MAX_AUDIO_BYTES", 25 * 1024 * 1024)
 
 _HTTP_TIMEOUT = (10, 60)
+_PENDENCIAS_HTTP_TIMEOUT = (5, 15)
+_PENDENCIAS_MAX_AULAS = 5
+_PENDENCIAS_MAX_ALUNOS = 10
+_PENDENCIAS_CONTEXT_MAX_CHARS = 12000
 
 
 def _load_env_file(path: Path = ENV_FILE) -> None:
@@ -140,8 +144,13 @@ def sb_get(path: str, params: Dict[str, str]) -> Any:
     return r.json()
 
 
-def sb_post(path: str, body: Any, prefer: Optional[str] = None) -> requests.Response:
-    return requests.post(f"{SUPABASE_URL}{path}", headers=sb_headers(prefer), json=body, timeout=_HTTP_TIMEOUT)
+def sb_post(
+    path: str,
+    body: Any,
+    prefer: Optional[str] = None,
+    timeout: tuple[int, int] = _HTTP_TIMEOUT,
+) -> requests.Response:
+    return requests.post(f"{SUPABASE_URL}{path}", headers=sb_headers(prefer), json=body, timeout=timeout)
 
 
 def sb_patch(path: str, params: Dict[str, str], body: Any, prefer: Optional[str] = None) -> requests.Response:
@@ -885,6 +894,546 @@ def _norm_text(value: Any) -> str:
     raw = str(value or "").lower()
     raw = "".join(c for c in unicodedata.normalize("NFKD", raw) if not unicodedata.combining(c))
     return re.sub(r"\s+", " ", raw).strip()
+
+
+_PENDENCIAS_EXPLICITAS_PATTERNS = [
+    r"\bquais (?:sao )?(?:as )?minhas pendencias\b",
+    r"\bquais (?:sao )?as pendencias que eu tenho\b",
+    r"\bpode me mostrar (?:as )?minhas pendencias\b",
+    r"\bme mostra (?:as )?minhas pendencias\b",
+    r"\bquais pendencias eu (?:ainda )?tenho\b",
+    r"\bo que eu tenho pendente\b",
+    r"\bo que (?:ainda )?falta (?:eu )?(?:lancar|registrar)\b",
+    r"\bquem (?:esta|ta) sem (?:chamada|presenca)\b",
+    r"\bquais alunos (?:ainda )?(?:estao|tao) sem presenca\b",
+    r"\bquais (?:sao )?(?:as )?minhas aulas (?:ainda )?sem (?:registro|chamada|presenca)\b",
+    r"\bquais aulas (?:ainda )?(?:estao|tao) sem (?:registro|chamada|presenca)\b",
+]
+
+_PENDENCIAS_NEGADAS_PREFIX_PATTERNS = [
+    r"\bnao quero saber\b",
+]
+
+_PENDENCIAS_RELATADAS_SUFFIX_PATTERNS = [
+    r"\b(?:perguntou|disse|falou)$",
+    r"\b(?:estou|estava)\s+(?:so\s+)?citando(?:\s+(?:a\s+)?pergunta)?$",
+]
+
+_PENDENCIAS_RESET_DISCURSIVO_PATTERN = (
+    r"(?:,\s*(?:mas|porem|agora)\b|\s+(?:mas|porem)\s+)"
+)
+
+
+def _prefixo_local_de_pendencias(prefixo: str) -> str:
+    """Keep only the clause after the last explicit discourse reset."""
+    ultimo_reset = 0
+    for match in re.finditer(_PENDENCIAS_RESET_DISCURSIVO_PATTERN, prefixo):
+        ultimo_reset = match.end()
+    return prefixo[ultimo_reset:]
+
+
+def _aparar_prefixo_de_pendencias(prefixo: str) -> str:
+    return re.sub(r"[\s'\"“”‘’():,\-\[\]{}]+$", "", prefixo).strip()
+
+
+def _prefixo_termina_em_relato_de_pendencias(prefixo: str) -> bool:
+    prefixo_aparado = _aparar_prefixo_de_pendencias(prefixo)
+    # Estes enquadramentos introduzem um pedido atual, nao uma pergunta citada.
+    if (
+        re.match(r"^(?:como|conforme|segundo|pelo que)\b", prefixo_aparado)
+        and re.search(r"\b(?:falou|disse)$", prefixo_aparado)
+    ):
+        return False
+    return any(
+        re.search(pattern, prefixo_aparado)
+        for pattern in _PENDENCIAS_RELATADAS_SUFFIX_PATTERNS
+    )
+
+
+def _analisar_intencao_de_pendencias(text: str) -> tuple[bool, bool]:
+    """Return (pedido_atual, pergunta_apenas_relatada_ou_citada)."""
+    encontrou_relato = False
+    for sentenca in re.split(r"[.!?;]+", _norm_text(text)):
+        if not sentenca.strip():
+            continue
+        for pattern in _PENDENCIAS_EXPLICITAS_PATTERNS:
+            for match in re.finditer(pattern, sentenca):
+                prefixo_local = _prefixo_local_de_pendencias(sentenca[:match.start()])
+                if any(re.search(negacao, prefixo_local) for negacao in _PENDENCIAS_NEGADAS_PREFIX_PATTERNS):
+                    continue
+                if _prefixo_termina_em_relato_de_pendencias(prefixo_local):
+                    encontrou_relato = True
+                    continue
+                return True, encontrou_relato
+    return False, encontrou_relato
+
+
+def _tem_intencao_explicita_de_pendencias(text: str) -> bool:
+    return _analisar_intencao_de_pendencias(text)[0]
+
+
+def _tem_pergunta_de_pendencias_apenas_relatada(text: str) -> bool:
+    pedido_atual, pergunta_relatada = _analisar_intencao_de_pendencias(text)
+    return pergunta_relatada and not pedido_atual
+
+
+def _buscar_fonte_pendencias(rpc_name: str, professor_id: int) -> tuple[bool, Any]:
+    try:
+        response = sb_post(
+            f"/rest/v1/rpc/{rpc_name}",
+            {"p_professor_id": int(professor_id)},
+            timeout=_PENDENCIAS_HTTP_TIMEOUT,
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(f"status_{response.status_code}")
+        result = response.json()
+        if result is None:
+            raise RuntimeError("resposta_vazia")
+        return True, result
+    except Exception as e:
+        log(
+            "pendencias_prefetch_falhou",
+            professor_id=int(professor_id),
+            fonte=rpc_name,
+            error=str(e)[:200],
+        )
+        return False, None
+
+
+def _int_nao_negativo(value: Any) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _id_valido(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _texto_permitido(value: Any, limite: int = 120, *, aceita_nulo: bool = False) -> Optional[str]:
+    if value is None and aceita_nulo:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("texto_invalido")
+    return value[:limite]
+
+
+def _normalizar_aluno_conteudo(item: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(item, dict):
+        return None
+    if not _id_valido(item.get("aluno_id")) or not _id_valido(item.get("aula_alvo_id")):
+        return None
+    try:
+        return {
+            "aluno_id": item["aluno_id"],
+            "nome": _texto_permitido(item.get("nome")),
+            "primeiro_nome": _texto_permitido(item.get("primeiro_nome")),
+            "aula_alvo_id": item["aula_alvo_id"],
+        }
+    except ValueError:
+        return None
+
+
+def _normalizar_aula_conteudo(item: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(item, dict) or not _id_valido(item.get("aula_id")):
+        return None
+    dias_em_atraso = _int_nao_negativo(item.get("dias_em_atraso"))
+    n_alunos = _int_nao_negativo(item.get("n_alunos"))
+    alunos_brutos = item.get("alunos")
+    if (
+        dias_em_atraso is None
+        or n_alunos is None
+        or not isinstance(item.get("chamada_feita"), bool)
+        or not isinstance(item.get("tem_plano_emusys"), bool)
+        or not isinstance(alunos_brutos, list)
+        or n_alunos != len(alunos_brutos)
+    ):
+        return None
+    alunos = [_normalizar_aluno_conteudo(aluno) for aluno in alunos_brutos]
+    if any(aluno is None for aluno in alunos):
+        return None
+    alunos_limitados = alunos[:_PENDENCIAS_MAX_ALUNOS]
+    try:
+        return {
+            "aula_id": item["aula_id"],
+            "data": _texto_permitido(item.get("data"), 32),
+            "hora": _texto_permitido(item.get("hora"), 32),
+            "curso": _texto_permitido(item.get("curso"), aceita_nulo=True),
+            "turma": _texto_permitido(item.get("turma"), aceita_nulo=True),
+            "dias_em_atraso": dias_em_atraso,
+            "chamada_feita": item["chamada_feita"],
+            "tem_plano_emusys": item["tem_plano_emusys"],
+            "n_alunos": n_alunos,
+            "alunos_exibidos": len(alunos_limitados),
+            "alunos_restantes": n_alunos - len(alunos_limitados),
+            "alunos": alunos_limitados,
+        }
+    except ValueError:
+        return None
+
+
+def _normalizar_conteudo_pendente(data: Any, professor_id: int) -> Optional[Dict[str, Any]]:
+    if not isinstance(data, dict) or data.get("professor_id") != professor_id:
+        return None
+    total_aulas = _int_nao_negativo(data.get("total_aulas"))
+    total_alunos = _int_nao_negativo(data.get("total_alunos"))
+    pior_atraso = _int_nao_negativo(data.get("pior_atraso_dias"))
+    aulas_com_plano = _int_nao_negativo(data.get("aulas_com_plano_emusys"))
+    aulas_brutas = data.get("aulas")
+    if (
+        total_aulas is None
+        or total_alunos is None
+        or pior_atraso is None
+        or aulas_com_plano is None
+        or not isinstance(aulas_brutas, list)
+        or total_aulas != len(aulas_brutas)
+    ):
+        return None
+    aulas = [_normalizar_aula_conteudo(aula) for aula in aulas_brutas]
+    if any(aula is None for aula in aulas):
+        return None
+    if (
+        total_alunos != sum(aula["n_alunos"] for aula in aulas)
+        or pior_atraso != max((aula["dias_em_atraso"] for aula in aulas), default=0)
+        or aulas_com_plano != sum(1 for aula in aulas if aula["tem_plano_emusys"])
+    ):
+        return None
+    aulas_limitadas = aulas[:_PENDENCIAS_MAX_AULAS]
+    return {
+        "professor_id": professor_id,
+        "total_aulas": total_aulas,
+        "total_alunos": total_alunos,
+        "pior_atraso_dias": pior_atraso,
+        "aulas_com_plano_emusys": aulas_com_plano,
+        "aulas_exibidas": len(aulas_limitadas),
+        "aulas_restantes": total_aulas - len(aulas_limitadas),
+        "aulas": aulas_limitadas,
+    }
+
+
+def _normalizar_aluno_presenca(item: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(item, dict) or not _id_valido(item.get("aluno_id")):
+        return None
+    dias_em_atraso = _int_nao_negativo(item.get("dias_em_atraso"))
+    if dias_em_atraso is None:
+        return None
+    try:
+        return {
+            "aluno_id": item["aluno_id"],
+            "nome": _texto_permitido(item.get("nome")),
+            "dias_em_atraso": dias_em_atraso,
+        }
+    except ValueError:
+        return None
+
+
+def _normalizar_aula_presenca(item: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(item, dict) or not isinstance(item.get("alunos"), list):
+        return None
+    alunos = [_normalizar_aluno_presenca(aluno) for aluno in item["alunos"]]
+    if any(aluno is None for aluno in alunos):
+        return None
+    alunos_limitados = alunos[:_PENDENCIAS_MAX_ALUNOS]
+    try:
+        return {
+            "data_aula": _texto_permitido(item.get("data_aula"), 32),
+            "hora": _texto_permitido(item.get("hora"), 32),
+            "curso_nome": _texto_permitido(item.get("curso_nome"), aceita_nulo=True),
+            "total_alunos": len(alunos),
+            "alunos_exibidos": len(alunos_limitados),
+            "alunos_restantes": len(alunos) - len(alunos_limitados),
+            "alunos": alunos_limitados,
+        }
+    except ValueError:
+        return None
+
+
+def _escalacao_presenca_valida(item: Any) -> bool:
+    if not isinstance(item, dict):
+        return False
+    if _int_nao_negativo(item.get("qtd_alunos")) is None or _int_nao_negativo(item.get("dias_em_atraso")) is None:
+        return False
+    try:
+        _texto_permitido(item.get("data_aula"), 32)
+        _texto_permitido(item.get("hora"), 32)
+    except ValueError:
+        return False
+    return True
+
+
+def _normalizar_presenca_pendente(data: Any, professor_id: int) -> Optional[Dict[str, Any]]:
+    if not isinstance(data, dict) or data.get("professor_id") != professor_id:
+        return None
+    dentro_bruto = data.get("dentro_janela")
+    escalacao = data.get("escalar_coordenacao")
+    if not isinstance(dentro_bruto, list) or not isinstance(escalacao, list):
+        return None
+    dentro = [_normalizar_aula_presenca(aula) for aula in dentro_bruto]
+    if any(aula is None for aula in dentro) or not all(_escalacao_presenca_valida(item) for item in escalacao):
+        return None
+    dentro_limitado = dentro[:_PENDENCIAS_MAX_AULAS]
+    return {
+        "status": "ok",
+        "professor_id": professor_id,
+        "total_dentro_janela": len(dentro),
+        "dentro_janela_exibidas": len(dentro_limitado),
+        "dentro_janela_restantes": len(dentro) - len(dentro_limitado),
+        "dentro_janela": dentro_limitado,
+        "escalar_coordenacao": len(escalacao),
+    }
+
+
+def pendencias_prefetch(professor_id: int, text: str) -> Optional[Dict[str, Any]]:
+    if not _tem_intencao_explicita_de_pendencias(text):
+        return None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futuro_conteudo = executor.submit(
+            _buscar_fonte_pendencias,
+            "fabio_pendencias_professor",
+            professor_id,
+        )
+        futuro_presenca = executor.submit(
+            _buscar_fonte_pendencias,
+            "fabio_presencas_pendentes_professor",
+            professor_id,
+        )
+        conteudo_ok, conteudo = futuro_conteudo.result()
+        presenca_ok, presenca = futuro_presenca.result()
+
+    conteudo_normalizado = (
+        _normalizar_conteudo_pendente(conteudo, professor_id)
+        if conteudo_ok
+        else None
+    )
+    presenca_normalizada = (
+        _normalizar_presenca_pendente(presenca, professor_id)
+        if presenca_ok
+        else None
+    )
+    if conteudo_ok and conteudo_normalizado is None:
+        log(
+            "pendencias_prefetch_falhou",
+            professor_id=int(professor_id),
+            fonte="fabio_pendencias_professor",
+            error="formato_invalido",
+        )
+    if presenca_ok and presenca_normalizada is None:
+        log(
+            "pendencias_prefetch_falhou",
+            professor_id=int(professor_id),
+            fonte="fabio_presencas_pendentes_professor",
+            error="formato_invalido",
+        )
+
+    bloco: Dict[str, Any] = {
+        "conteudo": (
+            {"status": "ok", "resultado": conteudo_normalizado}
+            if conteudo_normalizado is not None
+            else {"status": "indisponivel"}
+        ),
+    }
+    bloco["presenca"] = presenca_normalizada or {"status": "indisponivel"}
+    return bloco
+
+
+def _status_pendencias_seguro(fonte: Any) -> str:
+    status = fonte.get("status") if isinstance(fonte, dict) else None
+    return status if status in {"ok", "indisponivel"} else "indisponivel"
+
+
+def _inteiro_contexto_seguro(value: Any) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 999_999_999:
+        return None
+    return value
+
+
+def _copiar_inteiros_contexto(fonte: Any, chaves: tuple[str, ...]) -> Dict[str, int]:
+    if not isinstance(fonte, dict):
+        return {}
+    saida: Dict[str, int] = {}
+    for chave in chaves:
+        valor = _inteiro_contexto_seguro(fonte.get(chave))
+        if valor is not None:
+            saida[chave] = valor
+    return saida
+
+
+def _texto_contexto_seguro(value: Any, limite: int) -> Optional[str]:
+    if value is None:
+        return None
+    return value[:limite] if isinstance(value, str) else ""
+
+
+def _compactar_aula_conteudo(item: Any, limite_alunos: int, limite_texto: int) -> Optional[Dict[str, Any]]:
+    if not isinstance(item, dict):
+        return None
+    alunos_brutos = item.get("alunos") if isinstance(item.get("alunos"), list) else []
+    alunos = []
+    for aluno in alunos_brutos[:limite_alunos]:
+        if not isinstance(aluno, dict):
+            continue
+        aluno_compacto = _copiar_inteiros_contexto(aluno, ("aluno_id", "aula_alvo_id"))
+        aluno_compacto["nome"] = _texto_contexto_seguro(aluno.get("nome"), limite_texto)
+        aluno_compacto["primeiro_nome"] = _texto_contexto_seguro(aluno.get("primeiro_nome"), limite_texto)
+        alunos.append(aluno_compacto)
+
+    saida: Dict[str, Any] = _copiar_inteiros_contexto(item, ("aula_id", "dias_em_atraso"))
+    for chave in ("data", "hora", "curso", "turma"):
+        saida[chave] = _texto_contexto_seguro(item.get(chave), limite_texto)
+    for chave in ("chamada_feita", "tem_plano_emusys"):
+        if isinstance(item.get(chave), bool):
+            saida[chave] = item[chave]
+    total_alunos = _inteiro_contexto_seguro(item.get("n_alunos"))
+    if total_alunos is None:
+        total_alunos = len(alunos_brutos)
+    saida.update({
+        "n_alunos": total_alunos,
+        "alunos_exibidos": len(alunos),
+        "alunos_restantes": max(total_alunos - len(alunos), 0),
+        "alunos": alunos,
+    })
+    return saida
+
+
+def _compactar_aula_presenca(item: Any, limite_alunos: int, limite_texto: int) -> Optional[Dict[str, Any]]:
+    if not isinstance(item, dict):
+        return None
+    alunos_brutos = item.get("alunos") if isinstance(item.get("alunos"), list) else []
+    alunos = []
+    for aluno in alunos_brutos[:limite_alunos]:
+        if not isinstance(aluno, dict):
+            continue
+        aluno_compacto = _copiar_inteiros_contexto(aluno, ("aluno_id", "dias_em_atraso"))
+        aluno_compacto["nome"] = _texto_contexto_seguro(aluno.get("nome"), limite_texto)
+        alunos.append(aluno_compacto)
+
+    saida: Dict[str, Any] = {}
+    for chave in ("data_aula", "hora", "curso_nome"):
+        saida[chave] = _texto_contexto_seguro(item.get(chave), limite_texto)
+    total_alunos = _inteiro_contexto_seguro(item.get("total_alunos"))
+    if total_alunos is None:
+        total_alunos = len(alunos_brutos)
+    saida.update({
+        "total_alunos": total_alunos,
+        "alunos_exibidos": len(alunos),
+        "alunos_restantes": max(total_alunos - len(alunos), 0),
+        "alunos": alunos,
+    })
+    return saida
+
+
+def _compactar_pendencias_em_nivel(
+    ctx: Dict[str, Any],
+    limite_aulas: int,
+    limite_alunos: int,
+    limite_texto: int,
+) -> Dict[str, Any]:
+    conteudo = ctx.get("conteudo") if isinstance(ctx, dict) else None
+    conteudo_status = _status_pendencias_seguro(conteudo)
+    conteudo_compacto: Dict[str, Any] = {"status": conteudo_status}
+    resultado = conteudo.get("resultado") if isinstance(conteudo, dict) else None
+    if conteudo_status == "ok" and isinstance(resultado, dict):
+        aulas_brutas = resultado.get("aulas") if isinstance(resultado.get("aulas"), list) else []
+        aulas = [
+            aula_compacta
+            for aula in aulas_brutas[:limite_aulas]
+            if (aula_compacta := _compactar_aula_conteudo(aula, limite_alunos, limite_texto)) is not None
+        ]
+        resultado_compacto: Dict[str, Any] = _copiar_inteiros_contexto(
+            resultado,
+            (
+                "professor_id",
+                "total_aulas",
+                "total_alunos",
+                "pior_atraso_dias",
+                "aulas_com_plano_emusys",
+            ),
+        )
+        total_aulas = resultado_compacto.get("total_aulas", len(aulas_brutas))
+        resultado_compacto.update({
+            "aulas_exibidas": len(aulas),
+            "aulas_restantes": max(total_aulas - len(aulas), 0),
+            "aulas": aulas,
+        })
+        conteudo_compacto["resultado"] = resultado_compacto
+
+    presenca = ctx.get("presenca") if isinstance(ctx, dict) else None
+    presenca_status = _status_pendencias_seguro(presenca)
+    presenca_compacta: Dict[str, Any] = {"status": presenca_status}
+    if presenca_status == "ok" and isinstance(presenca, dict):
+        dentro_bruto = presenca.get("dentro_janela") if isinstance(presenca.get("dentro_janela"), list) else []
+        dentro = [
+            aula_compacta
+            for aula in dentro_bruto[:limite_aulas]
+            if (aula_compacta := _compactar_aula_presenca(aula, limite_alunos, limite_texto)) is not None
+        ]
+        presenca_compacta.update(_copiar_inteiros_contexto(
+            presenca,
+            ("professor_id", "total_dentro_janela", "escalar_coordenacao"),
+        ))
+        total_dentro = presenca_compacta.get("total_dentro_janela", len(dentro_bruto))
+        presenca_compacta.update({
+            "dentro_janela_exibidas": len(dentro),
+            "dentro_janela_restantes": max(total_dentro - len(dentro), 0),
+            "dentro_janela": dentro,
+        })
+
+    return {"conteudo": conteudo_compacto, "presenca": presenca_compacta}
+
+
+def compact_pendencias_context(ctx: Dict[str, Any]) -> str:
+    try:
+        serializado = json.dumps(ctx, ensure_ascii=False, separators=(",", ":"))
+        if len(serializado) <= _PENDENCIAS_CONTEXT_MAX_CHARS:
+            return serializado
+
+        niveis = (
+            (_PENDENCIAS_MAX_AULAS, _PENDENCIAS_MAX_ALUNOS, 120),
+            (_PENDENCIAS_MAX_AULAS, 5, 96),
+            (3, 5, 80),
+            (2, 3, 64),
+            (1, 2, 48),
+            (1, 1, 32),
+        )
+        for limite_aulas, limite_alunos, limite_texto in niveis:
+            compacto = _compactar_pendencias_em_nivel(
+                ctx,
+                limite_aulas,
+                limite_alunos,
+                limite_texto,
+            )
+            serializado = json.dumps(compacto, ensure_ascii=False, separators=(",", ":"))
+            if len(serializado) <= _PENDENCIAS_CONTEXT_MAX_CHARS:
+                return serializado
+    except Exception:
+        pass
+    return json.dumps({
+        "conteudo": {"status": "indisponivel"},
+        "presenca": {"status": "indisponivel"},
+    }, separators=(",", ":"))
+
+
+def _bloco_prompt_pendencias(ctx: Optional[Dict[str, Any]], row: Dict[str, Any]) -> str:
+    if ctx is None:
+        return ""
+    if whatsapp_registro_mode(row) in {"pilot", "on"}:
+        instrucao_fluxo = """- Para conteudo pendente, ofereca receber audio de uma aula/turma/horario por vez.
+- Mostre o preview antes de qualquer escrita e nunca afirme que gravou durante esta consulta read-only."""
+    else:
+        instrucao_fluxo = """- Oriente usar o app do LA Teacher para consultar e, se houver conteudo pendente, registrar por la.
+- Nao prometa registro pelo WhatsApp durante esta consulta read-only."""
+    return f"""PENDENCIAS CANONICAS PRE-BUSCADAS PARA ESTE PROFESSOR:
+{compact_pendencias_context(ctx)}
+
+INSTRUCOES PARA RESPONDER A CONSULTA DE PENDENCIAS:
+- Trate conteudo e presenca como fontes independentes; nunca conclua que uma aula sem conteudo tambem esta sem chamada.
+- Se uma fonte estiver com status=indisponivel, diga explicitamente que nao conseguiu consultar essa parte. Preserve e use normalmente a fonte com status=ok; indisponivel nunca significa tudo certo.
+- Mostre no maximo 5 aulas por bloco e sugira comecar por uma aula concreta.
+{instrucao_fluxo}
+- Para presenca.dentro_janela, pergunte quem esteve e quem faltou. presenca.escalar_coordenacao e somente uma contagem; nao invente nem revele detalhes antigos.
+
+"""
 
 
 def _course_base(value: Any) -> str:
@@ -2004,10 +2553,13 @@ def try_fast_response(row: Dict[str, Any]) -> Optional[str]:
 
 def generate_answer(row: Dict[str, Any]) -> tuple[str, str]:
     tipo = row.get("identidade_tipo") or "professor"
+    text = row.get("content") or row.get("media_extracted_text") or ""
     if tipo == "professor":
-        fast = try_fast_response(row)
-        if fast:
-            return fast, "fast_path"
+        pedido_pendencias, pergunta_pendencias_relatada = _analisar_intencao_de_pendencias(text)
+        if not pedido_pendencias and not pergunta_pendencias_relatada:
+            fast = try_fast_response(row)
+            if fast:
+                return fast, "fast_path"
 
     prompt = build_prompt(row)
     professor_id = int(row.get("professor_id") or 0)
@@ -2181,7 +2733,11 @@ def build_prompt(row: Dict[str, Any]) -> str:
         agenda_stats = _today_agenda_stats(contexto_professor) if isinstance(contexto_professor, dict) and contexto_professor.get("ok") else {}
         outro_dia = _agenda_de_outro_dia(professor_id, text)
         identidade_linha = f"- identidade_tipo: professor\n- professor_id: {professor_id}"
-        bloco_escopo = capacidade_professor(row) + ESCOPO_PROFESSOR
+        bloco_escopo = (
+            _bloco_prompt_pendencias(pendencias_prefetch(professor_id, text), row)
+            + capacidade_professor(row)
+            + ESCOPO_PROFESSOR
+        )
     return f"""Canal: chat livre do Fábio com professor/admin da LA Music.
 Use a skill chat-fabio-la-music como guia principal de personalidade, roteamento e guardrails.
 Para presença pendente/governança de presença, siga governanca-presenca-fabio-la-music: preview-first, read-only, liderar pelo conteúdo, sem cobrança policial e sem auto-envio/escala sem validação.
@@ -2590,7 +3146,10 @@ def process_one() -> bool:
             mark_done(str(mid))
         log("processed_unsupported_media", id=first_row.get("id"), kind=row.get("kind"))
         return True
-    if try_handle_whatsapp_action(row) is True:
+    text = row.get("content") or row.get("media_extracted_text") or ""
+    consulta_pendencias = _tem_intencao_explicita_de_pendencias(text)
+    pergunta_pendencias_relatada = _tem_pergunta_de_pendencias_apenas_relatada(text)
+    if not consulta_pendencias and not pergunta_pendencias_relatada and try_handle_whatsapp_action(row) is True:
         for mid in row.get("_batch_ids") or [str(first_row["id"])]:
             mark_done(str(mid))
         log("processed_whatsapp_action", id=first_row.get("id"), batch_count=row.get("_batch_count", 1))
