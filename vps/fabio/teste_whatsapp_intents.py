@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fabio_whatsapp_intents import (  # noqa: E402
+    _explicit_time,
     classificar_intencao_audio,
     classificar_intencao_texto,
     interpretar_resposta_pendente,
@@ -74,6 +75,33 @@ class WhatsappIntentsTest(unittest.TestCase):
         )
         self.assertEqual(result["status"], "selecionada")
         self.assertEqual(result["aula_id"], 101)
+
+    def test_explicit_time_rejects_invalid_minutes_without_partial_hour_match(self):
+        candidates = [
+            {"aula_id": 101, "hora": "15:00"},
+            {"aula_id": 102, "hora": "16:00"},
+        ]
+        for text in ("Foi a aula das 15 h 99.", "Foi a aula das 15:99."):
+            with self.subTest(text=text):
+                self.assertIsNone(_explicit_time(text))
+                result = reduzir_shortlist(text, candidates)
+                self.assertEqual(result["status"], "perguntar")
+                self.assertIsNone(result["aula_id"])
+
+    def test_pending_choice_does_not_treat_times_as_candidate_ids(self):
+        action = {"tipo": "escolher_aula_audio", "candidatas": [15, 101]}
+        for text in ("15 h", "15 horas", "15:30", "15 h 30"):
+            with self.subTest(text=text):
+                self.assertEqual(
+                    interpretar_resposta_pendente(text, action),
+                    {"tipo": "perguntar", "motivo": "aula_nao_reconhecida"},
+                )
+        for text in ("aula 15", "opção 15", "15"):
+            with self.subTest(text=text):
+                self.assertEqual(
+                    interpretar_resposta_pendente(text, action),
+                    {"tipo": "escolher_aula", "aula_id": 15},
+                )
 
     def test_pending_response_never_defaults_to_confirmation(self):
         for case in self.cases["pendentes"]:

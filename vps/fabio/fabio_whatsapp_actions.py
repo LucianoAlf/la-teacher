@@ -248,7 +248,7 @@ def _mentions_candidate_student(text: str, candidates: list[dict[str, Any]]) -> 
 def _looks_like_class_refinement(text: str, candidates: list[dict[str, Any]] | None = None) -> bool:
     hay = str(text or "").lower()
     return bool(
-        re.search(r"\b(?:[01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)\s*(?:[0-5]\d)?\b", hay)
+        re.search(r"\b(?:[01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)(?:\s*[0-5]\d)?(?!\s*\d)\b", hay)
         or re.search(r"\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b", hay)
         or any(word in hay for word in (
             "hoje", "ontem", "amanha", "amanhã", "turma", "curso",
