@@ -300,7 +300,8 @@ def _refine_pending_class(
             action_id=str(action["id"]),
         )
 
-    _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
+    if not action.get("candidatas"):
+        _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
     aula_id = int(shortlist["aula_id"])
     if fluxo == "registro":
         return _select_and_enqueue_audio(backend, context, action, aula_id)
