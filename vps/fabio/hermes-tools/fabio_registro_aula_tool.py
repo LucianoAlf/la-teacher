@@ -9,9 +9,12 @@ They do NOT expose arbitrary SQL, shell, filesystem, or generic HTTP writes.
 from __future__ import annotations
 
 import importlib.util
+import difflib
 import json
 import os
+import re
 import tempfile
+import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List
 from urllib.parse import quote, urlparse
@@ -67,6 +70,10 @@ _TOOLSET = "fabio_registro_aula"
 _DEFAULT_SUPABASE_URL = "https://ouqwbbermlzqqvtqwlul.supabase.co"
 _MAX_AUDIO_BYTES = int(os.getenv("FABIO_AUDIO_MAX_BYTES", str(80 * 1024 * 1024)))
 _HTTP_TIMEOUT = (10, 120)
+_DEFAULT_WHISPER_MODEL = "large-v3-turbo"
+_MAX_TRANSCRIPTION_TITLES = 24
+_MAX_INITIAL_PROMPT_CHARS = 700
+_MAX_HOTWORDS_CHARS = 350
 
 
 def _supabase_url() -> str:
@@ -265,7 +272,180 @@ def fabio_buscar_presencas_pendentes_professor(professor_id: Any) -> str:
     return json.dumps({"ok": True, "status_code": resp.status_code, "result": data}, ensure_ascii=False)
 
 
-def fabio_transcrever_audio_url(audio_url: str, language: str | None = "pt") -> str:
+def _clean_transcription_hint(value: Any, max_chars: int = 80) -> str:
+    """Keep vocabulary hints short, single-line and inert for Whisper."""
+    raw = str(value or "")
+    safe = "".join(
+        ch if (ch.isalnum() or ch.isspace() or ch in " _-'&./()") else " "
+        for ch in raw
+    )
+    return re.sub(r"\s+", " ", safe).strip()[:max_chars].strip()
+
+
+def _repertoire_titles(annotations: Any) -> list[str]:
+    text = str(annotations or "")
+    titles: list[str] = []
+    for match in re.finditer(r"(?im)^\s*repert[oó]rio\s*:\s*(.+)$", text):
+        for candidate in re.split(r"[,;]", match.group(1)):
+            title = _clean_transcription_hint(candidate)
+            if title:
+                titles.append(title)
+    return titles
+
+
+def _normalized_hint_token(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value)
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()
+
+
+def _apply_contextual_title_corrections(text: str, titles: list[str] | None) -> str:
+    """Correct only a close phrase that shares an exact token with a known title."""
+    corrected = str(text or "")
+    for title in titles or []:
+        title_matches = list(re.finditer(r"\b\w+\b", title, flags=re.UNICODE))
+        title_tokens = [_normalized_hint_token(match.group(0)) for match in title_matches]
+        if len(title_tokens) < 2:
+            continue
+
+        words = list(re.finditer(r"\b\w+\b", corrected, flags=re.UNICODE))
+        tokens = [_normalized_hint_token(match.group(0)) for match in words]
+        width = len(title_tokens)
+        if len(tokens) < width:
+            continue
+        if any(tokens[i:i + width] == title_tokens for i in range(len(tokens) - width + 1)):
+            continue
+
+        title_key = " ".join(title_tokens)
+        best: tuple[float, int] | None = None
+        for index in range(len(tokens) - width + 1):
+            candidate_tokens = tokens[index:index + width]
+            if not set(candidate_tokens).intersection(title_tokens):
+                continue
+            score = difflib.SequenceMatcher(
+                None,
+                " ".join(candidate_tokens),
+                title_key,
+            ).ratio()
+            if score >= 0.78 and (best is None or score > best[0]):
+                best = (score, index)
+        if best is None:
+            continue
+
+        index = best[1]
+        start = words[index].start()
+        end = words[index + width - 1].end()
+        corrected = f"{corrected[:start]}{title}{corrected[end:]}"
+    return corrected
+
+
+def _transcription_hints(aula_id: int, professor_id: int) -> dict[str, Any]:
+    """Build bounded STT vocabulary from the authoritative class context.
+
+    Hints are resolved server-side. Only repertoire lines from recent history
+    are used, so free-form annotations never become an instruction channel.
+    Failure to obtain hints must never prevent transcription.
+    """
+    empty = {"initial_prompt": None, "hotwords": None, "titles": [], "titles_count": 0}
+    try:
+        aula_int = int(aula_id)
+        professor_int = int(professor_id)
+    except Exception:
+        return empty
+
+    try:
+        rows, err = _context_rows(aula_int, professor_int)
+    except Exception:
+        return empty
+    if err or not rows:
+        return empty
+
+    base = rows[0]
+    turma_nome = _clean_transcription_hint(base.get("turma_nome"), 120)
+    params: Dict[str, str] = {
+        "select": "data_aula,turma_nome,anotacoes",
+        "professor_id": f"eq.{professor_int}",
+        "anotacoes": "not.is.null",
+        "order": "data_aula.desc",
+        "limit": "20",
+    }
+    if turma_nome:
+        params["turma_nome"] = f"eq.{turma_nome}"
+
+    history: list[dict[str, Any]] = []
+    try:
+        resp = requests.get(
+            f"{_supabase_url()}/rest/v1/aulas_emusys",
+            headers=_headers(),
+            params=params,
+            timeout=_HTTP_TIMEOUT,
+        )
+        data = _safe_json_response(resp)
+        if resp.status_code < 400 and isinstance(data, list):
+            history = [item for item in data if isinstance(item, dict)]
+    except Exception:
+        history = []
+
+    titles: list[str] = []
+    seen_titles: set[str] = set()
+    latest_history_date = str(history[0].get("data_aula") or "") if history else ""
+    for item in history:
+        if latest_history_date and str(item.get("data_aula") or "") != latest_history_date:
+            break
+        for title in _repertoire_titles(item.get("anotacoes")):
+            key = title.casefold()
+            if key in seen_titles:
+                continue
+            seen_titles.add(key)
+            titles.append(title)
+            if len(titles) >= _MAX_TRANSCRIPTION_TITLES:
+                break
+        if len(titles) >= _MAX_TRANSCRIPTION_TITLES:
+            break
+
+    students: list[str] = []
+    seen_students: set[str] = set()
+    for row in rows:
+        name = _clean_transcription_hint(row.get("aluno_nome"), 100)
+        if not name or name.casefold() in seen_students:
+            continue
+        seen_students.add(name.casefold())
+        students.append(name)
+        if len(students) >= 8:
+            break
+
+    course = _clean_transcription_hint(base.get("curso_nome"), 100)
+    teacher = _clean_transcription_hint(base.get("professor_nome"), 100)
+    prompt_parts = ["Transcricao de uma aula de musica em portugues."]
+    if titles:
+        prompt_parts.append(
+            f"Preserve estes nomes exatos se forem pronunciados: {'; '.join(titles)}."
+        )
+    if course:
+        prompt_parts.append(f"Curso: {course}.")
+    if teacher:
+        prompt_parts.append(f"Professor: {teacher}.")
+    if students:
+        prompt_parts.append(f"Alunos: {', '.join(students)}.")
+    initial_prompt = " ".join(prompt_parts)[:_MAX_INITIAL_PROMPT_CHARS].strip()
+
+    hotword_parts = [title for title in titles for _ in range(2)] + students
+    hotwords = ", ".join(hotword_parts)[:_MAX_HOTWORDS_CHARS].rstrip(" ,") or None
+    return {
+        "initial_prompt": initial_prompt or None,
+        "hotwords": hotwords,
+        "titles": titles,
+        "titles_count": len(titles),
+    }
+
+
+def fabio_transcrever_audio_url(
+    audio_url: str,
+    language: str | None = "pt",
+    *,
+    initial_prompt: str | None = None,
+    hotwords: str | None = None,
+    context_titles: list[str] | None = None,
+) -> str:
     """Download and transcribe a temporary Supabase audio URL with local Whisper."""
     _validate_https_url(audio_url)
     with requests.get(audio_url, stream=True, timeout=_HTTP_TIMEOUT) as resp:
@@ -306,9 +486,16 @@ def fabio_transcrever_audio_url(audio_url: str, language: str | None = "pt") -> 
             timeout=90,
         )
 
-        model_name = os.getenv("FABIO_WHISPER_MODEL") or os.getenv("HERMES_STT_LOCAL_MODEL") or "base"
+        model_name = os.getenv("FABIO_WHISPER_MODEL") or os.getenv("HERMES_STT_LOCAL_MODEL") or _DEFAULT_WHISPER_MODEL
         model = WhisperModel(model_name, device="cpu", compute_type="int8")
-        segments, info = model.transcribe(wav_path, language=language or None, vad_filter=True)
+        transcription_options = {
+            "language": language or None,
+            "beam_size": 5,
+            "condition_on_previous_text": False,
+            "initial_prompt": initial_prompt or None,
+            "hotwords": hotwords or None,
+        }
+        segments, info = model.transcribe(wav_path, vad_filter=True, **transcription_options)
         parts: List[str] = []
         for seg in segments:
             text = (getattr(seg, "text", "") or "").strip()
@@ -322,7 +509,7 @@ def fabio_transcrever_audio_url(audio_url: str, language: str | None = "pt") -> 
         # tudo, refaz uma única vez sem VAD. Isso preserva o guardrail: não
         # inventa conteúdo, só evita falso vazio do transcritor.
         if not text:
-            segments, info = model.transcribe(wav_path, language=language or None, vad_filter=False)
+            segments, info = model.transcribe(wav_path, vad_filter=False, **transcription_options)
             parts = []
             for seg in segments:
                 text = (getattr(seg, "text", "") or "").strip()
@@ -330,6 +517,8 @@ def fabio_transcrever_audio_url(audio_url: str, language: str | None = "pt") -> 
                     parts.append(text)
             text = " ".join(parts).strip()
             used_vad = False
+
+        text = _apply_contextual_title_corrections(text, context_titles)
 
         return json.dumps({
             "ok": True,
@@ -339,6 +528,7 @@ def fabio_transcrever_audio_url(audio_url: str, language: str | None = "pt") -> 
             "bytes": total,
             "vad_filter": used_vad,
             "model": model_name,
+            "context_hints": bool(initial_prompt or hotwords),
         }, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"ok": False, "error": f"transcription_failed: {type(e).__name__}: {e}"}, ensure_ascii=False)
@@ -361,7 +551,7 @@ def fabio_transcrever_audio_fila(audio_id: str, language: str | None = "pt") -> 
     queue_resp = requests.get(
         f"{_supabase_url()}/rest/v1/fabio_fila_audios",
         headers=_headers(),
-        params={"id": f"eq.{audio_id}", "select": "id,storage_path", "limit": "1"},
+        params={"id": f"eq.{audio_id}", "select": "id,storage_path,aula_id,professor_id", "limit": "1"},
         timeout=_HTTP_TIMEOUT,
     )
     queue_data = _safe_json_response(queue_resp)
@@ -398,7 +588,52 @@ def fabio_transcrever_audio_fila(audio_id: str, language: str | None = "pt") -> 
         return json.dumps({"ok": False, "error": "signed_url_ausente"}, ensure_ascii=False)
     signed_path = signed_path.strip()
     signed_url = signed_path if signed_path.startswith("https://") else f"{_supabase_url()}/storage/v1{signed_path}"
-    return fabio_transcrever_audio_url(signed_url, language)
+    queue_row = queue_data[0]
+    hints = _transcription_hints(queue_row.get("aula_id"), queue_row.get("professor_id"))
+    return fabio_transcrever_audio_url(
+        signed_url,
+        language,
+        initial_prompt=hints.get("initial_prompt"),
+        hotwords=hints.get("hotwords"),
+        context_titles=hints.get("titles"),
+    )
+
+
+_TERMINAL_AUDIO_CODES = ("sem_conteudo_pedagogico", "transcricao_incompativel")
+
+
+def fabio_marcar_audio_erro_terminal(
+    audio_id: str,
+    codigo: str,
+    detalhe: str | None = None,
+) -> str:
+    """Stop retries for a typed semantic failure through the audited RPC."""
+    audio_id = str(audio_id or "").strip()
+    if not audio_id:
+        return json.dumps({"ok": False, "error": "audio_id_obrigatorio"}, ensure_ascii=False)
+    if codigo not in _TERMINAL_AUDIO_CODES:
+        return json.dumps({"ok": False, "error": "codigo_terminal_invalido"}, ensure_ascii=False)
+
+    resp = requests.post(
+        f"{_supabase_url()}/rest/v1/rpc/fabio_marcar_audio_erro_terminal",
+        headers=_headers(),
+        json={
+            "p_audio_id": audio_id,
+            "p_codigo": codigo,
+            "p_detalhe": str(detalhe or "").strip()[:360] or None,
+        },
+        timeout=_HTTP_TIMEOUT,
+    )
+    data = _safe_json_response(resp)
+    if resp.status_code >= 400:
+        return json.dumps(
+            {"ok": False, "status_code": resp.status_code, "error": data},
+            ensure_ascii=False,
+        )
+    return json.dumps(
+        {"ok": True, "status_code": resp.status_code, "result": data},
+        ensure_ascii=False,
+    )
 
 
 def fabio_atualizar_status_audio(audio_id: str, status: str, erro: str | None = None, transcricao: str | None = None) -> str:
@@ -593,7 +828,11 @@ def fabio_criar_registro_aula(p_payload: Dict[str, Any]) -> str:
 
     if not _has_pedagogical_content(canonical):
         if audio_id:
-            fabio_atualizar_status_audio(audio_id, "erro", "transcricao vazia; professor precisa regravar")
+            fabio_marcar_audio_erro_terminal(
+                audio_id,
+                "sem_conteudo_pedagogico",
+                "transcricao vazia; professor precisa regravar",
+            )
         return json.dumps({"ok": False, "error": "sem conteúdo pedagógico real; registro não criado", "audio_id": audio_id or None}, ensure_ascii=False)
 
     url = f"{_supabase_url()}/rest/v1/rpc/fabio_criar_registro"
@@ -723,6 +962,36 @@ registry.register(
         },
     },
     handler=lambda args, **kw: fabio_transcrever_audio_fila(args.get("audio_id", ""), args.get("language", "pt")),
+)
+
+registry.register(
+    name="fabio_marcar_audio_erro_terminal",
+    toolset=_TOOLSET,
+    description="Encerra uma falha semantica tipificada de audio pela RPC auditada, sem retry automatico.",
+    emoji="stop",
+    requires_env=["LAREPORT_SUPABASE_SERVICE_ROLE"],
+    check_fn=check_requirements,
+    schema={
+        "name": "fabio_marcar_audio_erro_terminal",
+        "description": "Use somente quando o audio nao tem conteudo pedagogico ou e incompativel com a aula. Nao use para falhas transitorias de rede ou servico.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "audio_id": {"type": "string", "description": "UUID exato do audio na fila"},
+                "codigo": {
+                    "type": "string",
+                    "enum": ["sem_conteudo_pedagogico", "transcricao_incompativel"],
+                },
+                "detalhe": {"type": "string", "description": "Resumo curto da evidencia semantica"},
+            },
+            "required": ["audio_id", "codigo"],
+        },
+    },
+    handler=lambda args, **kw: fabio_marcar_audio_erro_terminal(
+        args.get("audio_id", ""),
+        args.get("codigo", ""),
+        args.get("detalhe"),
+    ),
 )
 
 registry.register(

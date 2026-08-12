@@ -29,7 +29,6 @@ import { limparCamposManuais } from '../registroManual/modelo'
 // conteúdo, pra não poluir. Nenhum campo preenchido fica escondido.
 const EXTRAS_TRONCO: Array<{ chave: string; label: string; icon: string; cutucada: string }> = [
   { chave: 'materiais', label: 'Materiais', icon: 'fa-solid fa-guitar', cutucada: 'Materiais usados na aula? (opcional)' },
-  { chave: 'repertorio', label: 'Repertório', icon: 'fa-solid fa-list-ol', cutucada: 'Repertório trabalhado? (opcional)' },
   { chave: 'marco_ref', label: 'Marco de referência', icon: 'fa-solid fa-flag', cutucada: 'Algum marco de referência? (opcional)' },
 ]
 
@@ -434,6 +433,13 @@ export default function ConfirmarPage() {
               tronco
             </Badge>
           </div>
+          <CampoEditavel
+            label="Repertório"
+            icon="fa-solid fa-list-ol"
+            value={(tronco.campos.repertorio as string | null) ?? null}
+            cutucada="Quer registrar o repertório trabalhado? (opcional)"
+            onSave={(v) => void salvarCampoTronco('repertorio', v)}
+          />
           <CampoEditavel
             label="Atividades"
             icon="fa-solid fa-music"

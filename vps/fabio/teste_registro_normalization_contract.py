@@ -336,6 +336,8 @@ class RegistroNormalizationConsumerTest(unittest.TestCase):
         queue = _FakeResponse([{
             "id": "audio-1",
             "storage_path": "whatsapp/25/audio-1.webm",
+            "aula_id": 101,
+            "professor_id": 25,
         }])
         signed = _FakeResponse({
             "signedURL": "/object/sign/fabio-audios/whatsapp/25/audio-1.webm?token=seguro",
@@ -343,17 +345,27 @@ class RegistroNormalizationConsumerTest(unittest.TestCase):
         with patch.object(tool, "_headers", return_value={"Authorization": "Bearer seguro"}), \
              patch.object(tool.requests, "get", return_value=queue) as get_mock, \
              patch.object(tool.requests, "post", return_value=signed) as post_mock, \
+             patch.object(tool, "_transcription_hints", return_value={
+                 "initial_prompt": "Aula de teclado. Repertorio possivel: Astro Bot, Meu Lanchinho.",
+                 "hotwords": "Astro Bot, Meu Lanchinho",
+                 "titles_count": 2,
+             }) as hints_mock, \
              patch.object(tool, "fabio_transcrever_audio_url", return_value='{"ok": true}') as transcribe_mock:
             result = json.loads(tool.fabio_transcrever_audio_fila("audio-1", "pt"))
 
         self.assertTrue(result["ok"])
         self.assertIn("/rest/v1/fabio_fila_audios", get_mock.call_args.args[0])
         self.assertEqual(get_mock.call_args.kwargs["params"]["id"], "eq.audio-1")
+        self.assertIn("aula_id", get_mock.call_args.kwargs["params"]["select"])
+        self.assertIn("professor_id", get_mock.call_args.kwargs["params"]["select"])
         self.assertIn("/storage/v1/object/sign/fabio-audios/", post_mock.call_args.args[0])
         self.assertEqual(post_mock.call_args.kwargs["json"], {"expiresIn": 600})
+        hints_mock.assert_called_once_with(101, 25)
         called_url = transcribe_mock.call_args.args[0]
         self.assertIn("/storage/v1/object/sign/fabio-audios/", called_url)
         self.assertNotIn("audio_url", called_url)
+        self.assertEqual(transcribe_mock.call_args.kwargs["hotwords"], "Astro Bot, Meu Lanchinho")
+        self.assertIn("Astro Bot", transcribe_mock.call_args.kwargs["initial_prompt"])
 
         registration = next(
             item
@@ -363,6 +375,136 @@ class RegistroNormalizationConsumerTest(unittest.TestCase):
         self.assertEqual(
             registration["schema"]["parameters"]["required"],
             ["audio_id"],
+        )
+
+    def test_vocabulario_da_transcricao_usa_repertorio_real_da_mesma_turma(self):
+        tool = _carregar_tool_real()
+        contexto = [{
+            "aula_local_id": 101,
+            "professor_id": 25,
+            "professor_nome": "Isaac Professor",
+            "aluno_id": 7,
+            "aluno_nome": "Arthur Darzi Ferreira",
+            "curso_nome": "Teclado",
+            "turma_nome": "T_Ter_11",
+        }]
+        historico = _FakeResponse([
+            {
+                "data_aula": "2026-08-11",
+                "turma_nome": "T_Ter_11",
+                "anotacoes": (
+                    "Repertorio: Astro Bot, meu lanchinho\n"
+                    "Conteudo: Digitacao, passagem do polegar\n"
+                    "Objetivo: Aprender parte 3 da musica"
+                ),
+            },
+            {
+                "data_aula": "2026-08-04",
+                "turma_nome": "T_Ter_11",
+                "anotacoes": "Repertorio: Astro Bot, Show da Luna",
+            },
+        ])
+        with patch.object(tool, "_context_rows", return_value=(contexto, None)), \
+             patch.object(tool, "_headers", return_value={}), \
+             patch.object(tool.requests, "get", return_value=historico) as get_mock:
+            hints = tool._transcription_hints(101, 25)
+
+        self.assertIn("Astro Bot", hints["initial_prompt"])
+        self.assertIn("meu lanchinho", hints["initial_prompt"])
+        self.assertNotIn("Show da Luna", hints["initial_prompt"])
+        self.assertIn("Arthur Darzi Ferreira", hints["initial_prompt"])
+        self.assertEqual(hints["titles_count"], 2)
+        self.assertIn("/rest/v1/aulas_emusys", get_mock.call_args.args[0])
+        self.assertEqual(get_mock.call_args.kwargs["params"]["turma_nome"], "eq.T_Ter_11")
+
+    def test_vocabulario_da_transcricao_limita_e_saneia_texto_historico(self):
+        tool = _carregar_tool_real()
+        contexto = [{
+            "aula_local_id": 101,
+            "professor_id": 25,
+            "professor_nome": "Professor\nInjetado",
+            "aluno_id": 7,
+            "aluno_nome": "Arthur\tDarzi",
+            "curso_nome": "Teclado",
+            "turma_nome": "T_Ter_11",
+        }]
+        historico = _FakeResponse([{
+            "data_aula": "2026-08-11",
+            "turma_nome": "T_Ter_11",
+            "anotacoes": "Repertorio: Astro Bot, <script>alert(1)</script>, " + ("X" * 200),
+        }])
+        with patch.object(tool, "_context_rows", return_value=(contexto, None)), \
+             patch.object(tool, "_headers", return_value={}), \
+             patch.object(tool.requests, "get", return_value=historico):
+            hints = tool._transcription_hints(101, 25)
+
+        self.assertNotIn("<", hints["initial_prompt"])
+        self.assertNotIn("\n", hints["initial_prompt"])
+        self.assertLessEqual(len(hints["initial_prompt"]), tool._MAX_INITIAL_PROMPT_CHARS)
+        self.assertLessEqual(len(hints["hotwords"]), tool._MAX_HOTWORDS_CHARS)
+
+    def test_modelo_padrao_prioriza_qualidade_pedagogica(self):
+        tool = _carregar_tool_real()
+        self.assertEqual(tool._DEFAULT_WHISPER_MODEL, "large-v3-turbo")
+
+    def test_correcao_contextual_recupera_titulo_sem_inventar_frase_distante(self):
+        tool = _carregar_tool_real()
+        corrected = tool._apply_contextual_title_corrections(
+            "Aprendendo uma musica no lanchinho e tocando Astro Bot ate a metade.",
+            ["Astro Bot", "Meu Lanchinho"],
+        )
+        untouched = tool._apply_contextual_title_corrections(
+            "Fizemos um exercicio no banquinho.",
+            ["Meu Lanchinho"],
+        )
+
+        self.assertIn("Meu Lanchinho", corrected)
+        self.assertNotIn("no lanchinho", corrected)
+        self.assertEqual(untouched, "Fizemos um exercicio no banquinho.")
+
+    def test_erro_semantico_usa_porta_terminal_tipificada(self):
+        tool = _carregar_tool_real()
+        response = _FakeResponse({
+            "audio_id": "audio-1",
+            "status": "erro_terminal",
+            "erro_tipo": "semantico_terminal",
+        })
+        with patch.object(tool, "_headers", return_value={}), \
+             patch.object(tool.requests, "post", return_value=response) as post_mock:
+            result = json.loads(tool.fabio_marcar_audio_erro_terminal(
+                "audio-1",
+                "sem_conteudo_pedagogico",
+                "Audio sem fala de aula.",
+            ))
+
+        self.assertTrue(result["ok"])
+        self.assertIn("/rest/v1/rpc/fabio_marcar_audio_erro_terminal", post_mock.call_args.args[0])
+        self.assertEqual(post_mock.call_args.kwargs["json"]["p_codigo"], "sem_conteudo_pedagogico")
+
+    def test_codigo_terminal_fora_da_lista_nao_chama_rpc(self):
+        tool = _carregar_tool_real()
+        with patch.object(tool.requests, "post") as post_mock:
+            result = json.loads(tool.fabio_marcar_audio_erro_terminal(
+                "audio-1",
+                "codigo_inventado",
+                None,
+            ))
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "codigo_terminal_invalido")
+        post_mock.assert_not_called()
+
+    def test_schema_expoe_porta_terminal_sem_permitir_sql_livre(self):
+        tool = _carregar_tool_real()
+        registration = next(
+            item
+            for item in tool._captured_registrations
+            if item.get("name") == "fabio_marcar_audio_erro_terminal"
+        )
+        codigo = registration["schema"]["parameters"]["properties"]["codigo"]
+        self.assertEqual(
+            codigo["enum"],
+            ["sem_conteudo_pedagogico", "transcricao_incompativel"],
         )
 
     def test_tool_rejeita_fatias_vazias_sem_chamar_rpc(self):
