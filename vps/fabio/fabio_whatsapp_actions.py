@@ -340,14 +340,14 @@ def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, An
     if kind == "adiar":
         _event(backend, action, context, "adiado", {})
         return _result("deferred", reply="Tudo bem. Deixei para depois sem renovar o prazo.", action_id=str(action["id"]))
-    refined = _refine_pending_class(backend, context, action)
-    if refined is not None:
-        return refined
     if kind == "escolher_aula":
         if action.get("tipo") == "escolher_aula_audio":
             return _select_and_enqueue_audio(backend, context, action, int(response["aula_id"]))
         _event(backend, action, context, "aula_escolhida", {"aula_id": int(response["aula_id"])})
         return _result("call_preview", reply="Encontrei a aula. Confirma essa chamada?", action_id=str(action["id"]), aula_id=int(response["aula_id"]))
+    refined = _refine_pending_class(backend, context, action)
+    if refined is not None:
+        return refined
     if kind == "confirmar_intencao":
         if action.get("tipo") == "confirmar_intencao_audio":
             _event(backend, action, context, "intencao_confirmada", {})
