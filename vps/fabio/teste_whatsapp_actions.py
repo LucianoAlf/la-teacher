@@ -57,6 +57,8 @@ class FakeBackend:
             return {"ok": True, "registro_alvo_id": payload["p_registro_alvo_id"], "presenca": payload["p_presenca"]}
         if name == "fabio_registrar_presencas_aula":
             return {"ok": True, "aula_id": payload["p_aula_emusys_id"], "inseridos": 2, "total_roster": 2}
+        if name == "fabio_confirmar_chamada_acao":
+            return {"ok": True, "codigo": "chamada_confirmada", "escrita": {"aula_id": 101, "inseridos": 2, "total_roster": 2}}
         if name in {"fabio_status_acao", "fabio_status_audio_fila"}:
             return {"ok": True, "status": "aguardando_confirmacao"}
         if name == "fabio_acao_json":
@@ -243,6 +245,26 @@ class WhatsappActionsTest(unittest.TestCase):
         event = next(payload for name, payload in backend.calls if name == "fabio_aplicar_evento_acao")
         self.assertEqual(event["p_evento"], "confirmado")
         self.assertTrue(result["receipt"]["recuperado_pos_commit"])
+
+    def test_confirm_call_uses_atomic_action_confirmation_not_a_parallel_writer(self):
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "old",
+            "tipo": "confirmar_chamada",
+            "estado": "aberta",
+            "aula_id": 101,
+            "payload": {"alunos_ausentes": [7]},
+        }
+        backend = FakeBackend(action=action)
+
+        result = tratar_mensagem_professor(professor_context(text="sim"), backend)
+
+        self.assertEqual(result["code"], "confirmed_call")
+        names = [name for name, _ in backend.calls]
+        self.assertIn("fabio_confirmar_chamada_acao", names)
+        self.assertNotIn("fabio_registrar_presencas_aula", names)
+        self.assertNotIn("fabio_aplicar_evento_acao", names)
 
     def test_replay_same_message_does_not_upload_or_start_again(self):
         action = {"id": "acao-1", "professor_id": 25, "wa_message_id": "wa-1", "tipo": "processando_audio", "estado": "processando", "storage_path": "whatsapp/25/wa-1.ogg", "payload": {}}

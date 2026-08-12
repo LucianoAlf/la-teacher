@@ -105,11 +105,39 @@ custo. O isolamento desta frente é somente de Git. O runner SQL atual abre uma
 transação contra produção; não usá-lo aqui, mesmo com rollback, pois esta frente
 não cria dados sintéticos na produção.
 
-**PRÓXIMO PASSO desta frente:** criar somente o worktree
-`codex/presenca-canonica-report`, revalidar migrations, schema de ações do
-Fábio e ACLs, escrever as provas de contrato sem fixtures para resolvedor,
-`presente → ausente`, conflitos, espelhos e autorização contextual WhatsApp; só
-então implementar e aplicar as migrations no projeto principal. Não tocar nas branches paralelas `fabio-whatsapp`,
+**Implantação efetiva (12/08/2026):** a única migration de schema desta frente
+foi aplicada no projeto Supabase principal `ouqwbbermlzqqvtqwlul`, pelo worktree
+do LA Report, sem branch Supabase e sem fixture produtiva:
+
+- `20260812172432_presenca_canonica_resolvedor_conflitos`: resolvedor
+  status-aware, preservação do raw Emusys, conflito revisável, origem de
+  espelho, consumidores de pendência/sessão/Fábio e confirmação WhatsApp
+  atômica;
+- `20260812172556_presenca_canonica_conflitos_acl`: revoga a leitura direta de
+  `anon`/`authenticated` sobre `aluno_presenca_conflitos`; RLS continua ativo e
+  a tabela não tem policy de navegador.
+
+Provas pós-aplicação, sem escrever dados: `Emusys/presente` fecha,
+`Emusys/ausente` não fecha, falta humana fecha; `anon` e `authenticated` não
+possuem `SELECT` na trilha de conflitos e `service_role` possui. O Report teve
+testes e build verdes; o banco local não iniciou por uma migration histórica
+anterior (`20260109_fase1_seed_dados.sql` referencia `professores` inexistente),
+portanto não se deve usar esse startup como prova nem tentar contorná-lo.
+
+**Migração concorrente a reconciliar:** o histórico remoto também registra
+`20260812171943_20260812150000_chamada_retroativa_fallback_emusys`, aplicada
+antes da canônica e ainda não presente no Git remoto. Não foi recriada nem
+reaplicada aqui. Antes de nova migration compartilhada, localizar o arquivo e
+o autor, compará-lo ao histórico remoto e registrá-lo no Git sem alterar seu
+conteúdo.
+
+**Próximos gates desta frente:** publicar o bridge do Fábio que troca a escrita
+direta por `fabio_confirmar_chamada_acao`, com backup, hash e restart
+verificados; consumir no LA Teacher os campos `origem_presenca` e
+`tem_conflito_presenca` como badges. Só depois voltar ao formulário manual,
+em uma frente própria: microfone + caderno, rascunho por
+professor+aula+aluno, autosave/versionamento e cópias exclusivamente dentro do
+roster, jamais presença. Não tocar nas branches paralelas `fabio-whatsapp`,
 `fabio-pendencias-whatsapp` ou áudio.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
