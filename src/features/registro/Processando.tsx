@@ -4,6 +4,7 @@ import { Button, FabioAvatar, ScreenHeader } from '../../components/ui'
 import { registrosPendentes, statusAudioFila, type StatusFila } from '../../lib/api'
 import { cx } from '../../lib/cx'
 import { AppFrame } from '../../pages/app/AppFrame'
+import { estadoProcessamento, pollingAtivo, type EstadoProcessamento } from './fluxoFila'
 
 const INTERVALO_MS = 3_000
 const AVISO_DEMORA_MS = 90_000
@@ -29,7 +30,7 @@ export default function ProcessandoPage() {
   const navigate = useNavigate()
   const { state } = useLocation() as { state?: { aulaLabel?: string } }
   const [status, setStatus] = useState<StatusFila>('pendente')
-  const [erro, setErro] = useState(false)
+  const [estadoErro, setEstadoErro] = useState<EstadoProcessamento>('andamento')
   const [demorando, setDemorando] = useState(false)
   const jaNavegou = useRef(false)
 
@@ -45,6 +46,7 @@ export default function ProcessandoPage() {
         statusAudioFila(audioId).catch(() => null),
         registrosPendentes().catch(() => []),
       ])
+      if (!pollingAtivo(parar, jaNavegou.current)) return
       const meu = pend.find((r) => r.audio_id === audioId && r.parent_id == null)
       if (meu && !jaNavegou.current) {
         jaNavegou.current = true
@@ -53,8 +55,9 @@ export default function ProcessandoPage() {
       }
       if (st) {
         setStatus(st.status)
-        if (st.tem_erro || st.status === 'erro') {
-          setErro(true)
+        const proximoEstado = estadoProcessamento({ status: st.status, temErro: st.tem_erro })
+        setEstadoErro(proximoEstado)
+        if (proximoEstado === 'erro_terminal') {
           parar = true
           return
         }
@@ -71,13 +74,13 @@ export default function ProcessandoPage() {
 
   // Se ficar parado na fila além do normal, tranquiliza (mas segue observando).
   useEffect(() => {
-    if (status !== 'pendente' || erro) {
+    if (status !== 'pendente' || estadoErro !== 'andamento') {
       setDemorando(false)
       return
     }
     const t = window.setTimeout(() => setDemorando(true), AVISO_DEMORA_MS)
     return () => window.clearTimeout(t)
-  }, [status, erro])
+  }, [status, estadoErro])
 
   return (
     <AppFrame>
@@ -93,49 +96,60 @@ export default function ProcessandoPage() {
           </p>
         </div>
 
-        {erro ? (
+        {estadoErro === 'erro_terminal' ? (
           <div className="flex max-w-[300px] flex-col items-center gap-2 rounded-md border border-border-subtle bg-danger-soft px-4 py-3 text-[13px] font-semibold text-danger-text">
             <span>
-              <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" /> Deu um tropeço no processamento.
+              <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" /> Este áudio precisa de ajuda para terminar.
             </span>
             <span className="font-normal text-text-secondary">
-              O sistema tenta de novo sozinho em alguns minutos — não precisa reenviar. Se persistir, fala com a
-              coordenação.
+              Ele está guardado e não foi reenviado. Fale com a coordenação antes de gravar outra vez.
             </span>
           </div>
         ) : (
-          <div className="flex w-full max-w-[300px] flex-col gap-[13px] text-left">
-            {PASSOS.map((p, i) => {
-              const feito = p.feitoQuando.includes(status)
-              const fazendo = !feito && (i === 0 ? status === 'pendente' : PASSOS[i - 1].feitoQuando.includes(status))
-              return (
-                <div
-                  key={p.chave}
-                  className={cx(
-                    'flex items-center gap-[11px] text-sm',
-                    feito ? 'text-text-secondary' : fazendo ? 'text-text-primary' : 'text-text-muted',
-                  )}
-                >
-                  <span
+          <>
+            {estadoErro === 'erro_recuperavel' && (
+              <div className="flex max-w-[300px] flex-col items-center gap-2 rounded-md border border-border-subtle bg-danger-soft px-4 py-3 text-[13px] font-semibold text-danger-text">
+                <span>
+                  <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" /> O processamento tropeçou, mas segue em tentativa automática.
+                </span>
+                <span className="font-normal text-text-secondary">
+                  Não reenvie o áudio: esta tela continua acompanhando a fila.
+                </span>
+              </div>
+            )}
+            <div className="flex w-full max-w-[300px] flex-col gap-[13px] text-left">
+              {PASSOS.map((p, i) => {
+                const feito = p.feitoQuando.includes(status)
+                const fazendo = !feito && (i === 0 ? status === 'pendente' : PASSOS[i - 1].feitoQuando.includes(status))
+                return (
+                  <div
+                    key={p.chave}
                     className={cx(
-                      'flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border-2 text-[11px]',
-                      feito
-                        ? 'border-success bg-success-soft text-success-text'
-                        : fazendo
-                          ? 'border-brand text-brand-text'
-                          : 'border-border-strong text-transparent',
+                      'flex items-center gap-[11px] text-sm',
+                      feito ? 'text-text-secondary' : fazendo ? 'text-text-primary' : 'text-text-muted',
                     )}
                   >
-                    <i className={feito ? 'fa-solid fa-check' : 'fa-solid fa-spinner fa-spin'} aria-hidden="true" />
-                  </span>
-                  {p.rotulo}
-                </div>
-              )
-            })}
-          </div>
+                    <span
+                      className={cx(
+                        'flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border-2 text-[11px]',
+                        feito
+                          ? 'border-success bg-success-soft text-success-text'
+                          : fazendo
+                            ? 'border-brand text-brand-text'
+                            : 'border-border-strong text-transparent',
+                      )}
+                    >
+                      <i className={feito ? 'fa-solid fa-check' : 'fa-solid fa-spinner fa-spin'} aria-hidden="true" />
+                    </span>
+                    {p.rotulo}
+                  </div>
+                )
+              })}
+            </div>
+          </>
         )}
 
-        {demorando && !erro && (
+        {demorando && estadoErro === 'andamento' && (
           <p className="max-w-[300px] text-[12px] leading-relaxed text-text-muted">
             <i className="fa-solid fa-circle-info" aria-hidden="true" /> Está levando um pouco mais que o normal — seu
             áudio está seguro. Pode voltar à Home: assim que ficar pronto, o relatório aparece em

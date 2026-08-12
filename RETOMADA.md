@@ -1,5 +1,7 @@
 # RETOMADA — LA Teacher
 
+> **Checkpoint de rollout — 12/08/2026.** A frente de recibos e fila de áudio foi concluída e integrada pela PR #4 (merge `1d5e3c2`), após os commits `66d509b`, `074dbed`, `ea51cfd`, `193859a` e `197b1bb`. A migration `20260812163000` está aplicada e registrada; rollback preservou schema e 35 linhas, 28/28 mutantes SQL, 43 testes unitários e build passaram. Recibos originados no aplicativo não são enviados ao WhatsApp; ações originadas no WhatsApp continuam salvando no aplicativo e usam o retorno do canal. VPS e timer de recibo seguem ativos, sem jobs ativos/claims pendentes; Vercel Production está publicada e o login responde HTTP 200 sem erro de console. Não houve áudio real de professor, presença/falta, mensagem WhatsApp de saída, mensagem a responsável ou E2E com professor. Evidência: `docs/superpowers/evidence/2026-08-12-recibos-e-fila-audio.md`.
+
 > **Este arquivo existe pra sobreviver ao `/compact`.** O resumo automático guarda
 > o que eu lembro; este arquivo guarda o que é **verdade**. Depois de compactar,
 > a primeira coisa que eu faço é ler ele — e sigo daqui, sem perguntar de novo o

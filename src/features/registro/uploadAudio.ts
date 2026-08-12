@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase'
-import { enfileirarAudio, ErroGravacaoConhecido, type ErroGravacao } from '../../lib/api'
+import { enfileirarAudio, ErroGravacaoConhecido, type EnfileirarResultado, type ErroGravacao } from '../../lib/api'
 import { extensaoDoMime } from '../../lib/audio'
 import { proximaTentativaAutomatica } from './camposCanonicos'
 import {
@@ -27,7 +27,7 @@ export interface DadosEnvio {
 }
 
 export type ResultadoFila =
-  | { ok: true; audioId: string }
+  | { ok: true; resultado: EnfileirarResultado }
   | {
       ok: false
       mensagem: string
@@ -38,7 +38,7 @@ export type ResultadoFila =
     }
 
 export type ResultadoEnvio =
-  | { ok: true; audioId: string }
+  | { ok: true; resultado: EnfileirarResultado }
   | { ok: false; guardadoOffline: true; itemFilaId: string; mensagem: string; retryAutomatico: boolean; tentativas: number }
   | { ok: false; guardadoOffline: false; mensagem: string }
   /** Erro de validação (aula fora da janela etc.) — permanente, não vai pra fila. */
@@ -113,7 +113,7 @@ async function garantirIdentidadeDeUpload(item: ItemFilaLocal, ownerUserId: stri
  * Sobe o áudio e o enfileira via app_enfileirar_audio. O caminho e a intenção
  * já estão gravados localmente: um replay repete o mesmo objeto, não cria outro.
  */
-async function subirEEnfileirar(item: ItemFilaLocal, ownerUserId: string): Promise<string> {
+async function subirEEnfileirar(item: ItemFilaLocal, ownerUserId: string): Promise<EnfileirarResultado> {
   const pronto = await garantirIdentidadeDeUpload(item, ownerUserId)
   const { error: upErro } = await supabase.storage.from(BUCKET).upload(pronto.storagePath!, pronto.blob, {
     contentType: pronto.mime.split(';')[0] || 'audio/webm',
@@ -123,8 +123,7 @@ async function subirEEnfileirar(item: ItemFilaLocal, ownerUserId: string): Promi
   })
   if (upErro) throw upErro
 
-  const res = await enfileirarAudio(pronto.aulaId, pronto.storagePath!, pronto.duracaoSegundos, pronto.registroId ?? null)
-  return res.audio_id
+  return enfileirarAudio(pronto.aulaId, pronto.storagePath!, pronto.duracaoSegundos, pronto.registroId ?? null)
 }
 
 /**
@@ -200,9 +199,9 @@ export async function enviarAudio(dados: DadosEnvio): Promise<ResultadoEnvio> {
   itensEmEnvio.add(item.id)
   try {
     try {
-      const audioId = await subirEEnfileirar(item, item.ownerUserId)
+      const resultado = await subirEEnfileirar(item, item.ownerUserId)
       await descartarItemFilaPersistido(item.id, item.ownerUserId)
-      return { ok: true, audioId }
+      return { ok: true, resultado }
     } catch (erro) {
       if (erro instanceof ErroGravacaoConhecido) {
         await descartarItemFilaPersistido(item.id, item.ownerUserId)
@@ -259,9 +258,9 @@ export async function tentarNovamenteItemFila(id: string, ownerUserId: string | 
     }
 
     try {
-      const audioId = await subirEEnfileirar(item, ownerUserId)
+      const resultado = await subirEEnfileirar(item, ownerUserId)
       await descartarItemFilaPersistido(id, ownerUserId)
-      return { ok: true, audioId }
+      return { ok: true, resultado }
     } catch (erro) {
       const mensagem = mensagemDoErro(erro)
       if (erro instanceof ErroGravacaoConhecido) {

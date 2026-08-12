@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { SOMENTE_LEITURA } from './config'
 import { extensaoDoMime } from './audio'
+import { lerResultadoEnfileirar } from './enfileirarResultado'
 
 /**
  * Camada de dados do app: SOMENTE wrappers das RPCs app_*.
@@ -290,7 +291,7 @@ export async function registroCompleto(registroId: string): Promise<RegistroComp
 }
 
 /** Status do áudio na fila do Fábio (fabio_fila_audios) — só o do próprio professor. */
-export type StatusFila = 'pendente' | 'transcrevendo' | 'transcrito' | 'normalizado' | 'erro'
+export type StatusFila = 'pendente' | 'transcrevendo' | 'transcrito' | 'normalizado' | 'erro' | 'erro_terminal'
 
 export interface StatusAudioFila {
   audio_id: string
@@ -564,10 +565,16 @@ export async function atualizarPerfil(
 }
 
 export interface EnfileirarResultado {
-  audio_id: string
-  status: 'pendente'
+  /** Nulo somente quando a RPC reaproveita um rascunho já montado. */
+  audio_id: string | null
+  status: StatusFila | null
   modo: 'novo' | 'complementar'
   registro_id: string | null
+  /** O banco achou uma fila ativa desta mesma aula; não houve novo insert. */
+  ja_em_processamento?: boolean
+  /** O banco achou o rascunho desta aula; a UI deve abrir a confirmação. */
+  rascunho_existente?: boolean
+  deduplicado?: boolean
 }
 
 /**
@@ -620,7 +627,7 @@ export async function enfileirarAudio(
     if (conhecido) throw new ErroGravacaoConhecido(conhecido)
     throw error
   }
-  return res as unknown as EnfileirarResultado
+  return lerResultadoEnfileirar(res)
 }
 
 // ---------------------------------------------------------------------------
