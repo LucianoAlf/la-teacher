@@ -56,9 +56,24 @@ de fontes.
 - Fábio continua por RPC server-side com `professor_whatsapp`; não receberá
   grant direto de tabela nem acesso SQL no chat.
 
-**PRÓXIMO PASSO desta frente:** revisar a SPEC aprovada; só depois escrever o
-plano em gates, inventariar assinaturas/ACLs remotas de novo e implementar
-migration + testes sem criar dados de teste na produção. Não tocar nas branches
+**Plano versionado:**
+`docs/superpowers/plans/2026-08-12-presenca-canonica.md`. Ele separa o contrato
+de presença do formulário manual e fixa a propriedade: LA Teacher mantém
+resolvedor/gêmeos/leitura; LA Report mantém a RPC e a UX da chamada. A auditoria
+remota confirmou que `fn_sincronizar_gemeos_presenca(integer)` ainda é
+`SECURITY DEFINER` executável por `PUBLIC`/`anon`/`authenticated`; a migration
+planejada revoga essas ACLs sem abrir outra porta de escrita. A porta do Fábio
+`fabio_registrar_presencas_aula` permanece exclusiva de `service_role`.
+
+**Gate pendente, antes de qualquer fixture ou DDL:** criar branch Supabase
+efêmera do projeto `ouqwbbermlzqqvtqwlul`. O custo consultado é US$ 0,01344/hora
+e requer confirmação explícita do Alf na ferramenta. O runner SQL atual abre
+uma transação contra produção; não usá-lo aqui, mesmo com rollback, pois esta
+frente não cria dados sintéticos na produção.
+
+**PRÓXIMO PASSO desta frente:** após a confirmação do custo, criar a branch
+efêmera e o worktree `codex/presenca-canonica-report`, revalidar migrations e
+ACLs, escrever os testes RED e só então implementar. Não tocar nas branches
 paralelas `fabio-whatsapp`, `fabio-pendencias-whatsapp` ou áudio.
 
 > ⚠️ **HANDOFF PRA OUTRA FERRAMENTA (10/08, noite):** o Alf bateu ~99% da cota
