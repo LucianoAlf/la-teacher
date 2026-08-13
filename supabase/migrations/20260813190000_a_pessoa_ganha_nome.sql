@@ -1,3 +1,17 @@
+-- SUPERADA POR: 20260813210000_mata_a_view_duplicada.sql
+--
+-- Esta migration criou `vw_aluno_pessoa` -- que era DUPLICATA. A casa ja tinha
+-- `vw_aluno_identidade_unidade_canonica` (com uma coluna `pessoa_chave`, o
+-- mesmo nome) e `vw_professor_carteira_pessoa_canonica_sombra`. Os numeros
+-- batiam exatamente, entao a minha nao acrescentava nada.
+--
+-- A 20260813210000 apagou a view e repontou a RPC para a canonica. Replayar
+-- este arquivo RESSUSCITARIA a duplicata -- por isso ele fica marcado.
+--
+-- O raciocinio sobre a CHAVE (por que `(unidade_id, emusys_student_id)` e nao
+-- o id sozinho, e por que `data_nascimento` nao entra) segue valido e esta
+-- preservado abaixo como registro da auditoria.
+
 -- A pessoa ganha nome
 --
 -- O QUE ESTAVA FALTANDO. `public.alunos` nao e uma tabela de pessoas: a unica
