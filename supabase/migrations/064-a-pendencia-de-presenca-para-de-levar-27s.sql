@@ -1,3 +1,11 @@
+-- SUPERADA POR: 20260813260000_a_aula_operacional_volta_a_usar_o_indice.sql
+--
+-- O teste da 064 afirma um FORMATO DE PLANO que a `vw_presenca_pendencia` nao
+-- tem mais: ele exige o `idx_aulas_emusys_turma_no_horario` no subplano que a
+-- view deixou de ter. O indice continua criado e o orcamento de buffers que a
+-- 064 inaugurou continua sendo vigiado -- agora pelo teste da 20260813260000,
+-- que mede a mesma view (12,3s -> 735ms, 4M -> 252k buffers).
+--
 -- 064 — a pendência de presença para de levar 27 segundos
 --
 -- `vw_presenca_pendencia` é a fonte única de "aula sem presença forte" (013):

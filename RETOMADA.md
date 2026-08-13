@@ -2,8 +2,47 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 noite BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: os 13 testes vermelhos que sobraram** — são de uma classe
-> só, e vale tratar como classe. Sprints 0 a 3 fechados.
+> **PRÓXIMO PASSO: os vermelhos que sobraram** — `026`, `041`, `053`, `075`,
+> `077`, `080`, `086`, `088`. Sprints 0 a 3 fechados.
+>
+> ## ⚡ A PENDÊNCIA DE PRESENÇA: 12,3s → 735ms (13/08 noite)
+>
+> **Eu tinha dito que os 15 vermelhos eram "uma classe só" de expectativa
+> podre. Estava errado — tinha defeito vivo no meio, e mais de um.**
+>
+> O `064` reclamava de plano e de buffers. Fui medir a view de verdade:
+> **12,3 segundos, 3.999.329 buffers — e 97,6% deles num filtro só**,
+> `Filter: (id = fn_aula_operacional_id(id))`.
+>
+> **A causa:** existe um índice desenhado exatamente para essa busca
+> (`idx_aulas_emusys_slot_operacional`, 3 MB) e ele **não podia ser usado** —
+> quatro das cinco comparações eram `is not distinct from`, que **não é
+> indexável**. Não é um `=` mais cuidadoso: é outro operador, e o btree não
+> casa com ele. O índice certo existia e estava inalcançável.
+>
+> **O conserto** (`20260813260000`, aplicada e registrada) dá duas portas com a
+> MESMA semântica: campos preenchidos → `=` puro e o índice entra; algum nulo →
+> o caminho null-safe de sempre, byte por byte. Nenhuma linha muda de resposta.
+> **Medido depois: 735ms e 252.710 buffers — 16,7× mais rápido.**
+>
+> Isso é a fonte única da cobrança da noite, da manhã e do escalonamento.
+>
+> **O teste é de EQUIVALÊNCIA, não de opinião:** reconstrói a função antiga em
+> `pg_temp` e compara linha a linha num lote real. **5/5 mutantes** — e dois
+> deles só morreram depois de eu consertar o próprio teste:
+> * a amostra de linhas órfãs era `limit 1000` sobre um `OR`, e pegava só o
+>   nulo abundante (9.089 sem professor) — as **17** sem curso nunca entravam;
+> * mesmo estratificada, ainda faltava: as 17 sem curso estão **todas** também
+>   sem professor, então a guarda do curso é inalcançável com o dado de hoje.
+>   Só morreu com fixture própria, criada e desfeita dentro da transação.
+>   **Passo que nunca alcança o caso que vigia é decoração.**
+>
+> **4 migrations marcadas `SUPERADA POR`:** `042`, `044`, `048` (recriam o
+> `ON CONFLICT` de dois predicados → replayar reintroduz o 42P10) e `064`
+> (afirma um formato de plano que a view não tem mais; o orçamento de buffers
+> que ela inaugurou agora é vigiado pelo teste da `20260813260000`).
+>
+> **`038` e `043` ficaram verdes sozinhos** — eram sintoma do 42P10.
 >
 > ## 🚨 DEFEITO VIVO ACHADO E CONSERTADO — o aviso ao comercial (13/08 noite)
 >

@@ -1,3 +1,11 @@
+-- SUPERADA POR: 20260813250000_o_aviso_ao_comercial_volta_a_caber_no_indice.sql
+--
+-- Estes arquivos recriam `fabio_claim_aviso_comercial` com o `ON CONFLICT` de
+-- DOIS predicados. O indice `uq_fabio_notif_por_referencia` ganhou um terceiro
+-- (`tipo <> 'registro_recibo'`), entao replayar este arquivo REINTRODUZ o
+-- 42P10 vivo que a 20260813250000 consertou. O que este arquivo ensinou
+-- continua valendo e esta preservado abaixo como registro.
+--
 -- 044 — a mensagem ao comercial ganha hierarquia, e o interno ganha fronteira
 --
 -- O primeiro tiro real (06/08/2026, para o Alf) chegou certo e feio: "Presenca",
