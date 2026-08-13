@@ -1,3 +1,17 @@
+-- SUPERADA POR: 20260812004430_fix_registro_recibo_partial_conflict.sql
+--
+-- Esta versao traz `on conflict (wa_message_id)` SEM o predicado do indice
+-- unico parcial (`fcm_wa_msg_uq ... where wa_message_id is not null`), entao
+-- o Postgres nao consegue inferir o indice e a instrucao nem chega a planejar:
+-- 42P10. Nao e teoria -- derrubou a producao em 12/08 00:40 UTC
+-- (`delivered_unclosed`: recibo entregue ao professor e a funcao de fechar
+-- quebrando). A correcao saiu quatro minutos depois, na
+-- 20260812004430, que a produção usa hoje.
+--
+-- As guardas de ACL do recibo foram resgatadas para
+-- `20260813180000_guardas_resgatadas_do_whatsapp.sql`, com 5/5 mutantes, e o
+-- contrato do upsert parcial agora roda de verdade no teste da 20260812004430
+-- (que era orfao e nunca tinha rodado), com 2/2 mutantes.
 -- 095 — recibo canonico de registro no WhatsApp
 --
 -- Um registro confirmado pode gerar presenca, devolutivas e um carimbo para o

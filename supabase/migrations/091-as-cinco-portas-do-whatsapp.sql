@@ -1,3 +1,17 @@
+-- SUPERADA POR: 092-fecha-contrato-do-reconciliador.sql
+--
+-- Replayar a 091 sobre o schema de hoje da
+-- `42P13: cannot change return type of existing function` em
+-- `fabio_status_audio_fila(integer,uuid)`: a 092 acrescentou `registro_id` ao
+-- retorno DE PROPOSITO, e a 091 reinstala a assinatura antiga.
+--
+-- Consequencia que quase passou batido: com o baseline vermelho, TODO mutante
+-- da suite "morre" por erro e o placar mente. Medido em 13/08/2026, ela dizia
+-- 10/10 sem provar nada.
+--
+-- As guardas de ACL que este teste protegia (fabio_confirmar_registro e
+-- fn_confirmar_registro_core) foram resgatadas para
+-- `20260813180000_guardas_resgatadas_do_whatsapp.sql`, com 5/5 mutantes.
 -- 091 - as cinco portas do WhatsApp
 -- O app e o bridge atravessam os mesmos nucleos de escrita. A diferenca entre
 -- canais fica restrita a identidade resolvida, origem/auditoria e ACL.

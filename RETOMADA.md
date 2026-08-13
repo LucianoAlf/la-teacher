@@ -2,9 +2,55 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 tarde BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: seguir `docs/superpowers/plans/2026-08-13-correcao-pos-auditoria.md`
-> a partir do Sprint 3.** O Sprint 3 agora tem lista concreta (ver abaixo).
-> Cada checkpoint só fecha com **prova real na VPS**, não com verde de harness.
+> **PRÓXIMO PASSO: terminar o Sprint 3** em
+> `docs/superpowers/plans/2026-08-13-correcao-pos-auditoria.md`. Faltam quatro
+> itens, listados no fim deste bloco. Cada checkpoint só fecha com **prova
+> real**, não com verde de harness.
+>
+> **Sprint 3 EM ANDAMENTO — a bateria `09` saiu de 2 FALHARAM para 0
+> FALHARAM** (3 passam · 3 superadas · 1 não reaplicável).
+>
+> Os três baselines vermelhos foram diagnosticados: `090` não é replayável por
+> construção (`create table` sem `if not exists`); `091` virou
+> `SUPERADA POR: 092` (a 092 mudou a assinatura de `fabio_status_audio_fila` de
+> propósito); `095` virou `SUPERADA POR: 20260812004430`.
+>
+> **O incidente que estava escondido atrás da `095`:** em **12/08 00:40 UTC** o
+> log registrou `registro_recibo_entregue_mas_nao_fechado`, status
+> `delivered_unclosed` — o recibo **foi entregue** ao professor 10 e a função
+> que fecha quebrou com `42P10` (`ON CONFLICT` sem o predicado do índice
+> parcial). Não virou duplicata porque um caminho de recuperação fechou a linha
+> com o marcador sintético `recovered-delivered-unclosed` (1 notificação,
+> `tentativas=1`). O Codex corrigiu **quatro minutos depois**, na
+> `20260812004430`, que é o que a produção usa hoje.
+>
+> **Os órfãos e o incidente eram a MESMA história.** O teste daquela correção
+> era o `097-...test.sql`, órfão por dois motivos somados: nome que não pareia
+> com o da migration **e** `begin;/rollback;` próprios, que o runner recusa.
+> Os três órfãos foram pareados e convertidos ao formato da casa —
+> **não há mais teste órfão no repo**.
+>
+> **Um mutante pagou por si:** o M1 de `mutantes-20260812004430` (que
+> reintroduz literalmente o defeito de 12/08) **sobreviveu**, porque o teste
+> original reproduzia o upsert *inline* e nunca tocava na função. Virou passo
+> novo no teste; agora 2/2.
+>
+> **Nove guardas de ACL estavam apagadas** (090/091/095). Medidas antes: as
+> nove portas **estavam corretas** — não havia vazamento, mas ninguém olhava.
+> Resgatadas em `20260813180000_guardas_resgatadas_do_whatsapp.sql`, aplicada e
+> registrada, **5/5 mutantes**.
+>
+> **⚠️ Erro meu, registrado pra não voltar:** eu afirmei defeito **vivo** no
+> `ON CONFLICT` depois de rodar `EXPLAIN` contra a produção. O `EXPLAIN` usava
+> o texto **do arquivo 095** (versão velha) — a função viva já tem o predicado.
+> Testar o texto do repo e concluir sobre a produção é o erro de sempre com
+> roupa nova.
+>
+> **Falta no Sprint 3:** `094/M4` (unicidade da ação no ledger);
+> `20260813004713/M4` (remover o índice único não mata, e a migration *afirma*
+> que ele é "segunda barreira independente do lock"); estender
+> `exigirBaselineVerde()` aos 62 runners restantes; e o laço latente do caminho
+> `bloqueadas` herdado do Sprint 1.
 >
 > **Sprint 2 FECHADO em 13/08 — a rede de mutantes voltou a enxergar, e o
 > sprint achou coisa pior que o CRLF.**

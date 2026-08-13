@@ -443,6 +443,65 @@ STALE, aplicá-lo, e confirmar que agora ele **morre**.
 
 ---
 
+# Sprint 3 — matar o que sobreviver 🟡 EM ANDAMENTO (13/08)
+
+> **Feito nesta passada.** A bateria `09` saiu de **2 FALHARAM** para
+> **0 FALHARAM** (3 passam · 3 superadas · 1 não reaplicável).
+>
+> **Os três baselines vermelhos, diagnosticados:**
+>
+> | | causa medida | destino |
+> |---|---|---|
+> | `090` | `create table` sem `if not exists` — não replayável por construção | fica como "sem harness reaplicável" |
+> | `091` | `42P13` — a `092` mudou a assinatura de `fabio_status_audio_fila` de propósito | `SUPERADA POR: 092` |
+> | `095` | `42P10` — `ON CONFLICT` sem o predicado do índice parcial | `SUPERADA POR: 20260812004430` |
+>
+> **O incidente que estava escondido atrás disso.** O `42P10` da `095` não é
+> teoria: em **12/08 00:40 UTC** o log registrou
+> `notify_worker_registro_recibo_entregue_mas_nao_fechado`, status
+> `delivered_unclosed` — o recibo **foi entregue** ao professor 10 e a função
+> que fecha quebrou. Só não virou duplicata porque um caminho de recuperação a
+> fechou com o marcador sintético `recovered-delivered-unclosed` (1 notificação
+> afetada, `tentativas=1`). O Codex corrigiu **quatro minutos depois**, na
+> `20260812004430_fix_registro_recibo_partial_conflict.sql`, que é o que a
+> produção usa hoje.
+>
+> **E os dois achados eram a mesma história.** O teste daquela correção é o
+> `097-registro-recibo-partial-conflict.test.sql` — um dos **três órfãos**. Ele
+> nunca rodou, por dois motivos somados: nome que não pareia com o da migration
+> (o runner pareia por nome) **e** `begin;/rollback;` próprios, que o runner
+> recusa porque é ele o dono da transação. Duas camadas de silêncio sobre a
+> guarda de um defeito que já tinha mordido a produção.
+>
+> **Os três órfãos foram pareados e convertidos** ao formato da casa,
+> preservando exatamente o que afirmavam. Não há mais teste órfão no repo.
+>
+> **Um mutante pagou por si.** Ao escrever `mutantes-20260812004430`, o **M1**
+> — que reintroduz literalmente o defeito de 12/08 — **sobreviveu**. Motivo: o
+> teste original reproduzia o upsert *inline* e nunca tocava em
+> `fabio_concluir_registro_recibo`, então apagar o predicado **dentro da
+> função** era invisível. Virou passo novo no teste; agora **2/2**.
+>
+> **Nove guardas de ACL estavam apagadas** (090, 091, 095). Todas medidas em
+> produção antes: **as nove portas estavam corretas**, não havia vazamento — mas
+> ninguém olhava, e regressão nenhuma seria percebida. Resgatadas para
+> `20260813180000_guardas_resgatadas_do_whatsapp.sql`, aplicada, registrada,
+> **5/5 mutantes**.
+>
+> **Correção de um erro meu, registrada.** Eu afirmei que havia defeito **vivo**
+> no `ON CONFLICT` depois de rodar `EXPLAIN` contra produção. O `EXPLAIN` usava
+> o texto **do arquivo 095**, que é a versão velha — a função viva já carrega o
+> predicado. Não há defeito vivo. Testar o texto do repo e concluir sobre a
+> produção é o mesmo erro de sempre, com roupa nova.
+>
+> **Ainda aberto neste sprint:** `094/M4` (unicidade da ação no ledger) e
+> `20260813004713/M4` (o índice único que a migration chama de "segunda
+> barreira independente do lock" e nada prova); estender
+> `exigirBaselineVerde()` aos 62 runners restantes; e o laço latente do caminho
+> `bloqueadas` herdado do Sprint 1.
+
+## (plano original abaixo)
+
 # Sprint 3 — matar o que sobreviver
 
 **Depende do CP-2.3.** Só dá pra escrever depois que o placar verdadeiro
