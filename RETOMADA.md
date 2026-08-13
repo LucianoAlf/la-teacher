@@ -1,5 +1,63 @@
 # RETOMADA — LA Teacher
 
+> **Checkpoint canônico — 13/08/2026 07h49 BRT · consolidado após as PRs #1–#11.**
+> `origin/main` e o clone local apontam para `f3ccb5980a77584dcb614e5a76607cd42a484b93`
+> (PR #11, [fix: persist experimental audio retries](https://github.com/LucianoAlf/la-teacher/pull/11)). A produção Vercel
+> `dpl_9BoZUitZfiAHKDeoANYKj7x28aZP` está `Ready` e atende
+> `https://la-teacher.vercel.app/`; a rota `/app/login` abriu como **LA Teacher**,
+> com tela de login e sem erro de console. A árvore `main` está limpa neste
+> checkpoint. Não tomar os checklists antigos deste arquivo nem
+> `docs/ROADMAP.md` como estado de entrega: são histórico e não foram reescritos
+> neste trabalho.
+>
+> **Trabalho do outro chat integrado e publicado (PRs #6–#10):** presença
+> canônica e resolução de aula operacional; recuperação segura de áudio ligado a
+> aula sem roster; card de briefing estático oculto; ficha manual individual;
+> transcrição contextual/normalização conservadora; e teto de três tentativas
+> para falha transitória. A ficha manual continua usando
+> `fabio_registros_aula`/`aluno_presenca`, origem `texto`, presença confirmada
+> pelo professor e nenhuma fonte paralela. A validação autenticada anterior do
+> Matheus mostrou os caminhos **Áudio** e **Ficha** sem erro de console. As
+> referências de integração são as PRs #6, #7, #8, #9 e #10; não há branch de
+> código desse conjunto pendente de merge.
+>
+> **Correção integrada nesta conversa (PR #11):** o áudio experimental agora
+> entra pela mesma fila persistente do registro normal. A intenção e o Blob são
+> guardados antes do Storage; o retry reutiliza o mesmo `storage_path`, faz
+> `upsert` e volta à tela experimental correta. A migration
+> `20260813004713_audio_experimental_duravel.sql` está aplicada no projeto
+> Supabase `ouqwbbermlzqqvtqwlul`: a política
+> `storage.objects.fabio_audios_update_own` limita o `UPDATE` ao dono
+> autenticado, o índice parcial `uq_fabio_fila_audio_experimental_path` impede
+> duplicidade física e `app_enfileirar_audio_experimental(bigint,text,integer)`
+> está liberada para `authenticated`, não para `anon`.
+>
+> **Prova real da PR #11:** no vínculo experimental do Matheus Reis foi copiado
+> um áudio técnico já existente, sem enviar mensagem a professor, família ou
+> comercial. A VPS, pelo `fabio-audio-experimental.service`, reivindicou a fila,
+> transcreveu e produziu um rascunho `aguardando_confirmacao`, com uma tentativa
+> e transcrição não vazia; nenhuma notificação nasceu e nada foi confirmado. Ao
+> final, o rascunho, a fila e o objeto de Storage de teste foram removidos, com
+> verificação de zero resíduo. Este E2E prova Storage → fila → VPS → rascunho;
+> ele não substitui um professor autenticado gravando no navegador, que segue
+> sendo a próxima observação humana de uso.
+>
+> **Verificações recentes:** PR #11 ficou `CLEAN`, Vercel Preview aprovou;
+> `npm run test:unit` = **65/65**, `npm run build` e `git diff --check` verdes;
+> testes SQL remotos e **5/5 mutantes** da migration da fila experimental
+> morreram. O linter de segurança do Supabase continua apontando avisos legados
+> em outros objetos do projeto; a mudança desta frente foi verificada
+> pontualmente por política, grants, índice e `search_path` fixo.
+>
+> **Estado para continuar:** a produção está liberada para o piloto prático.
+> Observar professor autenticado enviando áudio experimental e repetir o mesmo
+> arquivo após uma falha transitória para provar a UX do retry no dispositivo.
+> Não enviar automaticamente nada a família. As três branches remotas ainda não
+> integradas (`claude/compassionate-heisenberg-e778a8`,
+> `fabio/atualiza-docs-estado-real` e `fabio/edge-carteiro-registro-aula`) não
+> fazem parte deste checkpoint; revisar diff e finalidade antes de qualquer
+> merge.
+
 > **Checkpoint ativo — 12/08/2026 20h38 BRT · registro manual e correção do
 > áudio publicados e provados em produção.** A entrega final entrou na `main`
 > pela PR #9, merge `f164c247acfe1e55d2b6fd28bb3afe214ed5e661`, com os
