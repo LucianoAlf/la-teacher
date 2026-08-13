@@ -2,8 +2,64 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 noite BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: os vermelhos que sobraram** — `026`, `041`, `053`, `075`,
-> `077`, `080`, `086`, `088`. Sprints 0 a 3 fechados.
+> **PRÓXIMO PASSO: `086` — o gêmeo e o escopo.** É o único vermelho que
+> guarda uma pergunta de desenho. Sprints 0 a 3 fechados.
+>
+> ## 📊 BATERIA: 15 VERMELHOS → 2 (13/08 noite)
+>
+> `69 passaram · 3 FALHARAM · 16 superadas · 7 não reaplicáveis` — e o `052`
+> dessa lista já foi consertado depois do run (verde + 6/6 mutantes), então o
+> saldo real é **2**: `026` e `086`.
+>
+> **NENHUM dos 13 que fecharam era defeito vivo do que eles testam.** Mas
+> chegar a essa frase custou achar **dois defeitos vivos** no caminho (o 42P10
+> do comercial e os 12,3s da pendência), e mais dois **defeitos nos próprios
+> testes/harness**. A conclusão que eu tirei cedo demais — *"são todos
+> expectativa podre"* — estava errada, e o preço de tratá-la como verdade seria
+> ter deixado os dois defeitos dormindo.
+>
+> **O que fechou, por classe:**
+> * SUPERADA (o arquivo carrega contrato antigo): `041`→`083` (plano do Emusys
+>   deixou de valer como relato), `042`/`044`/`048`→`20260813250000`,
+>   `053`→`075` e `075`→`095` (CHECK com 9 e 12 tipos; produção tem 13),
+>   `064`→`20260813260000`, `077`→`079` (assinatura de 3 params que a 079
+>   dropou).
+> * NÃO REAPLICÁVEL: `088` (`cannot drop columns from view`) — agora
+>   classificado sozinho.
+> * BUG DO TESTE: `080` (lia `v_r` sobrescrito; **sem coração = 30 =
+>   referência**, a função sempre acertou) e `20260813220000` (fixture refém do
+>   sorteio, quebrava quando a aula tinha gêmea).
+> * DÍVIDA REAL DESCOBERTA: `052` — seed sem `on conflict`, escondido **há
+>   meses** atrás do classificador frouxo.
+>
+> ## 🔧 O CLASSIFICADOR DA BATERIA MENTIA (13/08 noite)
+>
+> Ele decidia "reprovou" × "não serve de harness" com uma regex solta dentro do
+> laço. `duplicate` casava com `duplicate key` de DADO — e foi ele que mandou
+> um teste MEU pra coluna de dívida em vez da de reprovados.
+>
+> Virou `scripts/lib-veredito.mjs`, com nome e com teste
+> (`scripts/teste-veredito.mjs`, 9 casos com strings reais). **O teste pegou a
+> minha primeira correção na primeira rodada:** apertar o termo não bastava,
+> porque a mensagem de unique violation termina com `already exists.` no
+> DETAIL. Agora classifica por **SQLSTATE**, e **sem código legível o default é
+> REPROVAÇÃO** — falha que ninguém sabe classificar tem que aparecer.
+>
+> No primeiro run já pagou: desenterrou a `052`.
+>
+> ## ⏭️ OS DOIS QUE SOBRARAM
+>
+> * **`026`** — fixture procura aluno com `aulas_registradas = 0` na carteira
+>   do professor 25 e hoje não existe nenhum. Classe "fixture que procura em
+>   vez de construir", a mesma que já mordeu duas vezes hoje. Conserto
+>   mecânico.
+> * **`086`** — **este guarda uma pergunta de desenho, e por isso eu parei
+>   nele.** Os passos de comportamento PASSAM (os gêmeos sincronizam), mas o
+>   contador do core devolve `0` e o par é tocado mesmo fora do escopo pedido.
+>   Leitura provável: o trabalho migrou para o trigger
+>   `trg_sincronizar_gemeos_presenca`, que sincroniza SEMPRE — o que talvez
+>   seja mais correto, mas faz o parâmetro de escopo deixar de escopar.
+>   **Já estava vermelho antes de eu encostar em qualquer coisa hoje.**
 >
 > ## ⚡ A PENDÊNCIA DE PRESENÇA: 12,3s → 735ms (13/08 noite)
 >
