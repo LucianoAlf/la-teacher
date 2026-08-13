@@ -15,7 +15,7 @@ import { SessaoRow } from '../agenda/SessaoRow'
 import { useSessoes } from '../agenda/useSessoes'
 import { AppFrame } from '../../pages/app/AppFrame'
 import { useAuth } from '../../lib/auth'
-import { descartarItemFila, enviarAudio, tentarNovamenteItemFila } from './uploadAudio'
+import { descartarItemFila, destinoRetomadaFila, enviarAudio, tentarNovamenteItemFila } from './uploadAudio'
 import { descreverFalhaFila, LIMITE_TENTATIVAS_AUTOMATICAS } from './camposCanonicos'
 import { destinoAceiteFila } from './fluxoFila'
 import { useRecorder, LIMITE_SEGUNDOS } from './useRecorder'
@@ -188,7 +188,15 @@ function Gravador({ aulaId }: { aulaId: number }) {
     try {
       const resultado = await tentarNovamenteItemFila(filaLocal.id, session?.user.id)
       if (resultado.ok) {
-        const destino = destinoAceiteFila(resultado.resultado)
+        const aceite = resultado.resultado
+        if (aceite.tipo === 'experimental') {
+          const retomadaExperimental = destinoRetomadaFila(aceite)
+          navigate(`/app/experimental/${retomadaExperimental!.vinculoId}/registrar`, {
+            state: { audioId: retomadaExperimental!.audioId },
+          })
+          return
+        }
+        const destino = destinoAceiteFila(aceite.resultado)
         if (destino?.tela === 'confirmar') navigate(`/app/confirmar/${destino.registroId}`)
         else if (destino?.tela === 'processando') navigate(`/app/processando/${destino.audioId}`, { state: { aulaLabel: titulo } })
         else {

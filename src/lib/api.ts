@@ -649,6 +649,19 @@ export const ERROS_GRAVACAO = [
 ] as const
 export type ErroGravacao = (typeof ERROS_GRAVACAO)[number]
 
+/** Recusas semânticas da porta de áudio da experimental. */
+export const ERROS_AUDIO_EXPERIMENTAL = [
+  'aula_de_outro_professor',
+  'aula_cancelada',
+  'gravacao_ainda_nao_disponivel',
+  'janela_de_gravacao_encerrada',
+  'experimental_sem_aula_vinculada',
+  'experimental_faltou_nao_tem_registro',
+  'experimental_cancelada',
+  'sem_professor_vinculado',
+] as const
+export type ErroAudioExperimental = (typeof ERROS_AUDIO_EXPERIMENTAL)[number]
+
 /** Erro de validação conhecido da gravação — permanente, NÃO vai pra fila offline. */
 export class ErroGravacaoConhecido extends Error {
   readonly codigo: ErroGravacao
@@ -1087,8 +1100,40 @@ export async function enfileirarAudioExperimental(
     p_storage_path: storagePath,
     p_duracao_segundos: duracaoSegundos,
   })
-  if (error) throw error
-  return res as unknown as { audio_id: string; status: string; vinculo_id: number }
+  if (error) {
+    const conhecido = ERROS_AUDIO_EXPERIMENTAL.find((c) => error.message?.includes(c))
+    if (conhecido) throw new ErroAudioExperimentalConhecido(conhecido)
+    throw error
+  }
+  return lerResultadoEnfileirarExperimental(res)
+}
+
+/** Recusa da porta experimental que retry de rede não consegue resolver. */
+export class ErroAudioExperimentalConhecido extends Error {
+  readonly codigo: ErroAudioExperimental
+  constructor(codigo: ErroAudioExperimental) {
+    super(codigo)
+    this.name = 'ErroAudioExperimentalConhecido'
+    this.codigo = codigo
+  }
+}
+
+const UUID_PADRAO = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** O Blob local só é descartado depois de um aceite completo e verificável. */
+function lerResultadoEnfileirarExperimental(res: unknown): { audio_id: string; status: string; vinculo_id: number } {
+  if (!res || typeof res !== 'object' || Array.isArray(res)) throw new Error('Resposta inválida ao enfileirar o áudio experimental')
+  const bruto = res as Record<string, unknown>
+  if (typeof bruto.audio_id !== 'string' || !UUID_PADRAO.test(bruto.audio_id)) {
+    throw new Error('Resposta inválida ao enfileirar o áudio experimental')
+  }
+  if (typeof bruto.status !== 'string' || !bruto.status.trim()) {
+    throw new Error('Resposta inválida ao enfileirar o áudio experimental')
+  }
+  if (typeof bruto.vinculo_id !== 'number' || !Number.isFinite(bruto.vinculo_id)) {
+    throw new Error('Resposta inválida ao enfileirar o áudio experimental')
+  }
+  return { audio_id: bruto.audio_id, status: bruto.status, vinculo_id: bruto.vinculo_id }
 }
 
 /** O que o toque da falta FEZ. Mesma disciplina da confirmação: a tela conta o

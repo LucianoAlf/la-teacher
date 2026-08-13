@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AppFrame } from './AppFrame'
 import { Button, Card, EmptyState, ScreenHeader, Skeleton, Toast, useToast } from '../../components/ui'
 import { BlocoInterno } from '../../features/experimental/BlocoInterno'
@@ -21,6 +21,7 @@ import { registrarExperimental, type RegistroExperimental } from '../../lib/api'
 export default function ExperimentalRegistrarPage() {
   const { vinculoId } = useParams<{ vinculoId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { estado, recarregar } = useExperimental(vinculoId ? Number(vinculoId) : null)
   const { message, visible, show } = useToast()
 
@@ -30,6 +31,9 @@ export default function ExperimentalRegistrarPage() {
   const [conversao, setConversao] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [veioDoAudio, setVeioDoAudio] = useState(false)
+  const audioIdInicial = typeof (location.state as { audioId?: unknown } | null)?.audioId === 'string'
+    ? (location.state as { audioId: string }).audioId
+    : undefined
 
   // Copiar do banco pra tela é destrutivo: sobrescreve o que a pessoa está
   // digitando. Então só acontece em dois momentos declarados — ao abrir, e
@@ -124,6 +128,8 @@ export default function ExperimentalRegistrarPage() {
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-[calc(24px_+_env(safe-area-inset-bottom))]">
         <GravadorExperimental
           vinculoId={dados.vinculo_id}
+          aulaLabel={`${dados.nome_aluno} · ${dados.hora}`}
+          audioIdInicial={audioIdInicial}
           onPronto={() => {
             esperandoAudioRef.current = true
             recarregar()
