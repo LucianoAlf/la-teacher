@@ -68,7 +68,7 @@ begin
 end $$;
 
 select json_build_object(
-  'teste', '20260813210000-mata-a-view-duplicada',
+  'teste', '20260813215959-mata-a-view-duplicada',
   'falhas', (select count(*) from _mata_res where not ok),
   'detalhe', coalesce((select json_agg(json_build_object(
     'passo', caso, 'esperado','ok','obtido', coalesce(detalhe,'<NULL>'))
