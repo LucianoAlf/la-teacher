@@ -53,10 +53,23 @@
 
 ---
 
-# Sprint 0 — o registro que evapora hoje
+# Sprint 0 — o registro que evapora hoje ✅ FECHADO 13/08
 
 **Por que é o primeiro:** é o único item com prazo. Um professor gravou uma
 aula de verdade e o trabalho dele some se ninguém agir.
+
+> **Resultado:** os quatro checkpoints fecharam em 13/08. A professora é
+> **Daiana Pacifico da Silva dos Anjos** (`professor_id` 3), ativa. O prazo foi
+> estendido para **16/08 15:37 UTC** e o Fábio **reenviou a pergunta** — envio
+> provado no log (`whatsapp_sent`, `professor_id: 3`, `phone_tail: 9985`,
+> `msg_id 5521998250178:3EB001F81EEADBA1B8D446`). A ação segue `aberta`, com a
+> transcrição intacta e **2 eventos** na trilha, incluindo
+> `shortlist_reenviada_manual` gravado em `fabio_acao_eventos`. Nenhuma
+> mensagem foi para família ou comercial.
+>
+> **Achados novos que o sprint produziu — entram no backlog, ver o fim deste
+> documento:** F-A (a shortlist não usou o nome da aluna para desambiguar) e
+> F-B (ação aberta não é lembrada por ninguém e expira em silêncio).
 
 ### Contexto medido
 
@@ -98,15 +111,34 @@ a origem correta, conferido por consulta. Se for reenvio — mensagem observada
 saindo no log do bridge. Se for arquivamento — o texto salvo no CP-0.1 com o
 motivo escrito.
 
-### CP-0.4 — Entender por que ficou 20h parado
+### CP-0.4 — Entender por que ficou 20h parado ✅
 
-Uma ação `aberta` que vence sem ninguém perceber é um buraco de processo, não
-só um caso. Verificar: existe lembrete pro professor que não responde a
-shortlist? Existe alerta pra coordenação quando uma ação está perto de expirar?
+**Resposta medida: não existe lembrete nenhum.** Varredura em
+`~/fabio-chat-bridge`: o **único** arquivo que toca `fabio_acoes_pendentes` é
+`fabio_whatsapp_actions.py`, que é o handler **reativo** — só roda quando chega
+mensagem. Nenhum worker e nenhum timer olha ação `aberta` ou `expira_em`.
 
-**PROVA:** resposta com evidência (RPC/worker que faz isso, ou a constatação
-medida de que não existe). Se não existir, vira item pro backlog com o
-tamanho estimado.
+Consequência estrutural: ação que o professor não responde **não é lembrada,
+não alerta ninguém e expira em silêncio** — e depois a limpeza do reconciler
+apaga o objeto de áudio. Vira F-B no backlog.
+
+### Correção de um alarme meu, registrada para não voltar
+
+Durante o CP-0.3 eu **suspendi o envio** achando que havia troca de identidade:
+`professor_phone(3)` resolve um número terminado em `9985`, e o
+`wa_message_id` da ação começa com `5521998250178` —
+`fabio_identidade_whatsapp('5521998250178')` responde `numero_nao_cadastrado`.
+
+**Era alarme falso, e a medição que fecha é esta:** o prefixo `5521998250178`
+aparece em **92 mensagens de 6 professores diferentes**, nos dois papéis
+(`professor` e `fabio`). É a **linha do próprio Fábio**, não o número de
+ninguém — por isso é constante nas duas direções. O envio proativo para a
+Daiana está correto e funciona (10 envios registrados para `...9985`, mais o
+deste checkpoint).
+
+Fica escrito porque a checagem seca (`professor_phone` × prefixo do
+`wa_message_id`) **parece** uma prova de troca de identidade e não é. Quem
+repetir esse caminho vai tropeçar na mesma pedra.
 
 ---
 
@@ -428,6 +460,45 @@ sistemas.
 o checkpoint fecha como "mapeado, não tocado".
 
 ---
+
+## Backlog produzido pelo próprio plano
+
+### F-A — a shortlist não usa o que a transcrição já diz
+
+O Fábio perguntou à Daiana qual era a aula, e **o sistema já sabia**. A
+transcrição diz *"na aula da Beatriz Ohana"*, e o roster resolve sozinho:
+
+| `aula_id` | quando | unidade | alunos na presença |
+|---|---|---|---|
+| **217860** | 12/08 (qua) 15:00 | BARRA | **Beatriz Ohana De Carvalho Paula** (única) |
+| 205008 | 06/08 (qui) 20:00 | CG | 6 alunos, **nenhum** Beatriz |
+
+`reduzir_shortlist` filtra por dia/hora/turma (`_compatible`) e **não cruza
+nome de aluno citado na fala contra o roster das candidatas**. Resultado: uma
+pergunta desnecessária, que virou 20h de silêncio e quase custou o registro.
+
+Isso é exatamente o *"sem virar perturbação"* que o Alf pediu. Cuidado ao
+consertar: nome de aluno citado deve **desempatar** candidatas, não escolher
+sozinho quando não houver correspondência — e homônimo tem que continuar
+perguntando (já mordeu a casa antes).
+
+### F-B — ação aberta não é lembrada por ninguém
+
+Medido no CP-0.4: só o handler reativo toca `fabio_acoes_pendentes`. Não há
+lembrete pro professor nem alerta pra coordenação quando a ação se aproxima de
+`expira_em`. O trabalho do professor pode evaporar sem que ninguém saiba.
+
+Provável casa: o worker de devolutiva já é uma máquina de avisos ao professor
+(há tarefa aberta de generalizá-lo). Avaliar antes de criar timer novo.
+
+### F-C — a régua de precedência agora tem duas portas
+
+O Alf informou em 13/08 que o motor do WhatsApp passou a gravar conteúdo de
+aula **com baixa automática de presença, igual ao aplicativo**. Isso significa
+que app e WhatsApp escrevem registro **e** presença. A precedência já
+documentada (manual > professor/fabio_audio > emusys) tem que valer para as
+duas portas, e o CP-4 (carteira) e o Sprint 3 precisam ser lidos com isso em
+mente. **Não auditado ainda** — entra como frente própria.
 
 ## O que ficou de fora de propósito
 

@@ -3,8 +3,37 @@
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 tarde BRT · auditoria ao vivo + plano de correção
 >
 > **PRÓXIMO PASSO: seguir `docs/superpowers/plans/2026-08-13-correcao-pos-auditoria.md`
-> a partir do Sprint 0.** O plano está dividido em sprints e checkpoints; cada
-> checkpoint só fecha com **prova real na VPS**, não com verde de harness.
+> a partir do Sprint 1 (o laço do reconciler).** O plano está dividido em
+> sprints e checkpoints; cada checkpoint só fecha com **prova real na VPS**,
+> não com verde de harness.
+>
+> **Sprint 0 FECHADO em 13/08.** O registro que ia evaporar foi salvo: a
+> professora é **Daiana (professor 3)**, o prazo da ação foi estendido para
+> **16/08** e o Fábio **reenviou a pergunta**, com envio provado no log
+> (`whatsapp_sent`, `phone_tail 9985`, msg `...3EB001F81EEADBA1B8D446`). A ação
+> segue `aberta`, transcrição intacta, e a trilha ficou gravada em
+> `fabio_acao_eventos` como `shortlist_reenviada_manual`. Nada foi para família
+> nem comercial. **O Alf também vai falar com ela direto.**
+>
+> **Dois achados novos, que viraram backlog no plano (F-A e F-B):** a shortlist
+> **não usa o nome do aluno citado na transcrição** para desambiguar — o roster
+> já respondia (aula 217860 tem a Beatriz Ohana como aluna única; a outra
+> candidata tem 6 alunos e nenhuma Beatriz), e o Fábio foi perguntar mesmo
+> assim. E **nenhum worker olha ação aberta**: só o handler reativo toca
+> `fabio_acoes_pendentes`, então ação não respondida não é lembrada, não alerta
+> ninguém e expira em silêncio.
+>
+> **F-C, informado pelo Alf em 13/08 e ainda NÃO auditado:** o motor do WhatsApp
+> passou a gravar conteúdo de aula **com baixa automática de presença, igual ao
+> app**. Agora são **duas portas** escrevendo registro e presença — a régua de
+> precedência tem que valer para as duas.
+>
+> **Alarme falso meu, registrado para não voltar:** suspendi o envio achando
+> que havia troca de identidade, porque `professor_phone(3)` termina em `9985`
+> e o `wa_message_id` começa com `5521998250178` (que dá
+> `numero_nao_cadastrado`). **Não é troca:** esse prefixo aparece em 92
+> mensagens de 6 professores nos dois papéis — é a **linha do próprio Fábio**.
+> O envio proativo está correto.
 >
 > O trabalho voltou do Codex (PRs #4–#12) e foi **auditado ao vivo** aqui:
 > VPS, banco `ouqwbbermlzqqvtqwlul`, logs do systemd e bridge do Fábio.
