@@ -84,4 +84,18 @@ $skill$,
   'Divide o áudio do registro da experimental nos quatro campos de '
   'lead_experimental_registros. Lida por fabio_audio_experimental_worker.py.',
   'migration-052'
-);
+)
+-- SEED IDEMPOTENTE (acrescentado em 13/08/2026). Sem isto, replayar este
+-- arquivo esbarra em `uq_fabio_skills_nome_versao` e o teste da 052 nem chega
+-- a rodar. Ficou escondido por meses: o classificador antigo da bateria
+-- tratava qualquer `duplicate` como "migration não reaplicável" e mandava o
+-- caso pra coluna de dívida. Quando ele passou a olhar o SQLSTATE, `23505`
+-- virou reprovação e o seed apareceu.
+--
+-- O `do update` (e não `do nothing`) é de propósito: se alguém editar o texto
+-- da skill aqui, replayar tem que levar a edição pro banco. Um seed que ignora
+-- a própria mudança é pior que um que quebra -- ele mente em silêncio.
+on conflict (nome, versao) do update set
+  conteudo = excluded.conteudo,
+  ativa    = excluded.ativa,
+  notas    = excluded.notas;
