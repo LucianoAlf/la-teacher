@@ -230,7 +230,7 @@ def cleanup_once(backend: FabioWhatsappBackend, limit: int = 20) -> dict[str, An
     if not claim or claim.get("ok") is False:
         return {"ok": False, "codigo": (claim or {}).get("codigo", "claim_limpeza_falhou")}
 
-    counters = {"limpas": 0, "bloqueadas": 0, "falhas": 0}
+    counters = {"limpas": 0, "bloqueadas": 0, "arquivadas": 0, "falhas": 0}
     claimed = _items(claim)
     for item in claimed:
         action_id = item.get("acao_id")
@@ -244,7 +244,20 @@ def cleanup_once(backend: FabioWhatsappBackend, limit: int = 20) -> dict[str, An
             "p_storage_path": path,
         }))
         if not proof or proof.get("pode_remover") is not True:
-            counters["bloqueadas"] += 1
+            # `continue` sozinho era LACO: o lease de 120s expirava e a MESMA
+            # acao voltava pra fila para sempre. Quando o bloqueio e
+            # PERMANENTE (um registro confirmado aponta pro audio, e o audio e
+            # a evidencia dele), a porta abaixo carimba o motivo e tira da
+            # fila. Bloqueio temporario continua reentrando -- la reentrar e o
+            # certo -- e a propria RPC recusa carimbar esse caso.
+            arquivo = _one(backend.rpc("fabio_arquivar_limpeza_bloqueada", {
+                "p_acao_id": action_id,
+                "p_lease_token": lease_token,
+            }))
+            if arquivo and arquivo.get("ok") is True:
+                counters["arquivadas"] += 1
+            else:
+                counters["bloqueadas"] += 1
             continue
         try:
             backend.remove_audio(str(path))
