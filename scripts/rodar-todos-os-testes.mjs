@@ -32,6 +32,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { readdirSync, existsSync, readFileSync } from 'node:fs'
+import { naoEReaplicavel } from './lib-veredito.mjs'
 
 const DIR = 'supabase/migrations'
 const filtro = process.argv[2] ?? ''
@@ -74,15 +75,18 @@ for (const p of pares) {
   // "a execução falhou" com erro de DDL = a migration não é reaplicável.
   // O teste em si nem chegou a rodar, então chamar isso de reprovação seria
   // apontar o dedo pro lugar errado.
-  const ddl = /already exists|does not exist|cannot be cast|duplicate/i.test(saida)
-              && /a execução falhou/i.test(saida)
+  // A regra mora em `lib-veredito.mjs`, com teste próprio
+  // (`scripts/teste-veredito.mjs`). Aqui era uma regex sem nome, e ela
+  // escondeu uma reprovação de verdade em 13/08/2026 — regex sem nome não tem
+  // teste, e o que não tem teste mente quando ninguém está olhando.
+  const naoReaplicavelDeVerdade = naoEReaplicavel(saida)
 
   const superada = ok ? null : superadaPor(p.migration)
 
   if (ok) {
     passou.push(p.nome)
     console.log(`✓ ${p.nome}`)
-  } else if (ddl) {
+  } else if (naoReaplicavelDeVerdade) {
     naoReaplicavel.push(p.nome)
     const motivo = (saida.match(/ERROR:[^\n]*/) ?? ['(sem detalhe)'])[0].slice(0, 110)
     console.log(`~ ${p.nome}  — migration não reaplicável: ${motivo}`)

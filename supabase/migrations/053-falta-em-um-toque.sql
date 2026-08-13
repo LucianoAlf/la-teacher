@@ -1,3 +1,11 @@
+-- SUPERADA POR: 075-o-fabio-cobra-o-semaforo.sql
+--
+-- Este arquivo reinstala o `fabio_notificacoes_tipo_check` com **9** tipos. A
+-- producao ja tem **13**: a 075 acrescentou os tres de `feedback_*` e a 095 o
+-- `registro_recibo`. Replayar este arquivo tenta apertar o CHECK por cima de
+-- linhas VIVAS que usam os tipos novos -- por isso o erro e
+-- `is violated by some row`, e nao um defeito do que a 053 entregou.
+--
 -- 053 — a falta em um toque
 --
 -- APROVADO PELO ALF: "se o aluno faltar experimental, seria outra tela, um

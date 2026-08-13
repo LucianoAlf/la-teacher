@@ -1,3 +1,11 @@
+-- SUPERADA POR: 095-recibo-de-registro-no-whatsapp.sql
+--
+-- Mesmo caso da 053, um degrau acima: este arquivo declara **12** tipos no
+-- `fabio_notificacoes_tipo_check` e a producao tem **13** -- falta o
+-- `registro_recibo`, que a 095 acrescentou. Replayar aperta o CHECK por cima
+-- de linhas vivas. (A propria 095 esta marcada SUPERADA POR
+-- 20260812004430; a cadeia segue de la.)
+--
 -- 075 — o Fábio cobra o semáforo
 --
 -- POR QUE: coleta sem cobrança já foi testada na prática e deu ZERO resposta.

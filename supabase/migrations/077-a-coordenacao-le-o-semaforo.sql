@@ -1,3 +1,13 @@
+-- SUPERADA POR: 079-o-semaforo-ganha-filtros.sql
+--
+-- Este arquivo cria `app_coordenacao_feedback_mes(date, uuid, integer)`. A 079
+-- fez `drop function` dessa assinatura e criou a de CINCO parametros
+-- (`+ p_coracao text, p_professor_id integer`), que e a viva. Replayar aqui
+-- ressuscita a de tres AO LADO da de cinco: a chamada sem argumentos passa a
+-- ser ambigua (`42725: function ... is not unique`) -- que e exatamente o
+-- erro que o teste acusa. Nao ha ambiguidade em producao: conferido, existe
+-- uma assinatura so.
+--
 -- 077 — a coordenação lê o semáforo (e a observação chega em alguém)
 --
 -- POR QUE ESTA MIGRATION EXISTE

@@ -72,8 +72,17 @@ begin
   -- montada no MESMO grão da função (uma linha por aluno+professor, unidade
   -- resolvida por `(array_agg(...))[1]`) — comparar com a view crua compara
   -- duas perguntas diferentes e o passo falha sem haver defeito.
+  --
+  -- A CHAMADA VEM INLINE, sem reusar `v_r`. O passo do chip logo acima
+  -- reatribui `v_r` com o coração `sem_resposta`, e este passo estava lendo
+  -- aquele recorte contra uma referência que só filtra por UNIDADE: comparava
+  -- duas perguntas diferentes. Medido em 13/08/2026, com a unidade maior:
+  -- **sem coração = 30, referência = 30** (a função acerta), e o passo
+  -- reprovava exibindo os **28** do recorte `sem_resposta`. O próprio
+  -- cabeçalho deste arquivo já avisava que "com um coração escolhido este
+  -- número muda" -- a asserção é que não tinha lido o próprio aviso.
   insert into _res values ('professores continuam contados como pessoa',
-    (v_r #>> '{resumo,professores}')::int = (
+    (public.app_coordenacao_feedback_mes(null, v_uni, 1) #>> '{resumo,professores}')::int = (
       select count(distinct professor_id) from (
         select v.aluno_id, v.professor_id, (array_agg(v.unidade_id))[1] as unidade_id
           from public.vw_jornada_professor_atual v
