@@ -34,6 +34,42 @@
 > `fabio_agent` em texto claro** no `DATABASE_URI`. Não toquei — é decisão de
 > infra dele se vira variável de ambiente / arquivo restrito.
 >
+> ## ✅ F-C AUDITADO — as duas portas estão certas; o risco era outro (13/08)
+>
+> O Alf avisou que o motor do WhatsApp passou a gravar aula com **baixa
+> automática de presença**, igual ao app, e perguntou se a régua de precedência
+> valia para as duas. **Vale.** As duas convergem no mesmo core:
+>
+> - app do professor → `app_registrar_presencas_aula` → `fn_registrar_presencas_core`
+> - WhatsApp/áudio → `fabio_emitir_presenca_por_registro` → `fn_registrar_presencas_core`
+>
+> E o core só sobrescreve fonte fraca — **nunca pisa em decisão humana**.
+> Provado por teste comportamental, não por leitura: gravei presença de
+> `agenda_secretaria` e mandei o core tentar por cima com `fabio_audio`;
+> não pisou. Depois rebaixei para `emusys` e ele promoveu, como deve.
+>
+> **A terceira porta existe e é a maior surpresa:**
+> `app_registrar_chamada_agenda` (a da secretaria — **889 linhas, segunda maior
+> fonte, ativa hoje**) **não** passa pelo core: insere direto e tem régua
+> própria (`v_humanos`). Conferido: a lista dela é **idêntica** à de
+> `fn_presenca_e_forte`. **Não havia defeito vivo.**
+>
+> **O que foi consertado (`20260813220000_uma_regua_so_de_precedencia`):** a
+> mesma regra estava escrita em TRÊS lugares e de duas formas incompatíveis —
+> `fn_presenca_e_forte` e a agenda com lista **positiva** (5 fontes fortes), e
+> o core com lista **negativa** (`not in ('emusys','sistema')`). Concordavam só
+> porque o `CHECK` de `respondido_por` fecha o vocabulário em 7 valores, e
+> 5 + 2 são complementares. **No dia em que alguém acrescentar uma fonte ao
+> CHECK, o core passaria a tratá-la como forte em silêncio.** O core agora
+> **pergunta pra régua** em vez de repetir a lista. 3/3 mutantes, e o RED
+> falhou só nos passos de contrato — os comportamentais já passavam, que é a
+> prova de que não havia bug vivo.
+>
+> **Cheiro anotado, não consertado:** 5 linhas com `respondido_por = 'sistema'`
+> criadas em 13/08 15:16 são **pendências** (`status pendente`, presença nula)
+> de aulas reais de 12/08. Não mentem presença. Mas "respondido por sistema"
+> numa linha que ninguém respondeu é semântica torta.
+>
 > ## ⛔ ERRO MEU, ACHADO AO LER AS REGRAS DE NEGÓCIO DO LA REPORT (13/08)
 >
 > **Eu construí o que já existia.** O `D:/la-performance-report` (que eu só
