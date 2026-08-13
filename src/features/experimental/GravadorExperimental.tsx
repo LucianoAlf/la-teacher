@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AudioPlayer, Button } from '../../components/ui'
 import { JANELA_POS_AULA_DIAS } from '../agenda/sessao'
 import { LIMITE_SEGUNDOS, useRecorder } from '../registro/useRecorder'
-import { statusAudioFila } from '../../lib/api'
+import { statusAudioFila, type ErroAudioExperimental } from '../../lib/api'
 import { SOMENTE_LEITURA } from '../../lib/config'
-import { enviarAudioExperimental, type ErroExperimental } from './uploadAudioExperimental'
+import { enviarAudioExperimental } from '../registro/uploadAudio'
 
 /** Quanto tempo esperar o Fábio antes de dizer "não deu". O worker roda a cada
  *  20s e leva ~25s por áudio; 3 minutos cobre fila com mais de um na frente. */
@@ -15,9 +16,9 @@ type Fase =
   | { nome: 'gravar' }
   | { nome: 'enviando' }
   | { nome: 'ouvindo'; audioId: string }
-  | { nome: 'falhou'; motivo: string; permanente: boolean }
+  | { nome: 'falhou'; motivo: string; permanente: boolean; guardadoNaFila?: boolean }
 
-const MSG_ERRO: Record<ErroExperimental | 'rede' | 'demorou' | 'nao_entendi', string> = {
+const MSG_ERRO: Record<ErroAudioExperimental | 'rede' | 'demorou' | 'nao_entendi', string> = {
   aula_de_outro_professor: 'Essa aula não é da sua agenda.',
   aula_cancelada: 'Essa aula foi cancelada.',
   gravacao_ainda_nao_disponivel: 'A gravação abre 15 minutos antes da aula começar.',
@@ -46,19 +47,30 @@ const MSG_ERRO: Record<ErroExperimental | 'rede' | 'demorou' | 'nao_entendi', st
  */
 export function GravadorExperimental({
   vinculoId,
+  aulaLabel,
   onPronto,
+  audioIdInicial,
 }: {
   vinculoId: number
+  aulaLabel: string
   /** Chamado quando o Fábio terminou: a tela recarrega o registro e preenche. */
   onPronto: () => void
+  /** Reabre o acompanhamento quando a fila local conseguiu reenviar o áudio. */
+  audioIdInicial?: string
 }) {
   const rec = useRecorder()
+  const navigate = useNavigate()
   const [fase, setFase] = useState<Fase>({ nome: 'gravar' })
   const previewUrl = useMemo(() => (rec.blob ? URL.createObjectURL(rec.blob) : null), [rec.blob])
   const onProntoRef = useRef(onPronto)
   onProntoRef.current = onPronto
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
+
+  useEffect(() => {
+    if (!audioIdInicial) return
+    setFase((atual) => atual.nome === 'gravar' ? { nome: 'ouvindo', audioId: audioIdInicial } : atual)
+  }, [audioIdInicial])
 
   // ── O Fábio ouvindo: pergunta a cada 3s até normalizar, dar erro, ou cansar
   useEffect(() => {
@@ -109,6 +121,7 @@ export function GravadorExperimental({
     setFase({ nome: 'enviando' })
     const r = await enviarAudioExperimental({
       vinculoId,
+      aulaLabel,
       blob: rec.blob,
       mime: rec.mime || rec.blob.type,
       duracaoSegundos: rec.segundos,
@@ -116,12 +129,21 @@ export function GravadorExperimental({
     if (r.ok) {
       setFase({ nome: 'ouvindo', audioId: r.audioId })
     } else {
+      const guardadoNaFila = r.guardadoOffline
+      const erroGravacao = 'erroGravacao' in r ? r.erroGravacao : undefined
       setFase({
         nome: 'falhou',
-        motivo: MSG_ERRO[r.motivo],
-        // Motivo de validação não melhora com insistência: a tela não oferece
-        // "tentar de novo" pra um botão que nunca vai passar.
-        permanente: r.motivo !== 'rede',
+        motivo: erroGravacao
+          ? MSG_ERRO[erroGravacao]
+          : guardadoNaFila
+            ? r.retryAutomatico
+              ? 'Seu áudio ficou guardado neste aparelho. Pode sair desta tela: a fila tenta de novo sozinha quando a conexão voltar.'
+              : 'Seu áudio ficou guardado neste aparelho. Abra a Home para decidir quando tentar de novo.'
+            : MSG_ERRO.rede,
+        // Um item já persistido não pode ganhar um segundo envio pelo mesmo
+        // botão; ele será retomado pela fila da Home.
+        permanente: Boolean(erroGravacao) || guardadoNaFila,
+        guardadoNaFila,
       })
     }
   }
@@ -220,8 +242,8 @@ export function GravadorExperimental({
           <i className="fa-solid fa-headphones fa-beat-fade text-2xl text-brand-text" aria-hidden="true" />
           <b className="text-[14.5px]">O Fábio está ouvindo…</b>
           <span className="max-w-[280px] text-[12.5px] leading-relaxed text-text-secondary">
-            Leva menos de um minuto. Pode deixar a tela aberta — assim que ele terminar, os campos
-            abaixo se preenchem.
+            Leva menos de um minuto. Pode sair da tela: o áudio já foi aceito e o Fábio continua
+            trabalhando. Ao voltar, confira os campos abaixo.
           </span>
         </div>
       )}
@@ -238,8 +260,15 @@ export function GravadorExperimental({
                   <i className="fa-solid fa-rotate-right" aria-hidden="true" /> Tentar de novo
                 </Button>
               )}
-              <Button size="sm" variant="ghost" onClick={() => { rec.reset(); setFase({ nome: 'gravar' }) }}>
-                Escrever eu mesmo
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  if (fase.guardadoNaFila) navigate('/app')
+                  else { rec.reset(); setFase({ nome: 'gravar' }) }
+                }}
+              >
+                {fase.guardadoNaFila ? 'Abrir fila na Home' : 'Escrever eu mesmo'}
               </Button>
             </div>
           }

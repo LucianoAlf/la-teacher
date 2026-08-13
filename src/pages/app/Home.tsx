@@ -14,7 +14,7 @@ import { buscarPendencias, buscarPendentesHoje, type Pendencias } from '../../fe
 import { horaSessao, JANELA_POS_AULA_DIAS, tituloSessao } from '../../features/agenda/sessao'
 import { descreverFalhaFila } from '../../features/registro/camposCanonicos'
 import { itemPodeSerReenviado, type ItemFilaLocal, useFilaOffline } from '../../features/registro/filaOffline'
-import { descartarItemFila, tentarNovamenteItemFila } from '../../features/registro/uploadAudio'
+import { descartarItemFila, destinoRetomadaFila, tentarNovamenteItemFila } from '../../features/registro/uploadAudio'
 import { destinoAceiteFila, rotuloPendencia } from '../../features/registro/fluxoFila'
 import { CardFeedbackHome } from '../../features/feedback'
 import { AppFrame } from './AppFrame'
@@ -42,7 +42,15 @@ export default function HomePage() {
     try {
       const resultado = await tentarNovamenteItemFila(item.id, session?.user.id)
       if (resultado.ok) {
-        const destino = destinoAceiteFila(resultado.resultado)
+        const aceite = resultado.resultado
+        if (aceite.tipo === 'experimental') {
+          const retomadaExperimental = destinoRetomadaFila(aceite)
+          navigate(`/app/experimental/${retomadaExperimental!.vinculoId}/registrar`, {
+            state: { audioId: retomadaExperimental!.audioId },
+          })
+          return
+        }
+        const destino = destinoAceiteFila(aceite.resultado)
         if (destino?.tela === 'confirmar') navigate(`/app/confirmar/${destino.registroId}`)
         else if (destino?.tela === 'processando') navigate(`/app/processando/${destino.audioId}`, { state: { aulaLabel: item.aulaLabel } })
         else show('O sistema aceitou o áudio, mas não informou onde acompanhá-lo.')

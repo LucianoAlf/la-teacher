@@ -5,18 +5,21 @@ import { retryAutomaticoPermitido } from './camposCanonicos'
  * Fila local de áudios (IndexedDB). O blob só sai daqui depois de enviado ou de
  * uma ação explícita do professor. Cada item novo pertence a uma conta única.
  */
+export type DestinoFila =
+  | { tipo: 'aula'; aulaId: number; registroId: string | null }
+  | { tipo: 'experimental'; vinculoId: number }
+
 export interface ItemFilaLocal {
   id: string
   /** Obrigatório nos itens novos; impede exibir ou reenviar áudio de outra conta. */
   ownerUserId: string
-  aulaId: number
-  /** Rótulo humano da aula (para a UI da fila). */
+  /** A porta do banco é parte da intenção persistida, nunca inferida pelo rótulo. */
+  destino: DestinoFila
+  /** Rótulo humano do destino (para a UI da fila). */
   aulaLabel: string
   blob: Blob
   mime: string
   duracaoSegundos: number
-  /** Não nulo = correção por voz (modo complementar). */
-  registroId?: string | null
   criadoEm: string
   /** Chave estável da intenção; novas entradas sempre a recebem antes do upload. */
   chaveIntencao?: string | null
@@ -35,17 +38,49 @@ export interface ItemFilaLocal {
 }
 
 /** A versão anterior não tinha ownerUserId: esses blobs são preservados, mas não reutilizados. */
-type ItemFilaPersistido = Omit<ItemFilaLocal, 'ownerUserId'> & { ownerUserId?: string | null }
+type ItemFilaPersistido = Omit<ItemFilaLocal, 'ownerUserId' | 'destino'> & {
+  ownerUserId?: string | null
+  /** Entradas v1-v4 eram somente de aula e não traziam destino explícito. */
+  destino?: unknown
+  aulaId?: number
+  registroId?: string | null
+}
 
 const DB_NOME = 'la-teacher'
 const STORE = 'fila-audios'
 const VERSAO_DB = 4
 export const EVENTO_FILA = 'la-teacher:fila-audios-mudou'
 
+/**
+ * A migração é só de leitura: um item antigo sem destino continua sendo aula.
+ * Nunca inferimos `experimental` de texto ou de campos ausentes.
+ */
+export function normalizarDestinoFila(
+  destino: unknown,
+  aulaId: number | null | undefined,
+  registroId: string | null | undefined,
+): DestinoFila | null {
+  if (typeof destino === 'object' && destino !== null && 'tipo' in destino) {
+    const valor = destino as { tipo?: unknown; aulaId?: unknown; registroId?: unknown; vinculoId?: unknown }
+    if (valor.tipo === 'experimental' && typeof valor.vinculoId === 'number' && Number.isFinite(valor.vinculoId)) {
+      return { tipo: 'experimental', vinculoId: valor.vinculoId }
+    }
+    if (valor.tipo === 'aula' && typeof valor.aulaId === 'number' && Number.isFinite(valor.aulaId)) {
+      return { tipo: 'aula', aulaId: valor.aulaId, registroId: typeof valor.registroId === 'string' ? valor.registroId : null }
+    }
+  }
+  if (typeof aulaId === 'number' && Number.isFinite(aulaId)) {
+    return { tipo: 'aula', aulaId, registroId: typeof registroId === 'string' ? registroId : null }
+  }
+  return null
+}
+
 function normalizar(item: ItemFilaPersistido): ItemFilaPersistido {
   const falhaTerminal = item.falhaTerminal === true
+  const destino = normalizarDestinoFila(item.destino, item.aulaId, item.registroId)
   return {
     ...item,
+    ...(destino ? { destino } : {}),
     ownerUserId: typeof item.ownerUserId === 'string' && item.ownerUserId ? item.ownerUserId : null,
     chaveIntencao: item.chaveIntencao ?? null,
     storagePath: item.storagePath ?? null,
@@ -86,7 +121,9 @@ export function itemPodeSerReenviado({ falhaTerminal }: Pick<ItemFilaLocal, 'fal
 function itemDoUsuario(item: ItemFilaPersistido | undefined, ownerUserId: string): ItemFilaLocal | null {
   if (!item) return null
   const normalizado = normalizar(item)
-  return normalizado.ownerUserId === ownerUserId ? (normalizado as ItemFilaLocal) : null
+  // Item corrompido também fica preservado, mas nunca pode ser reenviado para uma
+  // porta adivinhada. O legado válido sempre trazia aulaId e cai no ramo acima.
+  return normalizado.ownerUserId === ownerUserId && normalizado.destino ? (normalizado as ItemFilaLocal) : null
 }
 
 function abrir(): Promise<IDBDatabase> {

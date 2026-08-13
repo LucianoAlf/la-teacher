@@ -1,5 +1,15 @@
 import { supabase } from '../../lib/supabase'
-import { enfileirarAudio, ErroGravacaoConhecido, type EnfileirarResultado, type ErroGravacao } from '../../lib/api'
+import {
+  enfileirarAudio,
+  enfileirarAudioExperimental,
+  ERROS_AUDIO_EXPERIMENTAL,
+  ERROS_GRAVACAO,
+  ErroAudioExperimentalConhecido,
+  ErroGravacaoConhecido,
+  type EnfileirarResultado,
+  type ErroAudioExperimental,
+  type ErroGravacao,
+} from '../../lib/api'
 import { extensaoDoMime } from '../../lib/audio'
 import { proximaTentativaAutomatica } from './camposCanonicos'
 import {
@@ -11,6 +21,7 @@ import {
   registrarFalhaFila,
   registrarFalhaTerminalFila,
   salvarNaFila,
+  type DestinoFila,
   type ItemFilaLocal,
 } from './filaOffline'
 
@@ -26,8 +37,37 @@ export interface DadosEnvio {
   registroId?: string | null
 }
 
+export interface DadosEnvioExperimental {
+  vinculoId: number
+  aulaLabel: string
+  blob: Blob
+  mime: string
+  duracaoSegundos: number
+}
+
+type DadosNovoItemFila = {
+  id?: string
+  ownerUserId: string
+  aulaLabel: string
+  blob: Blob
+  mime: string
+  duracaoSegundos: number
+  chaveIntencao?: string
+  destino: DestinoFila
+}
+
+export type AceiteFila =
+  | { tipo: 'aula'; resultado: EnfileirarResultado }
+  | { tipo: 'experimental'; audioId: string; vinculoId: number }
+
+export type DestinoRetomadaExperimental = {
+  tela: 'experimental'
+  audioId: string
+  vinculoId: number
+}
+
 export type ResultadoFila =
-  | { ok: true; resultado: EnfileirarResultado }
+  | { ok: true; resultado: AceiteFila }
   | {
       ok: false
       mensagem: string
@@ -43,6 +83,11 @@ export type ResultadoEnvio =
   | { ok: false; guardadoOffline: false; mensagem: string }
   /** Erro de validação (aula fora da janela etc.) — permanente, não vai pra fila. */
   | { ok: false; erroGravacao: ErroGravacao }
+
+export type ResultadoEnvioExperimental =
+  | { ok: true; audioId: string }
+  | { ok: false; guardadoOffline: true; itemFilaId: string; mensagem: string; retryAutomatico: boolean; tentativas: number; erroGravacao?: ErroAudioExperimental }
+  | { ok: false; guardadoOffline: false; mensagem: string }
 
 /** Resultado explícito do descarte: nunca afirma remoção enquanto há upload em voo. */
 export type ResultadoDescarteFila = { ok: true } | { ok: false; mensagem: string }
@@ -71,28 +116,58 @@ async function usuarioDoUpload(): Promise<string> {
   return uid
 }
 
-/** Cria e persiste a identidade do envio antes de qualquer chamada de Storage. */
-async function novoItemFila(dados: DadosEnvio): Promise<ItemFilaLocal> {
-  const ownerUserId = await usuarioDoUpload()
-  const chaveIntencao = crypto.randomUUID()
-  const criadoEm = new Date().toISOString()
+/** Cria a intenção pura; quem chama a persiste antes de tocar no Storage. */
+export function criarItemFilaLocal(dados: DadosNovoItemFila): ItemFilaLocal {
+  const chaveIntencao = dados.chaveIntencao ?? crypto.randomUUID()
+  const id = dados.id ?? crypto.randomUUID()
+  const storagePath = dados.destino.tipo === 'experimental'
+    ? `${dados.ownerUserId}/exp-${dados.destino.vinculoId}/${chaveIntencao}.${extensaoDoMime(dados.mime)}`
+    : `${dados.ownerUserId}/${dados.destino.aulaId}/${chaveIntencao}.${extensaoDoMime(dados.mime)}`
   return {
-    id: crypto.randomUUID(),
-    ownerUserId,
-    aulaId: dados.aulaId,
+    id,
+    ownerUserId: dados.ownerUserId,
+    destino: dados.destino,
     aulaLabel: dados.aulaLabel,
     blob: dados.blob,
     mime: dados.mime,
     duracaoSegundos: dados.duracaoSegundos,
-    registroId: dados.registroId ?? null,
-    criadoEm,
+    criadoEm: new Date().toISOString(),
     chaveIntencao,
-    storagePath: `${ownerUserId}/${dados.aulaId}/${chaveIntencao}.${extensaoDoMime(dados.mime)}`,
+    storagePath,
     ultimaFalha: null,
     tentativas: 0,
     ultimaTentativaEm: null,
     retryAutomatico: false,
   }
+}
+
+export type ClassificacaoFalhaFila =
+  | { tipo: 'transitoria' }
+  | { tipo: 'terminal'; codigo: ErroGravacao | ErroAudioExperimental }
+
+/** A porta persistida decide como interpretar a recusa; texto humano nunca decide destino. */
+export function classificarFalhaFila(item: Pick<ItemFilaLocal, 'destino'>, erro: unknown): ClassificacaoFalhaFila {
+  if (item.destino.tipo === 'aula' && erro instanceof ErroGravacaoConhecido) {
+    return { tipo: 'terminal', codigo: erro.codigo }
+  }
+  if (item.destino.tipo === 'experimental' && erro instanceof ErroAudioExperimentalConhecido) {
+    return { tipo: 'terminal', codigo: erro.codigo }
+  }
+  const mensagem = mensagemDoErro(erro)
+  const conhecidos = item.destino.tipo === 'experimental' ? ERROS_AUDIO_EXPERIMENTAL : ERROS_GRAVACAO
+  const codigo = conhecidos.find((valor) => mensagem.includes(valor))
+  return codigo
+    ? { tipo: 'terminal', codigo }
+    : { tipo: 'transitoria' }
+}
+
+/** Cria e persiste a identidade do envio antes de qualquer chamada de Storage. */
+async function novoItemFila(dados: DadosEnvio | DadosEnvioExperimental): Promise<ItemFilaLocal> {
+  const ownerUserId = await usuarioDoUpload()
+  const destino: DestinoFila = 'vinculoId' in dados
+    ? { tipo: 'experimental', vinculoId: dados.vinculoId }
+    : { tipo: 'aula', aulaId: dados.aulaId, registroId: dados.registroId ?? null }
+  return criarItemFilaLocal({ ...dados, ownerUserId, destino })
 }
 
 /** Novos caminhos sempre pertencem à mesma conta que criou o áudio. */
@@ -103,17 +178,45 @@ async function garantirIdentidadeDeUpload(item: ItemFilaLocal, ownerUserId: stri
   // Itens sem dono são quarentenados por filaOffline e nunca chegam aqui. Este
   // ramo só protege uma entrada nova interrompida antes de receber o caminho.
   const chaveIntencao = item.chaveIntencao ?? crypto.randomUUID()
-  const storagePath = item.storagePath ?? `${ownerUserId}/${item.aulaId}/${chaveIntencao}.${extensaoDoMime(item.mime)}`
+  const storagePath = item.storagePath ?? (item.destino.tipo === 'experimental'
+    ? `${ownerUserId}/exp-${item.destino.vinculoId}/${chaveIntencao}.${extensaoDoMime(item.mime)}`
+    : `${ownerUserId}/${item.destino.aulaId}/${chaveIntencao}.${extensaoDoMime(item.mime)}`)
   const atualizado = await atualizarItemFila(item.id, ownerUserId, { chaveIntencao, storagePath })
   if (!atualizado) throw new Error('Esse áudio não está mais disponível nesta sessão')
   return atualizado
 }
 
 /**
- * Sobe o áudio e o enfileira via app_enfileirar_audio. O caminho e a intenção
- * já estão gravados localmente: um replay repete o mesmo objeto, não cria outro.
+ * Chama a porta determinada pela intenção já persistida. O reenvio nunca usa
+ * rótulo de tela para decidir se é aula comum ou experimental.
  */
-async function subirEEnfileirar(item: ItemFilaLocal, ownerUserId: string): Promise<EnfileirarResultado> {
+export async function enfileirarDestinoFila(
+  item: ItemFilaLocal,
+  deps: {
+    enfileirarAula: typeof enfileirarAudio
+    enfileirarExperimental: typeof enfileirarAudioExperimental
+  } = { enfileirarAula: enfileirarAudio, enfileirarExperimental: enfileirarAudioExperimental },
+): Promise<AceiteFila> {
+  if (!item.storagePath) throw new Error('Áudio sem caminho de Storage')
+  if (item.destino.tipo === 'experimental') {
+    const resultado = await deps.enfileirarExperimental(
+      item.destino.vinculoId,
+      item.storagePath,
+      item.duracaoSegundos,
+    )
+    return { tipo: 'experimental', audioId: resultado.audio_id, vinculoId: resultado.vinculo_id }
+  }
+  const resultado = await deps.enfileirarAula(
+    item.destino.aulaId,
+    item.storagePath,
+    item.duracaoSegundos,
+    item.destino.registroId,
+  )
+  return { tipo: 'aula', resultado }
+}
+
+/** Sobe e enfileira a intenção preservada; replay repete o mesmo objeto. */
+async function subirEEnfileirar(item: ItemFilaLocal, ownerUserId: string): Promise<AceiteFila> {
   const pronto = await garantirIdentidadeDeUpload(item, ownerUserId)
   const { error: upErro } = await supabase.storage.from(BUCKET).upload(pronto.storagePath!, pronto.blob, {
     contentType: pronto.mime.split(';')[0] || 'audio/webm',
@@ -122,8 +225,13 @@ async function subirEEnfileirar(item: ItemFilaLocal, ownerUserId: string): Promi
     upsert: true,
   })
   if (upErro) throw upErro
+  return enfileirarDestinoFila(pronto)
+}
 
-  return enfileirarAudio(pronto.aulaId, pronto.storagePath!, pronto.duracaoSegundos, pronto.registroId ?? null)
+export function destinoRetomadaFila(resultado: AceiteFila): DestinoRetomadaExperimental | null {
+  return resultado.tipo === 'experimental'
+    ? { tela: 'experimental', audioId: resultado.audioId, vinculoId: resultado.vinculoId }
+    : null
 }
 
 /**
@@ -199,13 +307,71 @@ export async function enviarAudio(dados: DadosEnvio): Promise<ResultadoEnvio> {
   itensEmEnvio.add(item.id)
   try {
     try {
-      const resultado = await subirEEnfileirar(item, item.ownerUserId)
+      const aceite = await subirEEnfileirar(item, item.ownerUserId)
+      if (aceite.tipo !== 'aula') throw new Error('Destino de fila incompatível com aula')
       await descartarItemFilaPersistido(item.id, item.ownerUserId)
-      return { ok: true, resultado }
+      return { ok: true, resultado: aceite.resultado }
     } catch (erro) {
       if (erro instanceof ErroGravacaoConhecido) {
         await descartarItemFilaPersistido(item.id, item.ownerUserId)
         return { ok: false, erroGravacao: erro.codigo }
+      }
+      const atualizado = await registrarFalhaFila(item.id, item.ownerUserId, {
+        mensagem: mensagemDoErro(erro),
+        transitoria: falhaComprovadamenteTransitoria(erro),
+      })
+      if (!atualizado) return { ok: false, guardadoOffline: false, mensagem: 'Não consegui preservar o áudio localmente' }
+      if (atualizado.retryAutomatico) executarEmSegundoPlano(agendarProximoRetry(item.ownerUserId))
+      return {
+        ok: false,
+        guardadoOffline: true,
+        itemFilaId: atualizado.id,
+        mensagem: atualizado.ultimaFalha ?? 'Falha desconhecida ao enviar o áudio',
+        retryAutomatico: atualizado.retryAutomatico === true,
+        tentativas: atualizado.tentativas ?? 0,
+      }
+    }
+  } finally {
+    itensEmEnvio.delete(item.id)
+  }
+}
+
+/**
+ * A experimental usa exatamente o mesmo motor durável da aula comum. A diferença
+ * está somente na porta autenticada que a intenção já gravou em `destino`.
+ */
+export async function enviarAudioExperimental(dados: DadosEnvioExperimental): Promise<ResultadoEnvioExperimental> {
+  let item: ItemFilaLocal
+  try {
+    item = await novoItemFila(dados)
+    await salvarNaFila(item)
+  } catch (erro) {
+    return { ok: false, guardadoOffline: false, mensagem: mensagemDoErro(erro) }
+  }
+
+  itensEmEnvio.add(item.id)
+  try {
+    try {
+      const aceite = await subirEEnfileirar(item, item.ownerUserId)
+      if (aceite.tipo !== 'experimental') throw new Error('Destino de fila incompatível com experimental')
+      await descartarItemFilaPersistido(item.id, item.ownerUserId)
+      return { ok: true, audioId: aceite.audioId }
+    } catch (erro) {
+      const classificacao = classificarFalhaFila(item, erro)
+      if (classificacao.tipo === 'terminal') {
+        const atualizado = await registrarFalhaTerminalFila(item.id, item.ownerUserId, {
+          codigo: classificacao.codigo,
+          mensagem: mensagemDoErro(erro),
+        })
+        return {
+          ok: false,
+          guardadoOffline: true,
+          itemFilaId: atualizado?.id ?? item.id,
+          mensagem: atualizado?.ultimaFalha ?? mensagemDoErro(erro),
+          retryAutomatico: false,
+          tentativas: atualizado?.tentativas ?? 1,
+          erroGravacao: classificacao.codigo as ErroAudioExperimental,
+        }
       }
       const atualizado = await registrarFalhaFila(item.id, item.ownerUserId, {
         mensagem: mensagemDoErro(erro),
@@ -263,9 +429,10 @@ export async function tentarNovamenteItemFila(id: string, ownerUserId: string | 
       return { ok: true, resultado }
     } catch (erro) {
       const mensagem = mensagemDoErro(erro)
-      if (erro instanceof ErroGravacaoConhecido) {
+      const classificacao = classificarFalhaFila(item, erro)
+      if (classificacao.tipo === 'terminal') {
         const atualizado = await registrarFalhaTerminalFila(id, ownerUserId, {
-          codigo: erro.codigo,
+          codigo: classificacao.codigo,
           mensagem,
         })
         return {
@@ -274,7 +441,7 @@ export async function tentarNovamenteItemFila(id: string, ownerUserId: string | 
           retryAutomatico: false,
           tentativas: atualizado?.tentativas ?? (item.tentativas ?? 0) + 1,
           falhaTerminal: true,
-          codigoFalhaTerminal: atualizado?.codigoFalhaTerminal ?? erro.codigo,
+          codigoFalhaTerminal: atualizado?.codigoFalhaTerminal ?? classificacao.codigo,
         }
       }
       const atualizado = await registrarFalhaFila(id, ownerUserId, {
