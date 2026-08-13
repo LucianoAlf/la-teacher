@@ -2,8 +2,46 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 noite BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: `086` — o gêmeo e o escopo.** É o único vermelho que
-> guarda uma pergunta de desenho. Sprints 0 a 3 fechados.
+> **PRÓXIMO PASSO: as 97 marcações invisíveis de agosto** (bloco abaixo). É
+> handoff pro Kodex/Windsurf, que está mexendo em presença agora — eu **não
+> escrevi nada** de propósito. Sprints 0 a 3 fechados.
+>
+> ## 🚨 A EQUIPE MARCOU E O SISTEMA NÃO VÊ — 97 casos em agosto (13/08 noite)
+>
+> O Alf avisou que a equipe passou a dar presença em ~100% e pediu pra
+> conferir o número. **Medido, e o número não fecha por um motivo concreto.**
+>
+> **Cobertura de agosto (par aluno×aula, aula operacional, já encerrada):**
+> `1.812 pares · 695 com presença forte · **38,4%**`.
+> Por unidade: CG 43,4% · Barra 36,4% · Recreio 32,5%.
+>
+> **Mas a curva virou, e é isso que importa:**
+> 05/08 = 23,2% · 08/08 = 31,9% · 11/08 = 38,5% · **12/08 = 71,0%**
+> (13/08 marca 53,8% com o dia ainda correndo). A média do mês está sendo
+> puxada pra baixo pelos dias ANTERIORES ao motor. O motor funciona.
+>
+> **A junção com o Emusys está OK — conferido, não suposto:** das 1.227 marcas
+> de `agenda_secretaria` em agosto, **zero invisíveis** na
+> `vw_aluno_presenca_semantica_v1` (1.070 viram "chamada feita", o resto é
+> `aula_justificada`, que é estado legítimo). E **zero conflitos**: não existe
+> um único par com marca da secretaria E do Emusys ao mesmo tempo — a
+> precedência resolve na escrita.
+>
+> **O BURACO REAL: 752 das 1.461 marcas fortes de agosto (51%) estão gravadas
+> no GÊMEO, não na aula operacional.** Isso por si só não seria problema — o
+> trigger espelha. Mas **97 delas não têm espelho**: a equipe marcou, e a
+> cobrança, o painel e o Fábio não enxergam. Trabalho feito que some.
+>
+> **O motor de conserto existe e NÃO resolve.** Simulado em transação
+> descartada, `fn_sincronizar_gemeos_presenca` nas 97 âncoras:
+> * reporta `gemeos_sincronizados = 0` — **e mexeu em 21**. O contador mente,
+>   e é exatamente o passo que deixa a `086` vermelha. Agora tem número.
+> * sobram **76 órfãs** depois de rodar. Rodar em produção não limparia.
+>
+> **Por que eu parei aqui:** backfill de presença é escrita em massa, na mesma
+> tabela em que o Kodex está trabalhando neste momento. O Alf pediu
+> explicitamente para não conflitar nem sobrescrever o trabalho deles. Medir e
+> entregar o diagnóstico vale mais do que consertar por cima.
 >
 > ## 📊 BATERIA: 15 VERMELHOS → 2 (13/08 noite)
 >
