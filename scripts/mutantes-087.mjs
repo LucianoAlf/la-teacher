@@ -6,9 +6,14 @@
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
+import { exigirBaselineVerde } from './lib-baseline.mjs'
 
 const ORIGINAL = 'supabase/migrations/087-a-tela-do-radar.sql'
 const TESTE = 'supabase/migrations/087-a-tela-do-radar.test.sql'
+
+// Sem baseline verde, todo mutante 'morre' por erro e o placar mente.
+// Ver scripts/lib-baseline.mjs: isso ja aconteceu duas vezes em 13/08/2026.
+exigirBaselineVerde(ORIGINAL, TESTE)
 const TEMP = 'supabase/migrations/_mutante-087.sql'
 const fonte = readFileSync(ORIGINAL, 'utf8')
 

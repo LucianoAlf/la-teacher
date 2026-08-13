@@ -164,6 +164,26 @@ select 'path nao pode ser reutilizado por outra experimental', 'storage_path_reu
     else erro
   end from _out_audio_exp_duravel where tentativa = 'path cruzado');
 
+-- ESTE PASSO NASCEU DE UM MUTANTE SOBREVIVENTE (13/08/2026).
+--
+-- A migration afirma, em comentario, que o indice unico e uma "segunda
+-- barreira independente do lock" -- e nada provava essa afirmacao. O mutante
+-- que apagava o CREATE do arquivo sobrevivia SEMPRE, porque
+-- `create unique index if not exists` nao executa no replay contra a producao:
+-- a mutacao nao chegava a mudar nada. Agora o mutante DERRUBA o indice de
+-- verdade, dentro da transacao descartavel, e este passo e quem o pega.
+insert into _res_audio_exp_duravel (passo, esperado, obtido)
+select
+  'a segunda barreira existe: indice unico parcial por vinculo',
+  'presente',
+  case when exists (
+    select 1 from pg_index idx
+      join pg_class i on i.oid = idx.indexrelid
+     where idx.indrelid = 'public.fabio_fila_audios'::regclass
+       and idx.indisunique
+       and i.relname = 'uq_fabio_fila_audio_experimental_path'
+  ) then 'presente' else 'AUSENTE' end;
+
 select json_build_object(
   'falhas', (select count(*) from _res_audio_exp_duravel where esperado is distinct from obtido),
   'detalhe', coalesce((

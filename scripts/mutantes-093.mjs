@@ -7,9 +7,14 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { exigirBaselineVerde } from './lib-baseline.mjs'
 
 const ORIGINAL = 'supabase/migrations/093-presenca-padrao-e-fatias-canonicas.sql'
 const TESTE = 'supabase/migrations/093-presenca-padrao-e-fatias-canonicas.test.sql'
+
+// Sem baseline verde, todo mutante 'morre' por erro e o placar mente.
+// Ver scripts/lib-baseline.mjs: isso ja aconteceu duas vezes em 13/08/2026.
+exigirBaselineVerde(ORIGINAL, TESTE)
 const RUNNER = 'scripts/rodar-teste-sql.mjs'
 const fonte = readFileSync(ORIGINAL, 'utf8')
 const CHAMADA = '  perform public.fn_materializar_presenca_padrao(p_registro_id, p_professor_id);'

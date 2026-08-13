@@ -5,9 +5,14 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { executarEnsaioPresencaNull } from './verificar-residuos-presenca-null.mjs'
+import { exigirBaselineVerde } from './lib-baseline.mjs'
 
 const ORIGINAL = 'supabase/migrations/20260812135033_fix_presence_json_null_confirmation.sql'
 const TESTE = 'supabase/migrations/099-presenca-json-null-confirmation.test.sql'
+
+// Sem baseline verde, todo mutante 'morre' por erro e o placar mente.
+// Ver scripts/lib-baseline.mjs: isso ja aconteceu duas vezes em 13/08/2026.
+exigirBaselineVerde(ORIGINAL, TESTE)
 const fonte = readFileSync(ORIGINAL, 'utf8')
 const PREDICADO = "       and public.fn_presenca_declarada(coalesce(f.campos, '{}'::jsonb)) = 'nao_informada'"
 const MARCADOR_DIVERGENCIA = /—\s+\d+\s+passo\(s\)\s+divergiram:/u

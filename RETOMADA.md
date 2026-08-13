@@ -2,10 +2,40 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 tarde BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: terminar o Sprint 3** em
-> `docs/superpowers/plans/2026-08-13-correcao-pos-auditoria.md`. Faltam quatro
-> itens, listados no fim deste bloco. Cada checkpoint só fecha com **prova
-> real**, não com verde de harness.
+> **PRÓXIMO PASSO: Sprint 4 (a carteira falar um número só)** em
+> `docs/superpowers/plans/2026-08-13-correcao-pos-auditoria.md`. Os Sprints 0
+> a 3 estão fechados. Cada checkpoint só fecha com **prova real**, não com
+> verde de harness.
+>
+> **Sprint 3 FECHADO em 13/08 — os dois sobreviventes caíram e tinham a MESMA
+> raiz.** `094` foi de 6/7 para **7/7** e `20260813004713` de 4/5 para **5/5**.
+>
+> A raiz: os dois mutantes mexiam em DDL com `if not exists`, que **não executa
+> no replay** contra a produção — a mutação não chegava a agir. Eram
+> impossíveis de morrer, não difíceis. O conserto foi o mesmo: o mutante passou
+> a **derrubar o objeto de verdade** (`drop constraint` / `drop index`, dentro
+> da transação descartável) e o teste ganhou o passo de catálogo que o pega.
+> Os dois objetos foram medidos em produção antes e **existem** — era cobertura
+> fantasma, não defeito. De quebra, a afirmação da `20260813004713` de que o
+> índice é "segunda barreira independente do lock" agora é **provada**.
+>
+> **⚠️ Nove runners mexem em DDL `if not exists` e podem ter a mesma cobertura
+> fantasma:** `062`, `064`, `066`, `075`, `076`, `094`✅, `095`,
+> `20260812163000`, `20260813004713`✅. Dois consertados; os outros sete são
+> dívida **conhecida**.
+>
+> **A trava de baseline está em 60 dos 64 runners** (4 já tinham; `059`, `095`
+> e `20260812163000` ficaram fora por não seguirem o padrão `ORIGINAL`/`TESTE`).
+> `node --check` em todos: zero erro. E ela morde: `mutantes-090` agora devolve
+> `BASELINE VERMELHO` em vez do 10/10 falso.
+>
+> **Laço de `bloqueadas`: documentado, não consertado — de propósito.** Medido:
+> elegíveis hoje = 0, bloqueio permanente = 0, temporário = 0 — **não pode
+> disparar**. E há bifurcação de desenho que é decisão do Alf:
+> `acao_ativa_referencia_storage` é bloqueio **temporário** (reentrar na fila é
+> certo) e `registro_confirmado_referencia_storage` é **permanente** (reentrar a
+> cada 120s é laço). **Pergunta pro Alf:** o permanente vira carimbo que tira da
+> fila com o motivo escrito, ou vira pendência visível pra alguém resolver?
 >
 > **Sprint 3 EM ANDAMENTO — a bateria `09` saiu de 2 FALHARAM para 0
 > FALHARAM** (3 passam · 3 superadas · 1 não reaplicável).

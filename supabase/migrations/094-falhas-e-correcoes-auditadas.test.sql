@@ -691,6 +691,36 @@ begin
 end
 $function$;
 
+-- ------------------------------------------------------------------------
+-- ESTE PASSO NASCEU DE UM MUTANTE SOBREVIVENTE (13/08/2026).
+--
+-- O M4 trocava a linha `constraint ... unique (tipo, acao_id)` por um
+-- `check (true)` -- e sobrevivia SEMPRE. Motivo: a tabela nasce num
+-- `create table if not exists`, entao no replay contra a producao aquele bloco
+-- NAO EXECUTA e a mutacao nao muda nada. Mutante que nao consegue agir nao
+-- prova nada, mas passa a vista como cobertura.
+--
+-- Agora o mutante DERRUBA a constraint de verdade (dentro da transacao
+-- descartavel do runner), e o passo abaixo e quem o pega. A unicidade e o que
+-- impede um replay de repetir uma correcao ja aplicada.
+do $mut$
+begin
+  perform pg_temp.checar_094(
+    'ledger de correcao mantem a unicidade (tipo, acao_id)',
+    exists (
+      select 1 from pg_constraint
+       where conrelid = 'public.fabio_correcoes_acoes'::regclass
+         and contype = 'u'
+         and pg_get_constraintdef(oid) = 'UNIQUE (tipo, acao_id)'
+    ),
+    coalesce((select string_agg(conname || '=' || pg_get_constraintdef(oid), ' | ')
+                from pg_constraint
+               where conrelid = 'public.fabio_correcoes_acoes'::regclass
+                 and contype = 'u'), '<nenhuma constraint unica>')
+  );
+end
+$mut$;
+
 select json_build_object(
   'falhas', (select count(*) from _fabio_094_res where not coalesce(ok, false)),
   'detalhe', coalesce((select json_agg(json_build_object(

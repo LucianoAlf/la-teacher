@@ -443,6 +443,60 @@ STALE, aplicá-lo, e confirmar que agora ele **morre**.
 
 ---
 
+# Sprint 3 — matar o que sobreviver ✅ FECHADO 13/08
+
+> **Segunda passada — os dois sobreviventes caíram, e tinham a MESMA raiz.**
+>
+> | suíte | antes | agora |
+> |---|---|---|
+> | `094` | 6/7 | **7/7** |
+> | `20260813004713` | 4/5 | **5/5** |
+>
+> **A raiz comum:** os dois mutantes mexiam em DDL com `if not exists`
+> (`create table if not exists`, `create unique index if not exists`). No replay
+> contra a produção esses blocos **não executam** — o objeto já existe. Alterar
+> o texto deles não muda nada, então o mutante nunca podia ser pego. Era
+> impossível de morrer, não "difícil".
+>
+> **O conserto foi o mesmo nos dois:** o mutante passou a **derrubar o objeto de
+> verdade** (`drop constraint` / `drop index`, dentro da transação descartável
+> do runner), e o teste ganhou o passo de catálogo que o pega. Nos dois casos o
+> objeto foi medido em produção antes: a constraint `UNIQUE (tipo, acao_id)` e o
+> índice `uq_fabio_fila_audio_experimental_path` **existem** — não havia defeito,
+> havia cobertura fantasma.
+>
+> Ganho colateral que vale registrar: a `20260813004713` **afirmava em
+> comentário** que o índice era "segunda barreira independente do lock". Essa
+> afirmação agora é **provada** por um mutante que morre, em vez de ser só uma
+> frase bonita no arquivo.
+>
+> **Nove runners mexem em DDL `if not exists`** e podem ter a mesma cobertura
+> fantasma: `062`, `064`, `066`, `075`, `076`, `094`✅, `095`, `20260812163000`,
+> `20260813004713`✅. Os dois marcados foram consertados; os outros sete ficam
+> como dívida conhecida, não como surpresa.
+>
+> **A trava de baseline foi ligada em 60 runners** (64 no total: 4 já tinham).
+> Três ficaram de fora por não seguirem o padrão `ORIGINAL`/`TESTE`:
+> `059`, `095`, `20260812163000`. `node --check` em todos: **zero erro de
+> sintaxe**. E ela dispara de verdade — rodar `mutantes-090` agora devolve
+> `BASELINE VERMELHO` em vez do 10/10 falso de antes.
+>
+> **O laço latente de `bloqueadas` fica documentado, não consertado — de
+> propósito.** Medido hoje: `elegiveis_hoje = 0`, `bloqueio_permanente = 0`,
+> `bloqueio_temporario = 0`. Ele **não pode disparar**. E tem uma bifurcação de
+> desenho que não é minha para resolver sozinho:
+>
+> - `acao_ativa_referencia_storage` é bloqueio **temporário** — a ação viva vai
+>   terminar, e reentrar na fila depois é o comportamento certo.
+> - `registro_confirmado_referencia_storage` é **permanente** — um registro
+>   confirmado sempre vai referenciar aquele path, e reentrar a cada 120s é laço.
+>
+> Tratar os dois igual erra de um lado ou do outro. **Decisão pro Alf:** o
+> permanente vira carimbo (sai da fila e fica com o motivo escrito) ou vira
+> pendência visível pra alguém resolver?
+
+## (primeira passada, 13/08)
+
 # Sprint 3 — matar o que sobreviver 🟡 EM ANDAMENTO (13/08)
 
 > **Feito nesta passada.** A bateria `09` saiu de **2 FALHARAM** para

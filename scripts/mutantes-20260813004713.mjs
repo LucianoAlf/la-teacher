@@ -5,9 +5,14 @@
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { exigirBaselineVerde } from './lib-baseline.mjs'
 
 const ORIGINAL = 'supabase/migrations/20260813004713_audio_experimental_duravel.sql'
 const TESTE = 'supabase/migrations/20260813004713_audio_experimental_duravel.test.sql'
+
+// Sem baseline verde, todo mutante 'morre' por erro e o placar mente.
+// Ver scripts/lib-baseline.mjs: isso ja aconteceu duas vezes em 13/08/2026.
+exigirBaselineVerde(ORIGINAL, TESTE)
 const TEMP = 'supabase/migrations/_mutante-audio-experimental-duravel.sql'
 const fonte = readFileSync(ORIGINAL, 'utf8')
 
@@ -34,7 +39,12 @@ const MUTANTES = [
     de: `create unique index if not exists uq_fabio_fila_audio_experimental_path
   on public.fabio_fila_audios (professor_id, storage_path)
   where vinculo_id is not null;`,
-    para: '',
+    para: `create unique index if not exists uq_fabio_fila_audio_experimental_path
+  on public.fabio_fila_audios (professor_id, storage_path)
+  where vinculo_id is not null;
+-- M4: derruba a barreira de verdade. Apagar o CREATE nao bastava --
+-- IF NOT EXISTS nao executa no replay, entao a mutacao nao agia.
+drop index if exists public.uq_fabio_fila_audio_experimental_path;`,
   },
   {
     nome: 'M5 — anon recebe EXECUTE na porta experimental',

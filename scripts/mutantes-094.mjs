@@ -5,10 +5,15 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { exigirBaselineVerde } from './lib-baseline.mjs'
 
 const DEPENDENCIA = 'supabase/migrations/093-presenca-padrao-e-fatias-canonicas.sql'
 const ORIGINAL = 'supabase/migrations/094-falhas-e-correcoes-auditadas.sql'
 const TESTE = 'supabase/migrations/094-falhas-e-correcoes-auditadas.test.sql'
+
+// Sem baseline verde, todo mutante 'morre' por erro e o placar mente.
+// Ver scripts/lib-baseline.mjs: isso ja aconteceu duas vezes em 13/08/2026.
+exigirBaselineVerde(ORIGINAL, TESTE)
 const RUNNER = 'scripts/rodar-teste-sql.mjs'
 const fonte = readFileSync(ORIGINAL, 'utf8')
 const MUTANTES_SELECIONADOS = new Set(
@@ -175,7 +180,11 @@ if (baseline.codigo !== 0 || !rollbackConfirmado(baseline.saida)) {
       if (contar(texto, ANCORA_LEDGER_UNICO) !== 1) throw new Error('ancora da unicidade do ledger nao e unica')
       return texto.replace(
         ANCORA_LEDGER_UNICO,
-        '  constraint fabio_correcoes_acoes_tipo_acao_id_key check (true)\n',
+        '  constraint fabio_correcoes_acoes_tipo_acao_id_key unique (tipo, acao_id)\n'
+          + ');\n'
+          + 'alter table public.fabio_correcoes_acoes\n'
+          + '  drop constraint fabio_correcoes_acoes_tipo_acao_id_key;\n'
+          + 'create table if not exists public._m4_descartavel (x int',
       )
     }),
     executarMutante('M5 - correcao perde o ramo de replay do ledger', (texto) => {
