@@ -3,9 +3,30 @@
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 tarde BRT · auditoria ao vivo + plano de correção
 >
 > **PRÓXIMO PASSO: seguir `docs/superpowers/plans/2026-08-13-correcao-pos-auditoria.md`
-> a partir do Sprint 1 (o laço do reconciler).** O plano está dividido em
-> sprints e checkpoints; cada checkpoint só fecha com **prova real na VPS**,
-> não com verde de harness.
+> a partir do Sprint 2 (devolver visão à rede de mutantes).** O Sprint 2 toca
+> 47 arquivos no checkout compartilhado, então o **CP-2.1 exige confirmar com o
+> Alf que a outra sessão está parada** antes de mexer. Cada checkpoint só fecha
+> com **prova real na VPS**, não com verde de harness.
+>
+> **Sprint 1 FECHADO em 13/08 — o laço do reconciler acabou.** Migration
+> `20260813160000_limpeza_nao_se_repete.sql` aplicada e registrada. O `claim`
+> passou a exigir que a linha ainda não tenha o carimbo `payload.limpeza` —
+> carimbo que já era gravado e que ninguém lia. Provas: RED com exatamente um
+> passo divergindo; GREEN; **5/5 mutantes sobre baseline verde**; e no
+> `journalctl` ao vivo `claimed:5` → **`claimed:0` e fica**. A prova inversa
+> também foi feita: fixture controlado com objeto real no bucket foi limpo
+> **exatamente uma vez** e o resíduo conferido em zero. As 5 linhas velhas
+> ficam como trilha.
+>
+> **Lição cara deste sprint, guardar:** o primeiro placar de mutante deu
+> **5/5 e era falso** — o teste base tinha quebrado num fixture inválido e os
+> cinco morreram de erro, não de asserção. **Conferir o baseline VERDE antes de
+> ler placar de mutante** é passo obrigatório agora.
+>
+> **Achado lateral não consertado:** a mesma família de laço mora no caminho
+> `bloqueadas` do worker — quando a prova recusa, ele faz `continue` sem
+> concluir, o lease expira em 120s e a linha volta. Hoje não dispara
+> (`bloqueadas: 0` em tudo que foi medido). Está anotado pro Sprint 3.
 >
 > **Sprint 0 FECHADO em 13/08.** O registro que ia evaporar foi salvo: a
 > professora é **Daiana (professor 3)**, o prazo da ação foi estendido para

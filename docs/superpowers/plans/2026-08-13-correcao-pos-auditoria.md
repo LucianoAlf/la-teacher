@@ -142,7 +142,44 @@ repetir esse caminho vai tropeçar na mesma pedra.
 
 ---
 
-# Sprint 1 — o laço do reconciler
+# Sprint 1 — o laço do reconciler ✅ FECHADO 13/08
+
+> **Resultado:** os sete checkpoints fecharam. Migration
+> `20260813160000_limpeza_nao_se_repete.sql` aplicada e registrada no ledger.
+> O laço **parou ao vivo** e a limpeza **continua funcionando** — as duas
+> provas, não só a primeira.
+>
+> | checkpoint | prova |
+> |---|---|
+> | CP-1.1 | RED com **exatamente um** passo divergindo: *"acao ja limpa NAO e reivindicada de novo"*. Os outros cinco passaram — o teste isolou o defeito. |
+> | CP-1.2 | GREEN, sem divergência, schema e linhas vivas idênticas. |
+> | CP-1.3 | **5/5 mutantes mortos sobre baseline verde.** |
+> | CP-1.4 | Cláusula no ar, comentário gravado, ACL `anon=false / authenticated=false / service_role=true`; versão `20260813160000` registrada em `schema_migrations`. |
+> | CP-1.5 | `journalctl` ao vivo: `claimed:5` → **`claimed:0` e fica**, por 8 ciclos seguidos. |
+> | CP-1.6 | Fixture controlado (objeto real no bucket): **exatamente um** `claimed:1, limpas:1`, depois 0 estável. Objeto sumiu do Storage, carimbo gravado, lease liberado. Fixture removido com **zero resíduo** em ações, Storage e eventos órfãos. |
+> | CP-1.7 | As 5 linhas antigas já estão limpas, já têm `encerrado_em` e agora são inertes. **Decisão: ficam** como trilha da auditoria; o carimbo documenta o que houve. |
+>
+> Regressão no vizinho: teste da `092` (contrato do reconciliador) segue verde.
+>
+> **Duas lições que este sprint pagou, e que valem para o Sprint 3:**
+>
+> 1. **O primeiro `5/5` foi falso.** O teste base tinha quebrado (fixture com
+>    `payload` nulo violando NOT NULL) e os cinco mutantes "morreram" de erro,
+>    não de asserção. É a armadilha do mutante que morre de sintaxe, e ela
+>    imita um placar perfeito. **Conferir o baseline VERDE antes de ler
+>    qualquer placar de mutante** virou passo obrigatório.
+> 2. **Um mutante impossível é informação.** Não dá para provar o `coalesce` do
+>    payload porque a coluna é NOT NULL — então isso está escrito na migration
+>    e no runner, em vez de fingir cobertura. Cobertura declarada e não medida
+>    é pior que buraco conhecido.
+>
+> **Achado lateral, não consertado (entra no Sprint 3):** a mesma família de
+> laço existe no caminho `bloqueadas`. Quando `fabio_provar_limpeza` recusa, o
+> worker faz `continue` **sem** chamar o `concluir`, então o lease expira em
+> 120s e a linha volta pra sempre. Hoje não dispara (`bloqueadas: 0` em todas
+> as execuções medidas), mas uma linha permanentemente reprovada —
+> `registro_confirmado_referencia_storage`, por exemplo — entraria em laço de
+> 120s. Não mexi: está fora do defeito medido e merece o seu próprio RED.
 
 ### Contexto medido
 
