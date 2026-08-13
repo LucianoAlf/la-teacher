@@ -34,6 +34,56 @@
 > `fabio_agent` em texto claro** no `DATABASE_URI`. Não toquei — é decisão de
 > infra dele se vira variável de ambiente / arquivo restrito.
 >
+> ## ⛔ ERRO MEU, ACHADO AO LER AS REGRAS DE NEGÓCIO DO LA REPORT (13/08)
+>
+> **Eu construí o que já existia.** O `D:/la-performance-report` (que eu só
+> puxei DEPOIS — estava **244 commits atrás**) tem `docs/REGRAS-DE-NEGOCIO.md`,
+> e o banco já tinha:
+>
+> - **`vw_aluno_identidade_unidade_canonica`** — já tem coluna chamada
+>   **`pessoa_chave`**, o MESMO nome que escolhi, e ainda `aluno_id_canonico`,
+>   `aluno_ids_locais`, `identidade_fonte`, `identidade_confianca`.
+> - **`vw_professor_carteira_pessoa_canonica_sombra`** — a carteira por pessoa,
+>   por professor.
+>
+> Os números batem exatamente: minha RPC dá **20** (prof 25) e **47** (Ramon);
+> a canônica-sombra dá **20** e **47**. Minha `vw_aluno_pessoa` é redundante e
+> mais pobre. O CLAUDE.md avisa disso ("a canônica já existe") e eu fiz mesmo
+> assim, porque procurei função que ESCREVE em `alunos` e índice único, e nunca
+> perguntei "já existe view canônica de pessoa?".
+>
+> **Conserto proposto:** aposentar `vw_aluno_pessoa` e repontar
+> `app_professor_carteira_contagem` para a canônica. **Não executado** — ver a
+> decisão pendente abaixo, que muda o desenho.
+>
+> ## ⚠️ DECISÃO PENDENTE: banda conta na carteira do professor?
+>
+> `docs/REGRAS-DE-NEGOCIO.md` §3.5 diz que banda/coral são **atividade extra** e
+> ficam *"Excluída de: alunos ativos, alunos pagantes, ticket médio, MRR, LTV,
+> churn, médias de turma, **carteira do professor**, score do professor"*.
+>
+> Mas o Alf descreveu o caso operacional: o aluno **aparece na grade** do
+> professor de banda — "com o Willer na guitarra e com o Ramon na prática de
+> banda". Operacionalmente o Ramon **dá aula** para essa gente.
+>
+> São dois números legítimos, e a diferença é enorme:
+>
+> | professor | hoje | sem banda | cai |
+> |---|---|---|---|
+> | Ramon Pina Morais | 47 | **13** | 34 |
+> | Lucas da Silva Guimarães | 37 | 23 | 14 |
+> | Willian De Andrade | 41 | 31 | 10 |
+> | **Alan Samico** | 5 | **0** | 5 |
+>
+> O Alan só dá banda: pela régua do KPI, a carteira dele é **zero**. Dizer isso
+> pro Fábio seria absurdo operacionalmente.
+>
+> **Leitura que eu proponho (falta o Alf confirmar):** são DUAS perguntas
+> diferentes. *"Quem eu ensino"* (operacional, o Fábio, inclui banda) ≠
+> *"tamanho da carteira pra KPI"* (exclui banda). O erro seria ter um número só
+> respondendo as duas. Enquanto não confirmado, **a RPC segue incluindo banda** e
+> está marcada aqui como não-conforme ao doc.
+>
 > **✅ Caso multi-professor conferido (Alf, 13/08):** uma pessoa pode aparecer
 > na grade de vários professores — guitarra com um, banda com outro. Medido:
 > **127 pessoas** estão em mais de uma carteira, e uma está em **5**
