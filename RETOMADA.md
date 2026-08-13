@@ -2,8 +2,35 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 noite BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: a decisão da BANDA na carteira** — única coisa aberta que
-> não é minha. Ver o bloco do CP-4.3. Sprints 0 a 3 fechados.
+> **PRÓXIMO PASSO: Sprint 5 (higiene)** — 3 branches remotas, 650 advisors.
+> Sprints 0 a 3 fechados; a banda e o laço de `bloqueadas` fecharam em 13/08.
+>
+> ## ✅ A BANDA VEM SEPARADA — NO AR (13/08 noite)
+>
+> Decisão do Alf, corrigindo a minha proposta de somar tudo:
+> *"tem que vir separado: bandas, qualquer outra coisa tem que vir numa lista
+> separada."* Somar escondia, excluir mentia.
+>
+> Migration `20260813240000_a_banda_vem_separada` aplicada e registrada
+> (RED → GREEN → **6/6 mutantes**). `fn_carteira_fatiada` é a régua única; a
+> RPC do agente e o `fabio_contexto_professor` **perguntam pra ela** em vez de
+> repetir critério — a lição do F-C, aplicada no mesmo dia.
+>
+> **A régua não é minha:** `cursos.is_projeto_banda`, a marca canônica do LA
+> Report (`regras-negocio-canonicas.md` §1.3). Conferido: dá exatamente os
+> mesmos 13 regulares do Ramon que a régua de lá produz. O doc marca
+> `nome ILIKE '%banda%'` como legado a ser morto — não recriei.
+>
+> **Provado CONVERSANDO com o Fábio,** não só no banco:
+> Ramon (33) → *"47 alunos. São 13 regulares e, nas atividades extras: 15 no
+> GarageBand, 14 no Power Kids e 10 no Minha Banda Para Sempre."*
+> Matheus (25), que não tem extra → *"20 alunos regulares"*, sem lista vazia.
+>
+> **⚠️ Frente própria aberta: contar TURMAS ("você tem 3 bandas").** O número
+> de turmas mora em `aulas_emusys.turma_nome`, e o caminho de lá até o curso
+> (`curso_emusys_id` → `cursos.emusys_ids`) **está quebrado**: medido em
+> 13/08, ele faz o Ramon "dar aula de Violino" e infla Violão de 2 para 34
+> alunos. Contar turma por cima disso seria número errado com cara de número.
 >
 > ## ✅ LAÇO DE `bloqueadas`: FECHADO (13/08 noite)
 >
