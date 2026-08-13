@@ -2,8 +2,44 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 noite BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: Sprint 5 (higiene)** — 3 branches remotas, 650 advisors.
-> Sprints 0 a 3 fechados; a banda e o laço de `bloqueadas` fecharam em 13/08.
+> **PRÓXIMO PASSO: os 13 testes vermelhos que sobraram** — são de uma classe
+> só, e vale tratar como classe. Sprints 0 a 3 fechados.
+>
+> ## 🚨 DEFEITO VIVO ACHADO E CONSERTADO — o aviso ao comercial (13/08 noite)
+>
+> A bateria completa deu **60 passaram · 15 FALHARAM**. Fui conferir três
+> reprovados achando que eram testes podres. **Um era defeito vivo.**
+>
+> `fabio_claim_aviso_comercial` e `fabio_claim_aviso_falta_experimental`
+> carregavam um `ON CONFLICT` que **não infere mais o índice**: o
+> `uq_fabio_notif_por_referencia` ganhou uma terceira condição
+> (`tipo <> 'registro_recibo'`, quando o recibo virou índice próprio) e as duas
+> funções ficaram com duas. Dois predicados não implicam três → **42P10 no
+> PLANEJAMENTO**, antes de olhar uma linha.
+>
+> **Provado contra a PRODUÇÃO com `EXPLAIN`**, não contra o texto do repo — a
+> distinção que já me fez errar esta semana. `fabio_claim_notificacao_por_
+> referencia` **já estava certa** (por isso a devolutiva funciona: 39
+> entregues, a última hoje 20:20). É a MESMA falha do incidente de 12/08,
+> consertada num lugar e não nos outros.
+>
+> **Custo hoje: zero — e é esse o problema.** A fila está vazia
+> (`na_fila: 0`, medido no worker da VPS), então nunca disparou. Esperava a
+> próxima experimental registrada para o comercial não ficar sabendo, sem erro
+> na tela de ninguém: quem morre é um worker num timer de 3 minutos.
+>
+> Migration `20260813250000` aplicada e registrada (RED nomeou as duas funções
+> → GREEN → **4/4 mutantes**). Ela **lê a definição viva e troca só a
+> cláusula**, em vez de eu transcrever ~150 linhas do bloco family-safe da
+> devolutiva à mão — e aborta se a proporção âncora × `on conflict` não for a
+> medida (2 para 2 em cada). O teste prova PLANEJANDO, e tem passo garantindo
+> que a hierarquia family-safe sobreviveu ao patch.
+>
+> **Sobraram 13 vermelhos, e eles são outra classe:** expectativa cravada
+> contra dado vivo (`esperado 3, obtido 4`) e fixture que não acha mais o caso
+> (`aluno sem registro + aula do prof 25` → `faltou`). Bateria que fica
+> vermelha pelo calendário ensina todo mundo a ignorar vermelho — é isso que
+> vale atacar como classe, não um a um.
 >
 > ## ✅ A BANDA VEM SEPARADA — NO AR (13/08 noite)
 >
