@@ -1,5 +1,69 @@
 # RETOMADA — LA Teacher
 
+> ## 🔎 CHECKPOINT ATIVO — 13/08/2026 tarde BRT · auditoria ao vivo + plano de correção
+>
+> **PRÓXIMO PASSO: seguir `docs/superpowers/plans/2026-08-13-correcao-pos-auditoria.md`
+> a partir do Sprint 0.** O plano está dividido em sprints e checkpoints; cada
+> checkpoint só fecha com **prova real na VPS**, não com verde de harness.
+>
+> O trabalho voltou do Codex (PRs #4–#12) e foi **auditado ao vivo** aqui:
+> VPS, banco `ouqwbbermlzqqvtqwlul`, logs do systemd e bridge do Fábio.
+>
+> **Funcionando, medido:** VPS com 121 dias de uptime e disco em 28%; 3
+> serviços `running` e 14 timers armados, com **os 12 serviços de timer saindo
+> `exit=0`** na última execução. O **Fábio responde ponta a ponta** — pergunta
+> feita ao vivo por `falar_com_fabio.py --sem-historico` foi respondida em ~10s
+> com dado real (`hermes_api_ok`, professor 25). A migration da PR #11
+> (`audio_experimental_duravel`) está **mesmo aplicada** em produção, registrada
+> como `20260813101644`, e o teste SQL dela passa verde sem resíduo. Fila de
+> áudio com 108 itens, 98 normalizados e **zero pendente travado**.
+>
+> **Quebrado — 1, laço vivo:** o `fabio-whatsapp-reconciler` repetiu
+> **1493 de 1499 execuções idênticas** hoje (`claimed:5, limpas:5`), sempre nas
+> mesmas 5 linhas — artefatos do E2E `e2e-isaque-*`, cujo objeto no Storage
+> **já não existe** e cujo `payload` já carrega `limpeza.removido=true`. Causa:
+> `fabio_concluir_limpeza` não muda nenhuma coluna do predicado de
+> `fabio_claim_acoes_limpeza`, então a linha requalifica pra sempre. Custo
+> ~7.500 ciclos/dia (~22 mil chamadas inúteis), e `atualizado_em` reescrito a
+> cada 35s destrói a auditoria da coluna. Provável origem dos `522` de 12/08.
+>
+> **Quebrado — 2, a rede de mutantes está cega:** o Codex reportou **5/5**
+> mutantes na fila experimental; medido aqui, **1/5 com 4 STALE**. Causa provada:
+> os `.sql` vindos das PRs chegam em **CRLF** (`core.autocrlf=true`, repo **sem
+> `.gitattributes`**) e as âncoras dos mutantes são `\n` — âncora de uma linha
+> casa, **âncora multilinha nunca casa**. Não é mentira do Codex: no Linux dele,
+> LF, as 5 casavam. **47 arquivos `.sql` em CRLF**, e são exatamente `090`–`096`
+> e todos os datados de 12–13/08 — o trabalho inteiro das PRs #4–#11. Placar real:
+> 090 8/10 · 091 7/10 · **094 0/7** · 095 falha de âncora · 20260812163000 17/28 ·
+> 20260813004713 1/5.
+>
+> **Alarme falso descartado — NÃO reabrir:** a 093 acusa *"rascunho emite
+> presença antes da confirmação"* (`presencas_antes=1`), e a 099 acusa recibo
+> faltando. **Nenhum dos dois é defeito vivo.** O `fabio_criar_registro` em
+> produção **não referencia `aluno_presenca`**, não há trigger de presença em
+> `fabio_registros_aula`, e **nenhuma das 8 funções que dão `INSERT` em
+> `aluno_presenca` é chamada por ele**. E a 099 cobra recibo de `origem='app'`,
+> mas a resposta atual é `{"motivo":"origem_app","skipped":true}` — o
+> comportamento **novo e correto**. Os dois foram superados de propósito pela
+> `20260812163000_recibo_so_whatsapp_e_fila_ativa`; viram `-- SUPERADA POR:`,
+> não conserto.
+>
+> **Com prazo, hoje:** ação `8593cf8d-4e73-4bb4-b4ba-b8d98c418580` do professor
+> 3, `aberta` desde 12/08 19:12 UTC e **expirando 13/08 19:12 UTC (16:12 BRT)**.
+> É um áudio real e detalhado sobre a aluna Beatriz Ohana, com contexto de saúde
+> relatado por ela. O Fábio mandou shortlist com 2 aulas candidatas (`217860`,
+> `205008`) e o professor não respondeu. A transcrição está **inteira no
+> payload** — o texto não se perde, mas o registro não nasce.
+>
+> **Aberto, sem ser fogo:** o Fábio diz **20** alunos na carteira do Matheus, a
+> view canônica diz **23 linhas / 21 alunos distintos** — três números pra mesma
+> carteira. `node_modules` está pela metade com `esbuild.exe` travado, então os
+> **65/65 unitários do Codex não foram reproduzidos aqui**. O gateway sai com
+> `status=1/FAILURE` em todo stop (cosmético, mas mascara falha real no log).
+> Três branches remotas com 1 commit próprio e 420–493 commits de atraso.
+> Advisors: 650 no projeto compartilhado, com 5 `rls_disabled_in_public` e 9
+> `security_definer_view` — **banco compartilhado, não mexer sozinho**.
+
 > **Checkpoint canônico — 13/08/2026 07h49 BRT · consolidado após as PRs #1–#11.**
 > `origin/main` e o clone local apontam para `f3ccb5980a77584dcb614e5a76607cd42a484b93`
 > (PR #11, [fix: persist experimental audio retries](https://github.com/LucianoAlf/la-teacher/pull/11)). A produção Vercel
