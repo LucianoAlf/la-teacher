@@ -2,8 +2,37 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 tarde BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: construir o CP-4.3 — as duas decisões foram RESPONDIDAS por
-> medição, o sprint está destravado.** Sprints 0 a 3 fechados.
+> **PRÓXIMO PASSO: fazer o Fábio realmente CHAMAR a contagem.** O contrato
+> existe, está aplicado e provado; o que falta é o Hermes abrir a skill que
+> manda usá-lo (ver o bloco do Sprint 4 abaixo). Sprints 0 a 3 fechados.
+>
+> **CP-4.3 CONSTRUÍDO em 13/08.** Duas migrations aplicadas e registradas:
+> `20260813190000_a_pessoa_ganha_nome` (view `vw_aluno_pessoa` + RPC
+> `app_professor_carteira_contagem`, **5/5 mutantes**) e
+> `20260813200000_a_porta_do_agente` (o grant que faltava, RED→GREEN).
+>
+> **A pedra que eu pisei, e que vale guardar:** publiquei a RPC só para
+> `service_role`. O consumidor real é o `postgres-mcp` do Hermes, que conecta
+> com papel **próprio, `fabio_agent`** — ele não conseguia executar.
+> **Contrato publicado sem conferir QUEM vai chamar é contrato não publicado.**
+> O grant não alargou nada: `fabio_agent` já tinha SELECT na carteira, na view
+> e em `alunos`.
+>
+> **⚠️ O Fábio responde 20 e explica o multi-curso em português claro — mas NÃO
+> chama a RPC, e isso está provado.** Cobrado dos números exatos, respondeu:
+> *"são 20 pessoas. O total exato de matrículas não veio neste recorte."* Se
+> tivesse chamado, os três viriam juntos. O número está certo **por conta
+> própria**, não por contrato.
+>
+> **Causa medida:** a instrução está viva no `SKILL.md`, mas o
+> `.skills_prompt_snapshot.json` carrega **só o manifesto** (nome, categoria,
+> descrição) — nenhuma frase do corpo aparece nele. O corpo é aberto **sob
+> demanda**, e para "quantos alunos" o agente responde sem abrir a skill. Isso
+> é frente própria: **como o Hermes decide abrir uma skill**.
+>
+> **🔐 Para o Alf:** o `~/.hermes/config.yaml` guarda a **senha do papel
+> `fabio_agent` em texto claro** no `DATABASE_URI`. Não toquei — é decisão de
+> infra dele se vira variável de ambiente / arquivo restrito.
 >
 > **A ORIGEM DA DUPLICATA: é o contrato da tabela, não falha de sincronismo.**
 > A única chave única de `public.alunos` além da PK é

@@ -580,7 +580,64 @@ Cada um: teste vermelho → conserto → teste verde → mutante morre → aplic
 
 ---
 
-# Sprint 4 — as duas decisões, RESPONDIDAS POR MEDIÇÃO (13/08)
+# Sprint 4 — CP-4.3 construído, e o que ficou provado × o que não (13/08)
+
+> **Feito, aplicado e provado:**
+>
+> - `20260813190000_a_pessoa_ganha_nome.sql` — view `vw_aluno_pessoa` (dá NOME
+>   à pessoa por trás de cada linha, via `(unidade_id, emusys_student_id)`, com
+>   saída conservadora para os 16 sem id) + RPC
+>   `app_professor_carteira_contagem`. **5/5 mutantes** sobre baseline verde;
+>   cada mutante reintroduz um erro medido (o 23, o 21, fundir Pietro com
+>   Júlia, fundir os sem-identidade, abrir a porta).
+> - `20260813200000_a_porta_do_agente.sql` — o grant que faltava.
+>
+> **A pedra que eu mesmo pisei, e que vale mais que o código:** publiquei a RPC
+> só para `service_role`. O consumidor real é o `postgres-mcp` do Hermes, que
+> conecta com um papel **próprio, `fabio_agent`** — medido:
+> `has_function_privilege('fabio_agent', ...) = false`. **Contrato publicado sem
+> conferir QUEM vai chamar é contrato não publicado.** O grant não alarga nada:
+> `fabio_agent` já tinha SELECT na carteira, em `vw_aluno_pessoa` e em `alunos`
+> — ele já alcançava os mesmos dados, só que contando na mão e errando o grão.
+> RED→GREEN registrado no teste.
+>
+> **O que o Fábio responde hoje** (perguntado ao vivo, `--sem-historico`):
+>
+> > "Você tem 20 alunos na sua carteira. Às vezes o número parece diferente
+> > porque um mesmo aluno pode estar matriculado em mais de um curso. Aí ele
+> > aparece em mais de uma matrícula, mas continua sendo uma pessoa só."
+>
+> Certo, e explicado em português claro, sem jargão nem nome de tabela.
+>
+> ## ⚠️ Mas ele NÃO está chamando a RPC — e isso está provado, não suposto
+>
+> Cobrei os números exatos. Se ele tivesse chamado a função, os três viriam
+> juntos numa tacada. A resposta foi:
+>
+> > "Na sua carteira, são 20 pessoas. O total exato de matrículas não veio
+> > neste recorte."
+>
+> Ou seja: o **número está certo por conta própria**, não por contrato. A
+> instrução que escrevi na skill está viva no `SKILL.md`, mas o
+> `.skills_prompt_snapshot.json` carrega **só o manifesto** — nome, categoria e
+> descrição. Nenhuma frase do corpo aparece nele (`negrito`, `Conseguir
+> consultar`, `Check-in e presenca` → todas **0** ocorrências). O corpo é aberto
+> **sob demanda**, e para "quantos alunos" ele responde sem abrir a skill.
+>
+> **Isto é frente própria** — como o Hermes decide abrir uma skill — e não se
+> resolve martelando o texto. Parei aqui de propósito, com o estado medido.
+>
+> ## Achado de segurança, para o Alf
+>
+> O `~/.hermes/config.yaml` guarda a **senha do papel `fabio_agent` em texto
+> claro** dentro do `DATABASE_URI`. Não é anormal para string de conexão, mas
+> é credencial de banco de produção num arquivo lido por vários caminhos.
+> Vale decidir se roda por variável de ambiente / arquivo com modo restrito.
+> **Não toquei** — é decisão de infra dele.
+
+---
+
+# (histórico) Sprint 4 — as duas decisões, RESPONDIDAS POR MEDIÇÃO (13/08)
 
 > As duas decisões que travavam o CP-4.3 foram respondidas auditando o banco e
 > cruzando com a **API do Emusys ao vivo**. Não sobrou escolha de gosto.
