@@ -1,3 +1,15 @@
+-- SUPERADA POR: 083-a-cobranca-para-de-aceitar-plano-como-relato.sql
+--
+-- A fixture deste teste marca "conteudo lancado" escrevendo em
+-- `aulas_emusys.anotacoes` (a aula -41005). A 083 fechou exatamente esse
+-- buraco: `anotacoes` e o campo de PLANO do Emusys, e plano nao e relato --
+-- so `anotacoes_fabio` conta. Entao a -41005 passou a ser cobrada, e e por
+-- isso que os tres passos caem (`esperado 0, obtido 1` e os totais 3 -> 4).
+--
+-- Isso e a regra NOVA funcionando, nao regressao. Reescrever a fixture pra
+-- `anotacoes_fabio` daria verde, mas o teste deixaria de exercitar o que a
+-- 041 entregou: quem vigia a regua de hoje e o teste da 083.
+--
 -- 041 — o escalonamento cobra REGISTRO, nao presenca
 --
 -- Erro que esta migration conserta: a 039/040 liam vw_presenca_pendencia, que
