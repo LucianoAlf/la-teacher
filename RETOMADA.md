@@ -34,6 +34,18 @@
 > `fabio_agent` em texto claro** no `DATABASE_URI`. Não toquei — é decisão de
 > infra dele se vira variável de ambiente / arquivo restrito.
 >
+> **✅ Caso multi-professor conferido (Alf, 13/08):** uma pessoa pode aparecer
+> na grade de vários professores — guitarra com um, banda com outro. Medido:
+> **127 pessoas** estão em mais de uma carteira, e uma está em **5**
+> (Vinícius Lopa: Contrabaixo com o Marquinhos, "Minha Banda Para Sempre" com
+> o Ramon, Power Kids com Kaio, Renan e Rodrigo). **Cada carteira conta ela uma
+> vez** — o desenho aguenta.
+>
+> **⚠️ ARMADILHA PRO PAINEL DA COORDENAÇÃO:** somar as carteiras **não** dá o
+> total da escola. Medido: **999 pessoas** na escola × **1.144** somando as
+> carteiras = **145 a mais (14,5% de inflação)**. Total da escola tem que ser
+> `count(distinct pessoa_chave)` sobre todas as carteiras, nunca soma.
+>
 > **A ORIGEM DA DUPLICATA: é o contrato da tabela, não falha de sincronismo.**
 > A única chave única de `public.alunos` além da PK é
 > `UNIQUE (telefone, unidade_id, nome, curso_id)` — **com `curso_id` dentro**.
