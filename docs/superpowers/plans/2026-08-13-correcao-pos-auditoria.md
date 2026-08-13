@@ -580,7 +580,97 @@ Cada um: teste vermelho → conserto → teste verde → mutante morre → aplic
 
 ---
 
-# Sprint 4 — a carteira fala um número só 🟡 PREMISSA INVERTIDA (13/08)
+# Sprint 4 — as duas decisões, RESPONDIDAS POR MEDIÇÃO (13/08)
+
+> As duas decisões que travavam o CP-4.3 foram respondidas auditando o banco e
+> cruzando com a **API do Emusys ao vivo**. Não sobrou escolha de gosto.
+
+## A origem: não é acidente de sincronismo, é o contrato da tabela
+
+A única chave única de `public.alunos` além da PK:
+
+```
+idx_alunos_telefone_unidade_nome_curso_unique
+UNIQUE (telefone, unidade_id, nome, curso_id)
+```
+
+**`curso_id` está na chave.** `alunos` não é uma tabela de pessoas — é uma
+tabela de **pessoa × curso**. Uma pessoa com dois cursos *tem* que virar duas
+linhas; é o que a tabela declara. E `emusys_student_id` **não tem índice único
+nenhum**.
+
+A view não inventa nada: ela reflete fielmente esse grão. Consertar a view
+seria maquiar o sintoma.
+
+## Cruzamento com a fonte (API Emusys)
+
+| caso | banco | API Emusys (fonte) |
+|---|---|---|
+| `3183` @ CG | 2 cadastros (ids 265, 1465) | **1 pessoa** — Luiza Pimentel Oliveira Barbosa, 2017-05-18, **2 matrículas** (Canto T, Teclado T) |
+| `1001` @ BARRA | 2 cadastros | **1 pessoa** — Pietro Matola Abreu, 2011-02-26, 2 matrículas |
+| `1001` @ RECREIO | 3 cadastros | **1 pessoa** — Júlia Salarini Gama, 2016-03-03, 6 matrículas |
+
+O `1001` demonstra os dois problemas de uma vez: **pessoas diferentes com o
+mesmo número em unidades diferentes** (a skill da API já avisa: *"IDs são POR
+UNIDADE/ESCOLA"*), e **cada uma delas partida em vários cadastros** pelo grão
+por curso.
+
+## DECISÃO 1 — a chave de identidade é `(unidade_id, emusys_student_id)`
+
+Medido sobre 1.616 cadastros ativos:
+
+| chave | pessoas |
+|---|---|
+| `(unidade_id, emusys_student_id)` | **1.400** |
+| só `emusys_student_id` | 1.311 → **fundiria 89 pessoas diferentes** |
+| `(unidade_id, emusys_student_id, data_nascimento)` | **1.400** — idêntico |
+
+- Usar o id **sozinho** não é opção: junta Pietro com Júlia. A memória da casa
+  estava certa ao desconfiar dele.
+- **`data_nascimento` não precisa entrar**: o par já é exato, e os 1.400 não se
+  movem ao acrescentá-la. Ela serve como **asserção de sanidade**, não como
+  parte da chave.
+- Separação dos 224 grupos: **137 mesma unidade** (duplicata real, mesmo nome e
+  mesma data de nascimento) × **87 unidades diferentes** (colisão de
+  namespace). **Zero** grupos de mesma unidade apontando para pessoas
+  diferentes — nenhum contraexemplo.
+
+**Validação contra o número decidido:** na carteira do professor 25,
+`count(distinct (unidade_id, emusys_student_id))` = **20** — exatamente o que o
+Alf decidiu contar e o que o Fábio responde.
+
+## DECISÃO 2 — aditivo, e o alvo não é a view
+
+A raiz está em `alunos`, não em `vw_fabio_carteira_professor`. A view é
+`security_definer` e lida por outros sistemas do banco compartilhado; mudar o
+formato dela pode quebrar o LA Report, e ainda por cima não atacaria a causa.
+
+**Caminho:** uma RPC nova de contagem por pessoa, deduplicando pelo par, sem
+tocar nas linhas existentes. O `_fetch_professor_roster` passa a receber um
+número calculado em vez de o modelo contar uma lista.
+
+## Correção de um número meu
+
+Eu reportei antes **305 cadastros excedentes**. Aquele número somava `n-1`
+sobre grupos de `emusys_student_id` duplicado e portanto **misturava colisão de
+namespace com duplicata real**. O excedente verdadeiro é **216**
+(1.616 cadastros − 1.400 pessoas).
+
+## O que isto abre, e que NÃO é decisão minha
+
+Os 216 excedentes **não são sujeira**: são o grão que a tabela declara. Não dá
+para "limpar" sem contrariar o schema. A pergunta que fica pro Alf é de
+arquitetura, não de faxina:
+
+> `alunos` continua sendo **pessoa × curso** — e a gente só passa a contar
+> certo por cima —, ou vira **pessoa**, com as matrículas numa tabela ao lado?
+
+Contar certo pelo par funciona nos dois cenários, então o CP-4.3 **não fica
+bloqueado** por essa pergunta.
+
+---
+
+# (histórico) Sprint 4 — a carteira fala um número só 🟡 PREMISSA INVERTIDA (13/08)
 
 > **O Fábio estava certo e a view é que infla.** Eu abri este sprint achando o
 > contrário. A medição desmontou a premissa.

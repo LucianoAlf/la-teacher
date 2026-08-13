@@ -2,8 +2,46 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 tarde BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: Sprint 4, CP-4.3 — mas ele está PARADO em duas decisões do
-> Alf** (listadas no fim deste bloco). Sprints 0 a 3 fechados.
+> **PRÓXIMO PASSO: construir o CP-4.3 — as duas decisões foram RESPONDIDAS por
+> medição, o sprint está destravado.** Sprints 0 a 3 fechados.
+>
+> **A ORIGEM DA DUPLICATA: é o contrato da tabela, não falha de sincronismo.**
+> A única chave única de `public.alunos` além da PK é
+> `UNIQUE (telefone, unidade_id, nome, curso_id)` — **com `curso_id` dentro**.
+> `alunos` não é tabela de pessoas: é tabela de **pessoa × curso**. Quem tem
+> dois cursos *tem* que virar duas linhas. E `emusys_student_id` **não tem
+> índice único nenhum**. A view não inventa nada — reflete esse grão.
+>
+> **Cruzado com a API do Emusys ao vivo:** `3183` @ CG é **uma** Luiza com 2
+> matrículas (nosso banco: 2 cadastros). `1001` @ BARRA é o Pietro e `1001` @
+> RECREIO é a Júlia — **pessoas diferentes com o mesmo número**, porque os IDs
+> do Emusys são **por unidade** (a skill da API avisa isso).
+>
+> **✅ DECISÃO 1 — a chave é `(unidade_id, emusys_student_id)`.** Sobre 1.616
+> cadastros ativos: o par dá **1.400 pessoas**; o id **sozinho** dá 1.311, ou
+> seja **fundiria 89 pessoas diferentes**; e acrescentar `data_nascimento` dá
+> **1.400 também** — não muda nada, serve como asserção de sanidade, não como
+> parte da chave. Dos 224 grupos: **137** são duplicata real (mesma unidade) e
+> **87** são colisão de namespace; **zero** grupos de mesma unidade apontam
+> para pessoas diferentes.
+>
+> **✅ DECISÃO 2 — aditivo, e o alvo NÃO é a view.** A raiz está em `alunos`. A
+> view é `security_definer` e lida por outros sistemas; mexer nela não ataca a
+> causa e pode quebrar o LA Report. Caminho: **RPC nova de contagem por
+> pessoa**, deduplicando pelo par, sem tocar nas linhas existentes.
+>
+> **Validação:** na carteira do professor 25,
+> `count(distinct (unidade_id, emusys_student_id))` = **20** — o número que o
+> Alf decidiu e o que o Fábio responde.
+>
+> **⚠️ Correção de um número meu:** reportei **305** cadastros excedentes; aquilo
+> misturava colisão de namespace com duplicata real. O excedente verdadeiro é
+> **216** (1.616 − 1.400).
+>
+> **Pergunta de arquitetura que fica pro Alf (não bloqueia o CP-4.3):** `alunos`
+> continua **pessoa × curso** e a gente só conta certo por cima, ou vira
+> **pessoa** com as matrículas numa tabela ao lado? Contar pelo par funciona
+> nos dois cenários.
 >
 > **Sprint 4: a premissa se inverteu. O Fábio estava CERTO e a view é que
 > infla.** Decisão do Alf em 13/08: **carteira conta ALUNO**, não matrícula.
