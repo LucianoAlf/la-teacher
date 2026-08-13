@@ -1,3 +1,18 @@
+-- SUPERADA POR: 20260813280000_mata_a_regua_duplicada_do_veredito.sql
+--
+-- Esta migration criou `fn_presenca_e_resposta`, que era DUPLICATA da
+-- `fn_presenca_fecha_chamada` (a canonica, com 6 consumidores). A 280000
+-- apagou a funcao 40 minutos depois; replayar este arquivo a RESSUSCITA, e
+-- o teste dela referencia uma funcao que nao existe mais.
+--
+-- O que sobreviveu daqui e a `fn_presenca_status_efetivo`, que continua
+-- sendo criada por este arquivo e segue viva -- ela nomeia o `coalesce` com
+-- a coluna antiga `status` que ja estava copiado dentro do
+-- `upsert_presenca_emusys_bruta`.
+--
+-- O raciocinio sobre POR QUE as duas perguntas ('pode ser sobrescrito?' x
+-- 'tem veredito?') nao se fundem segue valido e esta preservado abaixo.
+--
 -- A régua do veredito vira função: uma fonte só pra "o aluno tem resposta?".
 --
 -- O PROBLEMA, medido em 13/08/2026. A casa tinha DUAS réguas de presença
