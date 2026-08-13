@@ -35,8 +35,25 @@ begin
   if v_aula.id is null or v_aluno is null then return; end if;
 
   -- 1) FONTE FORTE JA GRAVADA NAO PODE SER PISADA.
+  --
+  -- A limpeza tem que alcancar o SLOT INTEIRO, nao a aula sorteada. O
+  -- `aula_emusys_id` e id de EVENTO: o mesmo horario aparece em mais de uma
+  -- linha, e `trg_sincronizar_gemeos_presenca` espelha a presenca entre elas.
+  -- Apagando so uma das gemeas, o insert abaixo dispara o espelhamento e
+  -- esbarra na `uq_presenca_aluno_aula` da irma que ficou.
+  --
+  -- Isto NAO era teoria: em 13/08/2026 este teste quebrou com
+  -- `duplicate key (aluno_id, aula_emusys_id)=(674, 234509)`. Ele so tinha
+  -- passado antes porque a aula que o `order by` sorteou naquele instante nao
+  -- tinha gemea -- fixture refem do que o dado vivo sorteia.
   delete from public.aluno_presenca
-   where aluno_id = v_aluno and aula_emusys_id = v_aula.id;
+   where aluno_id = v_aluno
+     and aula_emusys_id in (
+       select irma.id from public.aulas_emusys irma
+        where irma.unidade_id       is not distinct from v_aula.unidade_id
+          and irma.professor_id     is not distinct from v_aula.professor_id
+          and irma.data_hora_inicio = v_aula.data_hora_inicio
+     );
   insert into public.aluno_presenca
     (aluno_id, aula_emusys_id, professor_id, unidade_id, data_aula, horario_aula,
      status, status_presenca, respondido_por, respondido_em)
