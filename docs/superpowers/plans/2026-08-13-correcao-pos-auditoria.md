@@ -276,6 +276,68 @@ encerradas, ou deixar. **PROVA:** decisão escrita + estado final conferido.
 
 ---
 
+# Sprint 2 — devolver visão à rede de mutantes ✅ FECHADO 13/08
+
+> **Resultado:** os cinco checkpoints fecharam, e o sprint achou um problema
+> **maior** que o CRLF.
+>
+> **CP-2.2 — a causa foi medida, não deduzida.** Template literal em JavaScript
+> normaliza `\r\n` para `\n` **por especificação**: medido âncora por âncora,
+> nenhuma continha `\r`, e **100% delas casavam com a versão LF** do `.sql`.
+> Ou seja, o fim de linha do `.mjs` é irrelevante — só os `.sql` precisavam
+> mudar. `.gitattributes` criado (`*.sql`, `*.mjs`, `*.test.sql` → `eol=lf`) e
+> 61 arquivos normalizados. **`git diff --numstat` = zero arquivos:** nenhuma
+> mudança de conteúdo, só fim de linha.
+>
+> **CP-2.3 — o placar verdadeiro, e a armadilha de novo.** A normalização
+> recuperou cobertura real, mas ao ler o placar eu quase repeti o erro do
+> Sprint 1: `090` e `091` passaram a reportar **10/10** e os **baselines das
+> duas FALHAM** contra a produção. Vinte "mortos" que não provam nada.
+>
+> | suíte | baseline | antes → agora | vale? |
+> |---|---|---|---|
+> | `20260812163000` | ✓ verde | 17/28 → **28/28** | **sim** |
+> | `094` | ✓ verde | 0/7 → **6/7** | sim — 1 sobrevivente real |
+> | `20260813004713` | ✓ verde | 1/5 → **4/5** | sim — 1 sobrevivente real |
+> | `090` · `091` | ✗ **falha** | "10/10" | **não — falso** |
+> | `095` | ✗ falha | não verificável | não |
+>
+> **A trava que faltava.** Nenhum runner desta casa conferia o baseline —
+> por isso a mentira passou duas vezes num dia. Criado
+> `scripts/lib-baseline.mjs` com `exigirBaselineVerde()`, e **testado nos dois
+> sentidos**: deixa passar com baseline verde (4/4 na suíte nova) e **barra**
+> com o baseline vermelho da `091`. Ligado nos dois runners novos; estender aos
+> outros 62 é item do Sprint 3.
+>
+> **CP-2.4 — SUPERADA sem desarmar guarda.** As duas migrations bloqueadas
+> carregavam guardas de ACL válidas (medidas corretas em produção). Antes de
+> marcar, as guardas foram **resgatadas** para
+> `20260813170000_guardas_resgatadas_da_presenca.sql` — aplicada, registrada e
+> com **4/4 mutantes mortos sobre baseline verde**. Só então `093` e
+> `20260812135033` ganharam o marcador; o runner agregado já classifica a `093`
+> como superada.
+>
+> **CP-2.5** — o mesmo `094/M6` que era `STALE — ancora do replay de devolutiva
+> nao e unica` agora aparece como `OK morto`.
+>
+> **Achados novos para o Sprint 3, todos medidos:**
+>
+> - `090`, `091` e `095` têm **baseline vermelho** — a suíte inteira delas é
+>   decoração hoje. Diagnosticar cada uma.
+> - **`094/M4` sobrevive de verdade**: "ledger de correcao perde a unicidade da
+>   acao". Sobrevivente real, com baseline verde.
+> - **`20260813004713/M4` sobrevive de verdade**: remover o índice único
+>   `uq_fabio_fila_audio_experimental_path` não mata. A própria migration
+>   afirma que ele é "segunda barreira independente do lock" — e **nada prova
+>   essa afirmação**.
+> - `mutantes-095.mjs` exige alvo **local** e o runner da casa é remoto: ele
+>   nunca verificou nada aqui. Bloqueio arquitetural, não âncora.
+> - **3 testes órfãos que nunca entram na bateria agregada** — `097`, `098` e
+>   `099` têm `.test.sql` sem `.sql` de mesmo nome, e o runner pareia por nome.
+> - Estender `exigirBaselineVerde()` aos outros 62 runners.
+
+## (plano original abaixo)
+
 # Sprint 2 — devolver visão à rede de mutantes
 
 **Por que vem antes de consertar defeito:** enquanto a rede está cega, qualquer

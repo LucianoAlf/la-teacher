@@ -3,10 +3,41 @@
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 tarde BRT · auditoria ao vivo + plano de correção
 >
 > **PRÓXIMO PASSO: seguir `docs/superpowers/plans/2026-08-13-correcao-pos-auditoria.md`
-> a partir do Sprint 2 (devolver visão à rede de mutantes).** O Sprint 2 toca
-> 47 arquivos no checkout compartilhado, então o **CP-2.1 exige confirmar com o
-> Alf que a outra sessão está parada** antes de mexer. Cada checkpoint só fecha
-> com **prova real na VPS**, não com verde de harness.
+> a partir do Sprint 3.** O Sprint 3 agora tem lista concreta (ver abaixo).
+> Cada checkpoint só fecha com **prova real na VPS**, não com verde de harness.
+>
+> **Sprint 2 FECHADO em 13/08 — a rede de mutantes voltou a enxergar, e o
+> sprint achou coisa pior que o CRLF.**
+>
+> A causa foi **medida**: template literal em JavaScript normaliza `\r\n` para
+> `\n` por especificação, então o fim de linha do `.mjs` é irrelevante e
+> **100% das âncoras casam com a versão LF** do `.sql`. `.gitattributes` criado
+> e 61 arquivos normalizados, com `git diff --numstat` = **zero arquivos**
+> (nenhuma mudança de conteúdo).
+>
+> **⚠️ ATENÇÃO ao ler placar de mutante desta casa.** Recuperado o CRLF, `090`
+> e `091` passaram a dizer **10/10 — e os baselines das duas FALHAM**. Vinte
+> "mortos" que não provam nada. O que a normalização recuperou de verdade:
+> `20260812163000` 17/28 → **28/28**, `094` 0/7 → **6/7**, `20260813004713`
+> 1/5 → **4/5** — essas três com baseline verde.
+>
+> Criado `scripts/lib-baseline.mjs` (`exigirBaselineVerde()`), **testado nos
+> dois sentidos**: passa no verde, **barra** no vermelho da `091`. Ligado nos
+> dois runners novos; falta estender aos outros 62.
+>
+> **`093` e `20260812135033` agora são `-- SUPERADA POR:`** — mas só depois de
+> as guardas de ACL delas serem resgatadas para
+> `20260813170000_guardas_resgatadas_da_presenca.sql`, aplicada, registrada e
+> com **4/4 mutantes**. Marcar SUPERADA sem isso teria desarmado guarda viva.
+>
+> **Lista do Sprint 3, tudo medido:** baseline vermelho em `090`/`091`/`095`;
+> **`094/M4` sobrevive de verdade** (unicidade da ação no ledger);
+> **`20260813004713/M4` sobrevive de verdade** — remover o índice único não
+> mata, e a migration *afirma* que ele é "segunda barreira independente do
+> lock" sem nada provar; `mutantes-095` exige alvo local e nunca verificou nada
+> aqui; **3 testes órfãos** (`097`, `098`, `099`) que nunca entram na bateria
+> porque o runner pareia por nome; e estender a trava de baseline aos 62
+> runners restantes.
 >
 > **Sprint 1 FECHADO em 13/08 — o laço do reconciler acabou.** Migration
 > `20260813160000_limpeza_nao_se_repete.sql` aplicada e registrada. O `claim`

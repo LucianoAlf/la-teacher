@@ -1,0 +1,27 @@
+# Fim de linha, e por que este arquivo existe
+#
+# Auditoria de 13/08/2026: a suite de mutantes da fila experimental reportava
+# "5/5 mortos" na maquina do Codex (Linux, LF) e media **1/5, com 4 STALE**
+# nesta maquina (Windows). Nenhuma das duas estava mentindo -- o repo e que
+# nao tinha regra de fim de linha.
+#
+# Sem `.gitattributes`, o `core.autocrlf=true` desta maquina escreve os .sql
+# em CRLF no checkout. As ancoras dos mutantes, porem, sao SEMPRE LF: template
+# literal em JavaScript normaliza `\r\n` para `\n` por especificacao (a
+# normalizacao do TV/TRV), e literais com `\n` escrito a mao ja sao LF por
+# construcao. Medido ancora por ancora: 100% delas casam com a versao LF do
+# .sql, e as multilinha nao casam com a CRLF.
+#
+# Resultado sem esta regra: ancora multilinha nunca casa, o runner imprime
+# STALE, e o placar final passa a vista como se fosse resultado. Garantia
+# cega que parece verde e pior que garantia ausente.
+#
+# 47 dos 197 .sql estavam em CRLF quando isto foi escrito -- justamente as
+# migrations 090-096 e as datadas de 12-13/08, ou seja a frente inteira das
+# PRs #4-#11.
+*.sql  text eol=lf
+*.mjs  text eol=lf
+
+# Os .test.sql sao alcancados por *.sql, mas ficam explicitos porque sao
+# metade do arsenal de garantia da casa.
+*.test.sql text eol=lf

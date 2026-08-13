@@ -1,3 +1,16 @@
+-- SUPERADA POR: 20260812163000_recibo_so_whatsapp_e_fila_ativa.sql
+--
+-- A 20260812163000 redefiniu `fabio_criar_registro` DE PROPOSITO. Replayar a
+-- 093 sobre o schema de hoje instala a versao antiga e o teste acusa
+-- `presencas_antes=1` -- o que PARECE presenca vazando em rascunho, e nao e.
+-- Medido em 13/08/2026: o `fabio_criar_registro` vivo NAO referencia
+-- `aluno_presenca`, nao ha trigger de presenca em `fabio_registros_aula`, e
+-- NENHUMA das 8 funcoes que dao INSERT em `aluno_presenca` e chamada por ele.
+--
+-- As guardas de ACL que este teste protegia foram resgatadas para
+-- `20260813170000_guardas_resgatadas_da_presenca.sql`, com 4/4 mutantes
+-- mortos. Marcar SUPERADA sem esse resgate teria desarmado a guarda em
+-- silencio.
 -- 093 — presença padrão e fatias canônicas.
 --
 -- O registro continua sendo a fonte do preview. A presença sem declaração só

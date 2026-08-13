@@ -1,3 +1,13 @@
+-- SUPERADA POR: 20260812163000_recibo_so_whatsapp_e_fila_ativa.sql
+--
+-- O teste `099-presenca-json-null-confirmation.test.sql` cobra recibo para
+-- registro com `origem='app'`. A 20260812163000 mudou isso de proposito, e a
+-- resposta viva hoje e literalmente `{"motivo":"origem_app","skipped":true}` --
+-- o comportamento novo e correto. Nao e defeito; e contrato substituido.
+--
+-- As guardas de ACL que aquele teste protegia foram resgatadas para
+-- `20260813170000_guardas_resgatadas_da_presenca.sql`, com 4/4 mutantes
+-- mortos.
 -- `presenca: null` e semanticamente igual a presenca ainda nao informada.
 -- O normalizador do app pode persistir a chave com JSON null, portanto testar
 -- apenas a existencia da chave deixa a confirmacao parcial: a chamada e

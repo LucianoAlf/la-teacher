@@ -15,6 +15,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
+import { exigirBaselineVerde } from './lib-baseline.mjs'
 
 const ORIGINAL = 'supabase/migrations/20260813160000_limpeza_nao_se_repete.sql'
 const TESTE = 'supabase/migrations/20260813160000_limpeza_nao_se_repete.test.sql'
@@ -60,6 +61,9 @@ const MUTANTES = [
     para: '    where a.storage_path is not null',
   },
 ]
+
+// Sem baseline verde, todo mutante morre de erro e o placar mente.
+exigirBaselineVerde(ORIGINAL, TESTE)
 
 let mortos = 0
 let stale = 0
