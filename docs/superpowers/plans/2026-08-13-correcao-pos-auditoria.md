@@ -580,6 +580,61 @@ Cada um: teste vermelho → conserto → teste verde → mutante morre → aplic
 
 ---
 
+# Sprint 4 — a carteira fala um número só 🟡 PREMISSA INVERTIDA (13/08)
+
+> **O Fábio estava certo e a view é que infla.** Eu abri este sprint achando o
+> contrário. A medição desmontou a premissa.
+>
+> **CP-4.2 — decidido pelo Alf em 13/08: carteira conta ALUNO**, não matrícula.
+>
+> **CP-4.1 — de onde vinha cada número, medido:**
+>
+> | número | o que é |
+> |---|---|
+> | 23 | linhas da view (matrícula × grão) |
+> | 21 | `aluno_id` distintos |
+> | **20** | **pessoas de verdade** ← o que o Alf decidiu contar |
+>
+> O 21 vira 20 por causa disto, achado na carteira do professor 25:
+>
+> - `aluno_id 265` — Luiza Pimentel Oliveira Barbosa — Teclado
+> - `aluno_id 1465` — Luiza Pimentel Oliveira Barbosa — Canto
+>
+> Mesma pessoa: mesmo nome, **mesma data de nascimento (2017-05-18)**, **mesmo
+> `emusys_student_id` (3183)**, mesma unidade, as duas `ativo` e nenhuma
+> arquivada. São dois cadastros para a mesma criança.
+>
+> **O tamanho real do problema, medido na base inteira:**
+> **224 grupos de `emusys_student_id` duplicado, 305 cadastros excedentes, e 60
+> grupos com 3 ou mais.** Não é o caso da Luiza — é sistêmico.
+>
+> **Mas o 20 do Fábio não é contrato — é aritmética de modelo.** O
+> `_fetch_professor_roster` **não deduplica**: manda as 23 linhas e pronto. O
+> Fábio recebeu a lista com nomes repetidos e contou. Perguntei três vezes, com
+> frases diferentes: **20, 20, 20** — estável, e certo. Só que nada garante isso
+> numa carteira maior, nem quando o duplicado vier com grafia diferente do nome
+> em vez de id repetido. Resposta certa, mecanismo frágil.
+>
+> **Duas decisões antes de eu construir o CP-4.3:**
+>
+> 1. **A chave de identidade.** `emusys_student_id` foi o que provou a
+>    duplicidade aqui, e é o candidato natural. Mas a memória da casa diz que
+>    esse campo **já colidiu entre pessoas diferentes** — então usá-lo sozinho
+>    troca um erro por outro. Vale casar `emusys_student_id` **e**
+>    `data_nascimento`?
+> 2. **Onde o número honesto mora.** `vw_fabio_carteira_professor` é
+>    `security_definer` e lida por outros sistemas do banco compartilhado —
+>    mexer no formato dela pode quebrar o LA Report. O caminho seguro é
+>    **aditivo**: uma RPC/coluna nova de contagem por pessoa, sem tocar nas
+>    linhas que já existem.
+>
+> **E fica dito:** deduplicar na contagem **esconde** os 305 cadastros
+> excedentes. O número passa a fechar e o problema continua lá, mexendo em
+> presença, em relatório e em qualquer coisa que conte aluno. A limpeza dos
+> cadastros é frente própria — e é do Alf, não minha.
+
+## (plano original abaixo)
+
 # Sprint 4 — a carteira fala um número só
 
 ### Contexto medido

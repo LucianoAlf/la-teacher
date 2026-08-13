@@ -2,10 +2,41 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 13/08/2026 tarde BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: Sprint 4 (a carteira falar um número só)** em
-> `docs/superpowers/plans/2026-08-13-correcao-pos-auditoria.md`. Os Sprints 0
-> a 3 estão fechados. Cada checkpoint só fecha com **prova real**, não com
-> verde de harness.
+> **PRÓXIMO PASSO: Sprint 4, CP-4.3 — mas ele está PARADO em duas decisões do
+> Alf** (listadas no fim deste bloco). Sprints 0 a 3 fechados.
+>
+> **Sprint 4: a premissa se inverteu. O Fábio estava CERTO e a view é que
+> infla.** Decisão do Alf em 13/08: **carteira conta ALUNO**, não matrícula.
+>
+> Os três números da carteira do professor 25: **23** linhas da view
+> (matrícula × grão) · **21** `aluno_id` distintos · **20** pessoas de verdade.
+> O 21 vira 20 por causa de um cadastro duplicado achado ali:
+> `aluno_id 265` e `aluno_id 1465` são **a mesma criança** — mesmo nome, mesma
+> data de nascimento (2017-05-18), **mesmo `emusys_student_id` (3183)**, mesma
+> unidade, as duas ativas e nenhuma arquivada.
+>
+> **⚠️ Tamanho real, medido na base inteira: 224 grupos de `emusys_student_id`
+> duplicado, 305 cadastros excedentes, 60 grupos com 3 ou mais.** Não é o caso
+> da Luiza — é sistêmico, e mexe em presença, relatório e tudo que conta aluno.
+>
+> **Mas o 20 do Fábio não é contrato, é aritmética de modelo.** O
+> `_fetch_professor_roster` **não deduplica** — manda as 23 linhas e o modelo
+> conta. Perguntei três vezes com frases diferentes: 20, 20, 20 — estável e
+> certo, mas nada garante isso numa carteira maior nem com duplicata de grafia
+> diferente. Resposta certa, mecanismo frágil.
+>
+> **As duas decisões que travam o CP-4.3:**
+>
+> 1. **Chave de identidade:** `emusys_student_id` provou a duplicidade aqui, mas
+>    a memória da casa diz que esse campo **já colidiu entre pessoas
+>    diferentes**. Casar com `data_nascimento` junto?
+> 2. **Onde mora o número honesto:** `vw_fabio_carteira_professor` é
+>    `security_definer` e lida por outros sistemas do banco compartilhado —
+>    mexer nela pode quebrar o LA Report. O caminho seguro é **aditivo** (RPC
+>    nova), sem tocar nas linhas existentes.
+>
+> E fica dito: deduplicar na contagem **esconde** os 305 excedentes. A limpeza
+> dos cadastros é frente própria, e é do Alf.
 >
 > **Sprint 3 FECHADO em 13/08 — os dois sobreviventes caíram e tinham a MESMA
 > raiz.** `094` foi de 6/7 para **7/7** e `20260813004713` de 4/5 para **5/5**.
