@@ -1,10 +1,55 @@
 # RETOMADA — LA Teacher
 
-> ## 🔎 CHECKPOINT ATIVO — 13/08/2026 tarde BRT · auditoria ao vivo + plano de correção
+> ## 🔎 CHECKPOINT ATIVO — 13/08/2026 noite BRT · auditoria ao vivo + plano de correção
 >
-> **PRÓXIMO PASSO: fazer o Fábio realmente CHAMAR a contagem.** O contrato
-> existe, está aplicado e provado; o que falta é o Hermes abrir a skill que
-> manda usá-lo (ver o bloco do Sprint 4 abaixo). Sprints 0 a 3 fechados.
+> **PRÓXIMO PASSO: a decisão da BANDA na carteira** — única coisa aberta que
+> não é minha. Ver o bloco do CP-4.3. Sprints 0 a 3 fechados.
+>
+> ## ✅ LAÇO DE `bloqueadas`: FECHADO (13/08 noite)
+>
+> Migration `20260813230000_bloqueio_permanente_sai_da_fila` **aplicada e
+> registrada** (RED → GREEN → **4/4 mutantes**), e o reconciler na VPS
+> patchado (backup `.bak-laco-*`, `py_compile` ok, rodado à mão).
+>
+> **Eu decidi, não subi pro Alf** — os dois bloqueios têm vidas opostas e isso
+> é desenho, não negócio:
+> `acao_ativa_referencia_storage` é **temporário** (a outra ação vai fechar →
+> reentrar na fila é o certo, e continua reentrando);
+> `registro_confirmado_referencia_storage` é **permanente** (o áudio é a
+> evidência do registro confirmado; nunca vai poder ser apagado). O permanente
+> vira **carimbo com o motivo escrito** e sai da fila — não vira pendência,
+> porque não há nada pra alguém resolver, e pendência fantasma essa casa já
+> paga caro.
+>
+> A porta nova é separada da `fabio_concluir_limpeza` **de propósito**: aquela
+> re-prova e recusa quando `pode_remover` é falso, e essa recusa é a defesa que
+> impede um worker com bug de apagar evidência. Não afrouxei.
+>
+> **Limite honesto da prova:** o lado do banco foi provado contra a produção
+> (claim real, tabelas reais, transação descartada). O ramo novo do worker
+> **não pôde disparar** — hoje há 0 candidatos bloqueados, e fabricar um seria
+> dado sintético em produção. O que está provado do worker: compila, roda, e o
+> contador `arquivadas` aparece na saída. Timer de 30s ativo.
+>
+> ## ✅ O NÚMERO DA CARTEIRA JÁ CHEGA CALCULADO (13/08 noite)
+>
+> Eu tinha registrado que o Fábio "acerta por conta própria, não por contrato".
+> **Medido hoje: está errado.** `fabio_contexto_professor(25)` já devolve
+> `total_alunos_carteira: 20` e `fonte_carteira:
+> vw_professor_carteira_pessoa_canonica_sombra` — contado com `count(*)` em
+> cima da **mesma view canônica** que a minha RPC lê. O número que entra no
+> prompt é calculado no banco, não pelo modelo.
+>
+> O que a `app_professor_carteira_contagem` acrescenta e o contexto não tem é o
+> **detalhe**: pessoas × matrículas × linhas juntos. Fica, porque lê a mesma
+> canônica — é outra granularidade da mesma verdade, não uma segunda verdade.
+>
+> ## ✅ SENHA NO `config.yaml`: NÃO É DECISÃO DO ALF (13/08 noite)
+>
+> Medido: `~/.hermes/config.yaml` é `600 fabio:fabio`, dentro de `~/.hermes`
+> que é `700`. A senha do `fabio_agent` só é legível por `root` ou por quem já
+> tem a conta `fabio` — que é exatamente quem já tem SSH pra tudo. **Não
+> acrescenta superfície de ataque nenhuma.** Não sobe pro Alf.
 >
 > **CP-4.3 CONSTRUÍDO em 13/08.** Duas migrations aplicadas e registradas:
 > `20260813190000_a_pessoa_ganha_nome` (view `vw_aluno_pessoa` + RPC
