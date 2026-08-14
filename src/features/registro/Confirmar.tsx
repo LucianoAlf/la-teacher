@@ -24,6 +24,9 @@ import { continuarFila } from './filaSerial'
 import { repertorioIndividualVisivel } from './camposCanonicos'
 import { presencaDaFatia } from './texto'
 import { limparCamposManuais } from '../registroManual/modelo'
+import { useAuth } from '../../lib/auth'
+import { buscarCacheManual, chaveCacheManual, removerCacheManual, salvarCacheManual } from '../registroManual/rascunhoLocal'
+import { montarFatiaCache, recuperarCamposFatia } from './recuperacaoManual'
 
 // Campos extras do tronco (narrativa do professor) — mostrados só quando têm
 // conteúdo, pra não poluir. Nenhum campo preenchido fica escondido.
@@ -53,6 +56,7 @@ export default function ConfirmarPage() {
   const { registroId } = useParams()
   const navigate = useNavigate()
   const { message, visible, show } = useToast()
+  const { session } = useAuth()
 
   const [fase, setFase] = useState<Fase>('carregando')
   const [tronco, setTronco] = useState<RegistroRow | null>(null)
@@ -76,27 +80,97 @@ export default function ConfirmarPage() {
     if (!registroId) return
     if (!silencioso) setFase('carregando')
     registroCompleto(registroId)
-      .then((res) => {
+      .then(async (res) => {
         if ('erro' in res) {
           setFase('nao_encontrado')
           return
         }
-        troncoAtualRef.current = res.tronco
-        fatiasAtuaisRef.current = res.fatias
-        setTronco(res.tronco)
-        setFatias(res.fatias)
+        let tronco = res.tronco
+        let fatias = res.fatias
+        let recuperou = false
+        // Recuperação: se ficou texto guardado localmente que não sincronizou
+        // (conexão caiu), traz de volta — mas só se for o MESMO registro e a
+        // MESMA versão (senão é conflito e o servidor manda, como no Caderno).
+        const owner = session?.user.id
+        if (owner && res.tronco.modo_entrada === 'manual' && res.tronco.aula_id != null) {
+          const cache = await buscarCacheManual(owner, res.tronco.aula_id).catch(() => null)
+          if (cache && cache.registroId === res.tronco.id && cache.versao === (res.tronco.versao ?? 1)) {
+            tronco = { ...res.tronco, campos: recuperarCamposFatia(res.tronco.campos, cache.troncoCampos) }
+            fatias = res.fatias.map((f) => {
+              const local = cache.fatias.find((c) => c.id === f.id)
+              return local ? { ...f, campos: recuperarCamposFatia(f.campos, local.campos) } : f
+            })
+            recuperou = true
+          }
+        }
+        troncoAtualRef.current = tronco
+        fatiasAtuaisRef.current = fatias
+        setTronco(tronco)
+        setFatias(fatias)
         setAula(res.aula)
         setJaReg({ ja: res.aula_ja_registrada === true, itens: res.ja_registrados ?? [] })
         setFase('ok')
+        // Recuperou texto que estava só no aparelho → tenta sincronizar já.
+        if (recuperou) {
+          geracaoManualRef.current += 1
+          void enfileirarSalvamentoManual()
+        }
       })
       .catch(() => setFase('erro'))
-  }, [registroId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registroId, session?.user.id])
 
   useEffect(() => {
     void carregar()
   }, [carregar])
 
+  // Reenviar sozinho quando a conexão voltar (igual ao áudio): se um save manual
+  // ficou pendente por falha, tenta de novo assim que o aparelho ficar online.
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (erroManualRef.current && (troncoAtualRef.current ?? tronco)?.modo_entrada === 'manual') {
+        void enfileirarSalvamentoManual()
+      }
+    }
+    window.addEventListener('online', aoVoltar)
+    return () => window.removeEventListener('online', aoVoltar)
+    // enfileirarSalvamentoManual lê refs; não precisa entrar nas deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tronco])
+
   // ---- persistência das edições (regenera o texto no formato da Tese) ----
+
+  /**
+   * Resiliência (igual ao áudio): guarda cada edição manual no cache local do
+   * aparelho ANTES de tentar o servidor, pra uma conexão ruim não custar o texto
+   * do professor. É o MESMO cache do Caderno; quando o save do servidor der
+   * certo, a gente limpa (o servidor já tem). Enquanto não der, o texto fica
+   * salvo aqui e volta na recuperação.
+   */
+  function guardarRascunhoLocal() {
+    const raiz = troncoAtualRef.current
+    const owner = session?.user.id
+    if (!raiz || !owner || raiz.modo_entrada !== 'manual' || raiz.aula_id == null) return
+    const aulaId = raiz.aula_id
+    void salvarCacheManual({
+      id: chaveCacheManual(owner, aulaId),
+      ownerUserId: owner,
+      aulaId,
+      registroId: raiz.id,
+      versao: raiz.versao ?? 1,
+      troncoCampos: limparTroncoManual(raiz.campos),
+      fatias: fatiasAtuaisRef.current.map(montarFatiaCache),
+      atualizadoEm: new Date().toISOString(),
+      estado: 'local',
+    }).catch(() => {})
+  }
+
+  function limparRascunhoLocal() {
+    const raiz = troncoAtualRef.current
+    const owner = session?.user.id
+    if (!raiz || !owner || raiz.aula_id == null) return
+    void removerCacheManual(owner, raiz.aula_id).catch(() => {})
+  }
 
   function enfileirarSalvamentoManual(): Promise<boolean> {
     salvamentosManuaisRef.current += 1
@@ -138,7 +212,12 @@ export default function ConfirmarPage() {
       return false
     }).finally(() => {
       salvamentosManuaisRef.current -= 1
-      if (salvamentosManuaisRef.current === 0) setSalvandoManual(false)
+      if (salvamentosManuaisRef.current === 0) {
+        setSalvandoManual(false)
+        // Sincronizou tudo sem erro → o servidor já tem, o cache local pode sair.
+        // Se sobrou erro, MANTÉM o cache: é o que segura o texto até a conexão voltar.
+        if (!erroManualRef.current) limparRascunhoLocal()
+      }
     })
     filaManualRef.current = tarefa
     return tarefa
@@ -154,6 +233,7 @@ export default function ConfirmarPage() {
     if (atual.modo_entrada === 'manual') {
       geracaoManualRef.current += 1
       erroManualRef.current = false
+      guardarRascunhoLocal()
       void enfileirarSalvamentoManual()
       return
     }
@@ -217,7 +297,10 @@ export default function ConfirmarPage() {
         return false
       }).finally(() => {
         salvamentosManuaisRef.current -= 1
-        if (salvamentosManuaisRef.current === 0) setSalvandoManual(false)
+        if (salvamentosManuaisRef.current === 0) {
+          setSalvandoManual(false)
+          if (!erroManualRef.current) limparRascunhoLocal()
+        }
       })
       filaManualRef.current = tarefa
       await tarefa
@@ -245,6 +328,7 @@ export default function ConfirmarPage() {
     if (raiz.modo_entrada === 'manual') {
       geracaoManualRef.current += 1
       erroManualRef.current = false
+      guardarRascunhoLocal()
       void enfileirarSalvamentoManual()
       return
     }
@@ -290,6 +374,7 @@ export default function ConfirmarPage() {
         show('Nada foi gravado — este registro não tem conteúdo por aluno. Fala com a coordenação ou regrave.')
         return
       }
+      limparRascunhoLocal()
       setSucesso(res)
       setFase('sucesso')
     } catch (e) {
