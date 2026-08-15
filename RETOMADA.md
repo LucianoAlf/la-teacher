@@ -2,16 +2,35 @@
 
 > # 🔖 PONTO DE RETOMADA — 15/08/2026, depois do compact
 >
-> **Os 6 itens do radar: 3 FEITOS, 3 são do Alf.**
+> **Os 6 itens do radar: 4 FEITOS E PROVADOS AO VIVO, 1 é do Alf, 1 aguarda.**
 >
 > | # | item | estado |
 > |---|---|---|
-> | #3 | roster vazio na aula comum | ✅ no ar — `c9f57f7`. ⏸️ **timer instalado e DESLIGADO** (ligar dispara 1 WhatsApp real pro prof 35) |
+> | #3 | roster vazio na aula comum | ✅ **no ar e ENTREGUE** — `c9f57f7` + `98d04a0`; timer ligado, aviso enviado ao prof 35 às 19:55 UTC |
 > | #4 | fila de áudios pendentes por professor | ✅ no ar — `074a5c2` |
 > | #2 | teto de 3 da shortlist | ✅ no ar — `eb400f4`, **sem mexer na guarda do banco** |
-> | #1 | perna do comercial da experimental | 🔴 **decisão do Alf** (manda WhatsApp real sobre aluna real) |
+> | #1 | perna do comercial da experimental | ✅ **entregou pela 1ª vez** — `af87aff`; ensaio limpo depois, timer religado |
 > | #5 | rotacionar a senha das 4 contas | 🔴 **é o Alf** — eu não manuseio senha |
 > | #6 | prova pela porta do WhatsApp | ⏳ depende do Isaque responder |
+>
+> ## O #1 não era defeito — era desenho mal lido por mim
+>
+> `fabio_avisos_comerciais_pendentes` **só devolve notificação que já existe
+> em estado de retentativa**. Quem cria a primeira é
+> `app_confirmar_registro_experimental`, chamando `fabio_claim_aviso_comercial`
+> com **lease 0** (já vencido), pra próxima varredura pegar. Ou seja: o
+> `na_fila: 0` de dias não era cano entupido — era **nenhum registro de
+> experimental confirmado**. O cano estava certo e vazio.
+>
+> ## ⚠️ O CHECK que só aparece na execução real (3ª vez)
+>
+> O aviso do #3 morreu com **23514** na primeira rodada: o `tipo`
+> `registro_sem_roster` não estava na allowlist
+> `fabio_notificacoes_tipo_check`. **O `--dry-run` passou honestamente** —
+> ele monta o corpo e para ANTES do claim, que é onde o CHECK mora.
+> Consertado em `20260815120000`, com teste que **insere a linha de verdade**
+> contra produção. Padrão que já se repetiu 3x: allowlist no banco, chamador
+> novo no código, ensaio que não toca a porta.
 >
 > ## O que a medição corrigiu (de novo)
 >
@@ -38,15 +57,20 @@
 > de dígito — "meio-dia" era barrado antes de chegar ao casador que já sabia
 > lê-lo. As duas agora leem `texto_tem_horario`.
 >
-> ## ⚠️ Duas travas minhas, de propósito
+> ## O que ficou LIGADO na VPS
 >
-> 1. **`fabio-sem-roster.timer` está instalado e DESLIGADO** na VPS. Ligar
->    (`systemctl --user enable --now fabio-sem-roster.timer`) dispara **um**
->    WhatsApp real pro professor 35 sobre um áudio de 10/08. O texto exato já
->    foi conferido em dry-run e está no commit `c9f57f7`.
-> 2. **#1 (comercial) não foi executado.** Manda WhatsApp pro consultor sobre
->    a Claudia Sophia com conteúdo que **eu inventei** no teste. Se for
->    executar, vai junto um aviso de que é teste.
+> - **`fabio-sem-roster.timer`** — a cada 15 min: religa áudio parado por
+>   turma vazia cujo roster apareceu, depois avisa quem continua parado.
+>   Calibragem: `FABIO_SEM_ROSTER_DIAS` (7), `FABIO_SEM_ROSTER_GRACE_MIN` (30).
+> - **`fabio-aviso-comercial.timer`** — foi **parado durante o ensaio** (pra
+>   não entregar sem o cabeçalho de teste) e **religado** (`active`).
+>
+> ## Restos do ensaio: nenhum
+>
+> Registro de ensaio e notificação apagados; `lead_experimental_registros`
+> e as notificações de comercial voltaram a **0 linhas**. O conteúdo enviado
+> não descrevia nenhuma aula — os três campos eram só o marcador de ensaio,
+> justamente pra não repetir o risco de inventar coisa sobre uma aluna real.
 >
 > **Nada pendente de commit.** `main` == `origin/main`, árvore limpa.
 >
