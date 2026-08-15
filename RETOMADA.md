@@ -85,7 +85,50 @@
 >
 > ---
 >
-> ## 🟡 FASE 4 — metade provada, metade em aberto
+> ## ✅ FASE 4 — TRILHO PROVADO FIM A FIM, COM ÁUDIO REAL (15/08, 14:29)
+>
+> Autorizado pelo Alf ("grava você mesmo, depois a gente elimina"). Logado como
+> **leo@lamusic.com.br** (Leonardo Castro, professor 19), no vínculo **2094 —
+> Claudia Sophia, experimental de teclado que ele deu de verdade em 13/08 16:00,
+> sala Amy, Barra**. Áudio de ~52s narrando aquela aula, com o contexto real que
+> a própria tela mostra (ela ganhou um teclado, iniciante, 11 anos).
+>
+> **A corrente inteira, em ~30 segundos:**
+>
+> | passo | evidência |
+> |---|---|
+> | upload no Storage com a sessão real do professor | HTTP 200, `fabio-audios/3da5c2cb…/exp-2094/…mp3`, 198 KB |
+> | `app_enfileirar_audio_experimental(2094, …)` | `{"status":"pendente","audio_id":"bd598874…","vinculo_id":2094}` |
+> | fila roteia por `vinculo_id` (não vai pro Hermes) | linha nasce com `vinculo_id=2094` |
+> | worker da VPS reivindica | `transcrevendo`, tentativa 1 |
+> | Whisper | **801 chars** transcritos |
+> | skill + modelo | os **quatro** campos, `leitura_de_conversao` incluída |
+> | `lead_experimental_registros` | **1 linha**, `origem='app'`, 14:29:50 |
+> | volta na tela do professor | os 4 textareas preenchidos em `/app/experimental/2094` |
+>
+> Era a **primeira vez** que esse trilho carregava um byte: antes disso,
+> `fabio_fila_audios` tinha **0** áudios com `vinculo_id` e
+> `lead_experimental_registros` tinha **0** linhas, desde sempre.
+>
+> ### ⚠️ O que eu segurei, e por quê
+>
+> O `fabio-aviso-comercial.timer` roda a cada ~3 min e **ia mandar WhatsApp pro
+> consultor comercial** sobre a Claudia Sophia — com a `leitura_de_conversao`
+> dizendo "tem tudo pra matricular". Conteúdo plausível que eu inventei, sobre
+> uma aluna real, indo pra um time que **não** era o público que o Alf
+> autorizou (ele autorizou chegar coisa pro Leonardo). **Parei o timer às
+> 17:30:47 UTC, antes da rodada das 17:32:44**, e religuei depois da limpeza.
+> Se o Alf quiser ver essa perna disparar também, é rodar de novo — são 30s.
+>
+> ### Limpeza conferida
+>
+> `lead_experimental_registros` = **0** · fila experimental = **0** · objeto do
+> Storage apagado · `public/ensaio-experimental.mp3` apagado · vínculo 2094
+> segue `realizado` (estado intocado) · `fabio-aviso-comercial.timer` **active**.
+>
+> ---
+>
+> ## 📋 O que já estava provado antes (ensaio a seco)
 >
 > `lead_experimental_registros` continua com **0 linhas** e `fabio_fila_audios`
 > nunca recebeu **nenhum** áudio com `vinculo_id`. O trilho nunca carregou um
