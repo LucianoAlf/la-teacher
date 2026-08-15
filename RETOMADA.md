@@ -1,5 +1,90 @@
 # RETOMADA — LA Teacher
 
+> ## 🔬 AUDITORIA — 15/08/2026 · onde o vínculo da experimental REALMENTE mora
+>
+> O Alf mandou parar de assumir e auditar: *"eles existem, você está buscando
+> num lugar errado."* Estava certo.
+>
+> ### O erro da minha medição anterior
+>
+> Eu medi cobertura contra `lead_experimental_aulas` (**102 linhas**) — que é a
+> tabela de **saída** da conciliação, não a fonte. A fonte é
+> **`lead_experimentais`: 928 linhas**. Medi o resultado e chamei de universo.
+>
+> ### A cadeia real
+>
+> ```
+> leads (9.188) → lead_experimentais (928) → lead_experimental_aulas (102) → aulas_emusys
+> ```
+>
+> ### Por que 6 em 10 não casam
+>
+> **1. O conciliador casa por CHAVE NATURAL, não por id.** `casado_por =
+> 'chave_natural'` em 82 de 104 vínculos — unidade + data + horário + professor.
+> Qualquer divergência de horário ou troca de professor quebra o casamento.
+>
+> **2. Os ids do Emusys guardados não servem.** Medido:
+>
+> | | |
+> |---|---|
+> | experimentais com `emusys_aula_id` | 300 |
+> | que casam com `aulas_emusys.id` | **1** (0,3%) |
+> | com `emusys_agendamento_id` | 50 |
+> | que casam | 5 |
+>
+> Confirma a pendência antiga: **`emusys_aula_id` é id de EVENTO, não da aula.**
+>
+> **3. A janela do conciliador é `data_experimental between hoje-1 e hoje+7`.**
+> Quem passou de ontem **nunca mais é conciliado** — fica órfão para sempre.
+>
+> ### 🔑 O ELO CERTO JÁ EXISTE E ESTÁ GUARDADO
+>
+> `GET /v1/aulas` do Emusys devolve, na aula experimental:
+>
+> ```json
+> { "id": 747974, "categoria": "experimental",
+>   "alunos": [{ "id_aluno": null, "id_lead": 14560,
+>                "nome_aluno": "Arthur Abílio Greco" }] }
+> ```
+>
+> E o espelho **já captura isso**: `aula_alunos_emusys.emusys_lead_id`.
+> Do outro lado, `lead_experimentais.emusys_lead_id`. **A junção direta existe e
+> ninguém usa.** (`GET /v1/matriculas` fecha o ciclo com `aluno.lead_id` quando
+> o lead vira aluno — não há endpoint de LISTAGEM de leads, então `/aulas` é a
+> fonte do elo.)
+>
+> ### A medição que decide (30 dias, 153 experimentais)
+>
+> | régua | cobertura |
+> |---|---|
+> | vínculo hoje (chave natural) | 59 = **39%** |
+> | a aula traz `emusys_lead_id` | 123 = 80% |
+> | **casa por `emusys_lead_id`** | **121 = 79%** |
+>
+> **Dobra a cobertura.** E as 30 restantes se explicam: 8 são aluno já
+> matriculado (não precisam de vínculo de lead) e 23 vêm sem lead e sem aluno —
+> essas são o resíduo real a investigar. Zero aula sem linha de roster.
+>
+> ### Como ajustar (recomendação, NÃO aplicada)
+>
+> 1. `fn_reconciliar_experimental_aulas` passa a casar **primeiro** por
+>    `aula_alunos_emusys.emusys_lead_id = lead_experimentais.emusys_lead_id`,
+>    carimbando `casado_por = 'emusys_lead_id'`. Chave natural vira **fallback**,
+>    não régua principal.
+> 2. **Alargar a janela** (`hoje-1`) ou criar uma varredura de recuperação: hoje
+>    o passado é irrecuperável por desenho.
+> 3. Não apagar `emusys_aula_id`/`emusys_agendamento_id`, mas **parar de tratar
+>    como chave de aula** — documentar que são de outro namespace.
+>
+> ⚠️ Achado colateral: os **tokens do Emusys estão hardcoded** em
+> `supabase/functions/sync-grade-futura-emusys/index.ts` (3 unidades). Merece
+> cofre — assunto separado, não mexi.
+>
+> **PRÓXIMO PASSO (combinado com o Alf): provar o trilho da experimental com
+> ÁUDIO REAL, fim a fim.** Só depois disso o ciclo se considera fechado. O
+> conserto do casamento por `emusys_lead_id` vem em seguida, com teste e
+> mutante como o resto.
+
 > ## 🟢 CHECKPOINT ATIVO — 15/08/2026 fim de tarde · a porta errada, fechada
 >
 > Assumi o conserto que a sessão paralela diagnosticou (ela parou por decisão
