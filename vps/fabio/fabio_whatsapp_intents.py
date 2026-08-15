@@ -278,6 +278,11 @@ _PARTICIPANTE_PADROES = (
     re.compile(r"\bveio\s+(?:a\s+|o\s+)?([a-z]{3,})\b"),       # "...veio a Marina"
     re.compile(r"\b([a-z]{3,})\s+substitui"),                  # "Marina substituiu..."
     re.compile(r"\b([a-z]{3,})\s+veio no lugar\b"),            # "Marina veio no lugar dele"
+    # Participante ANTES do gatilho, sem "foi/veio" — "Juliana fez aula no lugar
+    # do Jeremias" (frase real do Isaque). Último da lista de propósito: quando
+    # há "...foi a X", o padrão de cima já resolveu e "quem fez" nunca é lido
+    # como nome (o `quem` cai fora antes de chegar aqui).
+    re.compile(r"\b([a-z]{3,})\s+fez\b"),                      # "Juliana fez aula..."
 )
 
 

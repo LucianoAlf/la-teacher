@@ -247,6 +247,17 @@ class WhatsappIntentsTest(unittest.TestCase):
                 self.assertEqual(_norm(r["participante"]), "marina", frase)
                 self.assertEqual(r["matriculado"], "Jeremias Ou Yuan Ma", frase)
 
+    def test_detecta_substituicao_participante_antes_do_gatilho(self):
+        # Frase REAL do Isaque (15/08, msg 391e0456): o participante vem ANTES
+        # do "no lugar de", sem "foi/veio" — "Juliana fez aula no lugar do
+        # jeremias". A falsificação ao vivo pegou o detector devolvendo None
+        # aqui; o par (Jeremias, Juliana) tem que sair mesmo assim.
+        r = detectar_substituicao(
+            "Juliana fez aula no lugar do jeremias", ["Jeremias Ou Yuan Ma"])
+        self.assertIsNotNone(r)
+        self.assertEqual(r["matriculado"], "Jeremias Ou Yuan Ma")
+        self.assertEqual(_norm(r["participante"]), "juliana")
+
     def test_sem_substituicao_devolve_none(self):
         self.assertIsNone(detectar_substituicao(
             "aula do Jeremias, trabalhamos escala", ["Jeremias Ou Yuan Ma"]))
