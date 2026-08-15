@@ -101,7 +101,22 @@ def reivindicar(item: Dict[str, Any]) -> Dict[str, Any]:
                {"p_registro_id": item.get("registro_id"), "p_lease_minutos": LEASE_MIN}) or {}
 
 
-def processar(item: Dict[str, Any]) -> Dict[str, Any]:
+# Cabeçalho de ENSAIO. Existe porque a única forma de exercitar esta perna é
+# criar um registro de experimental, e o destinatário é um consultor de
+# verdade: sem isto, ele lê uma devolutiva sobre uma aluna real e liga pra
+# família por causa de um teste. Fica FORA do corpo montado pelo banco de
+# propósito — assim é a primeira coisa lida, antes do "🎓 Experimental
+# registrada", e nenhuma RPC precisa saber que existe um modo de ensaio.
+AVISO_DE_TESTE = "\n".join([
+    "🧪 *TESTE DO SISTEMA — ignore este conteúdo*",
+    "_Mensagem gerada pra provar o canal. Não é devolutiva real, não deve ser "
+    "encaminhada nem respondida, e o conteúdo abaixo não descreve nenhuma aula._",
+    "",
+    "",
+])
+
+
+def processar(item: Dict[str, Any], aviso_de_teste: bool = False) -> Dict[str, Any]:
     registro_id = item.get("registro_id") or item.get("vinculo_id")
     resultado: Dict[str, Any] = {"registro_id": registro_id, "tipo": item.get("tipo"), "status": "?"}
 
@@ -131,6 +146,8 @@ def processar(item: Dict[str, Any]) -> Dict[str, Any]:
 
     destinatario = pronto.get("destinatario")
     corpo = pronto.get("corpo") or ""
+    if aviso_de_teste:
+        corpo = AVISO_DE_TESTE + corpo
     try:
         enviar(destinatario, corpo)
     except Exception as e:  # noqa: BLE001
@@ -162,12 +179,18 @@ def processar(item: Dict[str, Any]) -> Dict[str, Any]:
 
     resultado["status"] = "enviada"
     resultado["destinatario_final"] = str(destinatario)[-4:]
+    if aviso_de_teste:
+        # O cabeçalho de ensaio NÃO fica no `corpo` gravado — ele é prefixado
+        # aqui, depois da leitura. Sem esta marca no log, o rastro diria que
+        # saiu uma devolutiva normal, e quem auditasse depois não teria como
+        # saber que aquela mensagem era ensaio.
+        resultado["aviso_de_teste"] = True
     log("enviada", registro_id=registro_id, notificacao_id=notificacao_id,
-        destinatario_final=str(destinatario)[-4:])
+        destinatario_final=str(destinatario)[-4:], aviso_de_teste=aviso_de_teste)
     return resultado
 
 
-def rodar(lote: int, dry_run: bool) -> Dict[str, Any]:
+def rodar(lote: int, dry_run: bool, aviso_de_teste: bool = False) -> Dict[str, Any]:
     fila: List[Dict[str, Any]] = rpc("fabio_avisos_comerciais_pendentes", {"p_lote": lote}) or []
     if not fila:
         return {"ok": True, "dry_run": dry_run, "na_fila": 0, "resultados": []}
@@ -185,7 +208,7 @@ def rodar(lote: int, dry_run: bool) -> Dict[str, Any]:
     resultados = []
     for item in fila:
         try:
-            resultados.append(processar(item))
+            resultados.append(processar(item, aviso_de_teste))
         except Exception as e:  # noqa: BLE001 — uma linha ruim não derruba o lote
             log("erro", registro_id=item.get("registro_id"), erro=str(e)[:300])
             resultados.append({"registro_id": item.get("registro_id"),
@@ -203,9 +226,12 @@ def main() -> int:
     ap.add_argument("--lote", type=int, default=LOTE)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--aviso-de-teste", action="store_true",
+                    help="prefixa a mensagem com um aviso de que e ensaio. "
+                         "Use SEMPRE que o registro nao for trabalho real de professor.")
     args = ap.parse_args()
 
-    saida = rodar(args.lote, args.dry_run)
+    saida = rodar(args.lote, args.dry_run, args.aviso_de_teste)
     if args.json:
         print(json.dumps(saida, ensure_ascii=False))
     else:
