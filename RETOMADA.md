@@ -19,6 +19,19 @@
 >    junto) — é a primeira coisa a fazer, antes de desenhar conserto.
 > 3. **Rotacionar a senha compartilhada** dos 4 professores (mesma senha nas
 >    4 contas, em texto claro no chat de 15/08).
+> 4. **O teto de 3 da shortlist** (aberto pelo incidente do Isaque, 15/08).
+>    `fabio_shortlist_valida` exige `cardinality between 1 and 3` — é o
+>    tamanho de um MENU. Mas a pergunta discriminante não tem menu: o
+>    professor responde em texto livre. Com 10 aulas compatíveis, guardamos as
+>    3 primeiras e **7 respostas possíveis dele continuam sem ter contra o que
+>    casar**. Alargar o teto é mexer numa guarda deliberada do banco —
+>    decisão do Alf/Alfredo. O conserto de hoje é **meio conserto**, e está
+>    dito assim no código.
+> 5. **"meio-dia" não casa com 12:00** — o casador entende horário, não
+>    apelido de horário. Foi justamente o que o Isaque falou no áudio.
+> 6. **Segundo áudio enviado com ação aberta é descartado** — vira "resposta
+>    de texto", e os bytes não vão pro Storage. O Isaque perdeu a aula das 13h
+>    assim (só a transcrição sobrou em `fabio_chat_mensagens`).
 
 > ## ✅ FASES 1, 2 e 3 NO AR — 15/08/2026 · o vínculo casa pelo id do lead
 >

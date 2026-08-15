@@ -70,7 +70,15 @@ class FakeBackend:
             # `pergunta_refinada` — tem lista vazia). O dublê precisa fazer o
             # mesmo, senão nenhum teste consegue enxergar a diferença.
             if payload["p_evento"] == "shortlist_definida" and isinstance(self.action, dict):
-                self.action["candidatas"] = list((payload.get("p_dados") or {}).get("candidatas") or [])
+                candidatas = list((payload.get("p_dados") or {}).get("candidatas") or [])
+                # `fabio_shortlist_valida` exige `cardinality between 1 and 3`.
+                # O dublê tem que recusar igual: sem isto o teste ficou verde
+                # com uma shortlist de 10 que a RPC real devolveu
+                # `shortlist_invalida` — dublê mais permissivo que produção é
+                # verde que não vale.
+                if not 1 <= len(candidatas) <= 3:
+                    return {"ok": False, "codigo": "shortlist_invalida"}
+                self.action["candidatas"] = candidatas
             return {"ok": True, "evento": payload["p_evento"], "acao_id": payload["p_acao_id"]}
         raise AssertionError(f"RPC inesperada: {name}")
 
@@ -650,7 +658,11 @@ class PerguntaDiscriminanteTest(unittest.TestCase):
             if name == "fabio_aplicar_evento_acao" and payload["p_evento"] == "shortlist_definida"
         ]
         self.assertTrue(shortlist, "a pergunta discriminante não guardou candidata nenhuma")
-        self.assertEqual(sorted(shortlist[0]["p_dados"]["candidatas"]), [201, 202, 203, 204])
+        # Três, não quatro: `fabio_shortlist_valida` recusa mais que isso.
+        # Meio conserto, e dito assim de propósito — ver o comentário em
+        # `reduzir_shortlist` e a pendência anotada na RETOMADA.
+        self.assertEqual(len(shortlist[0]["p_dados"]["candidatas"]), 3)
+        self.assertTrue(set(shortlist[0]["p_dados"]["candidatas"]) <= {201, 202, 203, 204})
 
     def test_professor_responde_a_pergunta_discriminante_e_a_aula_e_escolhida(self):
         backend = FakeBackend(candidates=self._quatro_aulas())

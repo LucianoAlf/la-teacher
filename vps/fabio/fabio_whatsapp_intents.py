@@ -207,9 +207,17 @@ def reduzir_shortlist(texto: str, candidatas: list[dict[str, Any]]) -> dict[str,
         # resposta desse tipo de ação só sabe casar contra essa lista: nenhuma
         # resposta do professor podia ser aceita, nunca. Foi o laço em que o
         # Isaque ficou preso, respondendo três vezes e ouvindo a mesma frase.
-        # Sem corte em 3: aqui não há menu, o professor responde em texto livre
-        # e o casamento é contra tudo que é compatível.
-        return {"status": "discriminante", "aula_id": None, "candidatas": compatible, "pergunta": _question_for(compatible, True)}
+        # ⚠️ Corte em 3 porque o BANCO manda: `fabio_shortlist_valida` exige
+        # `cardinality between 1 and 3`. Tentei guardar as 10 compatíveis e a
+        # RPC devolveu `shortlist_invalida` — descoberto num ensaio contra
+        # produção, DEPOIS do teste de unidade passar verde (o dublê aceitava
+        # qualquer tamanho; agora ele também recusa >3).
+        #
+        # Isto é meio conserto, e está dito de propósito: com 10 aulas
+        # compatíveis, 7 respostas possíveis do professor continuam sem ter
+        # contra o que casar. Alargar o teto é mexer numa guarda deliberada do
+        # banco — decisão do Alf/Alfredo, não minha, e está anotado na RETOMADA.
+        return {"status": "discriminante", "aula_id": None, "candidatas": compatible[:3], "pergunta": _question_for(compatible, True)}
     if len(compatible) == 1:
         return {"status": "selecionada", "aula_id": compatible[0]["aula_id"], "candidatas": compatible, "pergunta": None}
     return {"status": "perguntar", "aula_id": None, "candidatas": compatible[:3], "pergunta": _question_for(compatible[:3])}
