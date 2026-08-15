@@ -35,7 +35,24 @@
 > | 1 | **Task 3** — detector determinístico `detectar_substituicao` + testes | ✅ **FEITO** — `f6f4b5e`, 22 testes verdes, frase do Isaque provada, mutante mata 5 |
 > | 2 | **Task 1** — schema append-only (2 tabelas + view + triggers) — **só rollback+mutantes** | ✅ **FEITO** — `6d01db0`, 5/5 mutantes, rollback verde, **sem migration viva**. Subagente achou frouxidão: default privileges do Supabase davam ALL a `service_role`; corrigido incluindo `service_role` no `revoke all` (append-only camada-1 agora real) |
 > | 2 | **Task 2** — RPCs + máquina de estados — **só rollback+mutantes** | ✅ **FEITO** — `b312c2e` (RPCs) + `695a90f` (conserto da view). **O checkpoint pegou um verde falso**: o subagente reportou 5/5, mas rodando o baseline de novo caiu 3/3 (ver abaixo). Conserto aplicado, 5/5 na Task 1 e na Task 2, rollback prod sem divergência, **sem migration viva** |
-> | 3 | **Task 4** — wiring em shadow no fluxo WhatsApp | 🔒 **só depois das RPCs APLICADAS com OK explícito do Alf** — RPCs prontas e testadas, faltam aplicar `20260815130000` + `20260815140000` em prod (aguarda OK) |
+> | 3 | **Task 4** — wiring em shadow no fluxo WhatsApp | ✅ **FEITO + NO AR** — `9897767` (wiring) + `ceb09f5` (detector). Deployado no bridge (`/usr/bin/python3`, 73 testes verdes na venv real), restart limpo. Falsificado contra a transcrição REAL do Isaque (ver abaixo) |
+>
+> ### ✅ Task 4 no ar (15/08) + o que a falsificação pegou
+> Wiring: depois da aula pinada e do áudio enfileirado, `detectar_substituicao`
+> roda sobre a transcrição × roster da aula; achando o par, `registrar_candidata`
+> em SHADOW. Freios com teste: registro normal intocado; falha só loga (teste com
+> RPC explodindo); participante vai como nome citado (`participante_real_id` null,
+> `confianca` baixa) → `precisa_confirmar` → pergunta curta anexada; sem sinal,
+> nenhuma chamada; matriculado sem `aluno_id` não registra.
+> **A falsificação contra o Isaque (prof 10) pegou um buraco REAL do detector:**
+> "Juliana fez aula no lugar do jeremias" (a frase que ele DIGITOU) devolvia None
+> — participante antes do gatilho, sem "foi/veio". Consertado (`([a-z]{3,}) fez`
+> como último padrão). As 3 frases reais dele agora resolvem (Jeremias, Juliana),
+> inclusive a que o LLM antigo lia como autoria de música.
+> **v2 (não feito, sem urgência):** a escada de identidade `carteira→unidade→
+> externo` (`fabio_resolver_participante`) precisa do `unidade_id`, que
+> `fabio_aulas_candidatas` não devolve. Hoje todo participante entra como externo
+> e pede confirmação. Enriquecer quando o aula→unidade estiver à mão.
 >
 > ### ⚠️ O verde falso da Task 2, e a raiz (checkpoint 15/08)
 > A view `vw_fabio_participacao_ocorrencia_estado` derivava o estado com
