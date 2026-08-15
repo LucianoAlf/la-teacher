@@ -33,9 +33,14 @@
 > | fase | tarefa | estado |
 > |---|---|---|
 > | 1 | **Task 3** — detector determinístico `detectar_substituicao` + testes | ✅ **FEITO** — `f6f4b5e`, 22 testes verdes, frase do Isaque provada, mutante mata 5 |
-> | 2 | **Task 1** — schema append-only (2 tabelas + view + triggers) — **só rollback+mutantes** | 🚧 **subagente disparado** (sem migration viva) |
-> | 2 | **Task 2** — RPCs + máquina de estados — **só rollback+mutantes** | ⏳ depois da Task 1 (checkpoint) |
+> | 2 | **Task 1** — schema append-only (2 tabelas + view + triggers) — **só rollback+mutantes** | ✅ **FEITO** — `6d01db0`, 5/5 mutantes, rollback verde, **sem migration viva**. Subagente achou frouxidão: default privileges do Supabase davam ALL a `service_role`; corrigido incluindo `service_role` no `revoke all` (append-only camada-1 agora real) |
+> | 2 | **Task 2** — RPCs + máquina de estados — **só rollback+mutantes** | 🚧 **subagente disparado** |
 > | 3 | **Task 4** — wiring em shadow no fluxo WhatsApp | 🔒 **só depois das RPCs APLICADAS com OK explícito do Alf** |
+>
+> ⚠️ **Dependência da Task 2:** a schema (`20260815130000`) NÃO está aplicada em
+> produção. Então o ensaio rollback da Task 2 tem que rodar **schema + rpcs
+> juntos** num só BEGIN/ROLLBACK (arquivo combinado descartável no scratchpad);
+> os mutantes Docker já sobem o schema inteiro no bootstrap. Nada aplicado vivo.
 >
 > **Timestamps de migration reservados:** `20260815130000` (schema),
 > `20260815140000` (RPCs). Conferir `ls supabase/migrations` no disco antes de
