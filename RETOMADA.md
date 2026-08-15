@@ -1,5 +1,66 @@
 # RETOMADA — LA Teacher
 
+> ## ✅ FASE 1 e 3 FEITAS — 15/08/2026 · o vínculo casa pelo id do lead
+>
+> Ordem combinada com o Alf: **1 → 3 → 2 → 4**. As duas primeiras estão no ar.
+>
+> ### Fase 1 — a régua nova (commit `24a6a5b`)
+>
+> `fn_reconciliar_experimental_por_lead(dias_atras, dias_frente, limite)` casa
+> **(emusys_lead_id, DATA)** — o id que o próprio Emusys manda e o sync do LA
+> Report **já grava** em `aula_alunos_emusys.emusys_lead_id`.
+> **Nada aqui chama o Emusys**: a junção é entre duas tabelas nossas.
+>
+> ⚠️ **A data é obrigatória na chave.** 121 leads têm mais de uma experimental,
+> um deles com **SEIS** (remarcação). Sem a data, o registro penduraria na
+> tentativa errada da mesma criança. Tem mutante provando.
+>
+> Porta **nova**, não remendo: a antiga tem 15 KB de casos duramente
+> conquistados e vira **fallback** do legado (junho tem 109 experimentais sem
+> `emusys_lead_id`, campo nasceu em 21/06).
+>
+> ### Fase 3 — varredura do passado, EXECUTADA
+>
+> | | antes | depois |
+> |---|---|---|
+> | vínculos | 104 | **191** |
+> | pelo lead | 0 | **87** |
+> | por chave natural | 82 | 82 (intocados) |
+> | **cobertura 30d** | 59/153 = **39%** | **110/153 = 72%** |
+>
+> Integridade conferida: **0** violação de `uq_lead_exp_aula_vigente` e **0** de
+> `uq_lead_exp_aula_ocupada`. Resíduo honesto: 281 sem par, 14 ambíguos, 11 com
+> aula já ocupada — nenhum deles é escolhido no chute, de propósito.
+>
+> ### O que o ensaio a seco pegou (e o teste não pegava)
+>
+> `casado_por` tem **CHECK** fechando o vocabulário. O bootstrap do mutante não
+> tinha essa constraint — **schema de teste divergindo do real é verde que não
+> vale**. Constraint alargada e bootstrap corrigido. E o mutante do carimbo
+> morria por ERRO de constraint (exit≠0), não por asserção; troquei por um que
+> **mente na procedência** (`chave_natural`) e morre pela asserção certa.
+>
+> ---
+>
+> ## ⏭️ FALTA — nesta ordem
+>
+> **Fase 2 — a janela do cron.** Hoje o cron chama só
+> `fn_reconciliar_experimental_aulas` com janela `[hoje-1, hoje+7]`. Falta
+> **plugar a porta nova no cron** (`reconciliar-experimental-aulas`, jobid 95,
+> `12,27,42,57 * * * *`) para rodar ANTES da antiga. Sem isso, a Fase 1 só vale
+> para o passado que eu já varri — o presente continua dependendo da chave
+> natural.
+>
+> **Fase 4 — provar o trilho com ÁUDIO REAL, fim a fim.** `lead_experimental_registros`
+> ainda tem **0 linhas**: o trilho nunca processou nada em produção. Autorizado
+> pelo Alf usar o app logado como Isaque / Valdo / Daiana, gravar áudio de
+> verdade e conversar com o Fábio.
+>
+> **Legado a corrigir (apontado, não feito):** `lead_experimentais.emusys_aula_id`
+> (300 preenchidos, **1** casa — é id de EVENTO) e `emusys_agendamento_id`
+> (50/5). Parar de parecer chave de aula. E os **tokens do Emusys hardcoded**
+> em `sync-grade-futura-emusys/index.ts`.
+
 > ## 🔬 AUDITORIA — 15/08/2026 · onde o vínculo da experimental REALMENTE mora
 >
 > O Alf mandou parar de assumir e auditar: *"eles existem, você está buscando
