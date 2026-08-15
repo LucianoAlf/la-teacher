@@ -8,8 +8,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fabio_whatsapp_intents import (  # noqa: E402
     _explicit_time,
+    _norm,
     classificar_intencao_audio,
     classificar_intencao_texto,
+    detectar_substituicao,
     interpretar_resposta_pendente,
     reduzir_shortlist,
     validar_patch_correcao,
@@ -221,6 +223,39 @@ class WhatsappIntentsTest(unittest.TestCase):
         # "ma" sozinho não deve casar nada; sem outro sinal, as duas continuam.
         result = reduzir_shortlist("foi a aula, ma", pool)
         self.assertEqual(result["status"], "perguntar")
+
+    # ── Detector de substituição (Task 3) ────────────────────────────────────
+    # O buraco do teste do Isaque: quem participou no lugar de quem. Determinístico
+    # primeiro; o par (matriculado no roster, participante citado) sai da frase.
+
+    def test_detecta_substituicao_frase_do_isaque(self):
+        r = detectar_substituicao(
+            "quem fez aula no lugar do Jeremias foi a Juliana",
+            ["Jeremias Ou Yuan Ma"])
+        self.assertEqual(r["matriculado"], "Jeremias Ou Yuan Ma")
+        self.assertEqual(_norm(r["participante"]), "juliana")
+
+    def test_detecta_quatro_frases_fortes(self):
+        roster = ["Jeremias Ou Yuan Ma"]
+        for frase in ("no lugar do Jeremias veio a Marina",
+                      "quem fez foi a Marina",
+                      "a Marina substituiu o Jeremias",
+                      "a Marina veio no lugar dele"):
+            with self.subTest(frase=frase):
+                r = detectar_substituicao(frase, roster)
+                self.assertIsNotNone(r, frase)
+                self.assertEqual(_norm(r["participante"]), "marina", frase)
+                self.assertEqual(r["matriculado"], "Jeremias Ou Yuan Ma", frase)
+
+    def test_sem_substituicao_devolve_none(self):
+        self.assertIsNone(detectar_substituicao(
+            "aula do Jeremias, trabalhamos escala", ["Jeremias Ou Yuan Ma"]))
+
+    def test_substituicao_com_roster_ambiguo_sem_nome_no_texto_devolve_none(self):
+        # Dois alunos no roster e a frase não cita qual é o matriculado ("dele"):
+        # não dá pra saber quem foi substituído → não inventa.
+        r = detectar_substituicao("quem fez foi a Marina", ["Ana Silva", "Bruno Costa"])
+        self.assertIsNone(r)
 
     def test_correction_is_roster_bound_and_allowlisted(self):
         roster = [{"aluno_id": 7, "nome": "Sofia"}]

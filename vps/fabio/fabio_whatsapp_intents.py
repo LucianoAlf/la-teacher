@@ -257,6 +257,72 @@ def _nome_tokens(candidate: dict[str, Any]) -> set[str]:
     return tokens
 
 
+# ── Substituição (Task 3 do plano) ───────────────────────────────────────────
+# "Juliana no lugar do Jeremias" — quem PARTICIPOU no lugar de quem. O casador
+# já pina a AULA (pelo Jeremias, que está no roster); aqui a gente isola o par
+# (matriculado esperado, participante que veio). Determinístico primeiro: só as
+# frases fortes; o resto devolve None e (fase seguinte) cai pro LLM. Nunca
+# inventa — sem par claro, None.
+
+_SUBST_SINAIS = re.compile(
+    r"\bno lugar d[eoa]\b|\bquem fez foi\b|\bsubstitui|\bveio no lugar\b"
+)
+# Palavras que aparecem perto dos gatilhos mas não são nome de gente.
+_PARTICIPANTE_STOP = {
+    "aula", "hoje", "ontem", "tarde", "manha", "noite", "lugar", "dele", "dela",
+    "aluno", "aluna", "ele", "ela", "essa", "esse", "uma",
+}
+# Cada padrão captura o nome do PARTICIPANTE numa posição diferente da fala.
+_PARTICIPANTE_PADROES = (
+    re.compile(r"\bfoi\s+(?:a\s+|o\s+)?([a-z]{3,})\b"),        # "...foi a Juliana"
+    re.compile(r"\bveio\s+(?:a\s+|o\s+)?([a-z]{3,})\b"),       # "...veio a Marina"
+    re.compile(r"\b([a-z]{3,})\s+substitui"),                  # "Marina substituiu..."
+    re.compile(r"\b([a-z]{3,})\s+veio no lugar\b"),            # "Marina veio no lugar dele"
+)
+
+
+def _tokens_de_nome(nome: str) -> set[str]:
+    return {t for t in _norm(nome).split() if len(t) >= 3 and t not in _SOBRENOMES_COMUNS}
+
+
+def detectar_substituicao(texto: str, roster_nomes: list[str]) -> dict[str, Any] | None:
+    """Isola o par (matriculado, participante) numa fala de substituição.
+
+    `matriculado` é devolvido como o NOME do roster (string original); o
+    `participante` é o token citado (normalizado). Devolve None quando não há
+    sinal forte OU quando o matriculado não é determinável sem chute (roster com
+    mais de um aluno e nenhum citado na fala).
+    """
+    hay = _norm(texto)
+    if not _SUBST_SINAIS.search(hay):
+        return None
+
+    matriculado = None
+    matr_tokens: set[str] = set()
+    for nome in roster_nomes or []:
+        toks = _tokens_de_nome(nome)
+        if any(re.search(rf"\b{re.escape(t)}\b", hay) for t in toks):
+            matriculado, matr_tokens = nome, toks
+            break
+    if matriculado is None:
+        # Ninguém do roster foi citado ("dele"/"dela"). Só resolve sozinho se a
+        # aula tem UM aluno; com dois, quem foi substituído é chute — devolve None.
+        vivos = [n for n in (roster_nomes or []) if _norm(n)]
+        if len(vivos) == 1:
+            matriculado = vivos[0]
+            matr_tokens = _tokens_de_nome(matriculado)
+        else:
+            return None
+
+    for padrao in _PARTICIPANTE_PADROES:
+        for m in padrao.finditer(hay):
+            tok = m.group(1)
+            if tok in matr_tokens or tok in _PARTICIPANTE_STOP:
+                continue
+            return {"matriculado": matriculado, "participante": tok}
+    return None
+
+
 def _curso_tokens(candidate: dict[str, Any]) -> set[str]:
     """Instrumento falado, sem a marca de turma. "Violão T" → {violao}.
 
