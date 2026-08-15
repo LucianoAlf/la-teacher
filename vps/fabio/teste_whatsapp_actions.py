@@ -691,23 +691,28 @@ class PerguntaDiscriminanteTest(unittest.TestCase):
             {"aula_id": 204, "data": "2026-08-13", "hora": "15:00", "curso": "Teclado T", "turma": "T_Qui_15"},
         ]
 
-    def test_pergunta_discriminante_guarda_a_shortlist_na_acao(self):
+    def test_pergunta_discriminante_com_lista_truncada_nao_guarda_meia_verdade(self):
+        # Quatro compatíveis, teto de 3: guardar 3 faria a 4ª virar resposta
+        # impossível — o mesmo laço, só que mais difícil de ver. Sem shortlist
+        # guardada, a resposta casa contra o pool inteiro (provado no teste
+        # seguinte, que responde "13h" e acerta a 202).
         backend = FakeBackend(candidates=self._quatro_aulas())
         result = tratar_mensagem_professor(
             professor_context(kind="audio", text="trabalhei repertorio", media_url="https://media/1"),
             backend,
         )
         self.assertEqual(result["code"], "refine_class")
-        shortlist = [
+        eventos = [
             payload for name, payload in backend.calls
             if name == "fabio_aplicar_evento_acao" and payload["p_evento"] == "shortlist_definida"
         ]
-        self.assertTrue(shortlist, "a pergunta discriminante não guardou candidata nenhuma")
-        # Três, não quatro: `fabio_shortlist_valida` recusa mais que isso.
-        # Meio conserto, e dito assim de propósito — ver o comentário em
-        # `reduzir_shortlist` e a pendência anotada na RETOMADA.
-        self.assertEqual(len(shortlist[0]["p_dados"]["candidatas"]), 3)
-        self.assertTrue(set(shortlist[0]["p_dados"]["candidatas"]) <= {201, 202, 203, 204})
+        self.assertFalse(eventos, "guardou uma shortlist truncada")
+        # A pergunta foi feita, e o evento que a registra continua saindo: é
+        # ele que prova, no banco, que o professor foi perguntado.
+        self.assertIn("pergunta_refinada", [
+            payload["p_evento"] for name, payload in backend.calls
+            if name == "fabio_aplicar_evento_acao"
+        ])
 
     def test_professor_responde_a_pergunta_discriminante_e_a_aula_e_escolhida(self):
         backend = FakeBackend(candidates=self._quatro_aulas())
@@ -820,6 +825,99 @@ class AudioComAcaoAbertaTest(unittest.TestCase):
             backend,
         )
         self.assertFalse(backend.uploads)
+
+
+class ShortlistTruncadaTest(unittest.TestCase):
+    """Guardar 3 de 10 é pior que não guardar.
+
+    A shortlist guardada é a régua contra a qual `_refine_pending_class` filtra
+    o pool. Com 10 aulas compatíveis, guardar 3 transforma as outras 7 em
+    resposta impossível — o professor responde certo e ouve "não consegui
+    identificar", que é o laço do Isaque com outro nome.
+
+    O teto de 3 do banco (`fabio_shortlist_valida`) continua intocado: ele é
+    tamanho de MENU, e a pergunta discriminante não tem menu.
+    """
+
+    def _dez_aulas(self):
+        return [
+            {"aula_id": 100 + i, "data": "2026-08-15", "hora": f"{8 + i}:00", "curso": "Violão T"}
+            for i in range(10)
+        ]
+
+    def test_com_dez_compativeis_a_shortlist_nao_e_guardada_pela_metade(self):
+        backend = FakeBackend(candidates=self._dez_aulas())
+        resultado = tratar_mensagem_professor(
+            professor_context(kind="audio", wa_message_id="audio-1",
+                              text="dei aula hoje, trabalhamos repertório",
+                              media_url="https://media/1"),
+            backend,
+        )
+        self.assertEqual(resultado.get("code"), "refine_class")
+        eventos = [p["p_evento"] for name, p in backend.calls if name == "fabio_aplicar_evento_acao"]
+        self.assertNotIn("shortlist_definida", eventos,
+                         "guardou uma shortlist truncada — as outras 7 aulas viraram resposta impossível")
+        self.assertIn("pergunta_refinada", eventos)
+
+    def test_com_tres_compativeis_a_shortlist_continua_sendo_guardada(self):
+        backend = FakeBackend(candidates=self._dez_aulas()[:3])
+        tratar_mensagem_professor(
+            professor_context(kind="audio", wa_message_id="audio-1",
+                              text="dei aula hoje, trabalhamos repertório",
+                              media_url="https://media/1"),
+            backend,
+        )
+        shortlist = next(p for name, p in backend.calls
+                         if name == "fabio_aplicar_evento_acao" and p["p_evento"] == "shortlist_definida")
+        self.assertEqual(len(shortlist["p_dados"]["candidatas"]), 3)
+
+    def test_sem_shortlist_guardada_a_resposta_casa_contra_o_pool_inteiro(self):
+        # A aula certa é a 8ª — fora de qualquer corte em 3.
+        acao_sem_shortlist = {
+            "id": "acao-1", "professor_id": 25, "wa_message_id": "audio-1",
+            "tipo": "escolher_aula_audio", "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-1.ogg",
+            "payload": {"transcricao": "trabalhamos repertório"},
+        }
+        backend = FakeBackend(action=acao_sem_shortlist, candidates=self._dez_aulas())
+        tratar_mensagem_professor(
+            professor_context(wa_message_id="resposta", text="foi a das 15 horas"),
+            backend,
+        )
+        enfileirado = next(p for name, p in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertEqual(enfileirado["p_aula_id"], 107, "a 8ª aula ficou inalcançável")
+
+
+class PorteiraDoHorarioTest(unittest.TestCase):
+    """A porteira e o casador têm que falar a mesma língua.
+
+    O `2b716aa` ensinou "meio-dia" ao casador, mas `_looks_like_class_refinement`
+    tinha régua própria, só de dígito: a resposta que o casador entenderia era
+    barrada ANTES de chegar nele. Era a "outra porteira" anotada na RETOMADA
+    como não rastreada.
+    """
+
+    def _acao_com_shortlist(self):
+        return {
+            "id": "acao-1", "professor_id": 25, "wa_message_id": "audio-1",
+            "tipo": "escolher_aula_audio", "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-1.ogg",
+            "candidatas": [101, 102],
+            "payload": {"transcricao": "trabalhamos repertório"},
+        }
+
+    def test_meio_dia_atravessa_a_porteira_e_seleciona_a_aula(self):
+        backend = FakeBackend(action=self._acao_com_shortlist(), candidates=[
+            {"aula_id": 101, "data": "2026-08-15", "hora": "12:00", "curso": "Teclado T"},
+            {"aula_id": 102, "data": "2026-08-15", "hora": "16:00", "curso": "Teclado T"},
+        ])
+        tratar_mensagem_professor(
+            professor_context(wa_message_id="resposta", text="foi a de sábado, meio-dia"),
+            backend,
+        )
+        enfileirados = [p for name, p in backend.calls if name == "fabio_enfileirar_audio"]
+        self.assertTrue(enfileirados, '"meio-dia" foi barrado na porteira e a aula nem chegou ao casador')
+        self.assertEqual(enfileirados[0]["p_aula_id"], 101)
 
 
 class FilaDeEsperaDoAudioTest(unittest.TestCase):

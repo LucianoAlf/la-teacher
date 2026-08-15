@@ -15,6 +15,7 @@ from fabio_whatsapp_intents import (
     classificar_intencao_texto,
     interpretar_resposta_pendente,
     reduzir_shortlist,
+    texto_tem_horario,
     validar_patch_correcao,
 )
 
@@ -319,7 +320,13 @@ def _start_from_candidates(backend: FabioWhatsappBackend, context: dict[str, Any
     # discriminante. Ela é o único vocabulário que o interpretador de resposta
     # tem pra entender o que o professor responder; perguntar sem guardar é
     # abrir uma pergunta que nenhuma resposta consegue fechar.
-    _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
+    #
+    # A EXCEÇÃO é a lista truncada: guardar 3 de 10 transforma as outras 7 em
+    # resposta impossível, porque `_refine_pending_class` filtra o pool pela
+    # lista guardada. Sem lista, a resposta casa contra o pool inteiro — que é
+    # o que a pergunta aberta pede. Guardar meia verdade é pior que não guardar.
+    if not shortlist.get("truncada"):
+        _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
     if shortlist["status"] == "discriminante":
         _event(backend, action, context, "pergunta_refinada", {})
         return _result("refine_class", reply=shortlist["pergunta"], action_id=str(action["id"]))
@@ -352,7 +359,9 @@ def _mentions_candidate_student(text: str, candidates: list[dict[str, Any]]) -> 
 def _looks_like_class_refinement(text: str, candidates: list[dict[str, Any]] | None = None) -> bool:
     hay = str(text or "").lower()
     return bool(
-        re.search(r"\b(?:[01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)(?:\s*[0-5]\d)?(?!\s*\d)\b", hay)
+        # Mesma régua de horário do casador — inclusive os apelidos
+        # ("meio-dia"). Ver `texto_tem_horario`.
+        texto_tem_horario(hay)
         or re.search(r"\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b", hay)
         or any(word in hay for word in (
             "hoje", "ontem", "amanha", "amanhã", "turma", "curso",
@@ -408,8 +417,9 @@ def _refine_pending_class(
 
     ids = [int(item["aula_id"]) for item in shortlist["candidatas"]]
     if shortlist["status"] == "discriminante":
-        # Mesma regra do primeiro contato: guarda antes de perguntar.
-        if not action.get("candidatas"):
+        # Mesma regra do primeiro contato: guarda antes de perguntar — e pela
+        # mesma razão, NÃO guarda quando a lista veio truncada.
+        if not action.get("candidatas") and not shortlist.get("truncada"):
             _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
         _event(backend, action, context, "pergunta_refinada", {})
         return _result("refine_class", reply=shortlist["pergunta"], action_id=str(action["id"]))
