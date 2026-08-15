@@ -60,13 +60,22 @@
 > `20260815140000` (RPCs). Conferir `ls supabase/migrations` no disco antes de
 > aplicar (duas sessões, mesmo checkout).
 >
-> **PRÓXIMO PASSO:** Task 1, 2 e 3 estão **prontas, testadas e commitadas**
-> (schema + RPCs + detector). O que falta é **decisão do Alf**: aplicar
-> `20260815130000` (schema) + `20260815140000` (RPCs) em produção. Só depois do
-> OK explícito é que a Task 4 (wiring em shadow no `fabio_whatsapp_actions.py`)
-> destranca. Nada de aplicar migration viva sem esse OK. Conferir
-> `ls supabase/migrations` no disco antes de aplicar (duas sessões, mesmo
-> checkout).
+> **✅ MIGRATIONS APLICADAS EM PRODUÇÃO (15/08, OK do Alf):** `20260815130000`
+> (schema) + `20260815140000` (RPCs), via `aplicar-sql.mjs` (byte do arquivo).
+> Smoke pós-migration TODO verde, contra os objetos vivos:
+> - tabelas + view + 3 triggers (2 append-only + supersede) existem;
+> - `service_role` lê e insere, **sem UPDATE/DELETE** nas duas tabelas;
+> - `seq` é identity ALWAYS (o conserto do verde falso);
+> - máquina de estados fim a fim: registrar→candidata(precisa_confirmar),
+>   validar-candidata recusa, confirmar→confirmada (idempotente),
+>   validar→validada, descartar-validada recusa, idempotência por message_id;
+> - **SHADOW provado**: zero escrita em `aluno_presenca`/`fabio_registros_aula`;
+> - behavioral rodou em `DO ... raise` (rollback) → **zero resíduo** (0 linhas
+>   nas duas tabelas depois).
+>
+> **PRÓXIMO PASSO:** Task 4 (wiring em shadow no `fabio_whatsapp_actions.py`)
+> **continua trancada** — o Alf libera só depois de ler este relatório
+> pós-migration. Banco primeiro, prova, depois bridge. Nada no Fábio ainda.
 >
 > ---
 >
