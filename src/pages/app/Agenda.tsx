@@ -35,24 +35,49 @@ export default function AgendaPage() {
    * professor voltar num lugar que pode não abrir hoje. O que ele precisa
    * saber é o que AINDA dá pra fazer.
    */
-  const abrirSessao = (sessao: SessaoAula) => {
-    if (sessao.experimental) {
-      if (sessao.vinculo_id == null) {
-        // Sem promessa de prazo NEM de aviso: hoje nada notifica quando o
-        // vínculo aparece. Diz o que é, o que segue funcionando, e a quem
-        // recorrer se o dia da aula chegar assim.
-        show('Essa experimental ainda não casou com a agenda, então o registro dela não abre. A aula acontece normal — se chegar o dia assim, fala com a coordenação.')
-        return
-      }
-      navigate(`/app/experimental/${sessao.vinculo_id}`)
-      return
+  /**
+   * A régua da experimental, UMA vez, para TODAS as portas da linha.
+   *
+   * Até 15/08/2026 só `abrirSessao` ramificava. O microfone e o "preencher" da
+   * MESMA linha não: caíam direto no trilho do aluno, onde a experimental não
+   * tem aluno nenhum — o lead aparece em `aula_alunos_emusys` com `aluno_id`
+   * nulo, o roster sai vazio e o contrato recusa (corretamente: ele se nega a
+   * inventar um aluno). O áudio entrava na fila e morria em silêncio; cinco
+   * áudios de professor se perderam assim, de 10/08 a 14/08.
+   *
+   * Duas portas na mesma linha com réguas diferentes é o defeito. Agora a
+   * ramificação é uma função só, e quem quiser abrir uma porta nova passa por
+   * ela. O banco virou rede embaixo disto (`aula_experimental_usa_porta_propria`
+   * em `fn_enfileirar_audio_core`), porque é PWA: professor com bundle em cache
+   * continuaria mandando pelo trilho errado por dias depois do deploy.
+   *
+   * Devolve `true` quando já tratou a navegação — o chamador para aí.
+   */
+  const tratadoComoExperimental = (sessao: SessaoAula): boolean => {
+    if (!sessao.experimental) return false
+    if (sessao.vinculo_id == null) {
+      // Sem promessa de prazo NEM de aviso: hoje nada notifica quando o
+      // vínculo aparece. Diz o que é, o que segue funcionando, e a quem
+      // recorrer se o dia da aula chegar assim.
+      show('Essa experimental ainda não casou com a agenda, então o registro dela não abre. A aula acontece normal — se chegar o dia assim, fala com a coordenação.')
+      return true
     }
+    navigate(`/app/experimental/${sessao.vinculo_id}`)
+    return true
+  }
+
+  const abrirSessao = (sessao: SessaoAula) => {
+    if (tratadoComoExperimental(sessao)) return
     navigate(`/app/chamada/${sessao.aula_id_ancora}`, { state: { sessao } })
   }
-  const gravarAula = (sessao: SessaoAula) =>
+  const gravarAula = (sessao: SessaoAula) => {
+    if (tratadoComoExperimental(sessao)) return
     navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
-  const preencherAula = (sessao: SessaoAula) =>
+  }
+  const preencherAula = (sessao: SessaoAula) => {
+    if (tratadoComoExperimental(sessao)) return
     navigate(`/app/registro-manual/${sessao.aula_id_ancora}`, { state: { sessao } })
+  }
 
   return (
     <AppFrame>

@@ -697,6 +697,20 @@ def _has_pedagogical_content(value: Any) -> bool:
     return False
 
 
+def _codigo_do_erro(erro: BaseException) -> str:
+    """Motivo curto e inerte do erro de contrato, para viajar junto do `error`.
+
+    O `NormalizationContractError` ja nasce com o codigo no argumento
+    (`roster_invalido`, `roster_incompleto`, ...). Para os erros de tipo/chave,
+    que nao carregam codigo proprio, vale o nome da excecao. Sanitiza porque
+    isto acaba PERSISTIDO no campo `erro` da fila: nada de texto livre longo
+    virando pseudo-diagnostico depois.
+    """
+    bruto = str(erro).strip() or type(erro).__name__
+    limpo = re.sub(r"[^A-Za-z0-9_.:-]+", "_", bruto).strip("_")
+    return limpo[:80] or type(erro).__name__
+
+
 def _buscar_audio_fila(audio_id: str) -> Dict[str, Any]:
     """Resolve registration authority from the durable queue row."""
     response = requests.get(
@@ -793,8 +807,19 @@ def fabio_criar_registro_aula(p_payload: Dict[str, Any]) -> str:
         )
     except requests.RequestException:
         return json.dumps({"ok": False, "error": "fila_ou_roster_indisponivel"}, ensure_ascii=False)
-    except (NormalizationContractError, TypeError, ValueError):
-        return json.dumps({"ok": False, "error": "normalizacao_invalida"}, ensure_ascii=False)
+    except (NormalizationContractError, TypeError, ValueError) as erro:
+        # `codigo` carrega o motivo REAL (roster_invalido, roster_incompleto,
+        # roster_aula_divergente...). Achatar tudo num `normalizacao_invalida`
+        # mudo custou caro em 15/08/2026: sem o motivo, um agente preencheu o
+        # vazio com explicacao inventada ("contexto sem roster canonico e
+        # transcricao cita nome divergente"), ela foi GRAVADA no campo `erro` da
+        # fila, e mandou duas investigacoes atras da causa errada. A causa real
+        # era roster VAZIO, nao divergente. `error` fica estavel para quem ja
+        # depende dele; o motivo entra ao lado.
+        return json.dumps(
+            {"ok": False, "error": "normalizacao_invalida", "codigo": _codigo_do_erro(erro)},
+            ensure_ascii=False,
+        )
 
     try:
         rpc_payload = adaptar_contrato_para_payload_rpc(
@@ -803,8 +828,11 @@ def fabio_criar_registro_aula(p_payload: Dict[str, Any]) -> str:
             molde=p_payload["molde"],
             audio_id=audio_id or None,
         )
-    except (NormalizationContractError, KeyError, TypeError, ValueError):
-        return json.dumps({"ok": False, "error": "normalizacao_invalida"}, ensure_ascii=False)
+    except (NormalizationContractError, KeyError, TypeError, ValueError) as erro:
+        return json.dumps(
+            {"ok": False, "error": "normalizacao_invalida", "codigo": _codigo_do_erro(erro)},
+            ensure_ascii=False,
+        )
 
     if audio_id:
         existing_resp = requests.get(
