@@ -73,7 +73,8 @@ o molde das próximas. NÃO é a re-arquitetura inteira do Fábio nem tela.
 | `tipo` | text not null | CHECK `in ('substituicao')` — extensível sem migrar de novo |
 | `confianca` | text not null | CHECK `in ('alta','media','baixa')` |
 | `metodo_extracao` | text not null | CHECK `in ('deterministico','llm')` — pra medir det × llm |
-| `origem_message_id` | text null | `wa_message_id` que disparou |
+| `origem` | text not null | CHECK `in ('whatsapp','manual_admin')` — decide se `origem_message_id` pode ser null |
+| `origem_message_id` | text null | `wa_message_id` que disparou (ver constraint) |
 | `origem_transcricao` | text null | a frase que gerou (auditoria + medição) |
 | `supersede_ocorrencia_id` | uuid null | FK self — correção de FATO aponta pra linha anterior |
 | `criado_em` | timestamptz not null | `now()` |
@@ -85,8 +86,22 @@ o molde das próximas. NÃO é a re-arquitetura inteira do Fábio nem tela.
 - `chk_matriculado_difere_participante`: quando `participante_real_id` está
   preenchido, ele ≠ `aluno_matriculado_id` (substituir por si mesmo não é
   substituição).
-- Append-only imposto por **grant** (só `INSERT`/`SELECT` a `service_role`; sem
-  `UPDATE`/`DELETE` a ninguém) — o teste confere que o privilégio não existe.
+- `chk_origem_message_id`: `origem = 'whatsapp'` **exige** `origem_message_id`
+  não nulo; `null` só quando `origem = 'manual_admin'`. Sem isso, a reentrega
+  do UAZAPI duplica.
+- **Append-only em duas camadas** (não depender só de permissão):
+  1. **grant** — só `INSERT`/`SELECT` a `service_role`; sem `UPDATE`/`DELETE` a
+     ninguém;
+  2. **trigger defensivo** `BEFORE UPDATE OR DELETE` que levanta exceção —
+     pega até quem tem privilégio elevado (dono, migration mal escrita). O
+     teste exercita os dois: confere o grant ausente E que um `UPDATE`/`DELETE`
+     direto estoura.
+
+**Coerência do supersede** (imposta por trigger `BEFORE INSERT`, não só FK):
+quando `supersede_ocorrencia_id` está preenchido, a ocorrência referenciada tem
+que ter o **mesmo `aula_operacional_id` e o mesmo `aluno_matriculado_id`** — não
+se corrige uma ocorrência aleatória de outra aula/aluno. O mesmo trigger grava
+o evento `corrigida` na ocorrência antiga.
 
 ### `fabio_participacao_ocorrencia_eventos` (insert-only — o CICLO DE VIDA)
 
@@ -110,6 +125,37 @@ por `id`). Expõe `ocorrencia_id`, `estado_atual`, `estado_em`, `estado_por`.
 É a fonte única de "em que pé está cada ocorrência" — ninguém lê o ciclo de
 vida direto da tabela de eventos.
 
+**Mapa evento → `estado_atual`** (o evento `registrada` aparece na view como
+`candidata`; o resto é 1:1). Isto elimina a confusão entre o nome do evento e
+o estado que as RPCs devolvem:
+
+| último evento | `estado_atual` |
+|---|---|
+| `registrada` | `candidata` |
+| `confirmada` | `confirmada` |
+| `validada` | `validada` |
+| `descartada` | `descartada` |
+| `corrigida` | `corrigida` (foi sobrescrita por uma linha nova) |
+
+### Máquina de estados (transições permitidas / bloqueadas)
+
+Permitidas:
+- `candidata → confirmada` (professor concorda)
+- `confirmada → validada` (coordenação; **só depois** de confirmada)
+- `candidata → descartada`, `confirmada → descartada`
+
+Bloqueadas (a RPC recusa, não é UPDATE cego):
+- `validar` uma ocorrência que não está `confirmada` (ex.: pular a confirmação
+  do professor, ou validar uma `descartada`);
+- `descartar` uma ocorrência já `validada` — validada é decisão da coordenação;
+  desfazer exige **correção** (linha nova que a sobrescreve), não descarte;
+- qualquer transição sobre uma ocorrência já `corrigida` (sobrescrita) — a vida
+  dela acabou quando a substituta entrou;
+- `confirmar`/`validar` uma `descartada`.
+
+Idempotência de transição: repetir a mesma transição (confirmar duas vezes) não
+empilha efeito nem erra — devolve o estado atual.
+
 ## Ferramentas (RPCs) — contrato
 
 Todas `security definer`, `search_path` fixo, **só `service_role`**.
@@ -130,10 +176,13 @@ Entradas: `p_aula_id`, `p_professor_id`, `p_aluno_matriculado_id`,
 `p_participante_telefone`, `p_confianca`, `p_metodo_extracao`,
 `p_origem_message_id`, `p_origem_transcricao`.
 
-Faz, **em shadow**: resolve `aula_operacional_id`; insere o FATO; insere evento
-`registrada`. **Nada além disso** — não lê presença, não escreve presença, não
-chama Emusys. Retorno: `{ ok, ocorrencia_id, estado:'candidata',
-precisa_confirmar (bool), motivo_ambiguidade }`.
+É o ponto de entrada do **WhatsApp**: `origem` fixo `'whatsapp'` e
+`p_origem_message_id` **obrigatório** (recusa se nulo) — origem manual/admin,
+se existir um dia, é outro ponto de entrada. Faz, **em shadow**: resolve
+`aula_operacional_id`; insere o FATO; insere evento `registrada`. **Nada além
+disso** — não lê presença, não escreve presença, não chama Emusys. Retorno:
+`{ ok, ocorrencia_id, estado:'candidata', precisa_confirmar (bool),
+motivo_ambiguidade }`.
 `precisa_confirmar = true` quando a identidade do participante é ambígua
 (cardinalidade > 1) ou externa com confiança < alta.
 
@@ -213,15 +262,22 @@ o roster (Jeremias), a ocorrência é a verdade paralela que a gente mede.
 ## Testes
 
 **Contrato SQL (rollback contra produção) + mutantes Docker:**
-- append-only imposto: `service_role` não tem `UPDATE`/`DELETE` nas duas
-  tabelas (mutante que concede o privilégio morre);
-- estado derivado do último evento (mutante que lê estado de outro lugar
-  morre);
-- cadeia de supersede coerente;
+- append-only em duas camadas: `service_role` não tem `UPDATE`/`DELETE` **e** um
+  `UPDATE`/`DELETE` direto estoura pelo trigger (dois mutantes: um que devolve o
+  grant, outro que remove o trigger — os dois morrem);
+- estado derivado do último evento, com o mapa `registrada`→`candidata` (mutante
+  que lê estado de outro lugar morre);
+- **máquina de estados:** validar sem estar `confirmada` recusa; descartar uma
+  `validada` recusa; transição sobre `corrigida` recusa; confirmar/validar
+  repetido é idempotente (um mutante por transição bloqueada);
+- **supersede coerente:** corrigir ocorrência de outra aula ou outro aluno
+  matriculado recusa; o `corrigida` é gravado na antiga;
+- **`origem_message_id` obrigatório no WhatsApp:** inserir `origem='whatsapp'`
+  com message_id nulo recusa; idempotência prova que a mesma mensagem não gera
+  duas candidatas;
 - `candidata` não escreve em nenhuma tabela de presença/registro (o ensaio
   conta linhas antes/depois e exige zero);
-- escada de identidade devolve cardinalidade certa (0/1/>1);
-- idempotência por `origem_message_id`.
+- escada de identidade devolve cardinalidade certa (0/1/>1).
 
 **Unidade Python (`teste_whatsapp_intents`):**
 - `detectar_substituicao("quem fez aula no lugar do Jeremias foi a Juliana",
