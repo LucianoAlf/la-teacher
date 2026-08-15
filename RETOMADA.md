@@ -1,5 +1,60 @@
 # RETOMADA — LA Teacher
 
+> ## 🟢 CHECKPOINT ATIVO — 15/08/2026 fim de tarde · a porta errada, fechada
+>
+> Assumi o conserto que a sessão paralela diagnosticou (ela parou por decisão
+> minha e do Alf: rotear o microfone mandaria professores pra uma tela nunca
+> exercitada). Diagnóstico dela trazido pra `main` no `82b00a8`.
+>
+> ### O defeito, em uma frase
+>
+> **Duas portas na mesma linha da agenda com réguas diferentes.** Clicar na
+> LINHA ramificava certo; clicar no MICROFONE (e no "preencher") caía no trilho
+> do ALUNO — onde a experimental não tem aluno, o roster sai vazio e o contrato
+> recusa. Cinco áudios de professor morreram assim, de 10/08 a 14/08.
+>
+> **O contrato estava CERTO.** Ele se nega a inventar um `aluno_id`. Consertar o
+> contrato teria sido consertar a coisa errada.
+>
+> ### Três camadas (commit `0ae4961`)
+>
+> | # | onde | o quê |
+> |---|---|---|
+> | 1 | `Agenda.tsx` | a régua virou **uma função** aplicada nas **três** portas — linha, microfone e preencher. O manual tinha o mesmo defeito e ninguém tinha notado |
+> | 2 | `fn_enfileirar_audio_core` (`20260815070000`) | rede embaixo do cliente (é PWA, bundle em cache manda errado por dias): recusa com `aula_experimental_usa_porta_propria` em vez de aceitar pra perder depois |
+> | 3 | `fabio_registro_aula_tool.py` | para de achatar toda falha num `normalizacao_invalida` mudo; o motivo real viaja em `codigo` |
+>
+> **A guarda tem DUAS pernas de propósito** — `experimental` **E** sem aluno no
+> roster. Medido contra o histórico inteiro da fila: existe experimental cujo
+> lead já virou aluno que **funciona**, e guardar só por `categoria` a
+> quebraria. Zero falso positivo. Tem mutante provando exatamente isso.
+>
+> ### Provas
+>
+> 5/5 mutantes · contrato de catálogo verde · 148/148 unit · typecheck limpo ·
+> e a guarda exercitada **contra dado real de produção**: a aula do Isaque
+> (`34334742`, experimental com lead) agora **recusa**; a do Valdo (`253631`,
+> normal) **segue aceita**.
+>
+> ### ⚠️ O que NÃO fiz — e por quê
+>
+> - **Não provei o trilho da experimental fim a fim.** Ele está de pé desde
+>   07/08 e `lead_experimental_registros` tem **0 linhas** — nunca processou
+>   nada em produção. Fechar a porta errada é seguro sozinho; **abrir a certa
+>   com confiança exige um áudio real passando inteiro**. Esse é o próximo passo.
+> - **Não reenfileirei os 5 áudios perdidos.** Vários já tiveram os bytes
+>   apagados do Storage. Precisa conferir quem sobrou antes de tentar.
+> - **Aula NORMAL com roster vazio continua aberta.** São 413 em 30 dias.
+>   Existe uma que gera registro assim (pelo fallback da carteira), então NÃO é
+>   o mesmo defeito. Investigação separada, de propósito.
+> - **Cobertura de vínculo da experimental é baixa:** 59 de 160 em 30 dias
+>   (37%). Mesmo com o roteamento certo, 6 em 10 experimentais caem no
+>   "ainda não casou com a agenda". Isso é produto, não bug — mas é o teto real
+>   do trilho hoje.
+>
+> **PRÓXIMO PASSO:** provar o trilho da experimental com um áudio real, fim a
+> fim, antes de considerar o ciclo fechado.
+
 > ## 🔴 CHECKPOINT ATIVO — 15/08/2026 tarde BRT · o registro por WhatsApp
 >
 > **Relato do Alf:** o prof. **Valdo** mandou áudio de aula pelo WhatsApp às
