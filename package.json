@@ -139,8 +139,7 @@
     "teste:registro-manual": "node scripts/rodar-teste-sql.mjs supabase/migrations/20260812220500_registro_manual_ficha_individual.sql supabase/migrations/20260812220500_registro_manual_ficha_individual.test.sql",
     "teste:manual-nao-engole-audio": "node scripts/rodar-teste-sql.mjs supabase/migrations/20260814230000_o_rascunho_manual_nao_engole_o_audio.sql supabase/migrations/20260814230000_o_rascunho_manual_nao_engole_o_audio.test.sql",
     "mutantes:manual-nao-engole-audio": "node scripts/mutantes-20260814230000.mjs",
-    "teste:professor-corrige-chamada": "node scripts/rodar-teste-sql.mjs supabase/migrations/20260815010000_o_professor_corrige_a_propria_chamada.sql supabase/migrations/20260815010000_o_professor_corrige_a_propria_chamada.test.sql",
-    "mutantes:professor-corrige-chamada": "node scripts/mutantes-20260815010000.mjs"
+    "teste:secretaria-prevalece": "node scripts/rodar-teste-sql.mjs supabase/migrations/20260815020000_reverte_precedencia_secretaria_prevalece.sql supabase/migrations/20260815020000_reverte_precedencia_secretaria_prevalece.test.sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
