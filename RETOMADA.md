@@ -22,9 +22,16 @@
 > hoje registro aberto com falta travada, e fabricar dado em produção pra ver
 > pixel não vale. Ele está provado por **teste unitário** (caso da secretaria
 > com falta) e pelo **SQL contra o dado real do Valdo** (devolveu `falta` +
-> `agenda_secretaria` + `travada=true`). Screenshot não foi possível: o painel
-> do navegador não compõe frames neste ambiente — a conferência foi por medição
-> de DOM/geometria, não por foto.
+> `agenda_secretaria` + `travada=true`).
+>
+> **Conferido por FOTO, além da medição** (o Alf cobrou, com razão, que eu
+> usasse o browser em vez de desistir): o screenshot do Simple Browser voltou a
+> funcionar assim que o painel ficou visível — o erro anterior dizia
+> literalmente *"the Browser pane is not displayed"* e eu tinha lido como
+> impossibilidade do ambiente. Nas duas alunas aparece o badge verde `presente`
+> + 🔒 **"Lançada no Emusys"**, e os campos de CONTEÚDO (Progresso, Repertório
+> individual, Próximo passo, Observação) seguem **editáveis com o lápis** — que
+> é exatamente o desenho: presença travada, conteúdo livre.
 >
 > **PRÓXIMO PASSO:** nada travando esta frente. O que segue aberto é o backlog
 > anterior (bloco de 13/08 abaixo).
