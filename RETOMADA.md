@@ -2,13 +2,32 @@
 
 > ## 🔎 CHECKPOINT ATIVO — 15/08/2026 manhã BRT · três relatos de professor, na raiz
 >
-> **PRÓXIMO PASSO: conferir a tela do professor nos dois tamanhos (390×844 e
-> 1400×900).** O carimbo de presença já lançada está no ar (`95cd68c`) e provado
-> no banco, mas **eu não vi a tela** — a sessão do navegador aqui é a de
-> coordenação, e `/app/confirmar/...` redireciona pro painel de Equipe. Preciso
-> que o Alf logue como professor (igual fez com o Matheus em 14/08). O registro
-> `fdd74d8b-11e9-40e0-a7e5-0b619fc304e4` (prof 25, aula 232149) é o caso exato:
-> 4 fatias, **todas** com presença travada.
+> **✅ TELA CONFERIDA NOS DOIS TAMANHOS (15/08, com o Alf logado como Matheus).**
+> Registro `fdd74d8b-11e9-40e0-a7e5-0b619fc304e4` — turma Julia + Marina (Canto,
+> qui 13/08 16h), **2 fatias** (eu tinha dito 4: a contagem inflou porque o
+> `join` com `aluno_presenca` traz o gêmeo — a mesma armadilha de contar linha
+> crua). As duas alunas aparecem `presente` com o carimbo **"Lançada no
+> Emusys"** e cadeado.
+>
+> | medido | 1382×918 | 390×844 |
+> |---|---|---|
+> | carimbos visíveis | 2 | 2 (não truncados) |
+> | cadeados | 2 | 2 |
+> | botões "Marcar/Desfazer falta" | **0** | **0** |
+> | estouro horizontal | não | não |
+> | "Confirmar e gravar" sob a TabBar | — | **não** (clicável, 830/844) |
+>
+> **Limite honesto:** vi o ramo **presente travado**. O ramo **falta travada**
+> (o texto "fala com a secretaria") **não foi visto renderizado** — não existe
+> hoje registro aberto com falta travada, e fabricar dado em produção pra ver
+> pixel não vale. Ele está provado por **teste unitário** (caso da secretaria
+> com falta) e pelo **SQL contra o dado real do Valdo** (devolveu `falta` +
+> `agenda_secretaria` + `travada=true`). Screenshot não foi possível: o painel
+> do navegador não compõe frames neste ambiente — a conferência foi por medição
+> de DOM/geometria, não por foto.
+>
+> **PRÓXIMO PASSO:** nada travando esta frente. O que segue aberto é o backlog
+> anterior (bloco de 13/08 abaixo).
 >
 > Árvore limpa, `main` = `origin/main`, nada pendente de push.
 >
