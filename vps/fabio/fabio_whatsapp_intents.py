@@ -200,7 +200,16 @@ def reduzir_shortlist(texto: str, candidatas: list[dict[str, Any]]) -> dict[str,
     if not compatible:
         return {"status": "nenhuma", "aula_id": None, "candidatas": [], "pergunta": None}
     if len(compatible) > 3:
-        return {"status": "discriminante", "aula_id": None, "candidatas": [], "pergunta": _question_for(compatible, True)}
+        # `candidatas` vai CHEIA de propósito. "Discriminante" quer dizer "são
+        # aulas demais pra listar num menu", não "não sei quais são" — e quem
+        # recebe isto guarda a lista na ação. Devolvendo `[]` aqui (como era até
+        # 15/08/2026) a ação nascia sem candidata nenhuma, e o interpretador de
+        # resposta desse tipo de ação só sabe casar contra essa lista: nenhuma
+        # resposta do professor podia ser aceita, nunca. Foi o laço em que o
+        # Isaque ficou preso, respondendo três vezes e ouvindo a mesma frase.
+        # Sem corte em 3: aqui não há menu, o professor responde em texto livre
+        # e o casamento é contra tudo que é compatível.
+        return {"status": "discriminante", "aula_id": None, "candidatas": compatible, "pergunta": _question_for(compatible, True)}
     if len(compatible) == 1:
         return {"status": "selecionada", "aula_id": compatible[0]["aula_id"], "candidatas": compatible, "pergunta": None}
     return {"status": "perguntar", "aula_id": None, "candidatas": compatible[:3], "pergunta": _question_for(compatible[:3])}

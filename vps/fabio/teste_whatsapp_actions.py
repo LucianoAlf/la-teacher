@@ -64,6 +64,13 @@ class FakeBackend:
         if name == "fabio_acao_json":
             return self.action
         if name == "fabio_aplicar_evento_acao":
+            # Em produção o evento `shortlist_definida` é o que ESCREVE
+            # `candidatas` na linha da ação (medido em 15/08: as ações com
+            # esse evento têm candidatas, a do Isaque — que só teve
+            # `pergunta_refinada` — tem lista vazia). O dublê precisa fazer o
+            # mesmo, senão nenhum teste consegue enxergar a diferença.
+            if payload["p_evento"] == "shortlist_definida" and isinstance(self.action, dict):
+                self.action["candidatas"] = list((payload.get("p_dados") or {}).get("candidatas") or [])
             return {"ok": True, "evento": payload["p_evento"], "acao_id": payload["p_acao_id"]}
         raise AssertionError(f"RPC inesperada: {name}")
 
@@ -425,7 +432,14 @@ class WhatsappActionsTest(unittest.TestCase):
                     ),
                     backend,
                 )
-                self.assertEqual(result["code"], "pending_question")
+                # Era `pending_question` até 15/08/2026. O que essa asserção
+                # guardava de verdade — 15:99 não virar a aula 99, não
+                # enfileirar, não emitir evento — continua abaixo, intacto. O
+                # que mudou é a FALA: numa ação de escolher aula, o fallback
+                # agora repete a pergunta da aula em vez de oferecer
+                # "confirmar/corrigir/cancelar", que é o menu de outro estado.
+                self.assertEqual(result["code"], "choose_audio_class")
+                self.assertNotIn("confirmar, corrigir, cancelar", result.get("reply", ""))
                 names = [name for name, _ in backend.calls]
                 self.assertNotIn("fabio_aplicar_evento_acao", names)
                 self.assertNotIn("fabio_enfileirar_audio", names)
@@ -602,6 +616,84 @@ class WhatsappActionsTest(unittest.TestCase):
         )
         self.assertEqual(result["code"], "devolutiva_revision_question")
         self.assertFalse([call for call in backend.calls if call[0] == "fabio_atualizar_devolutiva_rascunho"])
+
+
+class PerguntaDiscriminanteTest(unittest.TestCase):
+    """O laço que prendeu o Isaque em 15/08/2026.
+
+    Ele mandou dois áudios dizendo a aula ("sábado, meio-dia"). O redutor achou
+    mais de 3 aulas compatíveis, escolheu perguntar de forma discriminante
+    ("Qual dia, horário ou turma foi essa aula?") — e **jogou a lista fora**.
+    A ação nasceu com `candidatas = []`, e o interpretador de resposta desse
+    tipo de ação só sabe casar contra essa lista. Lista vazia = nenhuma resposta
+    dele podia ser aceita, nunca. Três respostas, três vezes a mesma frase.
+    """
+
+    @staticmethod
+    def _quatro_aulas():
+        return [
+            {"aula_id": 201, "data": "2026-08-15", "hora": "12:00", "curso": "Teclado T", "turma": "T_Sa_12"},
+            {"aula_id": 202, "data": "2026-08-15", "hora": "13:00", "curso": "Teclado T", "turma": "T_Sa_13"},
+            {"aula_id": 203, "data": "2026-08-15", "hora": "14:00", "curso": "Teclado T", "turma": "T_Sa_14"},
+            {"aula_id": 204, "data": "2026-08-13", "hora": "15:00", "curso": "Teclado T", "turma": "T_Qui_15"},
+        ]
+
+    def test_pergunta_discriminante_guarda_a_shortlist_na_acao(self):
+        backend = FakeBackend(candidates=self._quatro_aulas())
+        result = tratar_mensagem_professor(
+            professor_context(kind="audio", text="trabalhei repertorio", media_url="https://media/1"),
+            backend,
+        )
+        self.assertEqual(result["code"], "refine_class")
+        shortlist = [
+            payload for name, payload in backend.calls
+            if name == "fabio_aplicar_evento_acao" and payload["p_evento"] == "shortlist_definida"
+        ]
+        self.assertTrue(shortlist, "a pergunta discriminante não guardou candidata nenhuma")
+        self.assertEqual(sorted(shortlist[0]["p_dados"]["candidatas"]), [201, 202, 203, 204])
+
+    def test_professor_responde_a_pergunta_discriminante_e_a_aula_e_escolhida(self):
+        backend = FakeBackend(candidates=self._quatro_aulas())
+        tratar_mensagem_professor(
+            professor_context(kind="audio", text="trabalhei repertorio", media_url="https://media/1"),
+            backend,
+        )
+        backend.calls.clear()
+        # "as 12 horas", e não "meio-dia": o casador entende HORÁRIO, não
+        # apelido de horário — e o Isaque disse justamente "meio-dia" no áudio.
+        # Isso é um buraco SEPARADO, anotado na RETOMADA; aqui o que se prova é
+        # que a resposta agora tem contra o que casar, que era o defeito.
+        result = tratar_mensagem_professor(
+            professor_context(wa_message_id="resposta-1", text="foi a das 12 horas"),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        enqueue = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertEqual(enqueue["p_aula_id"], 201)
+
+    def test_resposta_nao_reconhecida_reoferece_a_pergunta_da_aula_e_nao_o_menu_de_confirmacao(self):
+        """O agravante: a pergunta era "qual aula?" e o fallback respondia
+        "confirmar, corrigir, cancelar ou deixar para depois" — menu de OUTRO
+        estado. Foi isso que ensinou o Isaque a responder "Grave" e "Confirma
+        os 2", que esse estado não tem como aceitar."""
+        action = {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [201, 202, 203, 204],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+        backend = FakeBackend(action=action, candidates=self._quatro_aulas())
+        result = tratar_mensagem_professor(
+            professor_context(wa_message_id="grave-1", text="Grave"),
+            backend,
+        )
+        self.assertNotIn("confirmar, corrigir, cancelar", result.get("reply", ""))
+        self.assertIn("aula", result.get("reply", "").lower())
+        self.assertFalse([call for call in backend.calls if call[0] == "fabio_enfileirar_audio"])
 
 
 if __name__ == "__main__":

@@ -221,10 +221,14 @@ def _start_from_candidates(backend: FabioWhatsappBackend, context: dict[str, Any
         "intencao": fluxo,
         "transcricao": context.get("text") or "",
     })
+    # A shortlist é guardada ANTES de qualquer pergunta, inclusive a
+    # discriminante. Ela é o único vocabulário que o interpretador de resposta
+    # tem pra entender o que o professor responder; perguntar sem guardar é
+    # abrir uma pergunta que nenhuma resposta consegue fechar.
+    _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
     if shortlist["status"] == "discriminante":
         _event(backend, action, context, "pergunta_refinada", {})
         return _result("refine_class", reply=shortlist["pergunta"], action_id=str(action["id"]))
-    _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
     if shortlist["status"] == "perguntar":
         return _result("choose_audio_class" if fluxo == "registro" else "choose_call_class", reply=shortlist["pergunta"], action_id=str(action["id"]))
     aula_id = int(shortlist["aula_id"])
@@ -310,6 +314,9 @@ def _refine_pending_class(
 
     ids = [int(item["aula_id"]) for item in shortlist["candidatas"]]
     if shortlist["status"] == "discriminante":
+        # Mesma regra do primeiro contato: guarda antes de perguntar.
+        if not action.get("candidatas"):
+            _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
         _event(backend, action, context, "pergunta_refinada", {})
         return _result("refine_class", reply=shortlist["pergunta"], action_id=str(action["id"]))
 
@@ -427,6 +434,18 @@ def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, An
         })
         receipt = committed.get("escrita") if isinstance(committed.get("escrita"), dict) else committed
         return _result("confirmed_call", reply="Pronto: chamada registrada.", action_id=str(action["id"]), aula_id=aula_id, receipt=receipt)
+    # O fallback tem que oferecer o menu DO ESTADO EM QUE ELE ESTÁ. Enquanto a
+    # pergunta aberta era "qual aula?", responder "confirmar, corrigir,
+    # cancelar ou deixar para depois" é o menu de outro estado — e foi ele que
+    # ensinou o Isaque a responder "Grave" e "Confirma os 2", que este estado
+    # não tem como aceitar. O código já sabia o motivo (`aula_nao_reconhecida`)
+    # e jogava fora na hora de falar.
+    if str(action.get("tipo") or "").startswith("escolher_aula"):
+        return _result(
+            "choose_audio_class" if action.get("tipo") == "escolher_aula_audio" else "choose_call_class",
+            reply="Ainda não sei de qual aula você está falando. Me diz o dia e o horário (ex.: \"sábado, meio-dia\") ou o nome do aluno.",
+            action_id=str(action["id"]),
+        )
     return _result("pending_question", reply="Ainda não gravei. Você quer confirmar, corrigir, cancelar ou deixar para depois?", action_id=str(action["id"]))
 
 
