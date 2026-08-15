@@ -1,5 +1,53 @@
 # RETOMADA — LA Teacher
 
+> # 🧠 ARQUITETURA DE INTELIGÊNCIA DO FÁBIO — 15/08, em execução faseada
+>
+> **A virada:** o Alf + Alfredo pediram pra PARAR de empilhar reject/regex no
+> Fábio ("agente burro cheio de exceção") e construir arquitetura de verdade,
+> **modelo-Maria**. Eu confirmei acesso e estudei Maria (187.127.9.25, user
+> `claude`, key `id_ed25519_maria_claude`) e Tom (mesma VPS do Fábio, key
+> `tom_vps`). Padrão da Maria: AGENTS.md por **frente**, autonomia **graduada
+> por fase** (dry-run→assistida→plena), **roteamento com shadow** (decisão
+> logada antes de agir), **uma skill por capacidade**.
+>
+> **Diagnóstico:** o registro por WhatsApp do Fábio NÃO passa pelo cérebro dele
+> — é regex puro (`fabio_whatsapp_intents.py`). Por isso é burro. Destino
+> aprovado: **(A)** roteia pelo cérebro, casador determinístico vira
+> ferramenta de ground-truth + trava; **primeiro passo (B)**: híbrido em
+> shadow. Determinístico é o CHÃO/segurança, LLM é o intérprete, nunca juiz
+> soberano.
+>
+> **O buraco real medido:** substituição. "Juliana no lugar do Jeremias" — o
+> sistema sabe a AULA (pelo Jeremias no roster) mas não tem onde registrar
+> **quem participou**. Não é regex; é modelo de dado faltando.
+>
+> ## Documentos (aprovados por Alf + Alfredo)
+> - **Spec:** `docs/superpowers/specs/2026-08-15-participacao-ocorrencias-substituicao-design.md`
+> - **Plano:** `docs/superpowers/plans/2026-08-15-participacao-ocorrencias-substituicao.md`
+>
+> ## Execução FASEADA (ordem do Alf) + freios
+> Freios inegociáveis: **nada de migration viva sem OK do Alf**; **nada de
+> presença/falta/financeiro/Emusys**; **wiring nunca derruba o registro**;
+> ocorrência que falha **só loga**; **checkpoint entre tarefas**.
+>
+> | fase | tarefa | estado |
+> |---|---|---|
+> | 1 | **Task 3** — detector determinístico `detectar_substituicao` + testes | ✅ **FEITO** — `f6f4b5e`, 22 testes verdes, frase do Isaque provada, mutante mata 5 |
+> | 2 | **Task 1** — schema append-only (2 tabelas + view + triggers) — **só rollback+mutantes** | 🚧 **subagente disparado** (sem migration viva) |
+> | 2 | **Task 2** — RPCs + máquina de estados — **só rollback+mutantes** | ⏳ depois da Task 1 (checkpoint) |
+> | 3 | **Task 4** — wiring em shadow no fluxo WhatsApp | 🔒 **só depois das RPCs APLICADAS com OK explícito do Alf** |
+>
+> **Timestamps de migration reservados:** `20260815130000` (schema),
+> `20260815140000` (RPCs). Conferir `ls supabase/migrations` no disco antes de
+> aplicar (duas sessões, mesmo checkout).
+>
+> **Ao voltar:** se o subagente da Task 1 terminou, ler o diff dele
+> (`20260815130000_*`), conferir rollback+mutantes verdes, **checkpoint com o
+> Alf**, e só então Task 2. Task 4 continua trancada até as RPCs estarem
+> aplicadas em produção com OK do Alf.
+>
+> ---
+>
 > # 🔎 AUDITORIA DO TESTE DO ISAQUE — 15/08, fim do dia
 >
 > **Veredito: o canal FUNCIONA, mas ainda NÃO está pronto pra produção sem
