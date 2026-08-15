@@ -48,12 +48,29 @@
 >
 > | professor | antes | depois |
 > |---|---|---|
-> | **32 (Akeem)** | `transcrito` morto desde 14/08 | **`normalizado` + 2 registros gravados** |
-> | 10 (Isaque) | `transcrito` morto desde 13/08 | reprocessando (`transcrito`, tentativa 2 de 3) |
+> | **32 (Akeem)** | `transcrito` morto desde 14/08 | **`normalizado` + 2 registros gravados** ✅ |
+> | 10 (Isaque) | `transcrito` morto desde 13/08 | transcreveu, mas **`normalizacao_invalida`** ⚠️ |
 > | 36 (Valdo) | `transcrevendo` mudo | **`erro: falha ao gerar signed url`** |
 >
 > O do Valdo virar **erro** é o resultado certo: o áudio dele não existe mais
 > (defeito 3 apagou). O ganho é que o silêncio virou **erro diagnosticável**.
+>
+> ### ⚠️ QUINTO problema, de OUTRA natureza — fica aberto
+>
+> O áudio do Isaque transcreveu bem e mesmo assim
+> `fabio_criar_registro_aula` recusou: `normalizacao_invalida` (14:46:32, log
+> do Hermes). **Não é transporte — é contrato de conteúdo**, e é anterior a
+> tudo que eu consertei hoje. Já tem vítimas antigas: profs **3** e **46**,
+> `normalizacao_invalida` com **11 tentativas cada** desde 10-12/08.
+>
+> Meus consertos fizeram o que prometiam — a falha ficou **visível e limitada**
+> (para em 3 tentativas) em vez de silêncio infinito. Mas o áudio do Isaque
+> **não vai se recuperar sozinho**: a próxima tentativa falha igual.
+>
+> **Investigar:** por que `validar_e_sanear_normalizacao` recusa. O log mostra
+> o agente chamando `fabio_buscar_roster_aula` logo depois — cheiro de
+> divergência de roster (mesma família do erro do prof 3: *"contexto sem roster
+> canônico e transcrição cita nome divergente"*).
 >
 > ### ✅ Login por e-mail — FEITO (4 professores)
 >
