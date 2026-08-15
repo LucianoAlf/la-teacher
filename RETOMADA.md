@@ -115,11 +115,14 @@
 >   banco que o LA Report lê — e o `fabio-aviso-comercial.service` pode disparar
 >   WhatsApp pro comercial sobre uma aula que não aconteceu. Ação pra fora, sem
 >   volta: não faço sem o Alf mandar.
-> - As 4 contas de e-mail (`valdo@`/`isaque@`/`leo@`/`daiana@`) **não têm
->   professor vinculado** por `colaboradores` (`professor_id` nulo nas quatro) —
->   então nem dá pra abrir a tela de uma experimental logado como elas. **Isso
->   é uma pendência de verdade**, não só do teste: o login por e-mail entra, mas
->   não vira professor.
+> - Das 4 contas de e-mail, só o **`leo@` (Leonardo Castro, professor 19)** tem
+>   experimental na semana: **vínculo 2104, 18/08 14:00, Barra**. As outras três
+>   não têm nenhuma — não dá pra testar por elas nesta semana.
+>
+> ⚠️ Cuidado que quase virou erro no relatório: o vínculo professor↔usuário é
+> **`professores.usuario_id` → `usuarios`**, NÃO `colaboradores` (essa tem
+> `usuario_id` uuid, é outra coisa). Consultando a tabela errada eu concluí que
+> as 4 contas não tinham professor e quase reportei uma pendência que não existe.
 >
 > ---
 >
