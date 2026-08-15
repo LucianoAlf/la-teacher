@@ -46,6 +46,14 @@ _EXPLICIT_TIME_RE = re.compile(
 _TIME_MARKED_NUMBER_RE = re.compile(
     r"\b([01]?\d|2[0-3])(?:\s*(?:h|horas?)|:)(?:\s*(\d+))?\b"
 )
+# Sem dígito nenhum, de propósito: quem lê isto é `_explicit_time`, e a ordem
+# importa — "e meia" antes das formas curtas.
+_APELIDOS_DE_HORARIO = (
+    (re.compile(r"\bmeio[-\s]?dia\s+e\s+meia\b"), "12:30"),
+    (re.compile(r"\bmeia[-\s]?noite\s+e\s+meia\b"), "00:30"),
+    (re.compile(r"\bmeio[-\s]?dia\b"), "12:00"),
+    (re.compile(r"\bmeia[-\s]?noite\b"), "00:00"),
+)
 
 
 def _norm(value: Any) -> str:
@@ -142,7 +150,16 @@ def _candidate_values(candidate: dict[str, Any]) -> list[str]:
 
 
 def _explicit_time(text: str) -> str | None:
-    match = _EXPLICIT_TIME_RE.search(_norm(text))
+    hay = _norm(text)
+    # Apelido de horário é horário. O professor diz "meio-dia", não "12h" — e
+    # o Isaque disse exatamente isso no áudio de 15/08/2026, com a aula das
+    # 12:00 na agenda dele, e o casador não entendeu porque só lia dígito.
+    # As variantes "e meia" vêm primeiro: senão "meio-dia e meia" casaria com
+    # a regra curta e viraria 12:00.
+    for regex, valor in _APELIDOS_DE_HORARIO:
+        if regex.search(hay):
+            return valor
+    match = _EXPLICIT_TIME_RE.search(hay)
     if not match:
         return None
     return f"{int(match.group(1)):02d}:{int(match.group(2) or 0):02d}"

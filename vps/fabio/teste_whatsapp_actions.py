@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fabio_whatsapp_actions import tratar_mensagem_professor  # noqa: E402
+from fabio_whatsapp_intents import reduzir_shortlist  # noqa: E402
 
 
 class FakeBackend:
@@ -706,6 +707,56 @@ class PerguntaDiscriminanteTest(unittest.TestCase):
         self.assertNotIn("confirmar, corrigir, cancelar", result.get("reply", ""))
         self.assertIn("aula", result.get("reply", "").lower())
         self.assertFalse([call for call in backend.calls if call[0] == "fabio_enfileirar_audio"])
+
+
+class ApelidoDeHorarioTest(unittest.TestCase):
+    """"meio-dia" é horário, não enfeite.
+
+    O Isaque disse exatamente isso no áudio de 15/08 ("a aula de sábado,
+    meio-dia") e o casador não entendeu, porque só lia dígito. Professor fala
+    como gente fala.
+    """
+
+    def _acao(self):
+        return {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [301, 302],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+
+    def _aulas(self):
+        return [
+            {"aula_id": 301, "data": "2026-08-15", "hora": "12:00", "curso": "Teclado T", "turma": "T_Sa_12"},
+            {"aula_id": 302, "data": "2026-08-15", "hora": "15:00", "curso": "Teclado T", "turma": "T_Sa_15"},
+        ]
+
+    def test_meio_dia_seleciona_a_aula_das_doze(self):
+        for texto in ("foi a de meio-dia", "foi a de meio dia", "a aula de sábado, meio-dia"):
+            with self.subTest(texto=texto):
+                escolha = reduzir_shortlist(texto, self._aulas())
+                self.assertEqual(escolha["status"], "selecionada")
+                self.assertEqual(escolha["aula_id"], 301)
+
+    def test_meia_noite_nao_vira_meio_dia(self):
+        aulas = [
+            {"aula_id": 401, "data": "2026-08-15", "hora": "00:00", "curso": "Teclado T", "turma": "T_Sa_00"},
+            {"aula_id": 402, "data": "2026-08-15", "hora": "12:00", "curso": "Teclado T", "turma": "T_Sa_12"},
+        ]
+        escolha = reduzir_shortlist("foi a de meia-noite", aulas)
+        self.assertEqual(escolha["aula_id"], 401)
+
+    def test_meio_dia_e_meia_nao_e_lido_como_meio_dia(self):
+        aulas = [
+            {"aula_id": 501, "data": "2026-08-15", "hora": "12:00", "curso": "Teclado T", "turma": "A"},
+            {"aula_id": 502, "data": "2026-08-15", "hora": "12:30", "curso": "Teclado T", "turma": "B"},
+        ]
+        escolha = reduzir_shortlist("foi a de meio-dia e meia", aulas)
+        self.assertEqual(escolha["aula_id"], 502)
 
 
 if __name__ == "__main__":

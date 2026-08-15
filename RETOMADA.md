@@ -27,11 +27,23 @@
 >    casar**. Alargar o teto é mexer numa guarda deliberada do banco —
 >    decisão do Alf/Alfredo. O conserto de hoje é **meio conserto**, e está
 >    dito assim no código.
-> 5. **"meio-dia" não casa com 12:00** — o casador entende horário, não
->    apelido de horário. Foi justamente o que o Isaque falou no áudio.
-> 6. **Segundo áudio enviado com ação aberta é descartado** — vira "resposta
->    de texto", e os bytes não vão pro Storage. O Isaque perdeu a aula das 13h
+> 5. ~~"meio-dia" não casa com 12:00~~ **FEITO em parte (15/08).**
+>    `_explicit_time` aprendeu meio-dia / meia-noite / "e meia". Isso resolve o
+>    caminho do PRIMEIRO áudio — o do Isaque hoje teria casado direto com a
+>    T_Sá_12, sem nem abrir pergunta. ⚠️ Como RESPOSTA à pergunta
+>    discriminante ainda há outra porteira em `_refine_pending_class` que eu
+>    **não terminei de rastrear** — não afirmo que funciona ali.
+> 6. **Segundo áudio enviado com ação aberta é descartado** — o mais grave que
+>    fica aberto. Localizado: `fabio_whatsapp_actions.py:493-495` — havendo
+>    ação aberta, a mensagem vai direto pra `_handle_existing_action`
+>    **qualquer que seja o `kind`**, e o `_stage_audio` (linha 501) nunca é
+>    alcançado: os bytes não sobem pro Storage. O Isaque perdeu a aula das 13h
 >    assim (só a transcrição sobrou em `fabio_chat_mensagens`).
+>    Não consertei porque o modelo é de **uma ação aberta por professor**
+>    (`fabio_iniciar_acao` recusa a segunda) — guardar o áudio novo exige
+>    decidir onde ele espera. Três saídas possíveis: (a) subir pro Storage e
+>    parquear no payload da ação; (b) fechar a ação atual e começar do áudio
+>    novo; (c) fila de áudios pendentes por professor. É desenho, não remendo.
 
 > ## ✅ FASES 1, 2 e 3 NO AR — 15/08/2026 · o vínculo casa pelo id do lead
 >
