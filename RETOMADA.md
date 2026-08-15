@@ -1,5 +1,55 @@
 # RETOMADA — LA Teacher
 
+> ## 🔴 CHECKPOINT ATIVO — 15/08/2026 tarde BRT · o registro por WhatsApp
+>
+> **Relato do Alf:** o prof. **Valdo** mandou áudio de aula pelo WhatsApp às
+> 11:04. O Fábio respondeu *"Áudio recebido, vou processar"* e nunca mais
+> falou. Pedido: auditar os logs, achar onde quebrou, consertar na raiz, e
+> provar fim a fim.
+>
+> ### O que a auditoria achou: QUATRO defeitos independentes, em série
+>
+> O canal WhatsApp→registro **nunca funcionou com professor real**. Dos 6
+> áudios `origem='whatsapp'` que já existiram, o único "sucesso" era um
+> **fixture E2E que eu mesmo criei** (`e2e-isaque-*`) — o resto morreu.
+>
+> | # | defeito | onde | migration |
+> |---|---|---|---|
+> | 1 | `wa_message_id` do UAZAPI é `telefone:hash`; o **dois-pontos** ia cru pro nome do objeto. Upload 200, assinar 200, **baixar 400 InvalidSignature** | `fabio_whatsapp_actions.py` | — (Python) |
+> | 2 | `fn_fabio_retry_fila` só via `pendente`/`erro`. Quem morria **em voo** (`transcrevendo`/`transcrito`) ficava órfão pra sempre | banco | `20260815040000` |
+> | 3 | a limpeza **apagava o áudio em 98s** sem perguntar se a fila ainda ia usar — tornava o conserto 2 inerte | banco | `20260815050000` |
+> | 4 | a edge só aceita `pendente`/`erro`; o retry redespachava no estado morto e ela respondia `{"status":"ignorado"}` | banco | `20260815060000` |
+>
+> **Não era só o Valdo:** havia **2 áudios do APP** travados desde 13/08 —
+> professores 10 (Isaque) e 32 (Akeem) perderam registro e ninguém soube.
+>
+> ### Provas
+>
+> - dois-pontos: dois objetos idênticos, um com `:` (400) e outro sem (200)
+> - 27/27 unit · **5/5 + 5/5 + 6/6 mutantes** · contrato de catálogo verde nos 3
+> - **E2E com o código deployado, bytes reais (588 KB) e o id exato que
+>   falhou**: path sem dois-pontos, assinar 200, **baixar 200**, bytes idênticos
+>
+> ### A lição (vale mais que o conserto)
+>
+> **Consertar uma camada não conserta a tubulação.** Os defeitos 3 e 4 só
+> apareceram porque eu **medi o efeito do conserto anterior em produção** em vez
+> de declarar pronto. Se eu tivesse parado no 2 — verde em teste e em mutante —
+> teria dito "resolvido" com o professor ainda no silêncio.
+>
+> ### ⚠️ Impossível recuperar
+>
+> **O áudio do Valdo foi destruído** pelo defeito 3 às 14:07:19, antes de o
+> conserto existir. Ele **precisa regravar** — não há como reprocessar.
+>
+> **PRÓXIMO PASSO:** (a) pedir ao Valdo que regrave, pra fechar o fim a fim com
+> áudio real de professor; (b) login por e-mail dos 4 professores — a
+> capacidade **já existe** (`signInWithPassword` em `src/lib/auth.tsx:94`),
+> falta só trocar o e-mail sintético `<whatsapp>@la.internal` pelo real no
+> `usuarios` + auth. Decisão pendente do Alf: como eles definem a senha.
+>
+> Commit: `b2af90b`. Árvore limpa, `main` = `origin/main`.
+
 > ## 🔎 CHECKPOINT ATIVO — 15/08/2026 manhã BRT · três relatos de professor, na raiz
 >
 > **✅ TELA CONFERIDA NOS DOIS TAMANHOS (15/08, com o Alf logado como Matheus).**
