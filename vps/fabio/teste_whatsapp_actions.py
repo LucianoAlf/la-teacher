@@ -18,6 +18,12 @@ class FakeBackend:
         self.removals = []
         self.action_id = "acao-1"
         self.readback_status = readback_status
+        # A fila de espera do áudio (migration 20260815110000). O dublê guarda
+        # linha de verdade, com as MESMAS travas de produção — FIFO, um destino
+        # só e consumo atômico. Dublê mais permissivo que o banco é verde que
+        # não vale (já custou o teto de 3 da shortlist, acima).
+        self.parqueados = []
+        self._sequencia_parqueado = 0
 
     def rpc(self, name, payload):
         self.calls.append((name, payload))
@@ -48,6 +54,41 @@ class FakeBackend:
             }
         if name == "fabio_registro_completo_legacy":
             return {"ok": True, "registro_id": payload["p_registro_id"], "aula": {"data": "2026-08-11", "hora": "14:00"}, "tronco": {"texto_consolidado": "respiração"}, "fatias": [{"aluno_id": 7, "texto_consolidado": "apoio"}]}
+        if name == "fabio_parquear_audio":
+            if any(p["wa_message_id"] == payload["p_wa_message_id"]
+                   and p["professor_id"] == payload["p_professor_id"]
+                   for p in self.parqueados):
+                return {"ok": True, "ja_existia": True}
+            self._sequencia_parqueado += 1
+            self.parqueados.append({
+                "id": f"parq-{self._sequencia_parqueado}",
+                "ordem": self._sequencia_parqueado,
+                "professor_id": payload["p_professor_id"],
+                "wa_message_id": payload["p_wa_message_id"],
+                "storage_path": payload["p_storage_path"],
+                "transcricao": payload.get("p_transcricao") or "",
+                "duracao_segundos": payload.get("p_duracao_segundos") or 0,
+                "consumido": False,
+                "descartado": False,
+            })
+            return {"ok": True, "ja_existia": False, "id": self.parqueados[-1]["id"]}
+        if name == "fabio_audio_parqueado_proximo":
+            espera = [p for p in self.parqueados
+                      if p["professor_id"] == payload["p_professor_id"]
+                      and not p["consumido"] and not p["descartado"]]
+            if not espera:
+                return {}
+            return dict(sorted(espera, key=lambda p: p["ordem"])[0])
+        if name in {"fabio_audio_parqueado_consumir", "fabio_audio_parqueado_descartar"}:
+            alvo = next((p for p in self.parqueados if p["id"] == payload["p_id"]), None)
+            if not alvo or alvo["consumido"] or alvo["descartado"]:
+                return {"ok": False}
+            if name == "fabio_audio_parqueado_consumir":
+                alvo["consumido"] = True
+            else:
+                alvo["descartado"] = True
+                alvo["motivo"] = payload.get("p_motivo")
+            return {"ok": True}
         if name == "fabio_confirmar_registro":
             return {"ok": True, "registro_id": payload["p_registro_id"], "gravadas": 1, "ausentes_pulados": 0}
         if name == "fabio_atualizar_fatia":
@@ -59,6 +100,9 @@ class FakeBackend:
         if name == "fabio_registrar_presencas_aula":
             return {"ok": True, "aula_id": payload["p_aula_emusys_id"], "inseridos": 2, "total_roster": 2}
         if name == "fabio_confirmar_chamada_acao":
+            # Confirmar FECHA a ação em produção. O dublê precisa fechar também:
+            # é justamente a ação fechando que abre a vez do áudio parqueado.
+            self.action = None
             return {"ok": True, "codigo": "chamada_confirmada", "escrita": {"aula_id": 101, "inseridos": 2, "total_roster": 2}}
         if name in {"fabio_status_acao", "fabio_status_audio_fila"}:
             return {"ok": True, "status": "aguardando_confirmacao"}
@@ -776,6 +820,101 @@ class AudioComAcaoAbertaTest(unittest.TestCase):
             backend,
         )
         self.assertFalse(backend.uploads)
+
+
+class FilaDeEsperaDoAudioTest(unittest.TestCase):
+    """O áudio guardado tem que ENTRAR quando a vez dele chega.
+
+    O `5867be0` parou de destruir o segundo áudio, mas a resposta prometia
+    "assim que a gente fechar o anterior, ele entra" sem ninguém pra cumprir.
+    Estes testes cobram a promessa: parquear na chegada, drenar no fechamento,
+    e nunca deixar linha presa na fila sem destino.
+    """
+
+    def _acao_de_chamada(self):
+        # Mesma forma do `test_confirm_call_uses_atomic_action_confirmation`:
+        # é esta que o "sim" fecha de verdade.
+        return {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "chamada-original",
+            "tipo": "confirmar_chamada",
+            "estado": "aberta",
+            "aula_id": 101,
+            "payload": {"alunos_ausentes": [7]},
+        }
+
+    def _candidatas(self):
+        return [
+            {"aula_id": 101, "data": "2026-08-15", "hora": "12:00", "curso": "Teclado T"},
+            {"aula_id": 102, "data": "2026-08-15", "hora": "13:00", "curso": "Teclado T"},
+        ]
+
+    def test_audio_com_acao_aberta_entra_na_fila_de_espera(self):
+        backend = FakeBackend(action=self._acao_de_chamada(), candidates=self._candidatas())
+        tratar_mensagem_professor(
+            professor_context(kind="audio", wa_message_id="segundo-audio",
+                              text="aula das 13h", media_url="https://media/2"),
+            backend,
+        )
+        parqueado = next(p for name, p in backend.calls if name == "fabio_parquear_audio")
+        self.assertEqual(parqueado["p_wa_message_id"], "segundo-audio")
+        self.assertTrue(str(parqueado["p_storage_path"]).startswith("whatsapp/25/segundo-audio."))
+        # A transcrição vai junto: é ela que o casador usa pra escolher a aula
+        # quando a vez chegar. Sem isso, o áudio volta mudo.
+        self.assertEqual(parqueado["p_transcricao"], "aula das 13h")
+
+    def test_a_fila_nao_drena_enquanto_a_acao_continua_aberta(self):
+        backend = FakeBackend(action=self._acao_de_chamada(), candidates=self._candidatas())
+        tratar_mensagem_professor(
+            professor_context(kind="audio", wa_message_id="segundo-audio",
+                              text="aula das 13h", media_url="https://media/2"),
+            backend,
+        )
+        self.assertEqual(len(backend.parqueados), 1)
+        self.assertFalse(backend.parqueados[0]["consumido"],
+                         "o áudio foi drenado com a ação ainda aberta")
+
+    def test_ao_fechar_a_acao_o_audio_guardado_entra_sozinho(self):
+        backend = FakeBackend(action=self._acao_de_chamada(), candidates=self._candidatas())
+        tratar_mensagem_professor(
+            professor_context(kind="audio", wa_message_id="segundo-audio",
+                              text="aula das 13 horas", media_url="https://media/2"),
+            backend,
+        )
+        # O professor confirma a chamada: a ação fecha e a vez passa pro áudio.
+        resultado = tratar_mensagem_professor(
+            professor_context(wa_message_id="confirma", text="sim"),
+            backend,
+        )
+        self.assertTrue(backend.parqueados[0]["consumido"],
+                        "a ação fechou e o áudio guardado continuou parado")
+        # O áudio guardado não é re-baixado nem re-subido: os bytes já estão no
+        # Storage desde a chegada. Subir de novo seria pagar duas vezes e mudar
+        # o caminho que a ação já conhece.
+        self.assertEqual(len(backend.uploads), 1)
+        enfileirado = next(p for name, p in backend.calls if name == "fabio_enfileirar_audio")
+        self.assertTrue(str(enfileirado["p_storage_path"]).startswith("whatsapp/25/segundo-audio."))
+        self.assertEqual(enfileirado["p_aula_id"], 102, "entrou na aula errada")
+        self.assertIn("áudio recebido", (resultado.get("reply") or "").lower())
+
+    def test_audio_sem_candidata_sai_da_fila_com_motivo(self):
+        backend = FakeBackend(action=self._acao_de_chamada(), candidates=self._candidatas())
+        tratar_mensagem_professor(
+            professor_context(kind="audio", wa_message_id="segundo-audio",
+                              text="aula das 13 horas", media_url="https://media/2"),
+            backend,
+        )
+        # Quando a vez dele chegar não haverá aula elegível nenhuma.
+        backend.candidates = []
+        tratar_mensagem_professor(
+            professor_context(wa_message_id="confirma", text="sim"),
+            backend,
+        )
+        self.assertTrue(backend.parqueados[0]["descartado"],
+                        "o áudio sem candidata ficou preso na fila pra sempre")
+        self.assertFalse(backend.parqueados[0]["consumido"])
+        self.assertTrue(backend.parqueados[0].get("motivo"))
 
 
 class ApelidoDeHorarioTest(unittest.TestCase):

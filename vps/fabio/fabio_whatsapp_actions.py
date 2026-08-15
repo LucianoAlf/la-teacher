@@ -193,6 +193,100 @@ def _stage_audio(backend: FabioWhatsappBackend, context: dict[str, Any]) -> tupl
     return path, mime or "audio/ogg"
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# A fila de espera do áudio.
+#
+# O modelo é UMA ação aberta por professor. Isso não muda — é ele que impede o
+# Fábio de perguntar de três aulas ao mesmo tempo. O que faltava era uma fila
+# do lado de fora dessa porta: até 15/08/2026 o segundo áudio era só GUARDADO,
+# e a resposta prometia *"assim que a gente fechar o anterior, ele entra"* sem
+# ninguém pra cumprir.
+#
+# FIFO por professor (migration 20260815110000): a ordem é a do trabalho dele.
+
+
+# Teto por mensagem. Cada áudio drenado normalmente ABRE uma ação nova, então
+# na prática o laço roda uma vez — o teto existe pro caso em que a aula é
+# resolvida sem pergunta e o próximo já pode entrar. Sem teto, um lote grande
+# viraria uma rajada de mensagens no WhatsApp do professor.
+_MAX_DRENAGEM_POR_MENSAGEM = 3
+
+
+def _parquear(backend: FabioWhatsappBackend, context: dict[str, Any], storage_path: str) -> None:
+    _call(backend, "fabio_parquear_audio", {
+        "p_professor_id": int(context["professor_id"]),
+        "p_wa_message_id": str(context["wa_message_id"]),
+        "p_storage_path": storage_path,
+        "p_transcricao": str(context.get("text") or context.get("media_extracted_text") or ""),
+        "p_duracao_segundos": int(context.get("duracao_segundos") or 0),
+    })
+
+
+def _drenar_parqueados(backend: FabioWhatsappBackend, context: dict[str, Any], resultado: dict[str, Any]) -> dict[str, Any]:
+    """Chama o próximo da fila quando o professor não tem mais ação aberta.
+
+    Roda DEPOIS de tratar a mensagem atual, e só se a ação fechou de verdade —
+    a consulta é ao banco, não ao que o resultado parece dizer. Falha aqui
+    nunca derruba a resposta que o professor já ia receber: o áudio continua na
+    fila e entra na próxima mensagem.
+
+    ⚠️ LIMITE CONHECIDO: o gatilho é a mensagem de WhatsApp. Se a ação fechar
+    por outro caminho — o professor confirma o registro no app —, o áudio
+    parqueado espera até ele mandar a próxima mensagem. Não se perde (a fila é
+    tabela, não memória), mas também não entra sozinho no mesmo instante.
+    Fechar isso pede um timer lendo a fila, como o da devolutiva.
+    """
+    partes: list[str] = []
+    try:
+        for _ in range(_MAX_DRENAGEM_POR_MENSAGEM):
+            if _action(backend, context):
+                break
+            parqueado = _call(backend, "fabio_audio_parqueado_proximo", {
+                "p_professor_id": int(context["professor_id"]),
+            })
+            if not parqueado or not parqueado.get("id"):
+                break
+
+            contexto_audio = dict(
+                context,
+                wa_message_id=str(parqueado["wa_message_id"]),
+                text=str(parqueado.get("transcricao") or ""),
+                kind="audio",
+                duracao_segundos=int(parqueado.get("duracao_segundos") or 0),
+            )
+            saida = _start_from_candidates(
+                backend, contexto_audio, "registro",
+                _pool(backend, contexto_audio, "registro"),
+                str(parqueado["storage_path"]),
+            )
+
+            if saida.get("action_id"):
+                _call(backend, "fabio_audio_parqueado_consumir", {
+                    "p_id": str(parqueado["id"]),
+                    "p_acao_id": str(saida["action_id"]),
+                })
+            else:
+                # Sem ação nenhuma: `_start_from_candidates` já apagou o objeto
+                # do Storage. Sair da fila com motivo escrito é obrigatório —
+                # senão a próxima mensagem tenta de novo um áudio que não
+                # existe mais, pra sempre.
+                _call(backend, "fabio_audio_parqueado_descartar", {
+                    "p_id": str(parqueado["id"]),
+                    "p_motivo": str(saida.get("status") or "sem_candidata"),
+                })
+            if saida.get("reply"):
+                partes.append(str(saida["reply"]))
+    except Exception:  # noqa: BLE001
+        return resultado
+
+    if partes:
+        anterior = str(resultado.get("reply") or "").strip()
+        resultado = dict(resultado)
+        resultado["reply"] = "\n\n".join([p for p in [anterior, *partes] if p])
+        resultado["drenados"] = len(partes)
+    return resultado
+
+
 def _select_and_enqueue_audio(backend: FabioWhatsappBackend, context: dict[str, Any], action: dict[str, Any], aula_id: int) -> dict[str, Any]:
     _event(backend, action, context, "aula_escolhida", {"aula_id": aula_id})
     response = _call(backend, "fabio_enfileirar_audio", {
@@ -513,6 +607,7 @@ def tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBa
         if context.get("kind") == "audio" and not eh_replay:
             try:
                 guardado, _ = _stage_audio(backend, context)
+                _parquear(backend, context, guardado)
             except Exception:  # noqa: BLE001
                 # Falhar ao guardar não pode derrubar o fluxo que já funciona:
                 # a pergunta pendente do professor continua valendo.
@@ -523,7 +618,7 @@ def tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBa
                 f"{resultado['reply']} (Guardei esse áudio aqui — assim que a "
                 "gente fechar o anterior, ele entra.)"
             )
-        return resultado
+        return _drenar_parqueados(backend, context, resultado)
     text = str(context.get("text") or context.get("media_extracted_text") or "")
     if context.get("kind") == "audio":
         intent = classificar_intencao_audio(text, context.get("llm_json"))
