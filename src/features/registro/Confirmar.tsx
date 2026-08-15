@@ -23,6 +23,7 @@ import { CampoEditavel } from './CampoEditavel'
 import { continuarFila } from './filaSerial'
 import { repertorioIndividualVisivel } from './camposCanonicos'
 import { presencaDaFatia } from './texto'
+import { lerPresencaLancada, type FatiaComPresenca } from './presencaLancada'
 import { limparCamposManuais } from '../registroManual/modelo'
 import { useAuth } from '../../lib/auth'
 import { buscarCacheManual, chaveCacheManual, removerCacheManual, salvarCacheManual } from '../registroManual/rascunhoLocal'
@@ -584,8 +585,14 @@ export default function ConfirmarPage() {
             const primeiro = (f.aluno_primeiro_nome as string | null) ?? nomeCompleto
             const foto = (f.aluno_foto_url as string | null) ?? null
             const declarada = presencaDaFatia(f)
-            const ausente = declarada === 'ausente'
-            const semFaltaDeclarada = declarada === 'nao_informada'
+            // Presença já lançada (secretaria/Emusys) MANDA: ela aparece
+            // carimbada e o professor não mexe. Ele lança o conteúdo; se
+            // discorda da presença, fala com a secretaria — que corrige na
+            // fonte. Sem isso o professor era obrigado a "dar presença de
+            // novo" e o que ele mexia aqui não valia nada.
+            const lancada = lerPresencaLancada(f as unknown as FatiaComPresenca)
+            const ausente = lancada.travada ? lancada.estado === 'faltou' : declarada === 'ausente'
+            const semFaltaDeclarada = !lancada.travada && declarada === 'nao_informada'
             const repertorioDaTurma = typeof tronco.campos.repertorio === 'string' ? tronco.campos.repertorio : null
             const repertorioIndividual = typeof f.campos.repertorio === 'string' ? f.campos.repertorio : null
             const repertorioParaEditar = repertorioIndividualVisivel(repertorioDaTurma, repertorioIndividual)
@@ -599,19 +606,31 @@ export default function ConfirmarPage() {
                   presenca={ausente ? 'faltou' : 'presente'}
                   defaultOpen={!ausente}
                   acao={
-                    semFaltaDeclarada ? <PresencaPadrao nome={primeiro} onMarcarFalta={() => void responder(f.id, 'ausente')} /> : undefined
+                    lancada.travada
+                      ? <PresencaCarimbada carimbo={lancada.carimbo!} />
+                      : semFaltaDeclarada ? <PresencaPadrao nome={primeiro} onMarcarFalta={() => void responder(f.id, 'ausente')} /> : undefined
                   }
                 >
                   {ausente ? (
                     <div className="px-[14px] py-[11px] text-sm text-text-secondary">
-                      <p>Falta declarada — nada será gravado pra {primeiro}. Nada foi inventado. ✋</p>
-                      <button
-                        type="button"
-                        className="mt-2 text-[12.5px] font-bold text-brand-text underline"
-                        onClick={() => void responder(f.id, 'presente')}
-                      >
-                        Desfazer falta
-                      </button>
+                      {lancada.travada ? (
+                        <p>
+                          <b className="text-text-primary">{primeiro}</b> está como <b className="text-text-primary">falta</b> —{' '}
+                          {lancada.carimbo!.toLocaleLowerCase('pt-BR')}. Nada será gravado pra {primeiro}. Se ele veio,
+                          fala com a secretaria que elas ajustam. ✋
+                        </p>
+                      ) : (
+                        <>
+                          <p>Falta declarada — nada será gravado pra {primeiro}. Nada foi inventado. ✋</p>
+                          <button
+                            type="button"
+                            className="mt-2 text-[12.5px] font-bold text-brand-text underline"
+                            onClick={() => void responder(f.id, 'presente')}
+                          >
+                            Desfazer falta
+                          </button>
+                        </>
+                      )}
                     </div>
                   ) : (
                     entradaManual ? (
@@ -902,6 +921,20 @@ function Confetes() {
  * A UI explica o efeito e oferece a única exceção explícita; ela nunca pergunta
  * se o aluno esteve nem faz uma segunda regra de presença.
  */
+/**
+ * A presença já foi lançada por quem manda nela (secretaria/Emusys). Aqui é só
+ * o carimbo de quem lançou — sem botão, porque o professor não edita presença
+ * já dada; a responsabilidade dele nesta tela é o conteúdo da aula.
+ */
+function PresencaCarimbada({ carimbo }: { carimbo: string }) {
+  return (
+    <div className="flex items-start gap-2 px-[14px] py-[10px] text-[12.5px] leading-relaxed text-text-secondary">
+      <i className="fa-solid fa-lock mt-[3px] text-text-muted" aria-hidden="true" />
+      <span>{carimbo}</span>
+    </div>
+  )
+}
+
 function PresencaPadrao({ nome, onMarcarFalta }: { nome: string; onMarcarFalta: () => void }) {
   return (
     <div>
