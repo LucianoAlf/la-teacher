@@ -55,22 +55,81 @@
 > O do Valdo virar **erro** é o resultado certo: o áudio dele não existe mais
 > (defeito 3 apagou). O ganho é que o silêncio virou **erro diagnosticável**.
 >
-> ### ⚠️ QUINTO problema, de OUTRA natureza — fica aberto
+> ### 🔎 QUINTO problema — DIAGNOSTICADO 15/08 tarde: não é o contrato, é ROTEAMENTO
 >
-> O áudio do Isaque transcreveu bem e mesmo assim
-> `fabio_criar_registro_aula` recusou: `normalizacao_invalida` (14:46:32, log
-> do Hermes). **Não é transporte — é contrato de conteúdo**, e é anterior a
-> tudo que eu consertei hoje. Já tem vítimas antigas: profs **3** e **46**,
-> `normalizacao_invalida` com **11 tentativas cada** desde 10-12/08.
+> **O contrato está certo. O microfone é que abre a porta errada.**
 >
-> Meus consertos fizeram o que prometiam — a falha ficou **visível e limitada**
-> (para em 3 tentativas) em vez de silêncio infinito. Mas o áudio do Isaque
-> **não vai se recuperar sozinho**: a próxima tentativa falha igual.
+> O áudio do Isaque transcreveu bem e `fabio_criar_registro_aula` recusou com
+> `normalizacao_invalida`. A pista do "nome divergente" era **falsa**: o tool
+> devolve só a string genérica, e foi o **agente que inventou** a explicação e
+> gravou no campo `erro` da fila. Medido — a razão real é outra.
 >
-> **Investigar:** por que `validar_e_sanear_normalizacao` recusa. O log mostra
-> o agente chamando `fabio_buscar_roster_aula` logo depois — cheiro de
-> divergência de roster (mesma família do erro do prof 3: *"contexto sem roster
-> canônico e transcrição cita nome divergente"*).
+> **Os três casos são a mesma coisa, e são cinco, não três.** Reproduzido
+> chamando `_buscar_roster_aula` no código vivo da VPS:
+>
+> | audio | prof | aula | categoria | `qtd_contexto` | `qtd_roster` |
+> |---|---|---|---|---|---|
+> | `3c47cf22` | 10 (Isaque) | 34334742 | experimental | 1 | **0** |
+> | `292f9739` | 3 | 29640958 | experimental | 1 | **0** |
+> | `be63b8c6` | 46 | 18393249 | experimental | 1 | **0** |
+> | `d7a86ca7` | 46 | 18393265 | experimental | — | **0** (49 tentativas) |
+> | `88b89551` | 35 | 16157255 | **normal** | — | **0** (46 tentativas) |
+>
+> Roster **vazio**, não divergente. Em `aula_alunos_emusys` a linha existe com o
+> **nome** ("Davi Nakashima") e `aluno_id` **NULL** — porque **lead não é
+> aluno**, a mesma fronteira de [[contexto-experimental-antes-da-matricula]].
+> `_dedupe_roster` descarta quem não tem id, o fallback na
+> `vw_fabio_carteira_professor` também não acha (lead não está na carteira, e o
+> curso é "Aula Experimental"), e `fabio_criar_registro_aula:765` levanta
+> `roster_invalido` — que o catch-all da linha 796 achata em
+> `normalizacao_invalida`. **Recusar é o comportamento certo:** o contrato se
+> nega a inventar um `aluno_id`.
+>
+> ### A raiz: o trilho da experimental existe, está de pé, e nunca recebeu nada
+>
+> Desde **07/08** a fila tem duas rotas (`vinculo_id` nulo → Hermes/roster de
+> alunos; preenchido → `fabio_audio_experimental_worker.py`), construídas
+> exatamente porque "a experimental tem lead, não aluno". Medido hoje:
+>
+> - **139 linhas na `fabio_fila_audios`, ZERO com `vinculo_id`.**
+> - `lead_experimental_registros`: **0 linhas** desde que nasceu.
+> - `fabio-audio-experimental.timer`: **ativo, rodando a cada 20s.**
+>
+> O trilho está vivo esperando trabalho que nunca chega. Por quê:
+>
+> | camada | o que faz |
+> |---|---|
+> | [`SessaoRow.tsx:40`](src/features/agenda/SessaoRow.tsx:40) | `mostrarGravar` **não** considera `ehExperimental` → o microfone aparece na linha da experimental |
+> | [`Agenda.tsx:52`](src/pages/app/Agenda.tsx:52) | `gravarAula` **não** ramifica — enquanto `abrirSessao` (linha 39) ramifica certo e leva pra `/app/experimental/:vinculo_id` |
+> | `app_enfileirar_audio` / `fn_enfileirar_audio_core` | **não mencionam `experimental` nem `vinculo`** — aceitam a experimental sem guarda e gravam `vinculo_id = NULL` |
+>
+> **Clicar na LINHA leva à porta certa; clicar no MICROFONE da mesma linha leva
+> à porta errada e o áudio morre.** Dois botões no mesmo lugar, um deles perde o
+> trabalho do professor em silêncio.
+>
+> ### Tamanho da classe (30 dias, medido)
+>
+> Aulas com roster vazio — qualquer áudio delas seria recusado igual:
+> **149 experimentais** (de 177, ou seja **84%**) e **1.193 normais** (780 no
+> futuro, **413 já passadas**). Registros de aula experimental que existem em
+> `fabio_registros_aula`: **2**, ambos de hoje, e só porque aquela aula tinha
+> aluno matriculado.
+>
+> ### O que consertar (não aplicado ainda)
+>
+> 1. **Cliente (a raiz):** esconder o microfone na linha da experimental e
+>    mandar `gravarAula` seguir a mesma régua que `abrirSessao` já usa —
+>    incluindo o caso `vinculo_id == null`, que hoje já tem mensagem própria.
+> 2. **Banco (defesa em profundidade):** `fn_enfileirar_audio_core` deve
+>    **recusar** aula experimental, pra cliente velho não perder áudio de novo.
+> 3. **Diagnosticabilidade:** `fabio_criar_registro_aula` devolver o código real
+>    do contrato em vez de achatar tudo em `normalizacao_invalida` — foi esse
+>    achatamento, mais a explicação inventada pelo agente, que mandou a
+>    investigação pro lado errado por dias.
+> 4. **Recuperação:** ver quais dos 5 áudios ainda têm bytes no Storage e
+>    reenfileirar pelo trilho do `vinculo_id`.
+>
+> Evidência bruta em `~/claude-diag-normalizacao/` na VPS.
 >
 > ### ✅ Login por e-mail — FEITO (4 professores)
 >
