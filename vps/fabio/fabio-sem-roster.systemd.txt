@@ -1,0 +1,65 @@
+# Timer do aviso "a aula está sem aluno no sistema"
+#
+# Instalar em ~/.config/systemd/user/ na VPS (usuário fabio, sem sudo):
+#
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now fabio-sem-roster.timer
+#   systemctl --user list-timers | grep sem-roster
+#
+# O QUE ELE FAZ, NESTA ORDEM
+#
+#   1. `fn_fila_audio_retomar_por_roster` — religa o áudio que já morreu por
+#      turma vazia e cuja turma AGORA tem aluno. É a promessa da mensagem
+#      sendo cumprida por código.
+#   2. `fabio_fila_sem_roster_a_avisar` — quem continua parado e ainda não
+#      soube. Um aviso por linha da fila, deduplicado pelo índice único da
+#      referência (018).
+#
+# A ordem importa: religar antes de avisar evita cobrar a secretaria por algo
+# que ela já resolveu enquanto o professor estava esperando.
+#
+# POR QUE 15 MINUTOS, E NÃO 5
+#
+# Nada aqui é urgente — o áudio já está parado há horas ou dias, e a RPC só
+# devolve linha parada há mais de 30 min (FABIO_SEM_ROSTER_GRACE_MIN). Varrer
+# de 5 em 5 só multiplicaria consulta.
+#
+# POR QUE NÃO ENTRA NO `--event all`
+#
+# O `all` é a rodada do briefing/pendência, que tem hora marcada. Misturar a
+# cobrança da secretaria com o bom-dia das 8h junta duas conversas diferentes
+# no mesmo minuto. Timer próprio, como a devolutiva e o recibo.
+#
+# CALIBRAGEM (variáveis de ambiente, opcionais)
+#   FABIO_SEM_ROSTER_DIAS       (default 7)  — não cobra áudio mais velho que
+#                                              isso; sem esse teto, ligar o
+#                                              aviso despejaria o passivo
+#                                              inteiro de uma vez.
+#   FABIO_SEM_ROSTER_GRACE_MIN  (default 30) — a secretaria pode estar
+#                                              lançando a turma agora.
+
+# ─── ~/.config/systemd/user/fabio-sem-roster.service ────────────────────────
+[Unit]
+Description=Fabio — avisa o professor quando a aula está sem aluno no sistema
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fabio/fabio-chat-bridge
+EnvironmentFile=/home/fabio/.hermes/.env
+ExecStart=/usr/bin/flock -n /tmp/fabio-sem-roster.lock /usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event sem-roster --channel whatsapp --json
+StandardOutput=append:/home/fabio/.hermes/logs/fabio-sem-roster.out.log
+StandardError=append:/home/fabio/.hermes/logs/fabio-sem-roster.err.log
+
+# ─── ~/.config/systemd/user/fabio-sem-roster.timer ──────────────────────────
+[Unit]
+Description=Religa o áudio parado por turma vazia e avisa quem continua parado
+
+[Timer]
+OnCalendar=*:0/15
+AccuracySec=1min
+Persistent=false
+Unit=fabio-sem-roster.service
+
+[Install]
+WantedBy=timers.target

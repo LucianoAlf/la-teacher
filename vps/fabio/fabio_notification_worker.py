@@ -1569,9 +1569,159 @@ def run_devolutivas(channel: str, dry_run: bool, professor_id: Optional[int] = N
     return resultados
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Aula sem aluno — o professor gravou e o registro não tinha em quem entrar.
+#
+# O normalizador recusa CERTO: sem roster não dá pra fatiar por aluno sem
+# inventar gente. O defeito era o silêncio depois disso — a linha ia pra
+# erro_terminal e o professor nunca soube que o trabalho dele sumiu. Medido em
+# 15/08: 1 áudio em 30 dias (prof 35, G_Seg_17/CG), sobre 92 aulas âncora sem
+# nenhum aluno no roster. Pouco áudio, mas 100% de perda silenciosa.
+#
+# Duas metades, e a segunda é o que torna a primeira honesta:
+#   1. avisar — com o motivo certo: não é o professor, é a turma vazia lá;
+#   2. CUMPRIR a promessa do aviso — `fn_fila_audio_retomar_por_roster` religa
+#      o áudio quando a secretaria lança os alunos. Roda ANTES da varredura,
+#      pelo mesmo motivo de `manutencao_devolutivas`: função pronta sem
+#      chamador é o erro que este arquivo já viu três vezes.
+
+
+def retomar_sem_roster() -> int:
+    try:
+        return int(rpc("fn_fila_audio_retomar_por_roster", {"p_limite": 20}) or 0)
+    except Exception as exc:
+        log("sem_roster_retomada_falhou", error=str(exc)[:300])
+        return 0
+
+
+SEM_ROSTER_DIAS = int(os.getenv("FABIO_SEM_ROSTER_DIAS", "7"))
+SEM_ROSTER_GRACE_MIN = int(os.getenv("FABIO_SEM_ROSTER_GRACE_MIN", "30"))
+
+
+def format_aviso_sem_roster(prof: Dict[str, Any], item: Dict[str, Any]) -> str:
+    curso = (item.get("curso_nome") or "aula").strip()
+    turma = (item.get("turma_nome") or "").strip()
+    titulo = f"{curso} — {turma}" if turma else curso
+
+    quando = str(item.get("inicio_brt") or "")
+    # A RPC devolve timestamp sem fuso, já em BRT. Formato curto: o professor
+    # precisa reconhecer QUAL aula, não ler um ISO.
+    try:
+        momento = datetime.fromisoformat(quando.replace(" ", "T")[:19])
+        quando_texto = momento.strftime("%d/%m às %Hh%M").replace("h00", "h")
+    except Exception:  # noqa: BLE001
+        quando_texto = quando or "há alguns dias"
+
+    return "\n".join([
+        f"Oi, {first_name(prof)}! 🎵",
+        "",
+        f"Recebi seu áudio de *{titulo}*, de *{quando_texto}*, mas não consegui "
+        "gravar o registro: no sistema essa aula está *sem nenhum aluno*.",
+        "",
+        "Não é você. Sem aluno na turma eu não tenho em quem lançar o conteúdo — "
+        "e eu não invento aluno.",
+        "",
+        "*Seu áudio está guardado.* Assim que a secretaria lançar os alunos "
+        "dessa turma, eu processo sozinho e te aviso.",
+        "",
+        "Se achar que é engano, fala com a secretaria da unidade. 😉",
+    ])
+
+
+def run_sem_roster(channel: str, dry_run: bool, professor_id: Optional[int] = None) -> list[Dict[str, Any]]:
+    spec_tipo, spec_categoria = "registro_sem_roster", "informativa"
+    resultados: list[Dict[str, Any]] = []
+
+    if not dry_run:
+        religados = retomar_sem_roster()
+        if religados:
+            log("sem_roster_religados", quantos=religados)
+            resultados.append({"event": "sem_roster", "status": "religados", "quantos": religados})
+
+    try:
+        pendentes = rpc("fabio_fila_sem_roster_a_avisar", {
+            "p_limite": 20,
+            "p_grace_minutos": SEM_ROSTER_GRACE_MIN,
+            "p_dias": SEM_ROSTER_DIAS,
+        }) or []
+    except Exception as exc:
+        return resultados + [{"event": "sem_roster", "status": "error", "error": str(exc)[:500]}]
+
+    if professor_id is not None:
+        pendentes = [p for p in pendentes if int(p.get("professor_id") or 0) == int(professor_id)]
+    if not pendentes:
+        return resultados
+
+    por_id = {int(p["id"]): p for p in active_professors()}
+
+    for item in pendentes:
+        pid = int(item.get("professor_id") or 0)
+        resultado: Dict[str, Any] = {
+            "professor_id": pid, "event": "sem_roster", "tipo": spec_tipo,
+            "fila_id": str(item.get("fila_id")), "status": "init",
+        }
+        prof = por_id.get(pid)
+        if not prof:
+            resultado["status"] = "professor_inativo_skip"
+            resultados.append(resultado)
+            continue
+        if channel == "whatsapp" and not bridge.canonical_phone(prof.get("telefone_whatsapp") or ""):
+            resultado["status"] = "missing_phone_skip"
+            resultados.append(resultado)
+            continue
+        if not can_notify(pid, spec_categoria) and not dry_run:
+            resultado["status"] = "blocked_by_preferences"
+            resultados.append(resultado)
+            continue
+
+        corpo = format_aviso_sem_roster(prof, item)
+        if dry_run:
+            resultado["status"] = "dry_run_ready"
+            resultado["content_preview"] = corpo
+            resultados.append(resultado)
+            continue
+
+        claim = rpc("fabio_claim_notificacao_por_referencia", {
+            "p_professor_id": pid,
+            "p_tipo": spec_tipo,
+            "p_categoria": spec_categoria,
+            "p_canal": channel,
+            "p_corpo": corpo,
+            # A referência é a LINHA DA FILA, não a aula: é ela que a retomada
+            # procura depois pra saber onde a promessa foi feita.
+            "p_referencia_tipo": "fila_audio_sem_roster",
+            "p_referencia_id": str(item["fila_id"]),
+            "p_titulo": "Aula sem aluno no sistema",
+            "p_lease_minutos": 10,
+        }) or {}
+        if not claim.get("claimed"):
+            resultado["status"] = "already_claimed_or_sent"
+            resultados.append(resultado)
+            continue
+
+        notificacao_id = claim.get("notificacao_id")
+        lease_token = claim.get("lease_token")
+        try:
+            deliver(pid, channel, corpo)
+            if not mark_sent(notificacao_id, lease_token):
+                log("notificacao_enviada_mas_nao_fechada",
+                    notificacao_id=str(notificacao_id), professor_id=pid)
+                resultado["aviso"] = "entregue_mas_nao_fechada"
+            resultado["status"] = "sent"
+        except Exception as exc:
+            try:
+                mark_failed(notificacao_id, str(exc), lease_token)
+            finally:
+                resultado["status"] = "failed"
+                resultado["error"] = str(exc)[:500]
+        resultados.append(resultado)
+
+    return resultados
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "registro_recibo", "registro-recibo", "escalonamento", "feedback", "all"], default="all")
+    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "registro_recibo", "registro-recibo", "sem_roster", "sem-roster", "escalonamento", "feedback", "all"], default="all")
     parser.add_argument("--professor-id", type=int)
     parser.add_argument("--channel", choices=["whatsapp", "app"], default=DEFAULT_CHANNEL)
     parser.add_argument("--dry-run", action="store_true")
@@ -1588,6 +1738,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.event == "registro-recibo":
         args.event = "registro_recibo"
+    if args.event == "sem-roster":
+        args.event = "sem_roster"
 
     now = datetime.now(BRT)
     target_date = args.date or now.date().isoformat()
@@ -1604,6 +1756,23 @@ def main() -> int:
             log("event_result", **r)
         results.extend(recibo_results)
         if args.event == "registro_recibo":
+            payload = {"ok": True, "results": results}
+            print(json.dumps(payload, ensure_ascii=False) if args.json else payload)
+            return 0
+
+    # Aula sem aluno: varredura de fila, sem hora marcada — como a devolutiva.
+    # Fica FORA do "all" de propósito: tem timer próprio (fabio-sem-roster), e
+    # entrar no "all" faria a rodada do briefing das 8h cobrar a secretaria
+    # junto, misturando duas conversas.
+    if "sem_roster" in selected:
+        try:
+            sem_roster_results = run_sem_roster(args.channel, args.dry_run, args.professor_id)
+        except Exception as exc:
+            sem_roster_results = [{"event": "sem_roster", "status": "error", "error": str(exc)[:500]}]
+        for r in sem_roster_results:
+            log("event_result", **r)
+        results.extend(sem_roster_results)
+        if args.event == "sem_roster":
             payload = {"ok": True, "results": results}
             print(json.dumps(payload, ensure_ascii=False) if args.json else payload)
             return 0
