@@ -42,13 +42,41 @@
 > **O áudio do Valdo foi destruído** pelo defeito 3 às 14:07:19, antes de o
 > conserto existir. Ele **precisa regravar** — não há como reprocessar.
 >
-> **PRÓXIMO PASSO:** (a) pedir ao Valdo que regrave, pra fechar o fim a fim com
-> áudio real de professor; (b) login por e-mail dos 4 professores — a
-> capacidade **já existe** (`signInWithPassword` em `src/lib/auth.tsx:94`),
-> falta só trocar o e-mail sintético `<whatsapp>@la.internal` pelo real no
-> `usuarios` + auth. Decisão pendente do Alf: como eles definem a senha.
+> ### ✅ RECUPERAÇÃO PROVADA EM PRODUÇÃO (cron real das 14:45:01)
 >
-> Commit: `b2af90b`. Árvore limpa, `main` = `origin/main`.
+> A tubulação consertada ressuscitou órfãos reais sozinha:
+>
+> | professor | antes | depois |
+> |---|---|---|
+> | **32 (Akeem)** | `transcrito` morto desde 14/08 | **`normalizado` + 2 registros gravados** |
+> | 10 (Isaque) | `transcrito` morto desde 13/08 | reprocessando (`transcrito`, tentativa 2 de 3) |
+> | 36 (Valdo) | `transcrevendo` mudo | **`erro: falha ao gerar signed url`** |
+>
+> O do Valdo virar **erro** é o resultado certo: o áudio dele não existe mais
+> (defeito 3 apagou). O ganho é que o silêncio virou **erro diagnosticável**.
+>
+> ### ✅ Login por e-mail — FEITO (4 professores)
+>
+> Descoberto: `<whatsapp>@la.internal` é **placeholder por desenho** (o próprio
+> comentário do `professor-entrar` diz isso), e `signInWithPassword` já estava
+> ligado. Trocar pelo e-mail real **não quebra** o WhatsApp+código — é o caminho
+> previsto (`fn_pedir_codigo_de_acesso` lê `usuarios.email`).
+>
+> | professor | id | e-mail |
+> |---|---|---|
+> | Daiana Pacifico | 3 | daiana@lamusic.com.br |
+> | Isaque Mendes | 10 | isaque@lamusic.com.br |
+> | Leonardo Castro | 19 | leo@lamusic.com.br |
+> | Valdo Delfino | 36 | valdo@lamusic.com.br |
+>
+> Auth e `usuarios.email` conferidos consistentes nos 4. **Senha não definida
+> por mim** — o Alf define pelo "Esqueci minha senha" ou pelo painel.
+>
+> **PRÓXIMO PASSO:** pedir ao Valdo que **regrave** o áudio — é o único jeito de
+> fechar o fim a fim com áudio de professor pelo WhatsApp, já que o original foi
+> destruído antes do conserto existir.
+>
+> Commits: `b2af90b` (4 consertos) + `921d94c` (checkpoint). Árvore limpa.
 
 > ## 🔎 CHECKPOINT ATIVO — 15/08/2026 manhã BRT · três relatos de professor, na raiz
 >
