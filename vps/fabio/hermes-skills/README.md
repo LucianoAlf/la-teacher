@@ -36,12 +36,15 @@ As outras skills da casa (`briefing-pedagogico`, `cobrar-registro-aula`,
 `governanca-presenca-fabio`, `consultar-prontuario-aluno`) ainda vivem só
 na VPS. Espelhar cada uma na primeira vez que for editada.
 
-### Registro de aula — procedência do espelho (11/08/2026)
+### Registro de aula — procedência do espelho (15/08/2026)
 
 O espelho `registro-aula-audio-la-music/SKILL.md` corresponde exatamente ao
 runtime
 `~/.hermes/skills/la-music/registro-aula-audio-la-music/SKILL.md` no momento
-da coleta. SHA-256: `145bb5f6cff2bfd3aec753c7a20ddee93481aaff9e0c51e8ea47a82b170427a3`.
+da coleta. SHA-256: `6e597f1732f7399a54bde8057a0c6462990dbae99e2b05468d3402e76ecca855`
+(v1.4 — editada primeiro localmente e enviada VPS via scp, hash conferido dos
+dois lados; antes de editar eu confirmei que o hash da VPS ainda batia com o
+espelho anterior, `145bb5f6...`, para não pisar em edição concorrente).
 Ele é auditável no Git, mas a VPS continua sendo a dona da fonte viva: não
 copie este arquivo para ela sem comparar hash e diff.
 

@@ -1,7 +1,7 @@
 ---
 name: registro-aula-audio-la-music
-description: Use when a LA Music teacher sends an audio or text describing a lesson, including LA Teacher app webhook payloads, to turn it into a structured pedagogical record using Fábio's Normalização v1.3 alma.
-version: 1.3.0
+description: Use when a LA Music teacher sends an audio or text describing a lesson, including LA Teacher app webhook payloads, to turn it into a structured pedagogical record using Fábio's Normalização v1.4 alma.
+version: 1.4.0
 author: Fábio / Hermes Agent
 license: MIT
 metadata:
@@ -10,13 +10,14 @@ metadata:
     related_skills: [briefing-pedagogico-la-music]
 ---
 
-# FÁBIO · Alma de Normalização v1.3
-### O prompt-mestre do ato de registro · LA Music · 04/07/2026 (v1.1: 06/07/2026 · v1.2: 13/07/2026 · v1.3: 13/07/2026)
+# FÁBIO · Alma de Normalização v1.4
+### O prompt-mestre do ato de registro · LA Music · 04/07/2026 (v1.1: 06/07/2026 · v1.2: 13/07/2026 · v1.3: 13/07/2026 · v1.4: 15/08/2026)
 ### Usado por: Edge Function `fabio-processa-audio` (app) e skill do Hermes (WhatsApp) — UMA alma, dois canais.
 ### Fontes: Tese do Quintela (Relatorio_de_Aula_LA_Music) + Moldes Canônicos A/B/C + síntese aprovada pelo Alf (04/07).
 ### v1.1: adicionada a seção-núcleo "O CORAÇÃO DO FÁBIO" (separação turma comum vs. nominal) + Exemplo 1-bis (aula de canto), a partir da regra de negócio detalhada pelo Alf no chão de fábrica.
 ### v1.2: progresso individual não pode repetir/parafrasear atividades do tronco; se não houver evidência individual, `fatia.progresso = null`.
 ### v1.3: repertório pode existir no tronco e/ou na fatia; música específica de aluno vai em `fatia.repertorio`, sem repetir repertório comum da turma.
+### v1.4: título de música dito dentro do texto corrido de `atividades`/`progresso` tem que APARECER TAMBÉM em `repertorio` — checklist item 4, a partir de um bug real de produção (14-15/08: "Jingle Bells" e "O Sol" ficaram só no texto, com `repertorio=null`).
 
 ---
 
@@ -193,6 +194,34 @@ Se houver tronco e fatia ao mesmo tempo, **não escolha um e apague o outro**. E
 - tronco: o que a turma compartilhou;
 - fatia: qual música aquele aluno está trabalhando.
 
+### Teste de regressão obrigatório — O Sol / aula individual (bug real de produção, 15/08)
+
+Contexto real: aula individual de violão. O professor não separou "atividade" de "repertório" na fala — o nome da música saiu misturado dentro da frase de atividades, como costuma acontecer.
+
+Entrada conceitual:
+
+> "Trabalhamos postura no instrumento, corrigi a postura e fizemos os primeiros acordes com a execução da música O Sol."
+
+Saída ERRADA — foi exatamente o que aconteceu em produção (e, na mesma turma/dia, "Jingle Bells" recebeu o mesmo tratamento errado): o título fica só dentro do texto corrido, `repertorio` sai `null`.
+
+```json
+{ "tronco": { "campos": {
+  "atividades": "Prática dos primeiros acordes, com correção de postura e execução da música O Sol.",
+  "repertorio": null
+} } }
+```
+
+Saída CORRETA — o nome sai do meio da frase de `atividades` e vira também o valor de `repertorio`. `atividades` continua contando a narrativa da aula (pode até mencionar que houve uma música, sem repetir o título completo); `repertorio` é quem responde "qual foi a música", sem precisar abrir o texto corrido pra achar:
+
+```json
+{ "tronco": { "campos": {
+  "atividades": "Prática de postura no instrumento, correção de postura e primeiros acordes.",
+  "repertorio": "O Sol"
+} } }
+```
+
+Isso vale mesmo em aula 1:1, onde o tronco já é o próprio aluno (ver seção "PROGRESSO DEPENDE DO TAMANHO DA AULA" acima): `atividades` e `repertorio` continuam sendo campos diferentes, nunca fundir um dentro do outro só porque há um aluno só.
+
 Teste de regressão obrigatório — Valentina / recital:
 
 Contexto: turma trabalhou “Temos que Pegar” em conjunto, mas Valentina individualmente ensaiou “Imagine” para o recital.
@@ -242,6 +271,8 @@ Checklist antes de devolver JSON:
    - então verifique se `tronco.campos.atividades` resume o trabalho comum/real da aula.
 3. O tronco está vazio mas fatias estão ricas?
    - quase sempre é bug. Releia a transcrição e derive o tronco a partir do que foi dito.
+4. `atividades` (tronco) ou `progresso` (fatia) menciona uma música por nome dentro do texto corrido? Ex.: "execução da música X", "prática de X", "trabalhamos X", "com a música X".
+   - então esse título tem que existir TAMBÉM no `repertorio` correspondente (tronco se comum a todos, fatia se nominal de um aluno) — nunca só dentro da prosa de atividades/progresso. Bug real de produção, ver "Teste de regressão obrigatório — O Sol" na seção de repertório acima. Vale para toda aula, inclusive individual/1:1.
 
 Exemplo do bug corrigido:
 

@@ -33,8 +33,39 @@
 > individual, Próximo passo, Observação) seguem **editáveis com o lápis** — que
 > é exatamente o desenho: presença travada, conteúdo livre.
 >
-> **PRÓXIMO PASSO:** nada travando esta frente. O que segue aberto é o backlog
-> anterior (bloco de 13/08 abaixo).
+> ## 🎵 Relato novo (15/08, mesma sessão): repertório fica preso dentro de `atividades`
+>
+> O Alf trouxe print do WhatsApp de uma professora ("Ele colocou a música no
+> campo errado. Já editei") — Jingle Bells apareceu dentro do texto corrido de
+> `atividades` em vez de em `repertorio`. Não pediu conserto imediato, pediu
+> "ver a arquitetura" — mas medido (não só plausível) o defeito é sistêmico:
+> nos últimos 14 dias, **56/120 troncos** ficaram sem `repertorio`; pelo menos
+> dois são erro confirmado, não aula sem música — Jingle Bells (já editado
+> pelo professor) e um "O Sol" **do mesmo dia, ainda não editado no banco**,
+> enquanto a mesma música saiu certa em 3 outras aulas no mesmo dia. Não é
+> falha total (a maioria das extrações recentes está correta, com "Música, de
+> Artista"), é inconsistência de recall do modelo.
+>
+> **Causa raiz:** a skill `registro-aula-audio-la-music` já tem a regra
+> ("repertório é campo próprio"), mas o checklist de auto-conferência antes de
+> devolver o JSON não tinha item cobrando isso — só cobria `objetivo`/`eixos`
+> e tronco-vazio-com-fatia-rica.
+>
+> **Conserto aplicado (v1.4, SHA-256 `6e597f17...`):** item 4 novo no
+> checklist + exemplo de regressão embutido no prompt com o caso real de hoje
+> (O Sol, aula individual). Editado primeiro no espelho do repo, depois `scp`
+> pra VPS com hash conferido dos dois lados (antes e depois — sem deriva).
+> Invalidação do `.skills_prompt_snapshot.json` é automática por
+> mtime/tamanho (`prompt_builder.py:_load_skills_snapshot`), não precisa
+> comando manual.
+>
+> **PRÓXIMO PASSO — verificação pendente, não fabricada:** este é um prompt de
+> LLM, não código determinístico; não existe harness pra ensaiar essa skill
+> sem tocar dado real de aula (`falar_com_fabio.py` só cobre o chat
+> `chat-fabio-la-music`, rota diferente). Verificação real vem da próxima
+> leva de registros de aula com música mencionada solta na fala — reconsultar
+> `fabio_registros_aula` daqui a alguns dias, ou assim que o Alf reportar o
+> padrão de novo.
 >
 > Árvore limpa, `main` = `origin/main`, nada pendente de push.
 >
