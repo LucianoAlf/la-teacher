@@ -1,8 +1,9 @@
 # RETOMADA — LA Teacher
 
-> ## ✅ FASE 1 e 3 FEITAS — 15/08/2026 · o vínculo casa pelo id do lead
+> ## ✅ FASES 1, 2 e 3 NO AR — 15/08/2026 · o vínculo casa pelo id do lead
 >
-> Ordem combinada com o Alf: **1 → 3 → 2 → 4**. As duas primeiras estão no ar.
+> Ordem combinada com o Alf: **1 → 3 → 2 → 4**. As três primeiras estão no ar;
+> a 4 está **parcialmente provada** (ver no fim).
 >
 > ### Fase 1 — a régua nova (commit `24a6a5b`)
 >
@@ -40,21 +41,89 @@
 > morria por ERRO de constraint (exit≠0), não por asserção; troquei por um que
 > **mente na procedência** (`chave_natural`) e morre pela asserção certa.
 >
+> ### ⚠️ Correção do que eu relatei na Fase 3
+>
+> Dos **87** vínculos da varredura, **78 a chave natural TAMBÉM alcançaria** —
+> eles só estavam fora da janela `[hoje-1, hoje+7]` da porta antiga. O ganho da
+> varredura veio da **JANELA**, não da chave. A chave nova é a única que alcança
+> **9** deles. Continuo achando a porta nova necessária (esses 9 são justamente
+> professor trocado / horário mudado), mas o número que eu dei antes dava a
+> impressão errada.
+>
 > ---
 >
-> ## ⏭️ FALTA — nesta ordem
+> ## ✅ FASE 2 — o cron abre as duas portas (commit `951d24f`)
 >
-> **Fase 2 — a janela do cron.** Hoje o cron chama só
-> `fn_reconciliar_experimental_aulas` com janela `[hoje-1, hoje+7]`. Falta
-> **plugar a porta nova no cron** (`reconciliar-experimental-aulas`, jobid 95,
-> `12,27,42,57 * * * *`) para rodar ANTES da antiga. Sem isso, a Fase 1 só vale
-> para o passado que eu já varri — o presente continua dependendo da chave
-> natural.
+> `cron.job` 95 agora chama **`fn_reconciliar_experimental_tick(7, 200)`**:
+> porta do id do lead primeiro, chave natural depois. Rodou às **14:12 BRT,
+> `succeeded`**, e os 87 vínculos seguem vigentes (0 substituídos).
 >
-> **Fase 4 — provar o trilho com ÁUDIO REAL, fim a fim.** `lead_experimental_registros`
-> ainda tem **0 linhas**: o trilho nunca processou nada em produção. Autorizado
-> pelo Alf usar o app logado como Isaque / Valdo / Daiana, gravar áudio de
-> verdade e conversar com o Fábio.
+> **Plugar do jeito óbvio teria sido PIOR que não plugar.** Três defeitos que só
+> apareceram ao ir plugar:
+>
+> 1. **A chave natural desfazia o casamento do id do lead.** A porta antiga
+>    confere todo vínculo `vinculado` pela régua dela; não batendo, conclui
+>    "reagendou" e tira de vigência. Mas professor trocado é EXATAMENTE o caso
+>    da porta nova: as duas no mesmo tick casariam às :12 e desfariam às :12,
+>    para sempre. Conserto: **cada chave policia o que ela criou**. Soberania
+>    **não é imunidade** — não casando nem pelo id (remarcação de verdade), sai
+>    de vigência igual.
+> 2. **O `pendente` trancava a porta nova.** Como só cabe uma linha vigente por
+>    lead e a porta nova só INSERIA, um lead carimbado `pendente/sem_par` ficava
+>    fora do alcance dela para sempre. Agora ela **PROMOVE** a linha — criar
+>    outra quebraria o `/app/experimental/:vinculo_id` que o app já abriu.
+> 3. **Falha da porta nova não derruba a antiga** (handler no tick).
+>
+> **6/6 mutantes mortos por asserção.** Dois achados do ensaio: o bootstrap
+> Docker não tinha `fn_presenca_e_forte` e **todo** lead virava "+1 erro"
+> silencioso no `exception when others`; e `to_regclass('cron.job')` **não**
+> protege um `exists (select from cron.job)` na mesma expressão (plpgsql resolve
+> nomes ao planejar) — o acesso ao cron foi pra dentro de um `EXECUTE`.
+>
+> Os 2 pendentes que sobraram na janela são **ambiguidade real**: a função
+> devolveu `aula_ocupada: 2` — a aula já é de outro lead vigente. Não rouba.
+>
+> ---
+>
+> ## 🟡 FASE 4 — metade provada, metade em aberto
+>
+> `lead_experimental_registros` continua com **0 linhas** e `fabio_fila_audios`
+> nunca recebeu **nenhum** áudio com `vinculo_id`. O trilho nunca carregou um
+> byte real.
+>
+> **PROVADO ao vivo (15/08):**
+>
+> - Timer `fabio-audio-experimental.timer` **ativo**, disparando a cada ~16s.
+> - Caminho de LEITURA do worker, com **áudio real de professor** (261 KB,
+>   `whatsapp/36/...mp3`), rodando as **próprias funções dele** sem escrever
+>   nada: `baixar` ✓ · `transcrever` (Whisper, 320 chars em português) ✓ ·
+>   `skill_ativa` (2.342 chars, de `fabio_skills`) ✓ · `montar_prompt` ✓ ·
+>   `bridge.run_hermes_api` (7,03 s, model `fabio`) ✓ · `extrair_json` devolveu
+>   os **quatro campos** ✓.
+>   `leitura_de_conversao` veio **null** — correto: o áudio-fonte era de aula
+>   NORMAL, não tinha sinal de conversão pra ler.
+> - Caminho de ESCRITA, contra produção em `BEGIN/ROLLBACK`, com os campos
+>   LITERAIS que o modelo devolveu: fila roteia pelo `vinculo_id` ✓ ·
+>   `fabio_gravar_registro_experimental_de_audio` grava ✓ · os quatro campos
+>   chegam no registro ✓ · a fila fecha em `normalizado` ✓.
+>
+> **EM ABERTO — e é o pedaço que importa:** ninguém apertou o botão de gravar no
+> app. Falta um professor real gravando uma experimental real. Duas razões pra
+> eu ter parado aqui:
+>
+> - Gravar eu mesmo escreveria **ficção pedagógica sobre uma criança real** no
+>   banco que o LA Report lê — e o `fabio-aviso-comercial.service` pode disparar
+>   WhatsApp pro comercial sobre uma aula que não aconteceu. Ação pra fora, sem
+>   volta: não faço sem o Alf mandar.
+> - As 4 contas de e-mail (`valdo@`/`isaque@`/`leo@`/`daiana@`) **não têm
+>   professor vinculado** por `colaboradores` (`professor_id` nulo nas quatro) —
+>   então nem dá pra abrir a tela de uma experimental logado como elas. **Isso
+>   é uma pendência de verdade**, não só do teste: o login por e-mail entra, mas
+>   não vira professor.
+>
+> ---
+>
+> ## ⏭️ FALTA
 >
 > **Legado a corrigir (apontado, não feito):** `lead_experimentais.emusys_aula_id`
 > (300 preenchidos, **1** casa — é id de EVENTO) e `emusys_agendamento_id`
