@@ -25,7 +25,7 @@
 >    professor responde em texto livre. Com 10 aulas compatíveis, guardamos as
 >    3 primeiras e **7 respostas possíveis dele continuam sem ter contra o que
 >    casar**. Alargar o teto é mexer numa guarda deliberada do banco —
->    decisão do Alf/Alfredo. O conserto de hoje é **meio conserto**, e está
+>    decisão do Alf. O conserto de hoje é **meio conserto**, e está
 >    dito assim no código.
 > 5. ~~"meio-dia" não casa com 12:00~~ **FEITO em parte (15/08).**
 >    `_explicit_time` aprendeu meio-dia / meia-noite / "e meia". Isso resolve o

@@ -233,7 +233,7 @@ def reduzir_shortlist(texto: str, candidatas: list[dict[str, Any]]) -> dict[str,
         # Isto é meio conserto, e está dito de propósito: com 10 aulas
         # compatíveis, 7 respostas possíveis do professor continuam sem ter
         # contra o que casar. Alargar o teto é mexer numa guarda deliberada do
-        # banco — decisão do Alf/Alfredo, não minha, e está anotado na RETOMADA.
+        # banco — decisão do Alf, não minha, e está anotado na RETOMADA.
         return {"status": "discriminante", "aula_id": None, "candidatas": compatible[:3], "pergunta": _question_for(compatible, True)}
     if len(compatible) == 1:
         return {"status": "selecionada", "aula_id": compatible[0]["aula_id"], "candidatas": compatible, "pergunta": None}
