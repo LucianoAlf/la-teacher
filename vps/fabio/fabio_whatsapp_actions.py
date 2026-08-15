@@ -492,7 +492,38 @@ def tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBa
         return revision
     action = _action(backend, context)
     if action:
-        return _handle_existing_action(backend, context, action)
+        # GUARDAR É INCONDICIONAL; rotear é que depende de estado.
+        #
+        # Até 15/08/2026 o áudio que chegava com uma ação aberta era tratado
+        # como resposta de TEXTO e o `_stage_audio` lá embaixo nunca era
+        # alcançado: os bytes iam pro lixo. O Isaque mandou dois áudios
+        # seguidos e o da aula das 13h morreu assim — sobrou a transcrição em
+        # `fabio_chat_mensagens`, sumiu o áudio. Professor manda áudio em
+        # sequência: é assim que ele trabalha, não é uso errado.
+        #
+        # O caminho sai do `wa_message_id`, que essa mesma tabela já guarda —
+        # então áudio guardado é recuperável por consulta, sem coluna nova.
+        # Isto NÃO retoma o áudio sozinho: a fila de pendentes por professor
+        # ainda não existe (ver RETOMADA). O que isto faz é parar de destruir.
+        # Replay da MESMA mensagem não é áudio novo: é a que abriu a ação, e o
+        # áudio dela já está guardado. Subir de novo desfaria a idempotência
+        # que o `_handle_existing_action` garante logo abaixo.
+        eh_replay = str(action.get("wa_message_id")) == str(context.get("wa_message_id"))
+        guardado = None
+        if context.get("kind") == "audio" and not eh_replay:
+            try:
+                guardado, _ = _stage_audio(backend, context)
+            except Exception:  # noqa: BLE001
+                # Falhar ao guardar não pode derrubar o fluxo que já funciona:
+                # a pergunta pendente do professor continua valendo.
+                guardado = None
+        resultado = _handle_existing_action(backend, context, action)
+        if guardado and resultado.get("reply"):
+            resultado["reply"] = (
+                f"{resultado['reply']} (Guardei esse áudio aqui — assim que a "
+                "gente fechar o anterior, ele entra.)"
+            )
+        return resultado
     text = str(context.get("text") or context.get("media_extracted_text") or "")
     if context.get("kind") == "audio":
         intent = classificar_intencao_audio(text, context.get("llm_json"))

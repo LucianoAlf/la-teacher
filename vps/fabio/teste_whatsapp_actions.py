@@ -709,6 +709,75 @@ class PerguntaDiscriminanteTest(unittest.TestCase):
         self.assertFalse([call for call in backend.calls if call[0] == "fabio_enfileirar_audio"])
 
 
+class AudioComAcaoAbertaTest(unittest.TestCase):
+    """O segundo áudio não pode sumir.
+
+    Até 15/08/2026: havendo ação aberta, a mensagem ia direto pra
+    `_handle_existing_action` seja qual for o `kind`, e o `_stage_audio` nunca
+    era alcançado — os bytes não subiam pro Storage. O Isaque mandou dois
+    áudios seguidos e o da aula das 13h morreu assim: sobrou a transcrição,
+    sumiu o áudio.
+
+    Guardar é incondicional; ROTEAR é que depende de estado. Enquanto a fila de
+    áudios pendentes não existe, o mínimo é não destruir.
+    """
+
+    def _acao_aberta(self):
+        return {
+            "id": "acao-1",
+            "professor_id": 25,
+            "wa_message_id": "audio-original",
+            "tipo": "escolher_aula_audio",
+            "estado": "aberta",
+            "storage_path": "whatsapp/25/audio-original.ogg",
+            "candidatas": [101, 102],
+            "payload": {"transcricao": "trabalhei repertorio"},
+        }
+
+    def test_audio_que_chega_com_acao_aberta_sobe_pro_storage(self):
+        backend = FakeBackend(action=self._acao_aberta(), candidates=[
+            {"aula_id": 101, "data": "2026-08-15", "hora": "12:00", "curso": "Teclado T"},
+            {"aula_id": 102, "data": "2026-08-15", "hora": "13:00", "curso": "Teclado T"},
+        ])
+        tratar_mensagem_professor(
+            professor_context(
+                kind="audio",
+                wa_message_id="segundo-audio",
+                text="aula de uma hora, tocamos Fur Elise e vimos o pedal",
+                media_url="https://media/2",
+            ),
+            backend,
+        )
+        self.assertEqual(len(backend.uploads), 1, "o segundo áudio não foi guardado")
+        # O caminho vem do wa_message_id: e isso que torna o audio recuperavel
+        # depois sem coluna nova nenhuma (`fabio_chat_mensagens` ja guarda o id).
+        self.assertTrue(backend.uploads[0][0].startswith("whatsapp/25/segundo-audio."))
+
+    def test_o_professor_e_avisado_de_que_o_audio_ficou_guardado(self):
+        backend = FakeBackend(action=self._acao_aberta(), candidates=[
+            {"aula_id": 101, "data": "2026-08-15", "hora": "12:00", "curso": "Teclado T"},
+            {"aula_id": 102, "data": "2026-08-15", "hora": "13:00", "curso": "Teclado T"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(
+                kind="audio", wa_message_id="segundo-audio",
+                text="aula de uma hora, tocamos Fur Elise", media_url="https://media/2",
+            ),
+            backend,
+        )
+        self.assertIn("guardei", (result.get("reply") or "").lower())
+
+    def test_texto_com_acao_aberta_continua_sem_upload(self):
+        backend = FakeBackend(action=self._acao_aberta(), candidates=[
+            {"aula_id": 101, "data": "2026-08-15", "hora": "12:00", "curso": "Teclado T"},
+        ])
+        tratar_mensagem_professor(
+            professor_context(wa_message_id="resposta", text="foi a das 12 horas"),
+            backend,
+        )
+        self.assertFalse(backend.uploads)
+
+
 class ApelidoDeHorarioTest(unittest.TestCase):
     """"meio-dia" é horário, não enfeite.
 
