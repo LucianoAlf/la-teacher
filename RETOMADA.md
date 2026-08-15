@@ -1,5 +1,25 @@
 # RETOMADA — LA Teacher
 
+> ## 🔭 RADAR — não pode cair (combinado com o Alf em 15/08)
+>
+> Interrompido pelo incidente do Isaque. **Voltar para estes três:**
+>
+> 1. **A perna do comercial da experimental** — única do ciclo que nunca
+>    entregou nada. `fabio-aviso-comercial` roda há dias com `na_fila: 0`
+>    porque nunca existiu registro. Hoje existiu por 40s e eu segurei o timer
+>    de propósito (conteúdo que eu inventei sobre aluna real indo pro
+>    comercial). **Precisa do OK do Alf** e são 30 segundos de re-execução.
+> 2. **Roster vazio na aula COMUM — é o que está sangrando.** Medido em
+>    15/08: **758 aulas normais em 30 dias sem nenhum aluno no roster** e
+>    **13 áudios de professor mortos** no período. Nos motivos aparece
+>    literalmente *"Aula sem roster canônico; impossível criar fatias sem
+>    inventar"*. Mesma família do defeito da experimental — só que na aula
+>    comum **não existe porta própria**, existe buraco. ⚠️ **Não medi quantos
+>    dos 13 são exatamente roster vazio** (tem transcrição vazia e signed url
+>    junto) — é a primeira coisa a fazer, antes de desenhar conserto.
+> 3. **Rotacionar a senha compartilhada** dos 4 professores (mesma senha nas
+>    4 contas, em texto claro no chat de 15/08).
+
 > ## ✅ FASES 1, 2 e 3 NO AR — 15/08/2026 · o vínculo casa pelo id do lead
 >
 > Ordem combinada com o Alf: **1 → 3 → 2 → 4**. As três primeiras estão no ar;
