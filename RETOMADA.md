@@ -34,8 +34,22 @@
 > |---|---|---|
 > | 1 | **Task 3** — detector determinístico `detectar_substituicao` + testes | ✅ **FEITO** — `f6f4b5e`, 22 testes verdes, frase do Isaque provada, mutante mata 5 |
 > | 2 | **Task 1** — schema append-only (2 tabelas + view + triggers) — **só rollback+mutantes** | ✅ **FEITO** — `6d01db0`, 5/5 mutantes, rollback verde, **sem migration viva**. Subagente achou frouxidão: default privileges do Supabase davam ALL a `service_role`; corrigido incluindo `service_role` no `revoke all` (append-only camada-1 agora real) |
-> | 2 | **Task 2** — RPCs + máquina de estados — **só rollback+mutantes** | 🚧 **subagente disparado** |
-> | 3 | **Task 4** — wiring em shadow no fluxo WhatsApp | 🔒 **só depois das RPCs APLICADAS com OK explícito do Alf** |
+> | 2 | **Task 2** — RPCs + máquina de estados — **só rollback+mutantes** | ✅ **FEITO** — `b312c2e` (RPCs) + `695a90f` (conserto da view). **O checkpoint pegou um verde falso**: o subagente reportou 5/5, mas rodando o baseline de novo caiu 3/3 (ver abaixo). Conserto aplicado, 5/5 na Task 1 e na Task 2, rollback prod sem divergência, **sem migration viva** |
+> | 3 | **Task 4** — wiring em shadow no fluxo WhatsApp | 🔒 **só depois das RPCs APLICADAS com OK explícito do Alf** — RPCs prontas e testadas, faltam aplicar `20260815130000` + `20260815140000` em prod (aguarda OK) |
+>
+> ### ⚠️ O verde falso da Task 2, e a raiz (checkpoint 15/08)
+> A view `vw_fabio_participacao_ocorrencia_estado` derivava o estado com
+> `order by criado_em desc, id desc`. Mas **`now()` é o horário de INÍCIO da
+> transação** (constante nela) e **`id` é uuid aleatório**: dois eventos na
+> MESMA transação (registrar→confirmar num só request, exatamente o que o teste
+> faz) empatavam em `criado_em` e o desempate caía em ordem de uuid. O estado
+> nunca avançava de forma confiável. O mutante do subagente passou **por sorte**
+> da ordem dos uuid. Conserto: `seq bigint generated always as identity` nos
+> eventos + `order by seq desc` (ordem de inserção monótona, sem relógio, sem
+> codificar a máquina de estados na view). Corrigi também a **cópia embutida do
+> schema** no runner da Task 2 (`mutantes-20260815140000.mjs` tem o DDL
+> hardcoded — dreno de drift a vigiar). **Lição:** re-rodar o baseline eu mesmo
+> é o que separou "reportado verde" de "vi verde".
 >
 > ⚠️ **Dependência da Task 2:** a schema (`20260815130000`) NÃO está aplicada em
 > produção. Então o ensaio rollback da Task 2 tem que rodar **schema + rpcs
@@ -46,10 +60,13 @@
 > `20260815140000` (RPCs). Conferir `ls supabase/migrations` no disco antes de
 > aplicar (duas sessões, mesmo checkout).
 >
-> **Ao voltar:** se o subagente da Task 1 terminou, ler o diff dele
-> (`20260815130000_*`), conferir rollback+mutantes verdes, **checkpoint com o
-> Alf**, e só então Task 2. Task 4 continua trancada até as RPCs estarem
-> aplicadas em produção com OK do Alf.
+> **PRÓXIMO PASSO:** Task 1, 2 e 3 estão **prontas, testadas e commitadas**
+> (schema + RPCs + detector). O que falta é **decisão do Alf**: aplicar
+> `20260815130000` (schema) + `20260815140000` (RPCs) em produção. Só depois do
+> OK explícito é que a Task 4 (wiring em shadow no `fabio_whatsapp_actions.py`)
+> destranca. Nada de aplicar migration viva sem esse OK. Conferir
+> `ls supabase/migrations` no disco antes de aplicar (duas sessões, mesmo
+> checkout).
 >
 > ---
 >
