@@ -147,7 +147,9 @@
     "teste:orfao-volta-pro-inicio": "node scripts/rodar-teste-sql.mjs supabase/migrations/20260815060000_o_orfao_reclamado_volta_pro_inicio.sql supabase/migrations/20260815060000_o_orfao_reclamado_volta_pro_inicio.test.sql",
     "mutantes:orfao-volta-pro-inicio": "node scripts/mutantes-20260815060000.mjs",
     "teste:experimental-porta-propria": "node scripts/rodar-teste-sql.mjs supabase/migrations/20260815070000_a_experimental_sem_aluno_nao_entra_pela_porta_do_aluno.sql supabase/migrations/20260815070000_a_experimental_sem_aluno_nao_entra_pela_porta_do_aluno.test.sql",
-    "mutantes:experimental-porta-propria": "node scripts/mutantes-20260815070000.mjs"
+    "mutantes:experimental-porta-propria": "node scripts/mutantes-20260815070000.mjs",
+    "teste:vinculo-por-lead": "node scripts/rodar-teste-sql.mjs supabase/migrations/20260815080000_o_vinculo_da_experimental_casa_pelo_id_do_lead.sql supabase/migrations/20260815080000_o_vinculo_da_experimental_casa_pelo_id_do_lead.test.sql",
+    "mutantes:vinculo-por-lead": "node scripts/mutantes-20260815080000.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
