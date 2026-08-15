@@ -56,6 +56,7 @@ create unique index if not exists uq_participacao_msg_vigente
 
 create table if not exists public.fabio_participacao_ocorrencia_eventos (
   id uuid primary key default gen_random_uuid(),
+  seq bigint generated always as identity,
   ocorrencia_id uuid not null references public.fabio_participacao_ocorrencias(id),
   evento text not null,
   por_tipo text not null,
@@ -78,7 +79,7 @@ select distinct on (e.ocorrencia_id)
   e.criado_em as estado_em,
   e.por_tipo  as estado_por
 from public.fabio_participacao_ocorrencia_eventos e
-order by e.ocorrencia_id, e.criado_em desc, e.id desc;
+order by e.ocorrencia_id, e.seq desc;
 
 create or replace function public.fn_participacao_append_only()
 returns trigger language plpgsql as $function$

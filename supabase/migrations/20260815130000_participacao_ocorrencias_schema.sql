@@ -43,6 +43,11 @@ create unique index if not exists uq_participacao_msg_vigente
 
 create table if not exists public.fabio_participacao_ocorrencia_eventos (
   id uuid primary key default gen_random_uuid(),
+  -- Ordem de insercao MONOTONA. now() e o horario de INICIO da transacao: dois
+  -- eventos gravados na mesma transacao (registrar->confirmar->validar num so
+  -- request) tem criado_em identico, e o id uuid nao ordena. seq desempata o
+  -- "ultimo evento" sem depender de relogio nem de negocio.
+  seq bigint generated always as identity,
   ocorrencia_id uuid not null references public.fabio_participacao_ocorrencias(id),
   evento text not null,
   por_tipo text not null,
@@ -69,7 +74,7 @@ select distinct on (e.ocorrencia_id)
   e.criado_em as estado_em,
   e.por_tipo  as estado_por
 from public.fabio_participacao_ocorrencia_eventos e
-order by e.ocorrencia_id, e.criado_em desc, e.id desc;
+order by e.ocorrencia_id, e.seq desc;
 
 comment on view public.vw_fabio_participacao_ocorrencia_estado is
   'Fonte unica do estado atual de cada ocorrencia. registrada->candidata; o resto 1:1.';
