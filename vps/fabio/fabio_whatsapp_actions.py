@@ -182,7 +182,13 @@ def _stage_audio(backend: FabioWhatsappBackend, context: dict[str, Any]) -> tupl
     if len(content) > max_bytes:
         raise RuntimeError("audio_too_large")
     extension = re.sub(r"[^a-z0-9]", "", str(extension or "ogg").lower()) or "ogg"
-    path = f"whatsapp/{int(context['professor_id'])}/{context['wa_message_id']}.{extension}"
+    # O id do UAZAPI e `<telefone>:<hash>`, e o dois-pontos atravessava cru pro
+    # nome do objeto. Upload 200 e assinatura 200, mas o GET da URL assinada
+    # voltava 400 InvalidSignature: o audio morria e o professor ficava no
+    # silencio (prof. Valdo, 15/08/2026 — provado com dois objetos identicos,
+    # um com ':' e outro sem). Mesma higiene que a `extension` acima ja fazia.
+    nome = re.sub(r"[^A-Za-z0-9._-]", "-", str(context["wa_message_id"]))
+    path = f"whatsapp/{int(context['professor_id'])}/{nome}.{extension}"
     backend.upload_audio(path, content, mime or "audio/ogg")
     return path, mime or "audio/ogg"
 

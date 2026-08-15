@@ -119,6 +119,38 @@ class WhatsappActionsTest(unittest.TestCase):
         self.assertEqual(enqueue["p_aula_id"], 101)
         self.assertTrue(enqueue["p_storage_path"].startswith("whatsapp/25/wa-1."))
 
+    def test_uazapi_message_id_never_leaks_unsafe_chars_into_storage_path(self):
+        """O id real do UAZAPI e `<telefone>:<hash>` — com dois-pontos.
+
+        Bug de producao (15/08/2026, prof. Valdo): o id entrava cru no nome do
+        objeto. Upload 200 e assinatura 200, mas o GET da URL assinada voltava
+        400 InvalidSignature — provado com dois objetos identicos, um com ':' e
+        outro sem. O audio morria e o professor ficava no silencio.
+
+        Os testes antigos passavam porque a fixture usava `wa-1`, um id limpo
+        que o UAZAPI nunca produz.
+        """
+        backend = FakeBackend(candidates=[{"aula_id": 101, "data": "2026-08-11", "hora": "14:00", "curso": "Piano"}])
+        result = tratar_mensagem_professor(
+            professor_context(
+                kind="audio",
+                text="Na aula de piano de hoje às 14h trabalhei respiração",
+                media_url="https://media/1",
+                wa_message_id="5521998250178:A5B8AC2B450B8544E2DDBC41AA3EC59D",
+            ),
+            backend,
+        )
+        self.assertEqual(result["code"], "audio_enqueued")
+        path = next(payload for name, payload in backend.calls if name == "fabio_enfileirar_audio")["p_storage_path"]
+
+        self.assertNotIn(":", path, f"dois-pontos quebra a URL assinada (400 InvalidSignature): {path}")
+        # Regra ampla: so o alfabeto seguro sobrevive no nome do objeto.
+        nome = path.rsplit("/", 1)[-1]
+        self.assertRegex(nome, r"^[A-Za-z0-9._-]+$", f"nome de objeto com caractere inseguro: {nome}")
+        # O caminho continua roteado pelo professor e o id segue distinguivel.
+        self.assertTrue(path.startswith("whatsapp/25/"), path)
+        self.assertIn("A5B8AC2B450B8544E2DDBC41AA3EC59D", path)
+
     def test_selected_audio_uses_distinct_event_keys_for_each_transition(self):
         backend = FakeBackend(candidates=[{"aula_id": 101, "data": "2026-08-11", "hora": "14:00", "curso": "Piano"}])
         result = tratar_mensagem_professor(
