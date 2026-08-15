@@ -1,6 +1,152 @@
 # RETOMADA — LA Teacher
 
-> ## 🔎 CHECKPOINT ATIVO — 13/08/2026 noite BRT · auditoria ao vivo + plano de correção
+> ## 🔎 CHECKPOINT ATIVO — 15/08/2026 manhã BRT · três relatos de professor, na raiz
+>
+> **PRÓXIMO PASSO: conferir a tela do professor nos dois tamanhos (390×844 e
+> 1400×900).** O carimbo de presença já lançada está no ar (`95cd68c`) e provado
+> no banco, mas **eu não vi a tela** — a sessão do navegador aqui é a de
+> coordenação, e `/app/confirmar/...` redireciona pro painel de Equipe. Preciso
+> que o Alf logue como professor (igual fez com o Matheus em 14/08). O registro
+> `fdd74d8b-11e9-40e0-a7e5-0b619fc304e4` (prof 25, aula 232149) é o caso exato:
+> 4 fatias, **todas** com presença travada.
+>
+> Árvore limpa, `main` = `origin/main`, nada pendente de push.
+>
+> ## ⛔ O ERRO MAIS CARO DESTA SESSÃO: eu inverti uma REGRA DE NEGÓCIO
+>
+> Achei que era defeito técnico e **mudei em produção sem perguntar**. Não era.
+>
+> **A regra (Alf, 15/08):** quem dá presença é a **SECRETARIA** — lança no
+> Emusys / LA Report — e é a resposta dela que **PREVALECE**. O professor lança
+> **CONTEÚDO**. Ele pode dar presença dentro da janela dele, mas **não
+> sobrescreve** a secretaria; se discorda, **reporta** e elas corrigem na fonte.
+> Ou seja: o `first write wins` entre fontes fortes é **intencional**.
+>
+> Eu li o relato do Valdo ("um aluno ficou como ausente e não consigo mudar"),
+> medi o mecanismo certo (a secretaria tinha respondido antes), e concluí
+> **errado**: inventei uma `fn_presenca_precedencia` pondo o professor acima da
+> secretaria, apliquei (`7e98652`) e ainda alterei o dado real do aluno.
+>
+> **Revertido por completo em `02b2fd5` + migration `20260815020000`:** as três
+> funções (`fn_registrar_presencas_core`, `app_registrar_presencas_aula`,
+> `fabio_registrar_presencas_aula`) voltaram **byte a byte** ao corpo anterior
+> (capturado de `pg_get_functiondef` **antes** de eu mexer), a régua inventada
+> saiu do catálogo, e o dado do Valdo foi restaurado **exatamente** — aula
+> 221905 de volta a `presente`/`falta` com `agenda_secretaria` e os
+> `respondido_em` originais. Os gêmeos não foram tocados (conferido nas duas
+> pontas). **Prova de que voltou ao estado original: o digest de schema do
+> runner voltou a `9d91cd89958a`**, o mesmo de antes da minha mudança.
+>
+> A `20260815010000` fica no repo (chegou a ser aplicada) **com aviso no topo**;
+> o teste e os mutantes dela foram **removidos** porque afirmavam a regra
+> errada. O teste novo (`20260815020000`) **trava a regra certa**, pra ninguém
+> "consertar" isso de novo lendo só o código.
+>
+> **O sinal que eu ignorei, e que vale como régua:** a regra estava escrita em
+> **três** lugares independentes e **concordando**, e havia migration recente e
+> deliberada sobre exatamente isso (`20260813220000`) dizendo *"não há defeito
+> vivo"*. **Três fontes concordando + migration recente explicando = desenho,
+> não descuido.** Se o conserto muda **quem vence** entre duas fontes humanas,
+> ou **o que um papel pode fazer**, isso é decisão do Alf — eu subo a pergunta.
+>
+> ## ✅ O PROBLEMA REAL DO VALDO ERA OUTRO — e esse foi consertado (95cd68c)
+>
+> Não era precedência: era **exibição**. Medido, e o Alf estava certo que "já
+> tínhamos feito isso" — **em parte**:
+>
+> | tela | lê a presença que a secretaria lançou? |
+> |---|---|
+> | Agenda (`app_minha_agenda_sessao`) | ✅ **sim**, desde sempre |
+> | Registro (`app_registro_completo`) | ❌ **não** |
+> | Ficha manual (`app_abrir_rascunho_manual`) | ❌ **não** (delega pra de cima) |
+>
+> A tela de registro montava a fatia só com `to_jsonb(r)` — a presença que o
+> **Fábio inferiu do áudio** —, sem nunca perguntar o que já tinha sido lançado.
+> Daí o *"tô tendo que dar presença de novo"*: ele mexia numa presença que já
+> existia, e o que ele mexia **não valia nada** (o banco, corretamente,
+> preservava a secretaria).
+>
+> **Migration `20260815030000` (aplicada):** a RPC passou a devolver por fatia
+> `presenca_lancada`, `presenca_fonte` e `presenca_travada`. A tela mostra o
+> carimbo ("Lançada pela secretaria" / "Lançada no Emusys"), **esconde**
+> *Marcar falta* e *Desfazer falta*, e diz o caminho certo (falar com a
+> secretaria). Como `app_abrir_rascunho_manual` **delega**, a ficha manual
+> ganhou junto — uma função consertada, duas telas.
+>
+> **Usei a régua que JÁ existia**, em vez de inventar outra (a lição do erro
+> acima, aplicada no mesmo dia): `fn_presenca_fecha_chamada` — fonte humana
+> forte **OU** `emusys='presente'`. O `ausente` do Emusys **não** trava, de
+> propósito: é a falta fantasma da migração, ambígua.
+>
+> Provado: teste SQL **contra o dado real do caso** (registro do Valdo, aula
+> 221905, presença da secretaria) verde no runner de produção; helper puro
+> `lerPresencaLancada` com **6 testes**; **74/74** unit; `tsc` e `build` limpos.
+>
+> ## ✅ O ÁUDIO DA TURMA ERA ENGOLIDO PELA FICHA MANUAL VAZIA (cb2c39b)
+>
+> Relato do Matheus: numa turma específica (Canto, Julia + Marina, 16h) o
+> "Enviar pro Fábio" **não ia** pra tela de "subindo o áudio" — pulava direto
+> pro formulário de conferência, 3ª tentativa seguida.
+>
+> **Raiz medida:** `app_abrir_rascunho_manual` cria o esqueleto manual (tronco +
+> fatias, `campos={}`) **assim que a tela de escrever abre**. A guarda
+> `rascunho_existente` de `fn_enfileirar_audio_core` pegava **qualquer** tronco
+> em rascunho — inclusive esse esqueleto vazio — e devolvia "vai confirmar"
+> **sem criar linha na fila**. O blob subia pro Storage e morria lá. Bastou
+> abrir a ficha manual da turma uma vez e abandonar.
+>
+> Reproduzido antes de tocar em nada: a chamada devolvia
+> `{"rascunho_existente": true, registro_id: <o esqueleto>}` e zero fila; depois
+> do fix, `{"audio_id": …, "status": "pendente"}`.
+>
+> **Fix (`20260814230000`):** a guarda passou a exigir `modo_entrada = 'audio'`
+> — manual e áudio são trilhas **separadas e coexistentes** (o próprio
+> `app_abrir_rascunho_manual` já devolve `audio_aberto_registro_id` em vez de
+> bloquear). Dois troncos na mesma aula já conviviam em produção (aulas 205412,
+> 232193), então não havia unicidade a violar. **3/3 mutantes**, contrato verde,
+> 68/68 unit à época.
+>
+> **Resíduo limpo:** 5 esqueletos manuais provadamente vazios apagados (tronco +
+> 9 fatias, profs 10/25/35). **Poupei 1** que parecia vazio mas tinha
+> `campos.audio_complemento_id` — complemento de áudio em voo; apagar teria
+> quebrado a ligação. Por isso o critério foi estrito e o delete foi **por id
+> explícito**, não por predicado solto.
+>
+> ## ✅ O CONFERE AÍ PERDIA O TEXTO EM CONEXÃO RUIM (c99c6ea)
+>
+> Relato do Isaque (que **escreve**, não grava áudio — a ficha manual foi feita
+> pra ele): *"os registros de ontem sumiram todos, tava tudo preenchido"*.
+>
+> **Nada de presença foi apagado** — intacto, zero conflito. A ficha manual
+> **funciona** em conexão boa (testado ao vivo, passo a passo, com login de
+> professor). **O buraco era resiliência:** o celular dele estava em **modo
+> avião** (o aviãozinho aparece no print), o app abre lendo do cache do PWA mas
+> **escrever precisa de internet** — e a tela "Confere aí" era a **única** que
+> não guardava a edição no aparelho (o Caderno já guardava). O texto ficava só
+> na tela e sumia ao sair.
+>
+> Conserto: a tela de confirmação passou a guardar cada edição no **mesmo cache
+> local (IndexedDB)** do Caderno, recuperar o que não sincronizou ao reabrir,
+> **reenviar sozinho** no evento `online`, e limpar o cache **só** quando o
+> servidor confirma. Provado ao vivo no app de produção: com o save bloqueado, o
+> texto foi pro IndexedDB; ao reconectar, sincronizou e o cache limpou.
+>
+> **Errei duas conclusões antes de chegar aqui**, as duas por não medir no lugar
+> certo: *"a ficha nunca salva conteúdo"* (li o RESULTADO como MECANISMO) e
+> quase consertei a linha errada (o "clobber" do `res.fatias`) por leitura de
+> código. O que destravou foi **reproduzir no app real**.
+>
+> ## ℹ️ LETÍCIA: trocar o WhatsApp já é possível hoje, sem construir nada
+>
+> O "Reenviar" do painel de Equipe lê `professores.telefone_whatsapp`. Basta
+> editar a professora no **LA Report → Professores → campo WhatsApp** e clicar
+> Reenviar aqui. **Conferido:** o `sync-professores-emusys` **não toca** nessa
+> coluna — ela só é escrita por edição manual no LA Report, então a troca não é
+> sobrescrita no próximo sync. Não faz sentido criar isso no LA Teacher: ele não
+> tem tela de admin editando dado de professor, e o autoatendimento
+> (`app_confirmar_meu_whatsapp`) não serve pra quem **ainda não entrou**.
+>
+> ## 🔎 Checkpoint anterior — 13/08/2026 noite BRT · auditoria ao vivo + plano de correção
 >
 > **PRÓXIMO PASSO: as 97 marcações invisíveis de agosto** (bloco abaixo). É
 > handoff pro Kodex/Windsurf, que está mexendo em presença agora — eu **não
