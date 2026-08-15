@@ -1,5 +1,33 @@
 # RETOMADA — LA Teacher
 
+> ## 📏 MEDIÇÃO QUE CORRIGE O RADAR (15/08, fim do dia)
+>
+> Eu disse duas vezes que eram **"13 áudios de professor mortos em 30 dias"**.
+> Abri por família e o número está **inflado**:
+>
+> | família | áudios | professores | período |
+> |---|---|---|---|
+> | falha de signed url | 5 | 2 | 11–15/08 |
+> | **roster vazio** | **4** | **4** | 10–13/08 |
+> | áudio sem conteúdo (professor não falou nada útil) | 2 | 2 | 11–15/08 |
+> | outro | 2 | 2 | 10–11/08 |
+>
+> E abrindo os 5 de *signed url*: **4 são fixture MINHA** (`e2e-isaque-preview-…`,
+> do meu teste de 11/08) e **1 é o Valdo de hoje 11:05, com `:` no caminho — o
+> bug que eu consertei hoje de manhã**. Ou seja: **signed url não tem perda real
+> pendente**.
+>
+> **Perda real de trabalho de professor em 30 dias: 4 (roster vazio) + 2
+> (outro) = 6**, não 13. E o roster vazio atinge **4 professores diferentes**,
+> o que o torna sistêmico e não caso isolado — continua sendo o item a atacar,
+> mas pelo motivo certo e com o tamanho certo.
+>
+> ⚠️ Lição repetida hoje: **eu classifiquei antes de medir, duas vezes**. As
+> 758 aulas com roster vazio são reais, mas "758 aulas" não é "758 perdas" —
+> só vira perda quando um professor grava sobre uma delas.
+>
+> ---
+>
 > ## 🔭 RADAR — não pode cair (combinado com o Alf em 15/08)
 >
 > Interrompido pelo incidente do Isaque. **Voltar para estes três:**
