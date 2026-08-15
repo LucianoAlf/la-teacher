@@ -1,5 +1,102 @@
 # RETOMADA — LA Teacher
 
+> # 🔖 PONTO DE RETOMADA — 15/08/2026, fim da sessão
+>
+> **O que eu estava fazendo:** o Alf mandou executar os **6 itens do radar**
+> (abaixo). Comecei pelo #3 e a medição corrigiu o próprio radar. Parei aqui
+> por contexto, não por bloqueio. **Próximo passo: item #3 (roster vazio).**
+>
+> **Nada pendente de commit.** `main` == `origin/main`, árvore limpa.
+>
+> ## O que ESTA sessão entregou (tudo no ar e com push)
+>
+> | commit | o que |
+> |---|---|
+> | `24a6a5b` | Fase 1 — `fn_reconciliar_experimental_por_lead` casa por (`emusys_lead_id`, DATA) |
+> | `951d24f` | Fase 2 — cron 95 chama `fn_reconciliar_experimental_tick`; a chave natural não desfaz o que o id do lead casou; o `pendente` deixa de trancar a porta nova |
+> | `a9a20a2` | Isaque — a pergunta discriminante guardava lista vazia e prendia o professor num laço |
+> | `bede7b8` | Isaque — teto de 3 da shortlist (o teste verde mentia: o dublê aceitava 10) |
+> | `2b716aa` | "meio-dia" virou horário |
+> | `5867be0` | guardar o áudio é incondicional (o 2º áudio parou de sumir) |
+>
+> Fase 3 (varredura): cobertura do vínculo 30d **39% → 72%** (110/153).
+> Fase 4: trilho da experimental **provado fim a fim com áudio real**
+> (vínculo 2094, Claudia Sophia/Leonardo) e **tudo limpo depois** — 0 registros,
+> 0 na fila, objeto do Storage apagado.
+>
+> ## ⚠️ Estado do Isaque (professor 10) — o que ficou
+>
+> - Ação travada `cbf35568` **cancelada**. Áudio das **12h (Stella, aula 267598)
+>   empurrado** → rascunho pronto no app dele.
+> - **O áudio das 13h (Billy) FOI PERDIDO.** Só sobrou a transcrição em
+>   `fabio_chat_mensagens` (*"aula de uma hora, tocamos Für Elise, pedal…"*).
+>   Os bytes nunca subiram — era o defeito que o `5867be0` conserta.
+> - O Alf **já mandou** o texto pedindo pra ele testar de novo, mandando
+>   **áudios em sequência** (é isso que exercita o conserto).
+> - **AGUARDANDO ele.** Quando cair, conferir em ordem:
+>   1. `fabio_chat_mensagens` do prof 10 → some a frase repetida "Ainda não gravei"?
+>   2. `storage.objects` `whatsapp/10/%` → **um objeto por áudio** (se ele mandar
+>      2 e vier 1, meu conserto não pegou pela porta do WhatsApp)
+>   3. `fabio_fila_audios` + agenda no app → rascunho por aula
+>
+> ## 🚧 Duas coisas que eu NÃO terminei de rastrear (não são bugs conhecidos —
+> são pontos onde eu sei que não sei)
+>
+> - **`_refine_pending_class` tem outra porteira.** "meio-dia" funciona no
+>   caminho do PRIMEIRO áudio (`reduzir_shortlist`, com teste). Como **resposta**
+>   à pergunta discriminante, não provei.
+> - **Meu arnês de teste real classificou tudo como `conversation`** — não
+>   reproduz o contexto que o bridge monta (ele passa `llm_json` e outros
+>   campos). Por isso os consertos do Isaque estão provados em **teste**, não
+>   ao vivo.
+>
+> ## 🔧 Como mexer no Fábio (procedimento que funcionou hoje)
+>
+> ```bash
+> # editar em vps/fabio/ no repo, rodar local:
+> cd vps/fabio && python -m unittest teste_whatsapp_actions      # 36 testes
+> # deployar:
+> scp -i ~/.ssh/id_ed25519_lahq_fabio_claude_code vps/fabio/ARQ.py fabio@89.116.73.186:~/fabio-chat-bridge/
+> ssh ... 'cd ~/fabio-chat-bridge && sed -i "s/$//" ARQ.py >   && /home/fabio/.hermes/hermes-agent/venv/bin/python -m unittest teste_whatsapp_actions >   && systemctl --user restart fabio-chat-bridge.service'
+> ```
+> ⚠️ `sed -i "s/$//"` é obrigatório: o repo é CRLF. Backups `.bak-laco-isaque-*`
+> ficaram na VPS. O `fabio-aviso-comercial.timer` foi parado e **religado**
+> (`active`) — conferir se algum dia parecer mudo.
+>
+> ## 🔭 OS 6 ITENS — ordem de execução
+>
+> **#3 (COMEÇAR POR AQUI) — roster vazio na aula comum.** 758 aulas em 30 dias
+> sem nenhum aluno no roster. ⚠️ Mas **758 aulas ≠ 758 perdas**: só vira perda
+> quando um professor grava sobre uma. Perda real medida: **4 áudios, 4
+> professores diferentes** (sistêmico, não caso isolado). O contrato recusa
+> corretamente (não inventa aluno) — falta a **porta** e falta o professor
+> **ficar sabendo**. Mesma família da experimental, sem porta própria.
+>
+> **#2 — o teto de 3 da shortlist.** `fabio_shortlist_valida` exige
+> `cardinality between 1 and 3`. É tamanho de MENU, mas a pergunta
+> discriminante não tem menu. Com 10 compatíveis, 7 respostas do professor não
+> casam. **Alargar é mexer numa guarda deliberada do banco — decisão do Alf.**
+>
+> **#4 — fila de áudios pendentes por professor.** O `5867be0` **para a perda**
+> mas não retoma sozinho. O modelo é de **uma ação aberta por professor**
+> (`fabio_iniciar_acao` recusa a segunda). Três saídas: (a) parquear no payload
+> da ação; (b) fechar a atual e recomeçar do áudio novo — **descartada**, vira
+> "perde todos menos o último"; (c) fila própria. Recomendação: (c).
+>
+> **#1 — a perna do comercial da experimental.** Nunca entregou nada
+> (`fabio-aviso-comercial` roda há dias com `na_fila: 0`). Hoje existiu registro
+> por 40s e eu **segurei o timer de propósito**: ia mandar WhatsApp pro consultor
+> sobre uma aluna REAL com conteúdo que **eu inventei**. 30s de re-execução.
+> **Se for fazer, mandar junto um aviso ao consultor de que é teste** — senão
+> alguém liga pra família.
+>
+> **#5 — rotacionar a senha** das 4 contas (`valdo@`/`isaque@`/`leo@`/`daiana@`,
+> a mesma nas quatro, em texto claro no chat de 15/08). **Eu não faço: não
+> manuseio senha.** É o Alf no painel do Supabase, 2 min.
+>
+> **#6 — a prova pela porta do WhatsApp.** Depende do Isaque (acima).
+>
+
 > ## 📏 MEDIÇÃO QUE CORRIGE O RADAR (15/08, fim do dia)
 >
 > Eu disse duas vezes que eram **"13 áudios de professor mortos em 30 dias"**.
