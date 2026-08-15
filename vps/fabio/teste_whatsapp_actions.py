@@ -10,7 +10,8 @@ from fabio_whatsapp_intents import reduzir_shortlist  # noqa: E402
 
 
 class FakeBackend:
-    def __init__(self, action=None, candidates=None, readback_status="aguardando_confirmacao"):
+    def __init__(self, action=None, candidates=None, readback_status="aguardando_confirmacao",
+                 participacao=None, participacao_explode=False):
         self.action = action
         self.candidates = candidates or []
         self.calls = []
@@ -18,6 +19,14 @@ class FakeBackend:
         self.removals = []
         self.action_id = "acao-1"
         self.readback_status = readback_status
+        # Ocorrência de substituição em SHADOW. Resposta controlável por teste;
+        # `participacao_explode` simula o banco fora do ar pra provar que a
+        # falha na camada shadow NUNCA derruba o registro normal (freio do Alf).
+        self.participacao_response = participacao or {
+            "ok": True, "ocorrencia_id": "oc-1", "estado": "candidata",
+            "precisa_confirmar": True, "ja_existia": False,
+        }
+        self.participacao_explode = participacao_explode
         # A fila de espera do áudio (migration 20260815110000). O dublê guarda
         # linha de verdade, com as MESMAS travas de produção — FIFO, um destino
         # só e consumo atômico. Dublê mais permissivo que o banco é verde que
@@ -44,6 +53,10 @@ class FakeBackend:
             return self.action
         if name == "fabio_enfileirar_audio":
             return {"ok": True, "audio_id": "audio-1", "status": "pendente"}
+        if name == "fabio_participacao_registrar_candidata":
+            if self.participacao_explode:
+                raise RuntimeError("banco fora do ar (simulado)")
+            return self.participacao_response
         if name == "fabio_registro_completo":
             return {
                 "ok": True,
@@ -1063,6 +1076,77 @@ class ApelidoDeHorarioTest(unittest.TestCase):
         ]
         escolha = reduzir_shortlist("foi a de meio-dia e meia", aulas)
         self.assertEqual(escolha["aula_id"], 502)
+
+
+class SubstituicaoShadowTest(unittest.TestCase):
+    """Wiring em SHADOW: quando a transcrição diz que alguém participou no lugar
+    de um aluno do roster, registrar a candidata via RPC — sem tocar o registro
+    normal, sem efeito operacional, e sem nunca derrubar o fluxo do Fábio."""
+
+    ROSTER = [
+        {"aluno_id": 793, "nome": "Jeremias Alves"},
+        {"aluno_id": 794, "nome": "Beatriz Ohana"},
+    ]
+    FALA = ("Na aula de piano de hoje as 14h trabalhei respiracao; "
+            "no lugar do Jeremias foi a Juliana")
+
+    def _candidate(self, alunos=None):
+        return {"aula_id": 101, "data": "2026-08-11", "hora": "14:00",
+                "curso": "Piano", "alunos": alunos if alunos is not None else list(self.ROSTER)}
+
+    def _run(self, text, alunos=None, **kw):
+        backend = FakeBackend(candidates=[self._candidate(alunos)], **kw)
+        result = tratar_mensagem_professor(
+            professor_context(kind="audio", text=text, media_url="https://media/1"), backend)
+        return backend, result
+
+    def _participacao(self, backend):
+        return [p for n, p in backend.calls if n == "fabio_participacao_registrar_candidata"]
+
+    def test_substituicao_detectada_registra_candidata_em_shadow(self):
+        backend, result = self._run(self.FALA)
+        self.assertEqual(result["code"], "audio_enqueued")
+        chamadas = self._participacao(backend)
+        self.assertEqual(len(chamadas), 1)
+        p = chamadas[0]
+        self.assertEqual(p["p_aula_id"], 101)
+        self.assertEqual(p["p_professor_id"], 25)
+        self.assertEqual(p["p_aluno_matriculado_id"], 793)          # Jeremias, do roster
+        self.assertIsNone(p["p_participante_real_id"])              # citado, ainda não resolvido
+        self.assertEqual(p["p_participante_nome"].lower(), "juliana")
+        self.assertEqual(p["p_confianca"], "baixa")
+        self.assertEqual(p["p_metodo_extracao"], "deterministico")
+        self.assertEqual(p["p_origem_message_id"], "wa-1")
+        self.assertIn("juliana", (p["p_origem_transcricao"] or "").lower())
+
+    def test_registro_normal_intacto_com_substituicao(self):
+        backend, result = self._run(self.FALA)
+        enfileiradas = [p for n, p in backend.calls if n == "fabio_enfileirar_audio"]
+        self.assertEqual(len(enfileiradas), 1)
+        self.assertEqual(enfileiradas[0]["p_aula_id"], 101)
+        self.assertEqual(result["code"], "audio_enqueued")
+        self.assertEqual(len(backend.uploads), 1)
+
+    def test_substituicao_pergunta_confirmacao_curta(self):
+        _, result = self._run(self.FALA)   # precisa_confirmar=True (default do dublê)
+        self.assertIn("Juliana", result["reply"])
+        self.assertIn("Jeremias", result["reply"])
+
+    def test_sem_substituicao_nao_chama_participacao(self):
+        backend, result = self._run("Na aula de piano de hoje as 14h trabalhei respiracao e escalas")
+        self.assertEqual(result["code"], "audio_enqueued")
+        self.assertFalse(self._participacao(backend))
+
+    def test_falha_na_substituicao_nunca_derruba_registro(self):
+        backend, result = self._run(self.FALA, participacao_explode=True)
+        self.assertEqual(result["code"], "audio_enqueued")
+        self.assertEqual(len([p for n, p in backend.calls if n == "fabio_enfileirar_audio"]), 1)
+        self.assertTrue(result["reply"])
+
+    def test_matriculado_sem_aluno_id_no_roster_nao_registra(self):
+        backend, result = self._run(self.FALA, alunos=[{"aluno_id": None, "nome": "Jeremias Alves"}])
+        self.assertEqual(result["code"], "audio_enqueued")
+        self.assertFalse(self._participacao(backend))
 
 
 if __name__ == "__main__":

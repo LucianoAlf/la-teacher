@@ -6,6 +6,7 @@ client or Hermes implementation and therefore cannot bypass the RPC doors.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 from typing import Any, Protocol
@@ -13,11 +14,14 @@ from typing import Any, Protocol
 from fabio_whatsapp_intents import (
     classificar_intencao_audio,
     classificar_intencao_texto,
+    detectar_substituicao,
     interpretar_resposta_pendente,
     reduzir_shortlist,
     texto_tem_horario,
     validar_patch_correcao,
 )
+
+log = logging.getLogger(__name__)
 
 
 class FabioWhatsappBackend(Protocol):
@@ -288,7 +292,74 @@ def _drenar_parqueados(backend: FabioWhatsappBackend, context: dict[str, Any], r
     return resultado
 
 
-def _select_and_enqueue_audio(backend: FabioWhatsappBackend, context: dict[str, Any], action: dict[str, Any], aula_id: int) -> dict[str, Any]:
+def _roster_aluno_id(alunos_roster: list[dict[str, Any]] | None, nome: str) -> int | None:
+    """aluno_id do matriculado citado. O detector devolve o NOME do roster
+    (string original), então casa por igualdade — sem chute."""
+    for aluno in alunos_roster or []:
+        if isinstance(aluno, dict) and aluno.get("nome") == nome:
+            aid = aluno.get("aluno_id")
+            try:
+                return int(aid) if aid is not None else None
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def _registrar_substituicao_shadow(
+    backend: FabioWhatsappBackend,
+    context: dict[str, Any],
+    aula_id: int,
+    alunos_roster: list[dict[str, Any]] | None,
+) -> str | None:
+    """SHADOW: se a transcrição diz que alguém participou no lugar de um aluno do
+    roster, registra a candidata via RPC — em paralelo ao registro normal.
+
+    Freios (do Alf): nunca levanta (só loga); não toca presença/falta/reposição/
+    financeiro/Emusys (a RPC é `security definer` e escreve só na camada de
+    ocorrência); se identidade ambígua, devolve uma pergunta curta de confirmação
+    (o participante ainda não é resolvido para um aluno — vai como nome citado,
+    `precisa_confirmar`). Retorna a pergunta a anexar ao reply, ou None.
+    """
+    try:
+        transcricao = str(context.get("text") or context.get("media_extracted_text") or "").strip()
+        if not transcricao:
+            return None
+        roster_nomes = [str(a.get("nome")) for a in (alunos_roster or [])
+                        if isinstance(a, dict) and a.get("nome")]
+        if not roster_nomes:
+            return None
+        par = detectar_substituicao(transcricao, roster_nomes)
+        if not par:
+            return None
+        matriculado_id = _roster_aluno_id(alunos_roster, par["matriculado"])
+        if matriculado_id is None:
+            return None
+        participante = str(par["participante"]).title()
+        resposta = backend.rpc("fabio_participacao_registrar_candidata", {
+            "p_aula_id": int(aula_id),
+            "p_professor_id": int(context["professor_id"]),
+            "p_aluno_matriculado_id": int(matriculado_id),
+            "p_participante_real_id": None,
+            "p_participante_nome": participante,
+            "p_participante_telefone": None,
+            "p_confianca": "baixa",
+            "p_metodo_extracao": "deterministico",
+            "p_origem_message_id": str(context["wa_message_id"]),
+            "p_origem_transcricao": transcricao,
+        })
+        if not isinstance(resposta, dict) or not resposta.get("ok"):
+            log.warning("substituicao shadow: RPC nao ok (aula %s): %s", aula_id, resposta)
+            return None
+        if resposta.get("precisa_confirmar"):
+            return (f"Ah, e anotei em observação: parece que {participante} participou no "
+                    f"lugar de {par['matriculado']}. Confere pra mim? (não muda a chamada)")
+        return None
+    except Exception as exc:  # freio: shadow nunca derruba o registro
+        log.warning("substituicao shadow ignorada (aula %s): %s", aula_id, exc)
+        return None
+
+
+def _select_and_enqueue_audio(backend: FabioWhatsappBackend, context: dict[str, Any], action: dict[str, Any], aula_id: int, alunos_roster: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     _event(backend, action, context, "aula_escolhida", {"aula_id": aula_id})
     response = _call(backend, "fabio_enfileirar_audio", {
         "p_professor_id": int(context["professor_id"]),
@@ -301,7 +372,13 @@ def _select_and_enqueue_audio(backend: FabioWhatsappBackend, context: dict[str, 
     if not audio_id:
         raise RuntimeError("audio_id_missing")
     _event(backend, action, context, "audio_enfileirado", {"audio_id": audio_id})
-    return _result("audio_enqueued", reply="Áudio recebido. Vou processar a aula e te mostro o resumo antes de gravar.", action_id=str(action["id"]), audio_id=audio_id)
+    # SHADOW, DEPOIS da aula pinada e do áudio enfileirado: observa a divergência
+    # roster×participação sem alterar o registro. Falha aqui não derruba nada.
+    reply = "Áudio recebido. Vou processar a aula e te mostro o resumo antes de gravar."
+    pergunta = _registrar_substituicao_shadow(backend, context, aula_id, alunos_roster)
+    if pergunta:
+        reply = f"{reply}\n\n{pergunta}"
+    return _result("audio_enqueued", reply=reply, action_id=str(action["id"]), audio_id=audio_id)
 
 
 def _start_from_candidates(backend: FabioWhatsappBackend, context: dict[str, Any], fluxo: str, candidates: list[dict[str, Any]], storage_path: str | None) -> dict[str, Any]:
@@ -334,9 +411,19 @@ def _start_from_candidates(backend: FabioWhatsappBackend, context: dict[str, Any
         return _result("choose_audio_class" if fluxo == "registro" else "choose_call_class", reply=shortlist["pergunta"], action_id=str(action["id"]))
     aula_id = int(shortlist["aula_id"])
     if fluxo == "registro":
-        return _select_and_enqueue_audio(backend, context, action, aula_id)
+        return _select_and_enqueue_audio(backend, context, action, aula_id, _roster_da_aula(candidates, aula_id))
     _event(backend, action, context, "aula_escolhida", {"aula_id": aula_id})
     return _result("call_preview", reply="Encontrei a aula. Quem esteve presente? Confirma essa chamada?", action_id=str(action["id"]), aula_id=aula_id)
+
+
+def _roster_da_aula(candidates: list[dict[str, Any]] | None, aula_id: int) -> list[dict[str, Any]] | None:
+    """Roster (alunos) da aula escolhida dentro do pool. `fabio_aulas_candidatas`
+    devolve `alunos: [{aluno_id, nome, ...}]` no fluxo de registro."""
+    for candidate in candidates or []:
+        if isinstance(candidate, dict) and str(candidate.get("aula_id")) == str(aula_id):
+            alunos = candidate.get("alunos")
+            return alunos if isinstance(alunos, list) else None
+    return None
 
 
 def _mentions_candidate_student(text: str, candidates: list[dict[str, Any]]) -> bool:
@@ -442,7 +529,7 @@ def _refine_pending_class(
         _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
     aula_id = int(shortlist["aula_id"])
     if fluxo == "registro":
-        return _select_and_enqueue_audio(backend, context, action, aula_id)
+        return _select_and_enqueue_audio(backend, context, action, aula_id, _roster_da_aula(candidates, aula_id))
     _event(backend, action, context, "aula_escolhida", {"aula_id": aula_id})
     return _result("call_preview", reply="Encontrei a aula. Quem esteve presente? Confirma essa chamada?", action_id=str(action["id"]), aula_id=aula_id)
 
