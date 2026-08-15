@@ -1,5 +1,32 @@
 # RETOMADA — LA Teacher
 
+> # 🔎 AUDITORIA DO TESTE DO ISAQUE — 15/08, fim do dia
+>
+> **Veredito: o canal FUNCIONA, mas ainda NÃO está pronto pra produção sem
+> supervisão.** O Isaque mandou 4 áudios; **2 gravaram certo** (12h Stella,
+> 13h Billy — ambos `gravado_emusys`), **2 travaram** (14h Juliana-no-lugar-de-
+> Jeremias, 15h Marcelo). Ele achou que "deu certo" porque o Fábio respondeu —
+> mas metade do trabalho dele não salvou.
+>
+> **A causa era a "burrice" que ele mesmo apontou** — CONSERTADA e provada ao
+> vivo (`7839147`). O casador comparava a fala do professor com a forma
+> completa do banco: nome inteiro ("Billy Paulo Vangu Junior" vs "Billy"), hora
+> só em dígito ("uma hora" era ignorado), curso com sufixo ("Violão T" vs
+> "violão"), e "hoje" não desempatava dois 14:00. Agora casa por token/extenso/
+> data-relativa. Os 5 casos do Isaque resolvem contra o pool REAL de produção.
+>
+> **Estado do Isaque agora: LIMPO.** Cancelei a ação travada e descartei os 2
+> áudios parqueados (bytes ficaram no Storage). Ele precisa **reenviar os
+> áudios das 14h (Juliana) e 15h (Marcelo)** — vão pinar na hora.
+>
+> **⚠️ Um defeito NOVO que a auditoria achou e que NÃO é o casador:** com
+> preview + correção + áudio novo em voo ao mesmo tempo, o "Sim" fechou a ação
+> ERRADA — o Isaque confirmou pensando na aula das 14h e o sistema gravou a das
+> 13h. O casador esperto reduz o vaivém, mas **a serialização de confirmações
+> quando há preview pendente continua frágil.** Próximo alvo antes de soltar
+> sem supervisão.
+
+
 > # 🔖 PONTO DE RETOMADA — 15/08/2026, depois do compact
 >
 > **Os 6 itens do radar: 4 FEITOS E PROVADOS AO VIVO, 1 é do Alf, 1 aguarda.**
