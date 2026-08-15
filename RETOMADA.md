@@ -1,10 +1,52 @@
 # RETOMADA — LA Teacher
 
-> # 🔖 PONTO DE RETOMADA — 15/08/2026, fim da sessão
+> # 🔖 PONTO DE RETOMADA — 15/08/2026, depois do compact
 >
-> **O que eu estava fazendo:** o Alf mandou executar os **6 itens do radar**
-> (abaixo). Comecei pelo #3 e a medição corrigiu o próprio radar. Parei aqui
-> por contexto, não por bloqueio. **Próximo passo: item #3 (roster vazio).**
+> **Os 6 itens do radar: 3 FEITOS, 3 são do Alf.**
+>
+> | # | item | estado |
+> |---|---|---|
+> | #3 | roster vazio na aula comum | ✅ no ar — `c9f57f7`. ⏸️ **timer instalado e DESLIGADO** (ligar dispara 1 WhatsApp real pro prof 35) |
+> | #4 | fila de áudios pendentes por professor | ✅ no ar — `074a5c2` |
+> | #2 | teto de 3 da shortlist | ✅ no ar — `eb400f4`, **sem mexer na guarda do banco** |
+> | #1 | perna do comercial da experimental | 🔴 **decisão do Alf** (manda WhatsApp real sobre aluna real) |
+> | #5 | rotacionar a senha das 4 contas | 🔴 **é o Alf** — eu não manuseio senha |
+> | #6 | prova pela porta do WhatsApp | ⏳ depende do Isaque responder |
+>
+> ## O que a medição corrigiu (de novo)
+>
+> O radar dizia "758 aulas / 4 áudios mortos por roster vazio". Medido em
+> produção: **129** aulas sem roster em 30 dias, **92** delas âncora
+> operacional (as outras 37 o `fn_aula_operacional_id` já resolve), e
+> **91 das 92 têm `qtd_alunos = 0` VINDO DO EMUSYS** — não é sync perdida, é
+> o Emusys dizendo que a turma está vazia. Dos 4 áudios, **3 eram
+> experimental** entrando pela porta do aluno (família já fechada em
+> `20260815070000`). **Perda real de aula comum: 1 áudio** — prof 35,
+> G_Seg_17/CG, 10/08.
+>
+> ## #2 saiu sem virar decisão do Alf
+>
+> Eu tinha escrito que alargar o teto de 3 era decisão dele. Era o
+> diagnóstico errado: **o problema não é o teto, é guardar uma lista
+> truncada.** `_refine_pending_class` filtra o pool pela shortlist guardada —
+> com 10 compatíveis, guardar 3 faz as outras 7 virarem resposta impossível.
+> Sem shortlist guardada, a resposta casa contra o pool inteiro, que é o que
+> a pergunta aberta pede. A guarda do banco continua intocada.
+>
+> Junto foi a **"outra porteira"** que este arquivo anotava como não
+> rastreada: `_looks_like_class_refinement` tinha régua própria de horário, só
+> de dígito — "meio-dia" era barrado antes de chegar ao casador que já sabia
+> lê-lo. As duas agora leem `texto_tem_horario`.
+>
+> ## ⚠️ Duas travas minhas, de propósito
+>
+> 1. **`fabio-sem-roster.timer` está instalado e DESLIGADO** na VPS. Ligar
+>    (`systemctl --user enable --now fabio-sem-roster.timer`) dispara **um**
+>    WhatsApp real pro professor 35 sobre um áudio de 10/08. O texto exato já
+>    foi conferido em dry-run e está no commit `c9f57f7`.
+> 2. **#1 (comercial) não foi executado.** Manda WhatsApp pro consultor sobre
+>    a Claudia Sophia com conteúdo que **eu inventei** no teste. Se for
+>    executar, vai junto um aviso de que é teste.
 >
 > **Nada pendente de commit.** `main` == `origin/main`, árvore limpa.
 >
