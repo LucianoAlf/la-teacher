@@ -198,13 +198,40 @@ Fonte: `public.vw_aluno_presenca_semantica_v1`, filtrada por
 | `indeterminado` | `situacao_chamada = 'indeterminada'` | 126 |
 | `nao_aplicavel` | `situacao_chamada = 'nao_aplicavel'` (justificada/cancelada) | 774 |
 
-⚠️ **A regra que protege aluno real:** `registrada_inferida` /
-`falta_provavel` **não** é falta — a régua canônica a exclui de
-`considera_falta` **e** do denominador de frequência. São 1.194 linhas em 90
-dias (60 só na semana de 11–15/08). Se a RPC classificasse "não presente" como
-falta, o Fábio acusaria ~1.200 alunos de uma falta que o banco se recusa a
-afirmar. O Fábio deve dizer *"3 faltaram; 1 consta como falta provável, ainda
-não confirmada"*.
+⚠️ **A regra que protege aluno real — e de onde ela vem.** `registrada_inferida`
+/ `falta_provavel` **não** é falta: a régua canônica a exclui de
+`considera_falta` **e** do denominador. Isso não é lacuna, é o contrato novo
+funcionando. Medido por proveniência:
+
+| mês | proveniência | falta confirmada | falta provável |
+|---|---|---|---|
+| jun | emusys | 3.066 | 0 |
+| jul | emusys | 2.837 | 0 |
+| **ago** | **agenda_secretaria** (LA Report) | **646** | 0 |
+| ago | la_teacher | 38 | 0 |
+| ago | fabio_audio | 10 | 0 |
+| ago | emusys | **0** | **205** |
+
+Até julho, o `ausente` do Emusys virava "falta confirmada" automaticamente —
+3.066 faltas em junho que **nenhum humano afirmou** (o Emusys não tem "falta",
+tem "ausente"; o fantasma). De agosto em diante vale o contrato v1.4:
+*"ausência do Emusys é pendência; somente presente do Emusys é veredito
+automático. Respostas humanas continuam valendo para presente e falta."* A
+`agenda_secretaria` passou a ser **fonte humana forte** e produziu 646 faltas
+reais em agosto.
+
+Os 205 `falta_provavel` (03–15/08) são o **resíduo honesto**: ausências do
+Emusys que a secretaria ainda não vereditou. Verificado: **nenhum** deles tem
+resposta humana em `aluno_presenca_retificacoes`, em
+`aluno_presenca_revisoes_operacionais` nem em linha irmã da mesma aula; a linha
+correspondente em `aluno_presenca_administrativo` é o mesmo Emusys espelhado
+(`fonte='emusys'`, `justificada=false`, sem motivo) — não é veredito.
+
+**Portanto:** `vw_aluno_presenca_semantica_v1` é a fonte certa para o Fábio —
+ela é quem implementa esse contrato. E o Fábio deve narrar os baldes separados:
+*"3 faltaram; 1 consta como ausência pelo Emusys ainda não confirmada pela
+secretaria"*. Somar os dois seria reintroduzir exatamente a mentira que o
+contrato v1.4 eliminou.
 
 ---
 
