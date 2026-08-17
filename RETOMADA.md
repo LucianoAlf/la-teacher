@@ -1,5 +1,42 @@
 # RETOMADA — LA Teacher
 
+> # 🔓 UX DO APP: 3 QUEIXAS DOS PROFESSORES — RESOLVIDAS (17/08)
+>
+> A consulta letiva **fluiu** (Valdo, Isaque, Matheus usando). O que travava era
+> UX. As três, com causa medida:
+>
+> **1. "Desloga toda hora" — era CONFIG, não código.**
+> `sessions_single_per_user: true` no projeto Supabase: todo login novo revogava
+> os outros dispositivos. O `auth_logs` dizia em texto —
+> *"400: Invalid Refresh Token: Session Expired (Revoked by Newer Login)"*, 17×
+> em 24h. Como o professor usa PWA + navegador + computador, um derrubava o
+> outro. **Desligado** (Alf autorizou); só esse flag mudou.
+> ⚠️ O diagnóstico de 13/07 (storage do iOS) **estava errado**: medido agora,
+> Matheus tem **507 renovações × 16 logins** e sessão viva **46h**.
+> ⚠️ Defeito meu junto: eu chamava `refreshSession()` no `visibilitychange` com
+> um comentário afirmando que ele "só renova se faltar pouco pro vencimento" —
+> **falso** (conferido no fonte do auth-js): rotaciona **toda vez**. 420 tokens
+> do Matheus num dia, mediana **6s**. Trocado por `getSession()` (`951f997`).
+>
+> **2. Data voltava pra hoje** (`3af59d1`) — `useState(hojeBRT())` na Agenda: o
+> dia só existia na memória do componente e `navigate(-1)` remontava. Agora mora
+> na **URL** (`?dia=2026-08-15`): voltar, refresh e histórico funcionam de graça.
+> `diaDaUrl` valida (URL é dado de fora; `2026-02-31` viraria 03/03 em silêncio).
+>
+> **3. Aviso sem saída na chamada** (`3af59d1`) — "tenta de novo mais tarde" não
+> dizia COMO; o professor tinha que sair da tela (e perdia o dia). O
+> `onRecarregar` já existia e só não estava ao alcance dele: virou botão.
+>
+> **FALTA CONFERIR AO VIVO:** não provei 2 e 3 no navegador — a agenda exige
+> sessão e eu não digito senha de professor. Lógica pura testada (153 verdes) e
+> `tsc` limpo; quem fecha é o Isaque abrindo o sábado.
+>
+> Ordem certa pra queixa de sessão: `auth_logs` → `GET /config/auth` →
+> `auth.refresh_tokens` (parent nulo = login novo) → `auth.sessions` → só então o
+> código. Ver [[desloga-toda-hora-era-config-nao-codigo]].
+>
+> ---
+
 > # 🟢 CONSULTA LETIVA DO PROFESSOR — Fase 1 **COMPLETA, 1c NO AR** (17/08)
 >
 > **De onde veio:** o prof. **Valdo (36)** perguntou no WhatsApp em 16/08
