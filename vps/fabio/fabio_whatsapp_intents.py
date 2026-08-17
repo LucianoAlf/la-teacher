@@ -661,3 +661,21 @@ def montar_chamada_consulta(row: dict[str, Any], hoje: date,
         payload["p_unidade"] = pedido["unidade"]
         return {"rpc": "fabio_professor_resumo_aulas", "payload": payload, "pedido": pedido}
     return {"rpc": "fabio_professor_presencas_periodo", "payload": payload, "pedido": pedido}
+
+
+def tem_sinal_de_aula(texto: str) -> bool:
+    """A fala carrega ALGUM sinal de aula (presença ou conteúdo)?
+
+    Discriminador do roteador, e de propósito não é lista de palavrinhas de
+    confirmação ("ok", "sim", "blz"...): a régua é se a mensagem fala de aula.
+    Um "Ok" solto não fala; "A Sofia faltou e trabalhamos respiração" fala.
+
+    Existe porque em 16/08 o "Ok" do prof. Valdo — resposta a uma pergunta de
+    CONSULTA — abriu uma ação de chamada do nada e a conversa terminou em "Não
+    gravei nada". Ambíguo COM sinal continua legítimo para perguntar: ali há
+    conteúdo real, e o caminho determinístico é o único que consegue gravá-lo.
+    """
+    hay = _norm(texto)
+    if not hay:
+        return False
+    return _has_phrase(hay, _PRESENCE_WORDS) or _has_phrase(hay, _CONTENT_WORDS)

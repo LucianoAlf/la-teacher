@@ -15,8 +15,10 @@ from fabio_whatsapp_intents import (
     classificar_intencao_audio,
     classificar_intencao_texto,
     detectar_substituicao,
+    parece_consulta_letiva,
     interpretar_resposta_pendente,
     reduzir_shortlist,
+    tem_sinal_de_aula,
     texto_tem_horario,
     validar_patch_correcao,
 )
@@ -726,10 +728,24 @@ def tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBa
             action = _start(backend, context, "confirmar_intencao_audio", storage_path, {"transcricao": text, "intencao": "ambiguo"})
             return _result("confirm_audio_intent", reply="Quer registrar esse áudio como conteúdo de aula?", action_id=str(action["id"]))
         return _start_from_candidates(backend, dict(context, text=text), "registro", _pool(backend, context, "registro"), storage_path)
+    # A CONSULTA VENCE O ROTEADOR. "Quantas aulas eu dei semana passada?" e
+    # pergunta, nao lancamento: nao pode abrir chamada nem consultar o pool.
+    # Quem responde e o bridge, injetando o dado da RPC no prompt.
+    if parece_consulta_letiva(text):
+        return _result("conversation", handled=False, forward=True)
+
     intent = classificar_intencao_texto(text, context.get("llm_json"))
     if intent == "conversa":
         return _result("conversation", handled=False, forward=True)
     if intent == "ambiguo":
+        # DUVIDA SEM SINAL DE AULA NAO ABRE ACAO. Em 16/08 o "Ok" do Valdo —
+        # resposta a uma pergunta de consulta — criou uma
+        # `confirmar_intencao_chamada` do nada (nao havia acao pendente), e a
+        # conversa terminou em "Nao gravei nada". Ambiguo COM sinal segue
+        # perguntando: ali ha conteudo real e o caminho deterministico e o
+        # unico que consegue grava-lo.
+        if not tem_sinal_de_aula(text):
+            return _result("conversation", handled=False, forward=True)
         action = _start(backend, context, "confirmar_intencao_chamada", None, {"transcricao": text, "intencao": "ambiguo"})
         return _result("confirm_call_intent", reply="Você quer bater a chamada de uma aula com isso?", action_id=str(action["id"]))
     return _start_from_candidates(backend, context, "chamada", _pool(backend, context, "chamada"), None)

@@ -567,6 +567,10 @@ class WhatsappActionsTest(unittest.TestCase):
         self.assertEqual(enqueue["p_aula_id"], 102)
 
     def test_mixed_text_asks_intention_without_call_pool(self):
+        """Ambíguo COM sinal de aula continua perguntando — aqui há conteúdo real
+        ("faltou" + "trabalhamos respiração") e o caminho determinístico é o
+        único que consegue gravar isso. O que mudou (16/08) foi o ambíguo SEM
+        sinal nenhum: ver AmbiguoSemSinalNaoAbreAcaoTest."""
         backend = FakeBackend(candidates=[{"aula_id": 101}])
         result = tratar_mensagem_professor(professor_context(text="A Sofia faltou e trabalhamos respiração"), backend)
         self.assertEqual(result["code"], "confirm_call_intent")
@@ -1147,6 +1151,61 @@ class SubstituicaoShadowTest(unittest.TestCase):
         backend, result = self._run(self.FALA, alunos=[{"aluno_id": None, "nome": "Jeremias Alves"}])
         self.assertEqual(result["code"], "audio_enqueued")
         self.assertFalse(self._participacao(backend))
+
+
+class AmbiguoSemSinalNaoAbreAcaoTest(unittest.TestCase):
+    """A ferida do Valdo (16/08). Ele perguntou quantas aulas tinha dado; o Fábio
+    respondeu que não tinha a agenda; ele disse "Ok" — e esse "Ok" CRIOU uma ação
+    de chamada do nada (medido em `fabio_acoes_pendentes`:
+    `{"intencao":"ambiguo","transcricao":"Ok"}`), terminando em "Não gravei nada."
+
+    Não havia ação pendente antes. Uma fala SEM nenhum sinal de aula não pode
+    abrir fluxo de registro/chamada."""
+
+    def _backend(self):
+        return FakeBackend(candidates=[{"aula_id": 101, "data": "2026-08-11",
+                                        "hora": "14:00", "curso": "Piano"}])
+
+    def _nao_abriu(self, backend, result):
+        self.assertFalse(result["handled"])
+        self.assertTrue(result["forward_to_hermes"])
+        self.assertFalse([p for n, p in backend.calls if n == "fabio_iniciar_acao"],
+                         "nao pode abrir acao")
+        self.assertFalse([c for c in backend.calls if c[0] == "fabio_aulas_candidatas"],
+                         "nao pode nem consultar o pool")
+
+    def test_ok_solto_nao_abre_acao(self):
+        backend = self._backend()
+        self._nao_abriu(backend, tratar_mensagem_professor(professor_context(text="Ok"), backend))
+
+    def test_sim_solto_nao_abre_acao(self):
+        backend = self._backend()
+        self._nao_abriu(backend, tratar_mensagem_professor(professor_context(text="Sim"), backend))
+
+    def test_pergunta_do_valdo_nao_abre_acao(self):
+        """A pergunta que começou tudo: consulta é pergunta, não lançamento."""
+        backend = self._backend()
+        self._nao_abriu(backend, tratar_mensagem_professor(professor_context(
+            text="Na semana passada de terça-feira dia 11/08 ate sábado dia 15/08 "
+                 "me informe o total de aulas que eu dei"), backend))
+
+    def test_pergunta_de_falta_nao_abre_acao(self):
+        backend = self._backend()
+        self._nao_abriu(backend, tratar_mensagem_professor(
+            professor_context(text="quais alunos faltaram semana passada"), backend))
+
+    def test_pergunta_por_unidade_nao_abre_acao(self):
+        backend = self._backend()
+        self._nao_abriu(backend, tratar_mensagem_professor(
+            professor_context(text="quantas aulas eu dei no Recreio semana passada"), backend))
+
+    def test_audio_ambiguo_segue_perguntando(self):
+        """Áudio NÃO muda: ali existe conteúdo gravado que justifica pinar a aula."""
+        backend = self._backend()
+        result = tratar_mensagem_professor(
+            professor_context(kind="audio", text="A Sofia faltou e trabalhamos respiração",
+                              media_url="https://media/1"), backend)
+        self.assertEqual(result["code"], "confirm_audio_intent")
 
 
 if __name__ == "__main__":
