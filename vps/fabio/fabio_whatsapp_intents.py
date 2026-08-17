@@ -551,6 +551,21 @@ _CONSULTA_PRESENCA = re.compile(
 )
 _DATA_EXPLICITA = re.compile(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b")
 
+# O professor FALA a data, e o Whisper escreve o que ele falou: "dia 11 do 8",
+# nunca "11/08". Medido na transcrição real do Valdo em 17/08/2026 — os dois
+# áudios dele morriam aqui, com `parece_consulta_letiva` dizendo True e o
+# período saindo None. A forma digitada era a única que eu tinha testado,
+# porque é como EU escrevo.
+_DATA_FALADA = re.compile(r"\b(\d{1,2})\s+d[eo]\s+(\d{1,2})\b")
+
+_MESES = {
+    "janeiro": 1, "fevereiro": 2, "marco": 3, "março": 3, "abril": 4,
+    "maio": 5, "junho": 6, "julho": 7, "agosto": 8, "setembro": 9,
+    "outubro": 10, "novembro": 11, "dezembro": 12,
+}
+_DATA_MES_EXTENSO = re.compile(
+    rf"\b(\d{{1,2}})\s+de\s+({'|'.join(_MESES)})\b")
+
 
 def _data_de(dia: str, mes: str, ano: str | None, hoje: date) -> date | None:
     try:
@@ -570,9 +585,17 @@ def resolver_periodo(texto: str, hoje: date) -> tuple[date, date] | None:
     """
     hay = _norm(texto)
 
-    # 1) datas explícitas ("de 11/08 até 15/08") — a forma que o Valdo usou.
+    # 1) datas explícitas, nas TRÊS formas que aparecem de verdade:
+    #    digitada ("de 11/08 até 15/08"), falada ("do dia 11 do 8 até o dia 15
+    #    do 8" — o Valdo, por áudio) e mês por extenso ("11 de agosto").
+    #    Data impossível ("32 do 13") continua devolvendo None em vez de virar
+    #    data torta: `_data_de` recusa, e sem período o contrato é PERGUNTAR.
+    brutas = list(_DATA_EXPLICITA.findall(hay))
+    brutas += [(dia, mes, None) for dia, mes in _DATA_FALADA.findall(hay)]
+    brutas += [(dia, str(_MESES[mes]), None)
+               for dia, mes in _DATA_MES_EXTENSO.findall(hay)]
     achadas = [d for d in (_data_de(dia, mes, ano, hoje)
-                           for dia, mes, ano in _DATA_EXPLICITA.findall(hay))
+                           for dia, mes, ano in brutas)
                if d is not None]
     if len(achadas) >= 2:
         achadas.sort()

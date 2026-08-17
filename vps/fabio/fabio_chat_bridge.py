@@ -39,6 +39,7 @@ from fabio_whatsapp_intents import (
     classificar_intencao_texto,
     consulta_vence_atalho,
     montar_chamada_consulta,
+    parece_consulta_letiva,
 )
 from fabio_registro_normalization_contract import sanear_readback_para_preview
 
@@ -2779,7 +2780,41 @@ def _bloco_consulta_letiva(row: Dict[str, Any]) -> str:
         chamada = montar_chamada_consulta(
             row, date.fromisoformat(today_brt()), _unidades_nomes())
         if not chamada:
-            return ""
+            # SILÊNCIO AQUI É O QUE PRODUZ A PROMESSA VAZIA.
+            #
+            # 17/08/2026: os dois áudios do Valdo eram consulta ("quantas aulas
+            # eu dei..."), mas ele FALOU a data ("dia 11 do 8") e o período saía
+            # None. Sem bloco, o Fábio ia pro Hermes sem dado E sem a regra
+            # anti-promessa — e improvisou "não tenho a agenda carregada, se
+            # quiser eu confiro e te digo". É exatamente a ferida que esta
+            # feature existe pra fechar, reaberta pelo caminho de trás.
+            #
+            # O regex de data falada foi consertado junto, mas isto aqui é o que
+            # impede a PRÓXIMA forma que eu não imaginar de virar promessa: se é
+            # pergunta de vida letiva e eu não sei o período, o Fábio PERGUNTA.
+            texto = str(row.get("content") or row.get("media_extracted_text") or "")
+            if not parece_consulta_letiva(texto):
+                return ""
+            professor_id = row.get("professor_id")
+            log("consulta_letiva_sem_periodo", professor_id=professor_id,
+                modo=CONSULTA_LETIVA_MODO,
+                injetou=_consulta_letiva_injeta(professor_id),
+                texto=texto[:200])
+            if not _consulta_letiva_injeta(professor_id):
+                return ""
+            return (
+                "\nCONSULTA LETIVA — PERGUNTA SEM PERÍODO RECONHECIDO:\n"
+                "O professor está perguntando sobre a própria vida letiva (aulas dadas, "
+                "faltas, presenças), mas não consegui identificar de QUE PERÍODO ele fala.\n"
+                "Como responder:\n"
+                "- PERGUNTE o período, de forma curta e concreta "
+                "(ex.: \"de que dia a que dia?\" ou \"foi a semana passada?\").\n"
+                "- NUNCA prometa \"vou conferir e te trago\", \"vou verificar\" ou "
+                "\"já te passo\": você NÃO tem como fazer isso depois. Você só consegue "
+                "responder na hora em que ele disser o período.\n"
+                "- Não invente número e não diga que a agenda não está carregada: "
+                "o dado existe, só falta ele dizer o período.\n"
+            )
         pedido = chamada["pedido"]
 
         r = sb_post(f"/rest/v1/rpc/{chamada['rpc']}", chamada["payload"])

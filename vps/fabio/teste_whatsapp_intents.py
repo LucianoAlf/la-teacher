@@ -457,5 +457,67 @@ class ConsultaVenceAtalhoTest(unittest.TestCase):
         self.assertFalse(self.vence("bom dia, tudo bem?"))
 
 
+class DataFaladaTest(unittest.TestCase):
+    """O professor FALA a data; o Whisper escreve "dia 11 do 8", não "11/08".
+
+    17/08/2026, transcricao REAL do Valdo (as duas tentativas dele por audio):
+    parece_consulta_letiva devolvia True — entao o roteador liberava — mas
+    resolver_periodo devolvia None, o bloco voltava vazio EM SILENCIO e o Fabio
+    respondia "nao tenho a agenda carregada, se quiser eu confiro": a promessa
+    vazia que essa feature inteira existe pra matar.
+
+    Meus testes so tinham a forma DIGITADA (11/08), que e como EU escrevo.
+    """
+
+    HOJE = date(2026, 8, 17)
+
+    VALDO_1 = ("Olá, Fábio, me faz um favor. Me diz, por favor, quantas aulas eu dei "
+               "na semana do dia 11 do 8, terça-feira, até o dia 15 do 8, sábado? "
+               "Quantas aulas eu dei?")
+    VALDO_2 = ("Olá, Fábio, me faz um favor, me diz quantas aulas eu dei no total "
+               "do dia 11 do 8, terça-feira até o dia 15 do 8, sábado, quantas aulas "
+               "eu dei no total?")
+
+    def test_transcricao_real_do_valdo_resolve_o_periodo(self):
+        for i, fala in enumerate((self.VALDO_1, self.VALDO_2), start=1):
+            with self.subTest(audio=i):
+                self.assertTrue(parece_consulta_letiva(fala))
+                self.assertEqual(resolver_periodo(fala, self.HOJE),
+                                 (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_dia_X_do_Y_falado(self):
+        self.assertEqual(resolver_periodo("quantas aulas eu dei dia 11 do 8?", self.HOJE),
+                         (date(2026, 8, 11), date(2026, 8, 11)))
+        self.assertEqual(resolver_periodo("aulas do dia 3 do 7 ate o dia 9 do 7", self.HOJE),
+                         (date(2026, 7, 3), date(2026, 7, 9)))
+
+    def test_dia_X_de_Y_tambem_vale(self):
+        # "11 de 8" e tao falado quanto "11 do 8". Este caso nasceu de um
+        # MUTANTE SOBREVIVENDO: trocar `d[eo]` por `do` mantinha tudo verde,
+        # prova de que a asserção do "de" nunca existiu.
+        self.assertEqual(resolver_periodo("quantas aulas de 11 de 8 ate 15 de 8?", self.HOJE),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_mes_por_extenso(self):
+        self.assertEqual(resolver_periodo("quantas aulas de 11 de agosto a 15 de agosto?", self.HOJE),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+        self.assertEqual(resolver_periodo("quantas aulas eu dei em 3 de marco?", self.HOJE),
+                         (date(2026, 3, 3), date(2026, 3, 3)))
+
+    def test_forma_digitada_continua_valendo(self):
+        self.assertEqual(resolver_periodo("de 11/08 a 15/08", self.HOJE),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+        self.assertEqual(resolver_periodo("semana passada", self.HOJE),
+                         (date(2026, 8, 10), date(2026, 8, 16)))
+
+    def test_data_impossivel_nao_e_inventada(self):
+        # "32 do 13" nao existe: continua None (perguntar), nao vira data torta.
+        self.assertIsNone(resolver_periodo("quantas aulas eu dei dia 32 do 13?", self.HOJE))
+
+    def test_sem_periodo_continua_none(self):
+        # Sem periodo o contrato e PERGUNTAR, nao assumir hoje.
+        self.assertIsNone(resolver_periodo("quantas aulas eu dei?", self.HOJE))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
