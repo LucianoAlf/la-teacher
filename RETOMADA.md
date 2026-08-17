@@ -1,5 +1,73 @@
 # RETOMADA — LA Teacher
 
+> # 🔴→🟢 O "SIM" QUE GRAVOU A AULA ERRADA — 3 camadas CONSERTADAS (17/08)
+>
+> **O incidente**, reconstruído do banco + log da VPS (professor **Isaque, 10**,
+> 15/08). Minha nota antiga dizia "corrida entre preview e áudio novo" — **estava
+> errada no mecanismo**. Em 30 dias **nunca** houve duas ações abertas ao mesmo
+> tempo (pico = 1). O que houve foram **dois cérebros na mesma conversa**:
+>
+> | hora | o que aconteceu |
+> |---|---|
+> | 16:53 | o **LLM** mostra preview das **14h** (Jeremias) e **15h** (Marcelo) — a ação viva na máquina é a das **13h** (Billy) |
+> | 16:55:16 + :20 | "Juliana fez aula no lugar do jeremias" **+** "Sim" colados → log: `message_batch_collected count=2` → **a máquina é pulada inteira** |
+> | 16:55:34 | LLM: *"vou ajustar o registro: a aula das 14h foi da Juliana…"* |
+> | 16:56:55 | LLM: *"Ajustei… **Posso gravar? Responde sim**"* |
+> | 16:57:36 | "Sim" sozinha → máquina roda → confirma a ação ativa: **13h** |
+> | 17:03 | carimbo **T_Sá_13 • 13:00** — aula errada no prontuário |
+>
+> **Causa:** `fabio_chat_bridge.py:3197` — `if _batch_count != 1: return None`
+> pula a máquina, e o debounce de 2s junta mensagem colada. O LLM responde
+> sozinho e promete o que não tem mão pra fazer; a máquina colhe o "sim".
+>
+> ## Os 3 consertos (todos no ar, com mutante)
+> | # | commit | o que |
+> |---|---|---|
+> | 1 | `524b4d2` | **A trava.** O "sim" só vale pra ação que **falou por último**. RPC `fabio_acao_confirmacao_segura` + carimbo `fabio-acao:<acao>:<rand>` na resposta de texto (o preview já era `fabio-preview:<acao>` desde a 090; fala do LLM entra nula). 6 testes + **5/5 mutantes**; 11 casos SQL + **5/5 mutantes** |
+> | 2 | `dcafebf` | **O LLM cala a promessa.** `_bloco_acao_pendente` proíbe "ajustei/gravei/posso gravar/responde sim". Consulta em `_carregar_acao_ativa` (no `process_one`, **não** no `build_prompt`, que tem contrato de I/O). 6 testes + **5/5 mutantes**, inclusive o que corta o fio |
+> | 3 | `db8932d` | **O lote para de engolir.** Havendo ação aberta, mensagem anda sozinha e sem debounce. Conversa normal segue juntando. **4/4 mutantes** |
+>
+> ⚠️ **Por que a ordem importa:** consertar só o lote (3) **não resolveria** — se
+> a máquina tivesse colhido aquele "sim" das 16:55, gravaria a 13h do mesmo
+> jeito. A trava (1) é a que salva o prontuário.
+>
+> ⚠️ **Um mutante pegou asserção sem dente:** testei o reaproveitamento com
+> `side_effect=AssertionError`, mas `_carregar_acao_ativa` engole exceção de
+> propósito — engolia o AssertionError do teste junto. Trocado por **contagem
+> de chamadas**.
+>
+> ## E a SHADOW da substituição (0 linhas desde 15/08) — mesma raiz
+> Não é que ninguém substituiu ninguém. As **únicas duas frases** de
+> substituição do corpus são as do Isaque naquele dia: a de texto caiu **no lote
+> de 2** (máquina pulada) e a de áudio ficou parqueada, **sem pinar aula** — e o
+> wiring só roda depois de *aula pinada + áudio enfileirado*. O único caso real
+> passou exatamente pelos dois caminhos onde o detector não é alcançado. Desde
+> 15/08 houve só **6 registros por WhatsApp** no total: com essa amostra, "zero
+> linhas" nunca ia provar nada. Com o conserto 3, o caminho de texto passa a
+> alcançar o detector.
+>
+> ## Verificado ao vivo, conversando com o Fábio
+> - pergunta comum → responde normal, sem ruído
+> - consulta letiva do Valdo → **36 aulas** (`injetou: true`)
+>
+> ⚠️ **`falar_com_fabio.py` NÃO enxerga o drop-in do systemd.** Rodando sem a
+> flag, o log saiu `modo: shadow, injetou: false` e a resposta veio errada — eu
+> quase reportei regressão. O serviço vivo tem `FABIO_CONSULTA_LETIVA_MODO=todos`
+> (`systemctl --user show fabio-chat-bridge.service -p Environment`). Exportar a
+> flag à mão antes de concluir qualquer coisa pelo script.
+>
+> ## PENDENTE daqui
+> 1. **`teste_whatsapp_reconciler` está VERMELHO e não fui eu** — `cleanup_once`
+>    chama `fabio_arquivar_limpeza_bloqueada` e o dublê não conhece a RPC.
+> 2. **Observar em uso real**: ação aberta antes do deploy pede uma confirmação
+>    extra na primeira vez (a fala anterior dela não tem carimbo). Uma vez por ação.
+> 3. Decidir se o detector de substituição deve alcançar o áudio **parqueado**
+>    (hoje só roda com aula pinada).
+>
+> Ver [[duas-bocas-na-mesma-conversa]].
+>
+> ---
+
 > # 🚰 TORNEIRA DA DEVOLUTIVA NO WHATSAPP — os 2 caminhos automáticos FECHADOS (17/08)
 >
 > **O Alf já tinha pedido pra fechar isso antes, e continuou disparando** — ele
