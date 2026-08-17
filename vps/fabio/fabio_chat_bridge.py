@@ -34,7 +34,11 @@ if str(_CONTRACT_DIR) not in sys.path:
     sys.path.insert(0, str(_CONTRACT_DIR))
 
 from fabio_whatsapp_actions import FabioWhatsappBackend, tratar_mensagem_professor
-from fabio_whatsapp_intents import classificar_intencao_audio, classificar_intencao_texto
+from fabio_whatsapp_intents import (
+    classificar_intencao_audio,
+    classificar_intencao_texto,
+    montar_chamada_consulta,
+)
 from fabio_registro_normalization_contract import sanear_readback_para_preview
 
 HERMES_HOME = Path(os.getenv("HERMES_HOME", "/home/fabio/.hermes"))
@@ -2708,6 +2712,92 @@ def _agenda_de_outro_dia(professor_id: int, text: str) -> Optional[Dict[str, Any
     }
 
 
+# ── Consulta letiva do professor (Fase 1) ───────────────────────────────────
+# Nasceu do pedido do prof. Valdo em 16/08: "me informe o total de aulas que eu
+# dei de 11/08 a 15/08". O Fábio não tinha como responder — o canal do professor
+# é `no_mcp`, ele não tem ferramenta de banco. E, pior, prometeu ("eu olho e te
+# trago") e depois deixou o "Ok" dele virar uma ação de chamada.
+#
+# Aqui QUEM BUSCA É O BRIDGE: ele já sabe de quem é a linha da mensagem, chama a
+# RPC canônica com esse professor_id e injeta o resultado. O Fábio só narra —
+# não ganha banco, e a fronteira do financeiro é a RPC não ter a coluna.
+#
+# Rollout:
+#   shadow (padrão) = calcula e LOGA, não injeta nada
+#   piloto          = injeta só pra Valdo (36) e Matheus Felipe Lourenço (25)
+#   todos           = injeta pra todo mundo
+CONSULTA_LETIVA_MODO = os.getenv("FABIO_CONSULTA_LETIVA_MODO", "shadow")
+CONSULTA_LETIVA_PILOTO = {36, 25}
+_UNIDADES_CACHE: list[str] = []
+
+
+def _consulta_letiva_injeta(professor_id: int) -> bool:
+    if CONSULTA_LETIVA_MODO == "todos":
+        return True
+    if CONSULTA_LETIVA_MODO == "piloto":
+        return int(professor_id) in CONSULTA_LETIVA_PILOTO
+    return False
+
+
+def _unidades_nomes() -> list[str]:
+    """Nomes das unidades, pro extrator reconhecer "no Recreio"."""
+    global _UNIDADES_CACHE
+    if not _UNIDADES_CACHE:
+        try:
+            rows = sb_get("/rest/v1/unidades", {"select": "nome"})
+            _UNIDADES_CACHE = [u["nome"] for u in (rows or []) if u.get("nome")]
+        except Exception as exc:
+            log("consulta_letiva_unidades_falhou", error=str(exc)[-200:])
+    return _UNIDADES_CACHE
+
+
+def _bloco_consulta_letiva(row: Dict[str, Any]) -> str:
+    """Consulta letiva do professor. Falha aqui nunca derruba o prompt."""
+    try:
+        chamada = montar_chamada_consulta(
+            row, date.fromisoformat(today_brt()), _unidades_nomes())
+        if not chamada:
+            return ""
+        pedido = chamada["pedido"]
+
+        r = sb_post(f"/rest/v1/rpc/{chamada['rpc']}", chamada["payload"])
+        if r.status_code >= 400:
+            log("consulta_letiva_rpc_erro", rpc=chamada["rpc"],
+                status=r.status_code, corpo=r.text[:300])
+            return ""
+        dados = r.json()
+
+        log("consulta_letiva",
+            professor_id=chamada["payload"]["p_professor_id"],
+            rpc=chamada["rpc"], metrica=pedido["metrica"],
+            inicio=pedido["inicio"].isoformat(), fim=pedido["fim"].isoformat(),
+            unidade=pedido["unidade"], modo=CONSULTA_LETIVA_MODO,
+            injetou=_consulta_letiva_injeta(chamada["payload"]["p_professor_id"]),
+            resultado=json.dumps(dados, ensure_ascii=False, default=str)[:800])
+
+        if not _consulta_letiva_injeta(chamada["payload"]["p_professor_id"]):
+            return ""
+        if not isinstance(dados, dict) or not dados.get("ok"):
+            return ""
+
+        return (
+            "\nCONSULTA LETIVA (dado do banco, já escopado NESTE professor):\n"
+            f"- periodo_consultado: {pedido['inicio'].strftime('%d/%m')} a "
+            f"{pedido['fim'].strftime('%d/%m')}\n"
+            f"- resultado_json: {json.dumps(dados, ensure_ascii=False, default=str)[:3000]}\n"
+            "Como responder com isso:\n"
+            "- Diga SEMPRE o período que foi consultado, pro professor poder corrigir se entendeu outro.\n"
+            "- `faltas` e `falta_provavel` são COISAS DIFERENTES: falta_provavel é ausência que veio do "
+            "Emusys e a secretaria ainda não confirmou. Nunca some os dois, e nunca chame provável de falta.\n"
+            "- Não fale de dinheiro, mensalidade, pagamento ou repasse: não está aqui e não é assunto seu.\n"
+            "- Se ele perguntar algo que NÃO está neste bloco, diga que ainda não consegue consultar isso. "
+            "NUNCA prometa 'vou olhar e te trago' — você não tem como.\n"
+        )
+    except Exception as exc:
+        log("consulta_letiva_falhou", id=row.get("id"), error=str(exc)[-400:])
+        return ""
+
+
 def build_prompt(row: Dict[str, Any]) -> str:
     tipo = row.get("identidade_tipo") or "professor"
     hist = recent_history_for_row(row, 12)
@@ -2737,6 +2827,7 @@ def build_prompt(row: Dict[str, Any]) -> str:
             _bloco_prompt_pendencias(pendencias_prefetch(professor_id, text), row)
             + capacidade_professor(row)
             + ESCOPO_PROFESSOR
+            + _bloco_consulta_letiva(row)
         )
     return f"""Canal: chat livre do Fábio com professor/admin da LA Music.
 Use a skill chat-fabio-la-music como guia principal de personalidade, roteamento e guardrails.
