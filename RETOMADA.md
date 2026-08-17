@@ -316,6 +316,28 @@
 >
 > ## 🔭 RADAR — não pode cair (combinado com o Alf em 15/08)
 >
+> **0. AGUARDANDO EVIDÊNCIA — auditoria da 1ª substituição real (Task 4 shadow).**
+>    A substituição está em **shadow operacional** desde 15/08 (schema+RPCs em
+>    prod, wiring+detector no bridge, falsificado contra o Isaque). O Alf aprovou
+>    e o combinado é: **deixar rodar em uso real e auditar `fabio_participacao_
+>    ocorrencias` quando aparecer a próxima substituição** — sem tocar efeito
+>    operacional ainda. Quando cair a primeira, rodar a consulta abaixo e conferir:
+>    par certo (matriculado do roster × participante citado), estado `candidata` +
+>    `confianca` baixa (v1 externa), `origem_transcricao` batendo com a fala, e
+>    **zero** escrita nova em presença/falta/Emusys. Consulta pronta:
+>    ```sql
+>    select o.criado_em, o.professor_id, o.aluno_matriculado_id,
+>           o.participante_real_nome, o.confianca, o.metodo_extracao,
+>           e.estado_atual, o.origem_transcricao
+>    from public.fabio_participacao_ocorrencias o
+>    join public.vw_fabio_participacao_ocorrencia_estado e on e.ocorrencia_id = o.id
+>    order by o.criado_em desc limit 20;
+>    ```
+>    (Tabela hoje = 0 linhas; a primeira linha é o gatilho da auditoria.) A V2
+>    da escada de identidade — `fabio_resolver_participante` precisa do
+>    `unidade_id`, que `fabio_aulas_candidatas` não devolve — só depois desta
+>    observação.
+>
 > Interrompido pelo incidente do Isaque. **Voltar para estes três:**
 >
 > 1. **A perna do comercial da experimental** — única do ciclo que nunca
