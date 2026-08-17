@@ -68,6 +68,22 @@
 > distintos" — é falso (39 vs 30); o invariante certo é **nenhum balde repete o
 > mesmo aluno no mesmo dia**.
 >
+> ## ⚠️ 17/08 tarde — o Valdo testou POR ÁUDIO e falhou; CONSERTADO (`d05d959`)
+> A consulta letiva só quebrava o roteador no caminho de **texto sem ação
+> pendente**. O Valdo perguntou **por áudio**, e ainda tinha uma
+> `escolher_aula_chamada` **presa desde 16/08 21:31** (a wreckage do "Ok", TTL
+> 24h): cada áudio dele virava *"ainda não sei de qual aula você está falando"*.
+> Dois caminhos anteriores engoliam a consulta — `_handle_existing_action` e
+> `classificar_intencao_audio` — e o break-out era o último `return`.
+> **Conserto:** subir o break-out pra **antes de tudo** em
+> `tratar_mensagem_professor`, pros dois kinds. 3 testes novos (2 vi vermelhos
+> antes), suíte do Fábio verde, deploy md5-conferido. Wreckage `a9b86134`
+> cancelada pelo ledger; Valdo sem ação aberta. Consumer ao vivo: **36 aulas**.
+> **Cego que me pegou:** `falar_com_fabio.py` manda texto e nunca com ação
+> pendente — as duas dimensões do bug. Meu "provado ao vivo" de 1a/1b/1c não
+> tocou o canal real (áudio + estado). Ver
+> [[capacidade-nova-engolida-por-caminho-anterior]].
+>
 > ## Fase 1c — LIGADA pelo Alf (17/08 12:59 UTC)
 > `FABIO_CONSULTA_LETIVA_MODO=todos` no mesmo drop-in. **Todo professor** recebe
 > a resposta de verdade. Provado no prof. **35**, que até 12:59 o gate barrava:
