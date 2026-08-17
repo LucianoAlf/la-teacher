@@ -88,8 +88,23 @@
 > ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 \
 >   'grep consulta_letiva ~/.hermes/logs/fabio-chat-bridge.log | tail -20'
 > ```
-> **Fora de escopo, pra coordenação (Hugo/secretaria):** 9 pares aluno/aula com
-> presença **conflitante** só na semana do Rodrigo. Não é pro Fábio resolver.
+> **As duas formas de erro que eu procuro no log** (as duas só aparecem com fala
+> real, cruzando o log com as mensagens da fila):
+> - **surdez** — pergunta de aula/presença que **não** virou linha `consulta_letiva`
+> - **ruído** — linha `consulta_letiva` em cima de mensagem que **não era** pergunta
+>
+> ## Estado de deploy (conferido 17/08 13:1x)
+> `md5sum` do `fabio_chat_bridge.py` e do `fabio_whatsapp_intents.py` **idêntico**
+> entre repo e VPS; `git status` limpo e sincronizado com o origin. Backups na
+> VPS: `*.bak-20260817-atalho`.
+>
+> ## O QUE FALTA — nada bloqueia a Fase 2
+> 1. **Falsificar a classificação contra fala real** (acima). Não bloqueia
+>    desenhar a Fase 2 — pelo contrário, o que o extrator errar é **insumo** dela.
+> 2. **Entregar pra coordenação (Hugo/secretaria):** 9 pares aluno/aula com
+>    presença **conflitante** só na semana do Rodrigo. Não é pro Fábio resolver —
+>    ele mostra os baldes separados e não decide. Precisa de gente, não de código.
+> 3. **Radar item 0** (outro assunto): auditar a 1ª substituição real quando cair.
 >
 > Spec: `docs/superpowers/specs/2026-08-17-consulta-letiva-professor-design.md`
 > Plano: `docs/superpowers/plans/2026-08-17-consulta-letiva-professor.md`
