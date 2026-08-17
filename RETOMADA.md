@@ -27,9 +27,16 @@
 > dizia COMO; o professor tinha que sair da tela (e perdia o dia). O
 > `onRecarregar` já existia e só não estava ao alcance dele: virou botão.
 >
-> **FALTA CONFERIR AO VIVO:** não provei 2 e 3 no navegador — a agenda exige
-> sessão e eu não digito senha de professor. Lógica pura testada (153 verdes) e
-> `tsc` limpo; quem fecha é o Isaque abrindo o sábado.
+> **PROVADO AO VIVO** (17/08, o Alf logou como Isaque no preview, 375×812):
+> | teste | resultado |
+> |---|---|
+> | ir pro sábado 15/08 | URL vira `?dia=2026-08-15` ✅ |
+> | abrir a aula de **10h Teclado** (a do vídeo) e **voltar** | volta em **sábado 15/08** ✅ |
+> | F5 no sábado | mantém o sábado **e segue logado** ✅ |
+> | "voltar pra hoje" | volta pra segunda e **limpa** o `?dia=` ✅ |
+> | aviso do roster sem sincronia | botão **"Tentar de novo agora"** aparece e recarrega **sem sair da tela** ✅ |
+> | 6× `visibilitychange` (app indo e voltando do background) | **refresh_token NÃO muda** ✅ |
+> | `auth.refresh_tokens` do Isaque nos 15 min do teste | **1 token** (era 164/dia) ✅ |
 >
 > Ordem certa pra queixa de sessão: `auth_logs` → `GET /config/auth` →
 > `auth.refresh_tokens` (parent nulo = login novo) → `auth.sessions` → só então o
