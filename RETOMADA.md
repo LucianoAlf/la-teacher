@@ -1,6 +1,6 @@
 # RETOMADA — LA Teacher
 
-> # 🟢 CONSULTA LETIVA DO PROFESSOR — 1a fechado, **1b NO AR** (17/08)
+> # 🟢 CONSULTA LETIVA DO PROFESSOR — Fase 1 **COMPLETA, 1c NO AR** (17/08)
 >
 > **De onde veio:** o prof. **Valdo (36)** perguntou no WhatsApp em 16/08
 > *"quantas aulas eu dei de 11/08 a 15/08?"*. O Fábio não soube, **prometeu**
@@ -68,22 +68,22 @@
 > distintos" — é falso (39 vs 30); o invariante certo é **nenhum balde repete o
 > mesmo aluno no mesmo dia**.
 >
-> ## PRÓXIMO PASSO — o 1c ficou com o Alf
-> **A troca pra `todos` foi barrada pela trava de permissão** (é exatamente o
-> passo que amplia de 2 professores pro quadro inteiro). Não contornei. Pra
-> ligar, trocar `piloto` por `todos` no drop-in acima e:
-> `systemctl --user daemon-reload && systemctl --user restart fabio-chat-bridge.service`
+> ## Fase 1c — LIGADA pelo Alf (17/08 12:59 UTC)
+> `FABIO_CONSULTA_LETIVA_MODO=todos` no mesmo drop-in. **Todo professor** recebe
+> a resposta de verdade. Provado no prof. **35**, que até 12:59 o gate barrava:
+> - *"Na semana de 10 a 16/08, você deu **19 aulas** em Campo Grande"* (`injetou: true`)
+> - faltas confirmadas e **"ausência provável — ainda aguardando confirmação da
+>   secretaria"** narradas **separadas** ✅ os baldes não se somam, e a redação
+>   respeita que quem decide presença é a secretaria
 >
-> **Argumento a favor de ir logo:** medido no 1b, o professor **fora** do piloto
-> ainda responde *"Se quiser, eu confiro pra você"* — **a promessa vazia que
-> feriu o Valdo em 16/08**. Essa regra mora **dentro** do bloco injetado, então
-> hoje ela protege só 2 pessoas.
+> **Rollback é um arquivo:** `piloto` volta pros 2; apagar o drop-in volta pra
+> `shadow` (default do código). Sempre `daemon-reload` + `restart` depois.
 >
-> **Risco residual, honesto:** toda a evidência do 1a/1b é de perguntas
-> **minhas**. O que ainda não foi falsificado é a **classificação contra a fala
-> real** — o extrator pode não disparar numa formulação que eu não imaginei, ou
-> disparar onde não devia. Isso aparece no log; o número em si já está provado
-> contra produção em 3 professores. Ler com:
+> ## PRÓXIMO PASSO — falsificar a CLASSIFICAÇÃO contra fala real
+> O **número** já está provado contra produção em 3 professores (35, 36, 25). O
+> que **nunca** foi falsificado é o extrator contra formulação que eu não
+> imaginei — ele pode não disparar onde devia, ou disparar onde não devia. Toda
+> a evidência de 1a/1b/1c é de perguntas **minhas**. Isso aparece no log:
 > ```bash
 > ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 \
 >   'grep consulta_letiva ~/.hermes/logs/fabio-chat-bridge.log | tail -20'
