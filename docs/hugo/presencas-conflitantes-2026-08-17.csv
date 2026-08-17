@@ -1,0 +1,408 @@
+﻿data;unidade;professor;aluno;curso;conflito;aula_id
+09/07/2026;Barra;Gabriel Antony Alves de Araújo;Francisco Thomé Godoi;Bateria T;falta_confirmada x presente;201444
+09/07/2026;Barra;Gabriel Antony Alves de Araújo;Levi marinho ferreira de Lima;Musicalização para bebês;falta_confirmada x presente;201475
+09/07/2026;Barra;Gabriel Antony Alves de Araújo;Liv Ribeiro Oliveira;Musicalização Preparatória para instrumento;falta_confirmada x presente;201454
+09/07/2026;Barra;Gabriel Antony Alves de Araújo;Luigi Rodrigues Pereira;Musicalização para bebês;falta_confirmada x presente;201508
+09/07/2026;Barra;Gabriel Santos Teixeira da Silva;Clarice Braga Soares de Mello;Canto T;falta_confirmada x presente;201511
+09/07/2026;Barra;Gabriel Santos Teixeira da Silva;Guilherme de Lima Sodré;Canto T;falta_confirmada x presente;201506
+09/07/2026;Barra;Gabriel Santos Teixeira da Silva;Manuela Correa Pinto;Canto T;falta_confirmada x presente;201459
+09/07/2026;Barra;Gabriel Santos Teixeira da Silva;Maria Eduarda Dias Ferreira;Canto T;falta_confirmada x presente;201511
+09/07/2026;Barra;Gabriel Santos Teixeira da Silva;Maria Lúcia Vicente Lopes;Canto T;falta_confirmada x presente;201451
+09/07/2026;Barra;Gabriel Santos Teixeira da Silva;Maria Luiza Izidoro de Vasconcelos;Canto T;falta_confirmada x presente;201511
+09/07/2026;Barra;Gabriel Santos Teixeira da Silva;Valentina Faria Fernandes;Canto T;falta_confirmada x presente;201459
+09/07/2026;Barra;Isaque Mendes da Silva;Isabela Cavalcanti Hammerschlag Reis;Piano T;falta_confirmada x presente;201480
+09/07/2026;Barra;Leonardo Castro;Catarina Perim;Teclado T;falta_confirmada x presente;201447
+09/07/2026;Barra;Leonardo Castro;Clarice Braga Soares de Mello;Teclado T;falta_confirmada x presente;201502
+09/07/2026;Barra;Leonardo Castro;Renato Santos Tourinho;Cavaquinho T;aula_justificada x falta_confirmada;201519
+09/07/2026;Barra;Matheus Lana da Silva;Clarice Rangel Tourinho;Musicalização Preparatória para instrumento;falta_confirmada x presente;201500
+09/07/2026;Barra;Matheus Lana da Silva;Luísa Schlinz Paz;Bateria T;falta_confirmada x presente;201441
+09/07/2026;Campo Grande;Ana Beatriz Paz de Almeida;Murilo Oliveira da Hora Dantas;Musicalização Infantil T;falta_confirmada x presente;203205
+09/07/2026;Campo Grande;Matheus Felipe Lourenço;Anna Clara Ferreira Brito;Teclado T;falta_confirmada x presente;203291
+09/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Benjamin Lehrer Braz;Musicalização Preparatória;falta_confirmada x presente;192992
+09/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Catarina Soriani Arrosti;Musicalização Preparatória;falta_confirmada x presente;192992
+09/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Letícia Ferreira Vasconcelos;Canto;falta_confirmada x presente;193039
+09/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Luis Rodrigo Casares Villegas;Musicalização Preparatória;falta_confirmada x presente;193005
+09/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Luiza Faria Frazão de Souza;Teclado;falta_confirmada x presente;193032
+09/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Olivia Carvalho Rocha;Musicalização Preparatória;falta_confirmada x presente;192992
+09/07/2026;Recreio;Leticia de Almeida Palmeira;Pedro Dias Meliande;Musicalização Preparatória;falta_confirmada x presente;193035
+09/07/2026;Recreio;Lohana Leopoldo de Araújo;Sofia Gonçalves Copello Moraes;Canto;falta_confirmada x presente;193069
+09/07/2026;Recreio;Valdo Delfino;Marcos Antônio Marques Machado;Violão;falta_confirmada x presente;192999
+10/07/2026;Barra;Gabriel Santos Teixeira da Silva;Mayle do Nascimento Peres;Canto T;falta_confirmada x presente;201542
+10/07/2026;Barra;Isaque Mendes da Silva;Clarissa Menezes de Carvalho;Teclado T;aula_justificada x falta_confirmada;201590
+10/07/2026;Barra;Isaque Mendes da Silva;Tito Lapa Cazarim;Teclado T;falta_confirmada x presente;201579
+10/07/2026;Barra;Lohana Leopoldo de Araújo;Eva do Espírito Santo Esteves;Canto T;falta_confirmada x presente;201597
+10/07/2026;Barra;Lohana Leopoldo de Araújo;Flávia do Espírito Santo da Silva Telles;Canto T;falta_confirmada x presente;201588
+10/07/2026;Barra;Lohana Leopoldo de Araújo;João Pedro Proença Magalhães;Canto T;falta_confirmada x presente;201597
+10/07/2026;Barra;Matheus Lana da Silva;Frederico Dias de Oliveira;Guitarra T;falta_confirmada x presente;201594
+10/07/2026;Barra;Pedro Sérgio Figueiredo da Glória;Dante Custódio de Almeida Marques;Teclado T;falta_confirmada x presente;201532
+10/07/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Henrique Torres Lima Trombine;Harmonia T;falta_confirmada x presente;203410
+10/07/2026;Recreio;Erick Cosme da Silva;Abraão Teles Seabra;Bateria;falta_confirmada x presente;193117
+10/07/2026;Recreio;Erick Cosme da Silva;Luna Balbi Fabregas Surigue;Canto;falta_confirmada x presente;193231
+10/07/2026;Recreio;Joel de Salles Gouveia Filho;Rúbia Pimentel Duarte;Teclado;falta_confirmada x presente;193115
+10/07/2026;Recreio;Lucas da Silva Guimarães;David Kayat A. Mansour;Garage Band;falta_confirmada x presente;193179
+10/07/2026;Recreio;Lucas da Silva Guimarães;Elena Picanço Santos;Garage Band;falta_confirmada x presente;193179
+10/07/2026;Recreio;Lucas da Silva Guimarães;Helena de Souza Lima da Silva;Garage Band;falta_confirmada x presente;193179
+10/07/2026;Recreio;Rafael Alves Souza (Akeem);Catarina Petrolongo Pinto Abreu;Bateria;falta_confirmada x presente;193097
+11/07/2026;Barra;Ana Beatriz Paz de Almeida;Theo de Bem Felgueiras Ferreira;Musicalização para bebês;falta_confirmada x presente;201615
+11/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Eduardo Coriolano de Oliveira;Canto T;falta_confirmada x presente;201620
+11/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Mariana Herd Giglio;Canto T;falta_confirmada x presente;201653
+11/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Stella Sá de Farias gomes;Canto T;falta_confirmada x presente;201653
+11/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Thalita Araujo Costa;Canto T;falta_confirmada x presente;201653
+11/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Valentina Natividade de Sá Macedo;Canto T;falta_confirmada x presente;201653
+11/07/2026;Barra;Gabriel Antony Alves de Araújo;Bernardo Dumont de Pinho Paiva;Bateria T;falta_confirmada x presente;201634
+11/07/2026;Barra;Gabriel Antony Alves de Araújo;Heitor Lucas Nogueira dos Santos Soares;Musicalização Preparatória para instrumento;falta_confirmada x presente;201651
+11/07/2026;Barra;Peterson Biancamano;Arthur Titus Rego Von Bertrand;Bateria T;falta_confirmada x presente;201650
+11/07/2026;Barra;Peterson Biancamano;Pedro Vasconcellos Tourinho Garcia;Bateria T;falta_confirmada x presente;201676
+11/07/2026;Barra;Willian De Andrade Da Silva;Anna Luisa Peres Alves;Minha Banda Pra Sempre;falta_confirmada x presente;201718
+11/07/2026;Barra;Willian De Andrade Da Silva;Pietro Matola Abreu;Minha Banda Pra Sempre;falta_confirmada x presente;201718
+11/07/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Jean Carlos Dias dos Santos;Teclado T;aula_justificada x falta_confirmada;203564
+11/07/2026;Campo Grande;Caio Tenório de Araújo;Luan Gomes de Faria;Bateria T;aula_justificada x falta_confirmada;203429
+11/07/2026;Campo Grande;Joel de Salles Gouveia Filho;Catarina Marx Feitosa;Violino T;falta_confirmada x presente;203505
+11/07/2026;Campo Grande;Joel de Salles Gouveia Filho;Heitor Lima Coutinho Xavier;Violino T;falta_confirmada x presente;203505
+11/07/2026;Campo Grande;Joel de Salles Gouveia Filho;Milena Americo Paiva;Violino T;falta_confirmada x presente;203571
+11/07/2026;Campo Grande;Lucas Amorim Souza;Moisés Martins Francisco Ribeiro;Bateria T;falta_confirmada x presente;203434
+11/07/2026;Campo Grande;Valdo Delfino;Charles Lins Barbosa;Guitarra T;falta_confirmada x presente;203463
+11/07/2026;Campo Grande;Valdo Delfino;Diogo Gomes Santos Caffonso de Moraes;Violão T;falta_confirmada x presente;203430
+11/07/2026;Campo Grande;Valdo Delfino;Victor Hugo Santos Dias;Violão T;falta_confirmada x presente;203532
+11/07/2026;Campo Grande;Willer Arruda Machado;Águedha Silva Furtado;Guitarra T;falta_confirmada x presente;203473
+11/07/2026;Campo Grande;Willer Arruda Machado;Luana Ferreira de Souza;Guitarra T;falta_confirmada x presente;203473
+11/07/2026;Recreio;Erick Cosme da Silva;Ciro Eugenio da Silva de Oliveira;Canto;falta_confirmada x presente;193296
+11/07/2026;Recreio;Erick Cosme da Silva;Maria Cecília Muniz dos Santos;Canto;falta_confirmada x presente;193248
+11/07/2026;Recreio;Erick Cosme da Silva;Robson Alves de Oliveira Sobrinho;Canto;falta_confirmada x presente;193296
+11/07/2026;Recreio;Leticia de Almeida Palmeira;Benício Lima de Almeida;Musicalização Preparatória;falta_confirmada x presente;193258
+11/07/2026;Recreio;Leticia de Almeida Palmeira;Lis Diolinda da Cruz;Musicalização Preparatória;falta_confirmada x presente;193258
+11/07/2026;Recreio;Lucas da Silva Guimarães;Noah Teixeira Menezes de Lima;Guitarra;falta_confirmada x presente;193270
+11/07/2026;Recreio;Matheus Lana da Silva;Arthur Pontes Rodriguez;Guitarra;falta_confirmada x presente;193265
+13/07/2026;Barra;Larissa Bheattriz Barbosa Santos;Nicolas Mendes de Morais;Piano T;falta_confirmada x presente;201784
+13/07/2026;Barra;Lucas Amorim Souza;Théo Ferrante Pinho Poswolski;Bateria T;falta_confirmada x presente;201785
+13/07/2026;Barra;Willian De Andrade Da Silva;Nicolle Mendes de Morais;Guitarra T;falta_confirmada x presente;201781
+13/07/2026;Campo Grande;Gabriel Santos Teixeira da Silva;Laura Riggo Targueta Barboza;Canto T;falta_confirmada x presente;203601
+13/07/2026;Campo Grande;Gabriel Santos Teixeira da Silva;Mariana Guedes da Penha;Canto T;falta_confirmada x presente;203687
+13/07/2026;Campo Grande;Gabriel Santos Teixeira da Silva;Matheus Keyne Pereira Souza;Canto T;falta_confirmada x presente;203666
+13/07/2026;Campo Grande;Gabriel Santos Teixeira da Silva;Thuanny de Souza Chaves Ribeiro;Canto T;falta_confirmada x presente;203628
+13/07/2026;Campo Grande;Jordan Barbosa do Rêgo;Kayque Vinicius Da Costa Mallet de Oliveira;Bateria T;falta_confirmada x presente;203672
+13/07/2026;Campo Grande;Pedro Sérgio Figueiredo da Glória;Guilherme Mendes Guidi Da Rocha;Musicalização Infantil T;falta_confirmada x presente;203707
+13/07/2026;Recreio;Alexandre de Sá Ritta do Espirito Santo;Júlia Queiroz de Carvalho;Canto;falta_confirmada x presente;193394
+13/07/2026;Recreio;Ana Beatriz Paz de Almeida;Gabriel Quintella de Macedo Mayer;Musicalização Para Bebês;aula_justificada x falta_confirmada;193359
+13/07/2026;Recreio;Leticia de Almeida Palmeira;Aurora Drummond e Bragança;Musicalização Preparatória;falta_confirmada x presente;193381
+13/07/2026;Recreio;Leticia de Almeida Palmeira;Manuela de Menezes Lopes;Canto;aula_justificada x falta_confirmada;193435
+13/07/2026;Recreio;Lucas da Silva Guimarães;Carlos Yan Gomes Bastos;Violão;falta_confirmada x presente;193340
+13/07/2026;Recreio;Matheus Reis;Aline Barros;Bateria;falta_confirmada x presente;193318
+13/07/2026;Recreio;Rafael Alves Souza (Akeem);Miguel Bolais de Salles;Bateria;falta_confirmada x presente;193317
+14/07/2026;Barra;Erick Cosme da Silva;Andressa Fonseca da Silva;Bateria T;falta_confirmada x presente;201807
+14/07/2026;Barra;Gabriel Antony Alves de Araújo;Lucas Bianchi;Musicalização Preparatória para instrumento;falta_confirmada x presente;201862
+14/07/2026;Barra;Larissa Bheattriz Barbosa Santos;Laura Vieira Mesmer;Canto T;falta_confirmada x presente;201872
+14/07/2026;Barra;Larissa Bheattriz Barbosa Santos;Sophia Galhanone;Teclado T;falta_confirmada x presente;201865
+14/07/2026;Barra;Lucas Amorim Souza;Davi Barreto Lima;Bateria T;falta_confirmada x presente;201805
+14/07/2026;Campo Grande;Daiana Pacifico da Silva dos Anjos;Caroline Salvaterra Camara de Miranda;Canto T;falta_confirmada x presente;203756
+14/07/2026;Campo Grande;Daiana Pacifico da Silva dos Anjos;Erica Batista de Castro;Canto T;falta_confirmada x presente;203756
+14/07/2026;Campo Grande;Pedro Sérgio Figueiredo da Glória;Jammal Rodrigues Braga;Musicalização Infantil T;falta_confirmada x presente;203859
+14/07/2026;Campo Grande;Renan Amorim Guimarães;Alexandre Ayres Filho;Teclado T;falta_confirmada x presente;203747
+14/07/2026;Campo Grande;Renan Amorim Guimarães;Pedro Henrique Argeu Costa da Silva;Teclado T;falta_confirmada x presente;203747
+14/07/2026;Campo Grande;Valdo Delfino;Rayane Bianca dos Santos Stoianof Leite;Violão T;aula_justificada x falta_confirmada;203777
+14/07/2026;Recreio;Isaque Mendes da Silva;Caio Vinicius Vieira de Castro;Teclado;falta_confirmada x presente;193503
+14/07/2026;Recreio;Isaque Mendes da Silva;Sophia Capella Malafaia;Teclado;falta_confirmada x presente;193562
+14/07/2026;Recreio;Lohana Leopoldo de Araújo;Larissa Bezerra Silva de Oliveira;Canto;falta_confirmada x presente;193508
+14/07/2026;Recreio;Lohana Leopoldo de Araújo;Malu Picerno Franco Molinaro Amaral;Canto;falta_confirmada x presente;193508
+14/07/2026;Recreio;Lohana Leopoldo de Araújo;Maysa Telles Reis Gonçalves;Canto;falta_confirmada x presente;193475
+14/07/2026;Recreio;Lucas da Silva Guimarães;Daniel Cardoso Poggio Contardo;Guitarra;falta_confirmada x presente;193462
+14/07/2026;Recreio;Lucas da Silva Guimarães;Guilherme de Farias Varjão;Guitarra;falta_confirmada x presente;193462
+14/07/2026;Recreio;Matheus dos Santos Silva de Oliveira;Helena de Souza Lima da Silva;Canto;falta_confirmada x presente;193550
+14/07/2026;Recreio;Ramon Pina Morais;Inaê Antunes Coelho de Sá;Power Kids;falta_confirmada x presente;193490
+14/07/2026;Recreio;Ramon Pina Morais;Olivia Freire Rodrigues Oliveira;Power Kids;falta_confirmada x presente;193490
+14/07/2026;Recreio;Willer Arruda Machado;Bento Serpa Benitez;Teclado;falta_confirmada x presente;193549
+14/07/2026;Recreio;Willer Arruda Machado;Júlia Ramiro Petralanda;Teclado;falta_confirmada x presente;193478
+14/07/2026;Recreio;Willer Arruda Machado;Maitê Gomes Pereira;Teclado;falta_confirmada x presente;193549
+15/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Lara Lauredo Peixoto;Canto T;falta_confirmada x presente;201922
+15/07/2026;Barra;Gabriel Antony Alves de Araújo;Matheus Lima Mannarino;Musicalização para bebês;aula_justificada x falta_confirmada;201910
+15/07/2026;Barra;Jeyson Gaia Ramos;Vitor Rocha da Costa;Violão T;falta_confirmada x presente;201892
+15/07/2026;Barra;Leonardo Castro;Sandra Maria Gomes Carvalho;Piano T;aula_justificada x falta_confirmada;201877
+15/07/2026;Campo Grande;Fabricio Costa de Oliveira;Arthur Da Hora Marinho;Teclado T;falta_confirmada x presente;203987
+15/07/2026;Campo Grande;Lohana Leopoldo de Araújo;Isabela Paixão Figueiredo;Canto T;falta_confirmada x presente;203991
+15/07/2026;Campo Grande;Pedro Sérgio Figueiredo da Glória;Luísa Oliveira de Andrade Assunção;Musicalização para Bebês T;falta_confirmada x presente;203945
+15/07/2026;Campo Grande;Pedro Sérgio Figueiredo da Glória;Luiza Pereira dos Santos;Musicalização Infantil T;falta_confirmada x presente;203994
+15/07/2026;Campo Grande;Pedro Sérgio Figueiredo da Glória;Sofia Alves Vedoi;Musicalização Infantil T;falta_confirmada x presente;203994
+15/07/2026;Recreio;Alexandre de Sá Ritta do Espirito Santo;Manuela Jordão Toth;Canto;falta_confirmada x presente;193576
+15/07/2026;Recreio;Alexandre de Sá Ritta do Espirito Santo;Victor Alexandre Mendes Soares;Teclado;falta_confirmada x presente;193693
+15/07/2026;Recreio;Erick Cosme da Silva;Kelvin dos Santos Furtado;Canto;aula_justificada x falta_confirmada;193710
+15/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Elis Tineli Gomes Cotta;Canto;falta_confirmada x presente;193651
+15/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Isabel Ohana Nunes de Carvalho;Canto;falta_confirmada x presente;193687
+15/07/2026;Recreio;Leticia de Almeida Palmeira;Giovanna Gonçalves Frias Ribeiro;Canto;falta_confirmada x presente;193708
+15/07/2026;Recreio;Leticia de Almeida Palmeira;João Pedro Brizzi de Almeida;Musicalização Preparatória;falta_confirmada x presente;193578
+15/07/2026;Recreio;Leticia de Almeida Palmeira;Maria Edith Madeira Coimbra;Musicalização Preparatória;falta_confirmada x presente;193578
+15/07/2026;Recreio;Lucas da Silva Guimarães;Roberta Rodrigues Lins Rodolfo;Garage Band;falta_confirmada x presente;193650
+15/07/2026;Recreio;Rafael Alves Souza (Akeem);Arthur Barbosa Fagundes;Bateria;falta_confirmada x presente;193573
+15/07/2026;Recreio;Rafael Alves Souza (Akeem);Killian Paschuini Brito;Bateria;falta_confirmada x presente;193658
+15/07/2026;Recreio;Ramon Pina Morais;Alex Mendes Silva de Souza;Contrabaixo;falta_confirmada x presente;193705
+15/07/2026;Recreio;Ramon Pina Morais;Enzo Viçozo Rodrigues;Garage Band;falta_confirmada x presente;193692
+15/07/2026;Recreio;Ramon Pina Morais;João Pedro Cerveira Soares;Garage Band;falta_confirmada x presente;193668
+15/07/2026;Recreio;Ramon Pina Morais;Maysa Telles Reis Gonçalves;Garage Band;falta_confirmada x presente;193668
+15/07/2026;Recreio;Ramon Pina Morais;Yuri de Souza Ribeiro;Garage Band;falta_confirmada x presente;193668
+15/07/2026;Recreio;Renan Amorim Guimarães;Bianca Petrolongo Pinto Abreu;Teclado;falta_confirmada x presente;193572
+15/07/2026;Recreio;Renan Amorim Guimarães;Clara Martins Moura Marendaz;Garage Band;falta_confirmada x presente;193629
+15/07/2026;Recreio;Renan Amorim Guimarães;Elis Tineli Gomes Cotta;Garage Band;falta_confirmada x presente;193629
+15/07/2026;Recreio;Renan Amorim Guimarães;Laura Picanço Santos;Garage Band;falta_confirmada x presente;193629
+16/07/2026;Barra;Gabriel Antony Alves de Araújo;Bernardo Berriel;Musicalização Preparatória para instrumento;falta_confirmada x presente;201983
+16/07/2026;Barra;Gabriel Antony Alves de Araújo;Luigi Rodrigues Pereira;Musicalização para bebês;falta_confirmada x presente;202004
+16/07/2026;Barra;Gabriel Santos Teixeira da Silva;Guilherme de Lima Sodré;Canto T;falta_confirmada x presente;202002
+16/07/2026;Barra;Leonardo Castro;Catarina Perim;Teclado T;falta_confirmada x presente;201947
+16/07/2026;Barra;Leonardo Castro;Clarice Braga Soares de Mello;Teclado T;falta_confirmada x presente;201998
+16/07/2026;Barra;Matheus Lana da Silva;Clarice Rangel Tourinho;Musicalização Preparatória para instrumento;falta_confirmada x presente;201996
+16/07/2026;Barra;Matheus Lana da Silva;Luísa Schlinz Paz;Bateria T;falta_confirmada x presente;201941
+16/07/2026;Barra;Matheus Reis;Guilherme Dolavale Assed;Bateria T;falta_confirmada x presente;201989
+16/07/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Jaqueline Rosendo da Silva;Canto T;falta_confirmada x presente;204108
+16/07/2026;Campo Grande;Caio Tenório de Araújo;Lucas Souza dos Santos;Bateria T;falta_confirmada x presente;204102
+16/07/2026;Campo Grande;Caio Tenório de Araújo;Téo Brito de Souza;Bateria T;falta_confirmada x presente;204102
+16/07/2026;Campo Grande;Gabriel Barbosa Rufino Otávio;Miguel Bustamante França;Bateria T;falta_confirmada x presente;204052
+16/07/2026;Campo Grande;Joel de Salles Gouveia Filho;Aila Beatriz da Silva Campos;Violino T;falta_confirmada x presente;204053
+16/07/2026;Campo Grande;Rodrigo Pinheiro Gomes;Alexandre Ayres Filho;Power Kids;falta_confirmada x presente;204068
+16/07/2026;Campo Grande;Rodrigo Pinheiro Gomes;Antonia Scudio Guidi da Rocha;Power Kids;falta_confirmada x presente;204068
+16/07/2026;Campo Grande;Rodrigo Pinheiro Gomes;Ayres Nishio Da Silva Junior;Minha Banda Para Sempre T;falta_confirmada x presente;204075
+16/07/2026;Campo Grande;Rodrigo Pinheiro Gomes;Gustavo de Almeida Correa Peres;Minha Banda Para Sempre T;falta_confirmada x presente;204075
+16/07/2026;Campo Grande;Rodrigo Pinheiro Gomes;Julia da Costa de Oliveira;Power Kids;falta_confirmada x presente;204068
+16/07/2026;Campo Grande;Rodrigo Pinheiro Gomes;Kamilly Azevedo da Silva;Minha Banda Para Sempre T;falta_confirmada x presente;204040
+16/07/2026;Campo Grande;Rodrigo Pinheiro Gomes;Vicente Dias Botelho;Power Kids;falta_confirmada x presente;204068
+16/07/2026;Campo Grande;Rodrigo Pinheiro Gomes;Vinícius Lopa Mendes Rezende de Macedo;Power Kids;falta_confirmada x presente;204068
+16/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Benjamin Lehrer Braz;Musicalização Preparatória;falta_confirmada x presente;193723
+16/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Catarina Soriani Arrosti;Musicalização Preparatória;falta_confirmada x presente;193723
+16/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Letícia Ferreira Vasconcelos;Teclado;falta_confirmada x presente;193761
+16/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Letícia Ferreira Vasconcelos;Canto;falta_confirmada x presente;193768
+16/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Maria Helena Machado Dias de Paiva Alves;Musicalização Para Bebês;falta_confirmada x presente;233007
+16/07/2026;Recreio;Leticia de Almeida Palmeira;Maria Júlia Lagdem Fernandes;Canto;falta_confirmada x presente;193803
+16/07/2026;Recreio;Leticia de Almeida Palmeira;Pietra Sucena Novaes Calvo Bueno;Canto;falta_confirmada x presente;193803
+16/07/2026;Recreio;Leticia de Almeida Palmeira;Valentina Legget de Moura;Musicalização Para Bebês;falta_confirmada x presente;193767
+16/07/2026;Recreio;Lohana Leopoldo de Araújo;Sofia Gonçalves Copello Moraes;Canto;falta_confirmada x presente;193797
+16/07/2026;Recreio;Willer Arruda Machado;Carlos Eduardo Ferreira;Guitarra;falta_confirmada x presente;1142961
+16/07/2026;Recreio;Willer Arruda Machado;Maria Eduarda Westin Lara Camelo;Guitarra;falta_confirmada x presente;1122275
+16/07/2026;Recreio;Willian De Andrade Da Silva;Arthur Darzi Ferreira;Bateria;falta_confirmada x presente;193724
+16/07/2026;Recreio;Willian De Andrade Da Silva;Guilherme Ferreira Muniz dos Santos;Bateria;falta_confirmada x presente;193738
+17/07/2026;Barra;Gabriel Antony Alves de Araújo;Daniel Sampaio Senna Lattari;Musicalização Preparatória para instrumento;falta_confirmada x presente;202095
+17/07/2026;Barra;Gabriel Antony Alves de Araújo;Miguel Sperandio Kevorkian;Musicalização Preparatória para instrumento;falta_confirmada x presente;202095
+17/07/2026;Barra;Gabriel Santos Teixeira da Silva;Manuela Correa Pinto;Canto T;falta_confirmada x presente;202048
+17/07/2026;Barra;Gabriel Santos Teixeira da Silva;Mayle do Nascimento Peres;Canto T;falta_confirmada x presente;202038
+17/07/2026;Barra;Isaque Mendes da Silva;Rafael Mello dos Santos;Piano T;falta_confirmada x presente;202033
+17/07/2026;Barra;Lohana Leopoldo de Araújo;João Pedro Proença Magalhães;Canto T;falta_confirmada x presente;202093
+17/07/2026;Barra;Lohana Leopoldo de Araújo;Maria Fernanda Sellos Correa Peres;Canto T;falta_confirmada x presente;202079
+17/07/2026;Barra;Lohana Leopoldo de Araújo;Pérola Madeira Maturano;Canto T;falta_confirmada x presente;202054
+17/07/2026;Barra;Pedro Sérgio Figueiredo da Glória;Dante Custódio de Almeida Marques;Teclado T;falta_confirmada x presente;202028
+17/07/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;William Souza Rosa;Piano T;falta_confirmada x presente;204217
+17/07/2026;Campo Grande;Matheus Sterque Mendes;Bruna Damasceno Castro;Guitarra T;falta_confirmada x presente;204203
+17/07/2026;Campo Grande;Peterson Biancamano;Edio Gino da Silva Junior;Bateria T;falta_confirmada x presente;204263
+17/07/2026;Campo Grande;Peterson Biancamano;Millene Chris Pimentel de Matos;Bateria T;falta_confirmada x presente;204263
+17/07/2026;Campo Grande;Peterson Biancamano;Pietro Bahia de Oliveira;Bateria T;falta_confirmada x presente;204248
+17/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Arthur Bezerra Siqueira;Teclado;falta_confirmada x presente;193918
+17/07/2026;Recreio;Larissa Bheattriz Barbosa Santos;Enrico Florenzano;Musicalização Preparatória;falta_confirmada x presente;193866
+17/07/2026;Recreio;Lucas da Silva Guimarães;Manuela Correia Lopes de Oliveira;Guitarra;falta_confirmada x presente;193950
+17/07/2026;Recreio;Rafael Alves Souza (Akeem);Daniel Bezerra Siqueira;Bateria;falta_confirmada x presente;193924
+17/07/2026;Recreio;Rafael Alves Souza (Akeem);Daniel Mendes Saramago;Bateria;falta_confirmada x presente;193894
+17/07/2026;Recreio;Vicente Pinheiro Neto;Yuri Barros Jardim;Bateria;falta_confirmada x presente;193926
+18/07/2026;Barra;Ana Beatriz Paz de Almeida;Bella Moreno Godinho;Musicalização para bebês;falta_confirmada x presente;202188
+18/07/2026;Barra;Ana Beatriz Paz de Almeida;Theo de Bem Felgueiras Ferreira;Musicalização para bebês;falta_confirmada x presente;202111
+18/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Alana Vasconcelos de Araujo;Canto T;falta_confirmada x presente;202148
+18/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Beatriz von Glehn Herkenhoff;Canto T;falta_confirmada x presente;202131
+18/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Eduardo Coriolano de Oliveira;Canto T;falta_confirmada x presente;202116
+18/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Isabella Florenzano;Canto T;falta_confirmada x presente;202201
+18/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Mariana Herd Giglio;Canto T;falta_confirmada x presente;202148
+18/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Ricardo Ribeiro Baldanza;Canto T;falta_confirmada x presente;202116
+18/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Stella Sá de Farias gomes;Canto T;falta_confirmada x presente;202148
+18/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Thalita Araujo Costa;Canto T;falta_confirmada x presente;202148
+18/07/2026;Barra;Daiana Pacifico da Silva dos Anjos;Valentina Natividade de Sá Macedo;Canto T;falta_confirmada x presente;202148
+18/07/2026;Barra;Gabriel Antony Alves de Araújo;Bernardo Dumont de Pinho Paiva;Bateria T;falta_confirmada x presente;202130
+18/07/2026;Barra;Gabriel Antony Alves de Araújo;Davi Lima Quintarelli;Bateria T;falta_confirmada x presente;202208
+18/07/2026;Barra;Gabriel Antony Alves de Araújo;Filippe Carnetti Fernandes;Musicalização Preparatória para instrumento;falta_confirmada x presente;202117
+18/07/2026;Barra;Gabriel Antony Alves de Araújo;Heitor Lucas Nogueira dos Santos Soares;Musicalização Preparatória para instrumento;falta_confirmada x presente;202146
+18/07/2026;Barra;Gabriel Antony Alves de Araújo;Maria Clara Brivio do Nascimento;Bateria T;falta_confirmada x presente;202130
+18/07/2026;Barra;Gabriel Antony Alves de Araújo;Pedro Oliveira Cazarotti;Bateria T;falta_confirmada x presente;202104
+18/07/2026;Barra;Isaque Mendes da Silva;Daniel Pires de Lima;Violão T;falta_confirmada x presente;202121
+18/07/2026;Barra;Isaque Mendes da Silva;Laura Santos da Silva Garret;Teclado T;falta_confirmada x presente;202157
+18/07/2026;Barra;Isaque Mendes da Silva;Thiago Costa Carvalho Garret;Teclado T;falta_confirmada x presente;202157
+18/07/2026;Barra;Mariana Carneiro Ribeiro de Souza;Marcelo Oliveira Brum Cardoso;Teclado T;falta_confirmada x presente;202200
+18/07/2026;Barra;Mariana Carneiro Ribeiro de Souza;Mariana Herd Giglio;Teclado T;falta_confirmada x presente;202114
+18/07/2026;Barra;Mariana Carneiro Ribeiro de Souza;Miguel Brivio do Nascimento;Musicalização Preparatória para instrumento;falta_confirmada x presente;202136
+18/07/2026;Barra;Mariana Carneiro Ribeiro de Souza;Miguel Reis Pinna Mateus Leite;Musicalização Preparatória para instrumento;falta_confirmada x presente;202147
+18/07/2026;Barra;Matheus Reis;Caê Leal Santos;Guitarra T;falta_confirmada x presente;202140
+18/07/2026;Barra;Matheus Reis;Nina Aragão Velloso;Contrabaixo T;falta_confirmada x presente;202126
+18/07/2026;Barra;Willian De Andrade Da Silva;Benjamin Medeiros Paganini Agostinho;Musicalização para bebês;falta_confirmada x presente;202113
+18/07/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Ana Luiza Marques Paiva;Canto T;falta_confirmada x presente;230721
+18/07/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Erika Brito de Sousa;Canto T;falta_confirmada x presente;204319
+18/07/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Kamilly Azevedo da Silva;Canto T;falta_confirmada x presente;230721
+18/07/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Karina Barreto Emerick;Canto T;falta_confirmada x presente;204319
+18/07/2026;Campo Grande;Caio Tenório de Araújo;Zaion Ferraz Simões;Bateria T;falta_confirmada x presente;204401
+18/07/2026;Campo Grande;Joel de Salles Gouveia Filho;Milena Americo Paiva;Violino T;falta_confirmada x presente;204418
+18/07/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Leamsi Guedes de Sant'anna;Power Kids;falta_confirmada x presente;204318
+18/07/2026;Campo Grande;Valdo Delfino;Cássia Santos;Violão T;falta_confirmada x presente;204278
+18/07/2026;Campo Grande;Valdo Delfino;Diogo Gomes Santos Caffonso de Moraes;Violão T;falta_confirmada x presente;204278
+18/07/2026;Campo Grande;Valdo Delfino;Juliana Fonseca Fortes;Guitarra T;falta_confirmada x presente;252188
+18/07/2026;Recreio;Erick Cosme da Silva;Luciana Lima de Moura;Canto;falta_confirmada x presente;193984
+18/07/2026;Recreio;Erick Cosme da Silva;Maria Cecília Muniz dos Santos;Canto;falta_confirmada x presente;193975
+18/07/2026;Recreio;Israel Rocha da Silva;Guilherme Augusto Lacerda Mota;Bateria;falta_confirmada x presente;264022
+18/07/2026;Recreio;Lohana Leopoldo de Araújo;Isabela Ferreira Moura;Canto;falta_confirmada x presente;194004
+18/07/2026;Recreio;Lucas da Silva Guimarães;Henrique Pereira Caldas Pinto de Souza;Power Kids;falta_confirmada x presente;194018
+18/07/2026;Recreio;Lucas da Silva Guimarães;Maria Clara Monteiro de Carvalho;Power Kids;falta_confirmada x presente;194018
+18/07/2026;Recreio;Rafael Alves Souza (Akeem);Maria Luiza Ferreira Moura;Bateria;falta_confirmada x presente;193993
+03/08/2026;Campo Grande;Jordan Barbosa do Rêgo;Francisco Adilson Costa Ribeiro;Bateria T;falta_confirmada x presente;204536
+03/08/2026;Campo Grande;Jordan Barbosa do Rêgo;Vitoria Vivia dos Santos Costa;Bateria T;falta_confirmada x presente;204536
+03/08/2026;Campo Grande;Ramon Pina Morais;Arthur Felipe de Mattos;Minha Banda Para Sempre T;falta_confirmada x presente;204502
+03/08/2026;Campo Grande;Ramon Pina Morais;Kayque Vinicius Da Costa Mallet de Oliveira;Minha Banda Para Sempre T;falta_confirmada x presente;204548
+04/08/2026;Campo Grande;Marcos (Marquinhos) da Silva Saturnino;Cassyo Lucas Prado Silva;Contrabaixo T;falta_confirmada x presente;204653
+04/08/2026;Campo Grande;Matheus Felipe Lourenço;Davi Guilherme De Souza Chaves Ribeiro;Canto T;falta_confirmada x presente;204682
+04/08/2026;Campo Grande;Renan Amorim Guimarães;Miguel Bittencourt Costa;Power Kids;falta_confirmada x presente;204626
+04/08/2026;Campo Grande;Renan Amorim Guimarães;Victor Caputo Cerillo Andrade;Home Studio;falta_confirmada x presente;204672
+04/08/2026;Recreio;Lohana Leopoldo de Araújo;Larissa Bezerra Silva de Oliveira;Canto;falta_confirmada x presente;194225
+04/08/2026;Recreio;Matheus dos Santos Silva de Oliveira;Helena de Souza Lima da Silva;Canto;falta_confirmada x presente;194260
+04/08/2026;Recreio;Ramon Pina Morais;Grace Couto de Andrade;Garage Band;falta_confirmada x presente;194167
+04/08/2026;Recreio;Ramon Pina Morais;Hugo Penedo Amorim;Power Kids;falta_confirmada x presente;196877
+04/08/2026;Recreio;Ramon Pina Morais;Julia Christina Mury Messias;Power Kids;falta_confirmada x presente;194207
+04/08/2026;Recreio;Ramon Pina Morais;Júlia Salarini Gama;Power Kids;falta_confirmada x presente;194232
+04/08/2026;Recreio;Ramon Pina Morais;Valentina Mendes Rodrigues Aleixo;Power Kids;falta_confirmada x presente;196877
+05/08/2026;Campo Grande;Caio Tenório de Araújo;Kerialine Mendes Silva;Bateria T;falta_confirmada x presente;204733
+05/08/2026;Campo Grande;Caio Tenório de Araújo;Luís Guilherme Aguiar Baptista;Bateria T;falta_confirmada x presente;204733
+05/08/2026;Campo Grande;Caio Tenório de Araújo;Maria Aurora Ferreira Costa Jordão da Silva dos Anjos;Musicalização Infantil T;falta_confirmada x presente;204763
+05/08/2026;Campo Grande;Fabricio Costa de Oliveira;Karina Alexandra da Silva Fontes;Teclado T;falta_confirmada x presente;204755
+05/08/2026;Campo Grande;Lohana Leopoldo de Araújo;Sarah Ferreira dos Santos;Canto T;falta_confirmada x presente;204761
+05/08/2026;Recreio;Leticia de Almeida Palmeira;Gustavo Kuabara Schreiber;Musicalização Preparatória;falta_confirmada x presente;194292
+05/08/2026;Recreio;Leticia de Almeida Palmeira;João Pedro Brizzi de Almeida;Musicalização Preparatória;falta_confirmada x presente;194292
+05/08/2026;Recreio;Leticia de Almeida Palmeira;Maria Edith Madeira Coimbra;Musicalização Preparatória;falta_confirmada x presente;194292
+05/08/2026;Recreio;Rafael Alves Souza (Akeem);Arthur Carvalho Lima;Garage Band;falta_confirmada x presente;196766
+05/08/2026;Recreio;Rafael Alves Souza (Akeem);Calebe de Moura Oliveira Ramos;Garage Band;falta_confirmada x presente;196766
+05/08/2026;Recreio;Ramon Pina Morais;Enzo Viçozo Rodrigues;Garage Band;falta_confirmada x presente;196751
+05/08/2026;Recreio;Ramon Pina Morais;Giovanna Gonçalves Frias Ribeiro;Garage Band;falta_confirmada x presente;196751
+05/08/2026;Recreio;Ramon Pina Morais;Maria Eduarda Oliveira Costa;Garage Band;falta_confirmada x presente;196728
+05/08/2026;Recreio;Ramon Pina Morais;Yuri de Souza Ribeiro;Garage Band;falta_confirmada x presente;196728
+05/08/2026;Recreio;Renan Amorim Guimarães;Elis Tineli Gomes Cotta;Garage Band;falta_confirmada x presente;196690
+05/08/2026;Recreio;Renan Amorim Guimarães;Laura Picanço Santos;Garage Band;falta_confirmada x presente;196690
+05/08/2026;Recreio;Renan Amorim Guimarães;Yuri de Souza Ribeiro;Teclado;falta_confirmada x presente;196699
+06/08/2026;Barra;Gabriel Antony Alves de Araújo;Liv Ribeiro Oliveira;Musicalização Preparatória para instrumento;aula_justificada x falta_confirmada;202442
+06/08/2026;Barra;Matheus Lana da Silva;Gabriel Araújo Salles dos Reis;Musicalização Preparatória para instrumento;aula_justificada x falta_confirmada;202440
+06/08/2026;Campo Grande;Daiana Pacifico da Silva dos Anjos;Alcione Vieira Bastos de Mello;Canto T;falta_confirmada x presente;205008
+06/08/2026;Campo Grande;Gabriel Barbosa Rufino Otávio;Matheus de Albuquerque de Sousa;Bateria T;falta_confirmada x presente;204960
+06/08/2026;Campo Grande;Gabriel Barbosa Rufino Otávio;Rebeca dos Santos Gregório Pinto;Bateria T;falta_confirmada x presente;204960
+06/08/2026;Campo Grande;Peterson Biancamano;Renan de Souza Corrêa;Bateria T;falta_confirmada x presente;204928
+06/08/2026;Campo Grande;Rodrigo Pinheiro Gomes;Guilherme  Lauria  Muniz;Minha Banda Para Sempre T;falta_confirmada x presente;204917
+06/08/2026;Recreio;Leticia de Almeida Palmeira;Maria Júlia Lagdem Fernandes;Canto;falta_confirmada x presente;196862
+06/08/2026;Recreio;Lohana Leopoldo de Araújo;Luisa medeiros de Albuquerque;Canto;falta_confirmada x presente;196850
+08/08/2026;Barra;Gabriel Antony Alves de Araújo;Maria Clara Brivio do Nascimento;Bateria T;falta_confirmada x presente;202617
+08/08/2026;Barra;Gabriel Antony Alves de Araújo;Marina Holanda Cardoso;Musicalização para bebês;falta_confirmada x presente;202697
+08/08/2026;Barra;Gabriel Antony Alves de Araújo;Mel Gianni Botelho Egas Cocco Cordovil de Macedo;Teclado T;falta_confirmada x presente;202653
+08/08/2026;Barra;Gabriel Santos Teixeira da Silva;Louise Fernandes Soares Amigo;Canto T;falta_confirmada x presente;202687
+08/08/2026;Barra;Peterson Biancamano;Enzo Ferrari;Bateria T;falta_confirmada x presente;202667
+08/08/2026;Campo Grande;Adriana Mesquita dos Santos Vilas Boas;Maria Antônia Santos;Musicalização Infantil T;falta_confirmada x presente;231587
+08/08/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Cintia Luiza Moura Mailard;Canto T;falta_confirmada x presente;205207
+08/08/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Karina Barreto Emerick;Canto T;falta_confirmada x presente;205161
+08/08/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Adriana Vitor Pim;Teclado T;falta_confirmada x presente;205195
+08/08/2026;Campo Grande;Willer Arruda Machado;Marina Flor da Luz França;Teclado T;aula_justificada x falta_confirmada;205127
+08/08/2026;Recreio;Lucas da Silva Guimarães;Isabela Ferreira Moura;Power Kids;falta_confirmada x presente;197076
+08/08/2026;Recreio;Lucas da Silva Guimarães;Théo Arruda de Oliveira;Guitarra;falta_confirmada x presente;197055
+10/08/2026;Campo Grande;Gabriel Santos Teixeira da Silva;Matheus Keyne Pereira Souza;Canto T;aula_justificada x presente;205353
+10/08/2026;Campo Grande;Gabriel Santos Teixeira da Silva;Sarah Christina Mendes Silva;Canto T;aula_justificada x presente;205353
+10/08/2026;Campo Grande;Jordan Barbosa do Rêgo;André Luiz Rodrigues Marques;Bateria T;aula_justificada x falta_confirmada;205284
+10/08/2026;Campo Grande;Jordan Barbosa do Rêgo;Beatriz Souza;Bateria T;aula_justificada x falta_confirmada;205376
+10/08/2026;Campo Grande;Jordan Barbosa do Rêgo;Francisco Adilson Costa Ribeiro;Bateria T;aula_justificada x falta_confirmada;205376
+10/08/2026;Campo Grande;Jordan Barbosa do Rêgo;Kauã Rocha Barreto;Bateria T;aula_justificada x falta_confirmada;205358
+10/08/2026;Campo Grande;Lohana Leopoldo de Araújo;Matheus Felipe Correia Ferreira dos Santos;Canto T;aula_justificada x falta_confirmada;221505
+10/08/2026;Campo Grande;Pedro Sérgio Figueiredo da Glória;Guilherme Mendes Guidi Da Rocha;Musicalização Infantil T;aula_justificada x presente;205393
+10/08/2026;Campo Grande;Pedro Sérgio Figueiredo da Glória;Heitor Lopes Costa;Musicalização Infantil T;aula_justificada x falta_confirmada;205334
+10/08/2026;Campo Grande;Ramon Pina Morais;Julia Pessoa Valadares Luz Pereira;Piano T;aula_justificada x falta_confirmada;205270
+10/08/2026;Campo Grande;Ramon Pina Morais;Kayque Vinicius Da Costa Mallet de Oliveira;Minha Banda Para Sempre T;aula_justificada x presente;205389
+11/08/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Isabella Pereira Freitas de Almeida;Canto T;aula_justificada x falta_confirmada;205418
+11/08/2026;Campo Grande;Caio Tenório de Araújo;Lizie R. Mouzinho;Musicalização Infantil T;aula_justificada x presente;205555
+11/08/2026;Campo Grande;Caio Tenório de Araújo;Raffael Pietro Coutinho Agostinho;Bateria T;aula_justificada x falta_confirmada;205526
+11/08/2026;Campo Grande;Israel Rocha da Silva;Paulo Sergio Medina da Silva;Violão T;aula_justificada x falta_confirmada;205564
+11/08/2026;Campo Grande;Matheus Felipe Lourenço;Júlia Céspedes de Oliveira;Canto T;aula_justificada x falta_confirmada;205487
+11/08/2026;Campo Grande;Pedro Sérgio Figueiredo da Glória;Jammal Rodrigues Braga;Musicalização Infantil T;aula_justificada x falta_confirmada;205544
+11/08/2026;Campo Grande;Renan Amorim Guimarães;Victor Caputo Cerillo Andrade;Home Studio;aula_justificada x presente;205514
+11/08/2026;Campo Grande;Rodrigo Pinheiro Gomes;Emily Mouzinho;Violão T;aula_justificada x falta_confirmada;205559
+11/08/2026;Recreio;Ramon Pina Morais;Enzo de Castro Freitas;Garage Band;falta_confirmada x presente;201193
+12/08/2026;Barra;Leonardo Castro;Karina Melo Vasconcellos de Medeiros;Piano T;falta_confirmada x presente;217844
+12/08/2026;Barra;Leonardo Castro;Sandra Maria Gomes Carvalho;Piano T;falta_confirmada x presente;217842
+12/08/2026;Campo Grande;Caio Tenório de Araújo;Heitor Silva Braga;Bateria T;aula_justificada x falta_confirmada;221940
+12/08/2026;Campo Grande;Caio Tenório de Araújo;João Bernardes de Castro;Musicalização Infantil T;aula_justificada x falta_confirmada;221841
+12/08/2026;Campo Grande;Caio Tenório de Araújo;Luís Guilherme Aguiar Baptista;Bateria T;aula_justificada x falta_confirmada;221810
+12/08/2026;Campo Grande;Caio Tenório de Araújo;Ravi Basílio Martins;Musicalização Infantil T;aula_justificada x falta_confirmada;221841
+12/08/2026;Campo Grande;Fabricio Costa de Oliveira;Karina Alexandra da Silva Fontes;Teclado T;aula_justificada x presente;221833
+12/08/2026;Campo Grande;Jordan Barbosa do Rêgo;Benício Benjamim de Jesus Filgueiras;Bateria T;aula_justificada x falta_confirmada;221886
+12/08/2026;Campo Grande;Jordan Barbosa do Rêgo;Julia Xavier da Silva Souza Campelo;Bateria T;aula_justificada x presente;221843
+12/08/2026;Campo Grande;Jordan Barbosa do Rêgo;Miguel Bittencourt Costa;Bateria T;aula_justificada x falta_confirmada;221886
+12/08/2026;Campo Grande;Jordan Barbosa do Rêgo;Pablo Vinicius Coutinho Franco;Bateria T;aula_justificada x falta_confirmada;221878
+12/08/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Ana Victoria Padiglione Rosa;Teclado T;aula_justificada x presente;221853
+12/08/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Miguel Gomes Biancamano;Harmonia T;aula_justificada x falta_confirmada;221923
+12/08/2026;Campo Grande;Lohana Leopoldo de Araújo;Alice Roza Baltar;Canto T;aula_justificada x falta_confirmada;221906
+12/08/2026;Campo Grande;Lohana Leopoldo de Araújo;Brenda Pereira Dias;Canto T;aula_justificada x falta_confirmada;221839
+12/08/2026;Campo Grande;Lohana Leopoldo de Araújo;Nathan William Dos Santos Onório;Canto T;aula_justificada x falta_confirmada;221832
+12/08/2026;Campo Grande;Lohana Leopoldo de Araújo;Sarah Ferreira dos Santos;Canto T;aula_justificada x falta_confirmada;221839
+12/08/2026;Campo Grande;Matheus dos Santos Silva de Oliveira;Beatriz Freitas Pereira Zanardo;Canto T;aula_justificada x falta_confirmada;221907
+12/08/2026;Campo Grande;Matheus dos Santos Silva de Oliveira;Felipe Robalinho de Melo;Canto T;aula_justificada x falta_confirmada;221842
+12/08/2026;Campo Grande;Matheus dos Santos Silva de Oliveira;Jean Marcel Silva da Costa Jacques;Canto T;aula_justificada x presente;221807
+12/08/2026;Campo Grande;Matheus dos Santos Silva de Oliveira;Luciene de Almeida Correa de  Souza;Canto T;aula_justificada x falta_confirmada;221907
+12/08/2026;Campo Grande;Pedro Sérgio Figueiredo da Glória;Heitor Pereira Ramos;Musicalização Infantil T;aula_justificada x falta_confirmada;1119373
+12/08/2026;Campo Grande;Peterson Biancamano;Laura Leal Mesquita;Bateria T;aula_justificada x falta_confirmada;221872
+12/08/2026;Campo Grande;Peterson Biancamano;Lucas dos Santos Basilio;Bateria T;aula_justificada x presente;221846
+12/08/2026;Campo Grande;Valdo Delfino;Lucas Andrade de Castro;Guitarra T;aula_justificada x falta_confirmada;221905
+12/08/2026;Campo Grande;Willian Luiz Barros Ribeiro;Gael Zine Nascimento Paes Leme;Teclado T;aula_justificada x falta_confirmada;221823
+12/08/2026;Campo Grande;Willian Luiz Barros Ribeiro;Gustavo Chagas Lima;Musicalização Infantil T;aula_justificada x falta_confirmada;221916
+12/08/2026;Campo Grande;Willian Luiz Barros Ribeiro;João Machado Martins;Musicalização Infantil T;aula_justificada x falta_confirmada;221874
+13/08/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Ana Beatriz Da Conceição Pereira;Canto T;aula_justificada x falta_confirmada;232178
+13/08/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Jaqueline Rosendo da Silva;Canto T;aula_justificada x falta_confirmada;232178
+13/08/2026;Campo Grande;Caio Tenório de Araújo;Levi de Freitas Simões;Musicalização para Bebês T;aula_justificada x falta_confirmada;232128
+13/08/2026;Campo Grande;Caio Tenório de Araújo;Nicolas Silva do Bonfim;Bateria T;aula_justificada x falta_confirmada;232111
+13/08/2026;Campo Grande;Caio Tenório de Araújo;Saulo Oliveira de Souza;Musicalização para Bebês T;aula_justificada x falta_confirmada;232166
+13/08/2026;Campo Grande;Daiana Pacifico da Silva dos Anjos;Anderson Cherem de Mello;Canto T;aula_justificada x falta_confirmada;232215
+13/08/2026;Campo Grande;Daiana Pacifico da Silva dos Anjos;Carlos Eduardo Garcia do Nascimento;Canto T;aula_justificada x falta_confirmada;232234
+13/08/2026;Campo Grande;Daiana Pacifico da Silva dos Anjos;Flávio Esteves Ferreira;Canto T;aula_justificada x falta_confirmada;232234
+13/08/2026;Campo Grande;Gabriel Barbosa Rufino Otávio;Lucas Azevedo de Barros;Bateria T;aula_justificada x falta_confirmada;232213
+13/08/2026;Campo Grande;Israel Rocha da Silva;Daniel Teixeira de Mello;Guitarra T;aula_justificada x falta_confirmada;232216
+13/08/2026;Campo Grande;Israel Rocha da Silva;Lavínia Lyrio Ferreira;Guitarra T;aula_justificada x falta_confirmada;232110
+13/08/2026;Campo Grande;Israel Rocha da Silva;Tarcilio Araújo Brito;Guitarra T;aula_justificada x falta_confirmada;232188
+13/08/2026;Campo Grande;Matheus Felipe Lourenço;Anna Clara Ferreira Brito;Teclado T;aula_justificada x falta_confirmada;232208
+13/08/2026;Campo Grande;Pedro Sérgio Figueiredo da Glória;Alicia Castro Santiago Gonzaga;Teclado T;aula_justificada x falta_confirmada;232218
+13/08/2026;Campo Grande;Peterson Biancamano;Francisco Carlos de Oliveira Sales;Bateria T;aula_justificada x falta_confirmada;232173
+13/08/2026;Campo Grande;Peterson Biancamano;Renan de Souza Corrêa;Bateria T;aula_justificada x presente;232156
+13/08/2026;Campo Grande;Rodrigo Pinheiro Gomes;Alexandre Ayres Filho;Power Kids;aula_justificada x presente;232140
+13/08/2026;Campo Grande;Rodrigo Pinheiro Gomes;Antonia Scudio Guidi da Rocha;Power Kids;aula_justificada x presente;232140
+13/08/2026;Campo Grande;Rodrigo Pinheiro Gomes;Guilherme  Lauria  Muniz;Minha Banda Para Sempre T;aula_justificada x presente;232147
+13/08/2026;Campo Grande;Rodrigo Pinheiro Gomes;Julia da Costa de Oliveira;Power Kids;falta_confirmada x presente;232140
+13/08/2026;Campo Grande;Rodrigo Pinheiro Gomes;Patric Silva de Oliveira;Guitarra T;aula_justificada x falta_confirmada;232239
+13/08/2026;Campo Grande;Rodrigo Pinheiro Gomes;Vinícius Lopa Mendes Rezende de Macedo;Power Kids;aula_justificada x presente;232140
+14/08/2026;Barra;Matheus Lana da Silva;Hellena Pitrez Florentino;Teclado T;aula_justificada x falta_confirmada;249822
+14/08/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Davi de Matos Lopes Carvalho;Teclado T;aula_justificada x falta_confirmada;253618
+14/08/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Fabrício Ravi Ramos Medeiros;Teclado T;aula_justificada x falta_confirmada;253651
+14/08/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Gabriel Gomes Chaves;Power Kids;aula_justificada x falta_confirmada;253639
+14/08/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Henrique Torres Lima Trombine;Harmonia T;aula_justificada x falta_confirmada;253679
+14/08/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Mateus de Miranda Monteiro Balbino;Teclado T;aula_justificada x falta_confirmada;253651
+14/08/2026;Campo Grande;Leticia de Almeida Palmeira;Alice Rodrigues de Santana;Musicalização Infantil T;aula_justificada x falta_confirmada;253650
+14/08/2026;Campo Grande;Leticia de Almeida Palmeira;Camille Bazet marinho;Canto T;aula_justificada x falta_confirmada;253669
+14/08/2026;Campo Grande;Marcos Delfino Serafim;Sergio Gabriel Soares Costa;Bateria T;aula_justificada x falta_confirmada;253686
+14/08/2026;Campo Grande;Matheus Sterque Mendes;Bruna Damasceno Castro;Guitarra T;aula_justificada x falta_confirmada;253629
+14/08/2026;Campo Grande;Peterson Biancamano;Antônio Carlos Romero Andrade;Bateria T;aula_justificada x falta_confirmada;253630
+14/08/2026;Campo Grande;Peterson Biancamano;Edio Gino da Silva Junior;Bateria T;aula_justificada x falta_confirmada;253684
+14/08/2026;Campo Grande;Peterson Biancamano;Lidiane Maria Barbosa Lima Dias;Bateria T;aula_justificada x falta_confirmada;253621
+14/08/2026;Campo Grande;Peterson Biancamano;Mauro dos Santos de Carvalho;Bateria T;aula_justificada x falta_confirmada;253645
+14/08/2026;Campo Grande;Peterson Biancamano;Miguel Dias de Barros;Bateria T;aula_justificada x falta_confirmada;253667
+14/08/2026;Campo Grande;Peterson Biancamano;Millene Chris Pimentel de Matos;Bateria T;aula_justificada x falta_confirmada;253684
+14/08/2026;Campo Grande;Valdo Delfino;Luiza Mazeliah do Nascimento;Guitarra T;aula_justificada x falta_confirmada;253640
+15/08/2026;Campo Grande;Adriana Mesquita dos Santos Vilas Boas;Arthur De Jesus Lindo Braga;Musicalização Infantil T;aula_justificada x falta_confirmada;1112750
+15/08/2026;Campo Grande;Adriana Mesquita dos Santos Vilas Boas;Aurora Paixão da Costa Buarque;Musicalização Infantil T;aula_justificada x falta_confirmada;263193
+15/08/2026;Campo Grande;Adriana Mesquita dos Santos Vilas Boas;Maria Antônia Santos;Musicalização Infantil T;aula_justificada x falta_confirmada;263193
+15/08/2026;Campo Grande;Alan Samico do Nascimento;André Luis de Souza Rangel;Minha Banda Para Sempre T;aula_justificada x falta_confirmada;263138
+15/08/2026;Campo Grande;Alan Samico do Nascimento;Carlos Eduardo Garcia do Nascimento;Minha Banda Para Sempre T;aula_justificada x falta_confirmada;263138
+15/08/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Erika Brito de Sousa;Canto T;aula_justificada x falta_confirmada;263166
+15/08/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Karina Barreto Emerick;Canto T;aula_justificada x falta_confirmada;263166
+15/08/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Olivia Ventura Martins;Canto T;aula_justificada x falta_confirmada;263161
+15/08/2026;Campo Grande;Alexandre de Sá Ritta do Espirito Santo;Wylla Cristina Carvalho de Almeida;Canto T;aula_justificada x falta_confirmada;263207
+15/08/2026;Campo Grande;Caio Tenório de Araújo;Davi Lucca de Carvalho Gomes;Bateria T;aula_justificada x falta_confirmada;263201
+15/08/2026;Campo Grande;Caio Tenório de Araújo;Levi Jorge Leite Oliveira;Bateria T;aula_justificada x falta_confirmada;263176
+15/08/2026;Campo Grande;Caio Tenório de Araújo;Luan Gomes de Faria;Bateria T;aula_justificada x falta_confirmada;263123
+15/08/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Adriana Vitor Pim;Teclado T;aula_justificada x falta_confirmada;263197
+15/08/2026;Campo Grande;Kaio Felipe Rodrigues Cabral;Benjamim Soares Vieira;Teclado T;aula_justificada x falta_confirmada;263137
+15/08/2026;Campo Grande;Lucas Amorim Souza;Heitor Muniz Martis Da Silva;Bateria T;aula_justificada x falta_confirmada;263209
+15/08/2026;Campo Grande;Lucas Amorim Souza;Maria Flor Silva Da Conceiçao;Bateria T;aula_justificada x falta_confirmada;263209
+15/08/2026;Campo Grande;Lucas Amorim Souza;Moisés Martins Francisco Ribeiro;Bateria T;aula_justificada x falta_confirmada;263127
+15/08/2026;Campo Grande;Marcos Delfino Serafim;Heitor Cariuz Gino;Bateria T;aula_justificada x falta_confirmada;263189
+15/08/2026;Campo Grande;Marcos Delfino Serafim;Pedro Luiz de Almeida Piancó;Bateria T;aula_justificada x falta_confirmada;263242
+15/08/2026;Campo Grande;Valdo Delfino;Cássia Santos;Violão T;aula_cancelada x falta_confirmada;263124
+15/08/2026;Campo Grande;Valdo Delfino;Diogo Gomes Santos Caffonso de Moraes;Violão T;aula_justificada x falta_confirmada;263124
+15/08/2026;Campo Grande;Valdo Delfino;Emanuel Davi Costa Marcelino;Guitarra T;aula_justificada x falta_confirmada;263179
+15/08/2026;Campo Grande;Valdo Delfino;Juliana Fonseca Fortes;Guitarra T;aula_justificada x falta_confirmada;263262
+15/08/2026;Campo Grande;Willer Arruda Machado;Águedha Silva Furtado;Guitarra T;aula_justificada x falta_confirmada;263167
+15/08/2026;Campo Grande;Willer Arruda Machado;Jean Lucas de Santana Dias Brum Ribeiro;Teclado T;aula_cancelada x falta_confirmada;263250
+15/08/2026;Campo Grande;Willer Arruda Machado;Marina Flor da Luz França;Teclado T;aula_justificada x falta_confirmada;263129
