@@ -62,11 +62,15 @@
 > docstring) — ele só cutucava o professor no WhatsApp, que é o que o Alf não
 > quer.
 >
-> ## ❓ Pro Alf decidir (não é decisão minha)
+> ## 🅿️ Envio de 1 toque pelo app — ADIADO pelo Alf (17/08)
 > Em `/app/devolutivas` o professor tem **"Copiar"** (*"É só colar no WhatsApp
-> 📋"*), **não "Enviar"**. Então nada foi tirado dele — mas o envio ficou
-> manual. Se quiser envio de **1 toque pelo app** (o Fábio manda pro
-> aluno/responsável quando o professor mandar), isso é feature nova.
+> 📋"*), **não "Enviar"** — nada foi tirado dele, mas o envio ficou manual.
+> Eu perguntei se ele queria envio de 1 toque pelo app; resposta do Alf:
+> *"não vamos mandar nada automático por enquanto, não. Vamos deixar a coisa aí
+> fluindo, mas isso depois vai entrar lá na frente."*
+>
+> **Ou seja: manual é o estado desejado agora.** Não propor de novo, não
+> implementar por conta — entra numa rodada futura, com ele puxando.
 >
 > ## PRÓXIMO PASSO
 > **Observar o primeiro registro novo feito no app** e conferir que nasce
