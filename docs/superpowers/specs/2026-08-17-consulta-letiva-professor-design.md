@@ -198,6 +198,13 @@ Fonte: `public.vw_aluno_presenca_semantica_v1`, filtrada por
 | `indeterminado` | `situacao_chamada = 'indeterminada'` | 126 |
 | `nao_aplicavel` | `situacao_chamada = 'nao_aplicavel'` (justificada/cancelada) | 774 |
 
+> ⚠️ Esta coluna "linhas/90d" **mistura dois regimes de contrato** (a virada
+> aconteceu entre julho e agosto — ver quadro abaixo). Ela serve para mostrar
+> que os cinco baldes existem e têm volume, **não** como linha de base. Qualquer
+> comparação histórica precisa cortar por regime, senão a queda de "faltas" de
+> julho para agosto parece perda de dado quando na verdade é a parada da
+> promoção automática do fantasma.
+
 ⚠️ **A regra que protege aluno real — e de onde ela vem.** `registrada_inferida`
 / `falta_provavel` **não** é falta: a régua canônica a exclui de
 `considera_falta` **e** do denominador. Isso não é lacuna, é o contrato novo
@@ -306,7 +313,12 @@ consulta ainda não está disponível. Silêncio honesto > promessa vazia.
 4. somar `indeterminado` ou `nao_aplicavel` dentro de `faltas`;
 5. adicionar coluna financeira ao retorno;
 6. `professor_id` lido do texto da mensagem em vez da linha;
-7. `ambiguo` voltando a abrir ação de chamada.
+7. `ambiguo` voltando a abrir ação de chamada;
+8. classificar `falta_provavel` por proveniência (`proveniencia='emusys'`) em vez
+   de por `situacao_chamada`/`considera_falta` — parece equivalente hoje e
+   quebra no dia em que a secretaria vereditar um caso do Emusys: a linha
+   continuaria com proveniência `emusys` e voltaria a ser contada como provável
+   depois de já ter virado falta confirmada.
 
 Ensaio contra produção em `BEGIN/ROLLBACK` (as RPCs são read-only, então o
 ensaio é naturalmente sem resíduo) + mutantes em Docker, no molde já usado.
@@ -329,10 +341,16 @@ evidência medida.
 
 ## 9. O que ficou de fora, e por quê
 
-- **"Presenças pendentes" como funcionalidade vendida.** O balde existe na RPC
-  (`indeterminado`) porque é ele que impede o Fábio de mentir sobre falta — mas
-  virou pergunta sem assunto: 2 linhas indeterminadas em 2.005 na semana de
-  11–15/08. Não vale anunciar ao professor um recorte que responde "nenhuma"
-  para praticamente todos.
+- **Agir sobre a pendência — só reportar, nunca decidir.** *(Correção de uma
+  versão anterior desta spec, que dizia que "presenças pendentes" era pergunta
+  sem assunto. Estava errado: eu tinha olhado o balde errado.* `indeterminado`
+  *é raro — 2 linhas em 2.005 na semana de 11–15/08 — mas a pendência real é o*
+  `falta_provavel`*: 205 casos entre 03 e 15/08, 60 só na semana do Valdo.)*
+  A **consulta** está no escopo da Fase 1: a RPC devolve `falta_provavel` e o
+  Fábio narra o balde separado. O que fica **fora** é o professor **resolver** a
+  pendência pelo chat. Motivo: a regra da casa é que a **secretaria prevalece**
+  sobre o professor em presença — ele reporta, ela decide. Um fluxo de "o
+  professor afirma que o aluno estava lá" é desenho próprio, com trilha de
+  evidência, e não entra de carona aqui.
 - **Ferramenta própria do Fábio (B)**, aluno específico, tendência e
   proatividade: Fase 2.
