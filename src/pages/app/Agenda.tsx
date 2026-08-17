@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Toast, useToast } from '../../components/ui'
 import { hojeBRT } from '../../lib/date'
+import { diaDaUrl } from '../../features/agenda/diaSelecionado'
 import type { SessaoAula } from '../../lib/api'
 import { DateNav } from '../../features/agenda/DateNav'
 import { CardSessoesDoDia } from '../../features/agenda/CardSessoesDoDia'
@@ -16,7 +17,19 @@ import { AppNav } from './AppNav'
 export default function AgendaPage() {
   const { message, visible, show } = useToast()
   const navigate = useNavigate()
-  const [data, setData] = useState<string>(hojeBRT())
+  // O dia vive na URL, não em useState: assim o voltar do navegador devolve o
+  // professor ao dia que ele estava vendo. Ver features/agenda/diaSelecionado.
+  const [params, setParams] = useSearchParams()
+  const data = diaDaUrl(params.get('dia'), hojeBRT())
+  // `replace` de propósito: trocar de dia na tira da semana não empilha uma
+  // entrada no histórico por toque — senão o voltar viraria "desfazer dia a
+  // dia" em vez de sair da agenda.
+  const setData = useCallback(
+    (novo: string) => {
+      setParams(novo === hojeBRT() ? {} : { dia: novo }, { replace: true })
+    },
+    [setParams],
+  )
 
   const { estado, recarregar } = useSessoes(data)
   const { dias, contagem } = useSemana(data)

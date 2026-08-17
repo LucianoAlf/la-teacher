@@ -300,7 +300,19 @@ function Conteudo({ sessao, onRecarregar }: { sessao: SessaoAula; onRecarregar: 
       )}
       {!enviada && semRoster && (
         <Aviso icone="fa-solid fa-cloud-arrow-down" tom="warn">
-          A lista de alunos desta aula ainda não sincronizou do Emusys. Sem lista, sem chamada — tenta de novo mais tarde.
+          <div className="flex flex-col items-start gap-2">
+            <span>
+              A lista de alunos desta aula ainda não sincronizou do Emusys. Sem lista, não dá pra bater
+              chamada.
+            </span>
+            {/* O aviso mandava "tenta de novo mais tarde" e não dava COMO. O
+                professor era obrigado a sair da tela pra tentar de novo — e
+                (antes do dia ir pra URL) ainda perdia o dia que estava vendo.
+                O recarregar já existia aqui; só não estava ao alcance dele. */}
+            <Button size="sm" variant="ghost" onClick={onRecarregar}>
+              <i className="fa-solid fa-rotate-right" aria-hidden="true" /> Tentar de novo agora
+            </Button>
+          </div>
         </Aviso>
       )}
       {!enviada && !semRoster && naoConciliados.length > 0 && (
