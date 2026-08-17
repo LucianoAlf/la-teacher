@@ -1,6 +1,6 @@
 # RETOMADA — LA Teacher
 
-> # 🟢 CONSULTA LETIVA DO PROFESSOR — Fase 1 COMPLETA, EM SHADOW (17/08)
+> # 🟢 CONSULTA LETIVA DO PROFESSOR — 1a fechado, **1b NO AR** (17/08)
 >
 > **De onde veio:** o prof. **Valdo (36)** perguntou no WhatsApp em 16/08
 > *"quantas aulas eu dei de 11/08 a 15/08?"*. O Fábio não soube, **prometeu**
@@ -19,12 +19,37 @@
 > | 2 | RPC `fabio_professor_presencas_periodo` | ✅ `7d46dfe` + conserto `e71265a` · **aplicada** · 9/9 |
 > | 3 | extrator determinístico (`montar_chamada_consulta`) | ✅ `61c4949` |
 > | 4 | roteador: dúvida sem sinal não abre chamada | ✅ `ac364a9` · 97 testes |
-> | 5 | wiring no bridge | ✅ `304824b` · **NO AR em SHADOW** |
+> | 5 | wiring no bridge | ✅ `304824b` · **NO AR** |
+> | 6 | atalho parava de engolir a consulta | ✅ `19e98ea` · 5/5 mutantes |
 >
-> **Shadow provado ao vivo** (perguntando pro Fábio como o Valdo): loga
-> `consulta_letiva … modo shadow, injetou:false, total_aulas 36, CG 25,
-> Recreio 11` e **a resposta ao professor não muda**. Presença roteia pra outra
-> RPC; pergunta comum não aciona nada (zero ruído).
+> ## ⚠️ O 1a mediu o que existia pra medir, e achou um defeito
+> A shadow ficou 27 min no ar **sem tráfego real nenhum** (as 2 entradas do log
+> eram minhas). Então fechei o 1a do jeito que dá pra fechar: **bateria de
+> perguntas conversando com o Fábio**. E ela pegou o defeito **na pergunta do
+> Valdo**: *"quantas aulas eu dei de 11/08 a 15/08?"* **não emitia log nenhum**.
+>
+> **Causa, e é de ORDEM:** `generate_answer` chama `try_fast_response` **antes**
+> do `build_prompt` — e o bloco da consulta mora **dentro** do `build_prompt`.
+> O atalho casava "quantas aulas", pegava a **primeira data do intervalo** e
+> respondia *"em 11/08 você teve 5 aulas"*. A resposta certa era **36**.
+>
+> **Conserto:** `consulta_vence_atalho()` — o atalho responde de UM dia da
+> AGENDA sem filtro de unidade, então ele se cala exatamente quando a pergunta
+> não cabe nesse formato: **período de vários dias**, **filtro de unidade**, ou
+> **pergunta de presença** (o contador dele conta aluno *na agenda*, o oposto de
+> "quem faltou"). Um dia só, sem unidade: continua no atalho, em 1,1s.
+>
+> ## Fase 1b — LIGADA (17/08 12:47 UTC)
+> Drop-in do systemd, **não** no `.env` (que é de segredo e está protegido):
+> `~/.config/systemd/user/fabio-chat-bridge.service.d/consulta-letiva.conf`
+>
+> Provado ao vivo, com `injetou: true`:
+> - **36** "de 11/08 a 15/08" → *"você deu **36 aulas**: 25 em Campo Grande e 11 no Recreio"*
+> - **36** "no Recreio semana passada" → *"**11 aulas**, 8 com registro e 3 sem"*
+> - **25** "quais alunos faltaram" → **3 alunos, sem duplicata**, justificativa à parte
+> - **35 (fora do piloto)** → `injetou:false`, resposta segue como antes ✅ o gate é gate
+> - **36** "quanto eu recebo pelas 36 aulas" → mandou pro financeiro ✅
+> - **36** "Ok" / "bom dia" → conversa, não abre chamada, zero ruído ✅
 >
 > **Números canônicos** (11–15/08): Valdo **36 aulas** (CG 25 / Recreio 11;
 > linha crua daria **74**), presenças Valdo **31 presentes / 9 faltas**;
@@ -43,10 +68,22 @@
 > distintos" — é falso (39 vs 30); o invariante certo é **nenhum balde repete o
 > mesmo aluno no mesmo dia**.
 >
-> ## PRÓXIMO PASSO
-> **Observar a shadow com uso real por alguns dias.** O piloto (Valdo 36 +
-> Matheus 25) está **NÃO liberado** — é decisão do Alf. Pra ligar:
-> `FABIO_CONSULTA_LETIVA_MODO=piloto` no service e restart. Ler o shadow com:
+> ## PRÓXIMO PASSO — o 1c ficou com o Alf
+> **A troca pra `todos` foi barrada pela trava de permissão** (é exatamente o
+> passo que amplia de 2 professores pro quadro inteiro). Não contornei. Pra
+> ligar, trocar `piloto` por `todos` no drop-in acima e:
+> `systemctl --user daemon-reload && systemctl --user restart fabio-chat-bridge.service`
+>
+> **Argumento a favor de ir logo:** medido no 1b, o professor **fora** do piloto
+> ainda responde *"Se quiser, eu confiro pra você"* — **a promessa vazia que
+> feriu o Valdo em 16/08**. Essa regra mora **dentro** do bloco injetado, então
+> hoje ela protege só 2 pessoas.
+>
+> **Risco residual, honesto:** toda a evidência do 1a/1b é de perguntas
+> **minhas**. O que ainda não foi falsificado é a **classificação contra a fala
+> real** — o extrator pode não disparar numa formulação que eu não imaginei, ou
+> disparar onde não devia. Isso aparece no log; o número em si já está provado
+> contra produção em 3 professores. Ler com:
 > ```bash
 > ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 \
 >   'grep consulta_letiva ~/.hermes/logs/fabio-chat-bridge.log | tail -20'
