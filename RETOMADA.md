@@ -1,6 +1,6 @@
 # RETOMADA — LA Teacher
 
-> # 🚰 TORNEIRA DA DEVOLUTIVA NO WHATSAPP — 1 caminho fechado, 2 EM ABERTO (17/08)
+> # 🚰 TORNEIRA DA DEVOLUTIVA NO WHATSAPP — os 2 caminhos automáticos FECHADOS (17/08)
 >
 > **O Alf já tinha pedido pra fechar isso antes, e continuou disparando** — ele
 > viu professores recebendo. Eu medi e confirmei: **não tinha parado**.
@@ -30,39 +30,54 @@
 > origem). **4/4 mutantes morrem**, incluindo "desliga tudo" — morto pela
 > asserção de que o **WhatsApp nativo continua elegível**.
 >
-> ## 🔴 EM ABERTO 1 — o recibo também leva a devolutiva
-> `registro_recibo` (canal whatsapp) **carrega o rascunho dentro**
-> (`fabio_notification_worker.py`, ~linha 1200: `📝 Rascunho de devolutiva:`).
-> ```
-> origem app      → 26 recibos enviados, último 12/08 17:59  ← parou sozinho, NÃO SEI POR QUÊ
-> origem whatsapp →  7 recibos enviados, último 17/08 20:01  ← correto
-> ```
-> Se voltar a disparar pra `app`, **volta a vazar por aí**. Não mexi porque não
-> entendi o que o desligou. Consulta pra retomar:
-> ```sql
-> select t.origem, count(*), max(n.enviada_em)
-> from public.fabio_notificacoes n
-> join public.fabio_registros_aula t on t.id::text = n.referencia_id and t.parent_id is null
-> where n.tipo='registro_recibo' and n.canal='whatsapp' group by 1;
-> ```
+> ### A trava é load-bearing — medido, não suposto
+> Das **109 devolutivas de origem app já empurradas** no WhatsApp (03/08 →
+> **17/08 14:10**, **10 professores**), **100% vinham de tronco SEM recibo**.
+> Ou seja: a cláusula antiga do recibo **nunca segurou nenhuma delas**; quem
+> passa a segurar é a trava nova. Se ela cair, o vazamento volta inteiro.
 >
-> ## 🔴 EM ABERTO 2 — o dado não fecha, e isso ameaça o conserto
-> `fabio_registros_aula` diz que o **último registro com `origem='app'` é de
-> 18/07** (147 no total) — mas devolutivas de origem app continuaram nascendo
-> nos últimos 10 dias. Ou **o app parou de marcar `origem='app'`**, ou o worker
-> processa fila velha.
+> ⚠️ **Mas ela ainda não teve um caso vivo.** Às 18:56 de 17/08 a RPC devolve
+> **0**, e as **31** devolutivas `gerada` de origem app paradas na fila são de
+> tronco de **11–12/08 que TEM recibo** — seguradas pela cláusula antiga, não
+> pela trava. O último registro do app é de **17/08 14:05**, anterior à trava.
+> **O próximo registro feito no app é o primeiro teste real dela.**
 >
-> **Isto importa muito:** se o app hoje grava com **outra origem**, a trava que
-> eu acabei de aplicar **não o alcança** e o vazamento continua com outro nome.
-> É a primeira coisa a medir. Consulta:
-> ```sql
-> select origem, count(*), min(criado_em), max(criado_em)
-> from public.fabio_registros_aula where parent_id is null group by 1;
-> ```
+> ## ✅ Caminho 2 — RECIBO (já estava fechado; fui eu, em 12/08)
+> Não "parou sozinho": a migration **`20260812163000_recibo_so_whatsapp_e_fila_ativa`**
+> fechou, com **guarda dupla** — e as duas conferidas **VIVAS no `pg_proc`**
+> (não no arquivo):
+> - `fn_enfileirar_registro_recibo`: `origem is distinct from 'whatsapp'` → devolve
+>   `skipped: origem_app`, nem enfileira;
+> - `fabio_claim_registro_recibo`: exige `raiz.origem = 'whatsapp'` no claim.
+>
+> Por isso os recibos de app pararam em **12/08 14:59** (26 no total) e os de
+> whatsapp seguem (7, último **17/08 17:01**). Na VPS o `REGISTRO_RECIBO_MODE=on`
+> e o `fabio-registro-recibo.timer` roda a cada ~10s: **mesmo ligado, o banco não
+> entrega nada de origem app**. A trava está no lugar certo — no dado, não no
+> worker.
+>
+> ## Quem carregava o TEXTO
+> Só o recibo (`📝 Rascunho de devolutiva:`, worker ~linha 1200). O aviso da
+> oferta **não carrega o texto** (`format_oferta_devolutiva` diz isso na
+> docstring) — ele só cutucava o professor no WhatsApp, que é o que o Alf não
+> quer.
+>
+> ## ❓ Pro Alf decidir (não é decisão minha)
+> Em `/app/devolutivas` o professor tem **"Copiar"** (*"É só colar no WhatsApp
+> 📋"*), **não "Enviar"**. Então nada foi tirado dele — mas o envio ficou
+> manual. Se quiser envio de **1 toque pelo app** (o Fábio manda pro
+> aluno/responsável quando o professor mandar), isso é feature nova.
 >
 > ## PRÓXIMO PASSO
-> Investigar os dois abertos **nesta ordem** (o 2 primeiro — ele decide se o
-> conserto do caminho 1 vale). Só depois dizer que a torneira fechou.
+> **Observar o primeiro registro novo feito no app** e conferir que nasce
+> devolutiva e **não** nasce `devolutiva_pronta`:
+> ```sql
+> select t.origem, d.status, count(*), max(d.criado_em), max(d.oferecida_em)
+> from public.fabio_devolutivas d
+> join public.fabio_registros_aula f on f.id = d.registro_fatia_id
+> join public.fabio_registros_aula t on t.id = coalesce(f.parent_id, f.id)
+> where d.criado_em > '2026-08-17 22:00Z' group by 1,2;
+> ```
 >
 > ---
 
