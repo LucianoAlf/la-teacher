@@ -101,9 +101,30 @@
 > ## O QUE FALTA — nada bloqueia a Fase 2
 > 1. **Falsificar a classificação contra fala real** (acima). Não bloqueia
 >    desenhar a Fase 2 — pelo contrário, o que o extrator errar é **insumo** dela.
-> 2. **Entregar pra coordenação (Hugo/secretaria):** 9 pares aluno/aula com
->    presença **conflitante** só na semana do Rodrigo. Não é pro Fábio resolver —
->    ele mostra os baldes separados e não decide. Precisa de gente, não de código.
+> 2. **Entregar pra coordenação (Hugo/secretaria):** ⚠️ **os "9 pares na semana
+>    do Rodrigo" eram um recorte enganoso.** Levantado em 17/08: são **407 pares**
+>    desde 09/07, **~30 professores**, **as 3 unidades** — não é de professor
+>    nenhum em especial. Lista pronta em
+>    `docs/hugo/presencas-conflitantes-2026-08-17.csv` (gerador:
+>    `scratchpad/dump-conflitos.mjs`). Não é pro Fábio resolver — ele mostra os
+>    baldes separados e não decide. Precisa de gente, não de código.
+>
+>    **Conflito = dois estados AFIRMATIVOS incompatíveis** na mesma
+>    `(aluno, aula operacional)`. Afirmação × pendência (`falta_provavel`) **não
+>    entra** — a v1.4 já resolve, e sem esse corte a lista ia com 608 quase toda
+>    de ruído.
+>
+>    **São dois assuntos, não um** — a distribuição no tempo denuncia:
+>    | janela | `falta × presente` | `justificada × falta` |
+>    |---|---|---|
+>    | 09–19/07 | **231** | 10 |
+>    | 20–31/07 | *(recesso)* | — |
+>    | 01–08/08 | 50 | 3 |
+>    | 10–17/08 | **4** | **91** |
+>
+>    O crônico está **caindo** (231 → 50 → 4); um **novo** apareceu na última
+>    semana. Ressalva honesta: a semana recente ainda pode mexer conforme a
+>    secretaria termina de lançar.
 > 3. **Radar item 0** (outro assunto): auditar a 1ª substituição real quando cair.
 >
 > Spec: `docs/superpowers/specs/2026-08-17-consulta-letiva-professor-design.md`
