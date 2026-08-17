@@ -554,6 +554,71 @@ def _correction_output(text: str, action: dict[str, Any], readback: dict[str, An
     return {"registro_id": draft.get("id"), "aluno_id": matches[0].get("aluno_id"), "campos": {"presenca": presence}}
 
 
+def _rotulo_da_aula(aula: dict[str, Any]) -> str:
+    """Rotulo curto no mesmo formato que o professor ja ve na shortlist."""
+    if not isinstance(aula, dict):
+        return ""
+    hora = str(aula.get("hora") or aula.get("horario") or "")[:5]
+    partes = [
+        _preview_date(aula.get("data_aula") or aula.get("data")),
+        hora,
+        str(aula.get("curso") or aula.get("nome") or ""),
+        str(aula.get("turma") or aula.get("turma_nome") or ""),
+    ]
+    return " ".join(p for p in partes if p and p != "—").strip()
+
+
+def _confirmacao_responde_a_maquina(backend: FabioWhatsappBackend, context: dict[str, Any],
+                                    action: dict[str, Any]) -> bool:
+    """O "sim" e resposta a ULTIMA fala do Fabio? So a maquina pode ter falado.
+
+    FAIL-SAFE de proposito: banco mudo, resposta em formato inesperado ou
+    excecao contam como INSEGURO. Uma trava que abre quando o banco nao
+    responde e uma trava que abre justamente no dia em que tudo esta ruim — e
+    o que ela protege e escrita no prontuario do aluno.
+    """
+    try:
+        resposta = backend.rpc("fabio_acao_confirmacao_segura", {
+            "p_professor_id": int(context["professor_id"]),
+            "p_acao_id": str(action["id"]),
+        })
+    except Exception:  # noqa: BLE001
+        return False
+    if not isinstance(resposta, dict):
+        return False
+    return resposta.get("segura") is True
+
+
+def _pedir_confirmacao_de_novo(backend: FabioWhatsappBackend, context: dict[str, Any],
+                               action: dict[str, Any]) -> dict[str, Any]:
+    """Nao grava e devolve a pergunta DIZENDO qual aula esta em jogo.
+
+    Repetir "quer confirmar?" sem dizer o que devolveria o professor ao mesmo
+    escuro que criou o erro. E a pergunta se cura sozinha: como agora quem
+    falou por ultimo e a propria maquina, o proximo "sim" passa direto.
+    """
+    rotulo = ""
+    if action.get("registro_id"):
+        try:
+            readback = _call(backend, "fabio_registro_completo", {
+                "p_professor_id": int(context["professor_id"]),
+                "p_registro_id": action["registro_id"],
+            })
+            rotulo = _rotulo_da_aula(readback.get("aula") or {})
+        except Exception:  # noqa: BLE001
+            rotulo = ""
+    if not rotulo:
+        payload = action.get("payload") if isinstance(action.get("payload"), dict) else {}
+        rotulo = _rotulo_da_aula(payload.get("aula") or payload.get("candidata") or {})
+    alvo = f"o registro da aula {rotulo}" if rotulo else "o registro que eu te mostrei"
+    return _result(
+        "confirm_restate",
+        reply=(f"Antes de gravar, confirma comigo: e {alvo}? "
+               "Responde *sim* de novo que eu gravo."),
+        action_id=str(action["id"]),
+    )
+
+
 def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, Any], action: dict[str, Any]) -> dict[str, Any]:
     if str(action.get("wa_message_id")) == str(context.get("wa_message_id")):
         return _result("replay", reply="Essa mensagem já está em processamento.", action_id=str(action["id"]))
@@ -600,6 +665,19 @@ def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, An
         _event(backend, action, context, "correcao_aplicada", {"registro_id": valid["registro_id"]})
         return _result("correction_applied", reply="Atualizei o rascunho. Ainda não gravei no prontuário; quer confirmar?", action_id=str(action["id"]), readback=updated)
     if kind == "confirmar":
+        # ── A TRAVA: o "sim" so vale pra acao que FALOU por ultimo ───────────
+        # 15/08/2026, professor 10. O LLM conduziu sozinho uma conversa inteira
+        # sobre a aula das 14h ("Ajustei... Posso gravar esse registro agora?
+        # Responde sim") enquanto a acao viva na maquina era a das 13h. O "sim"
+        # do professor era resposta ao LLM; a maquina colheu pra outra aula e
+        # gravou 13h no prontuario.
+        #
+        # Nao da pra confiar so em consertar o lote (bridge:3197): se a maquina
+        # tivesse pego aquele "sim", ela gravaria a das 13h do mesmo jeito. O
+        # que separa confirmacao legitima de sequestrada e QUEM falou por ultimo
+        # com o professor — e isso o banco sabe responder.
+        if not _confirmacao_responde_a_maquina(backend, context, action):
+            return _pedir_confirmacao_de_novo(backend, context, action)
         if action.get("tipo") == "confirmar_registro":
             readback_before = _call(backend, "fabio_registro_completo", {"p_professor_id": int(context["professor_id"]), "p_registro_id": action["registro_id"]})
             trunk_before = readback_before.get("tronco") if isinstance(readback_before.get("tronco"), dict) else {}

@@ -870,12 +870,54 @@ class BridgeIntegrationTest(unittest.TestCase):
         sent = []
         action_result = {"handled": True, "reply": "Pronto: chamada registrada.", "code": "confirmed_call", "action_id": "acao-1"}
         with patch.object(bridge, "tratar_mensagem_professor", return_value=action_result), \
-             patch.object(bridge, "insert_fabio_response_for_row", side_effect=lambda value, text, channel: sent.append(text)), \
+             patch.object(bridge, "insert_fabio_response_for_row",
+                          side_effect=lambda value, text, channel, wa_message_id=None: sent.append(text)), \
              patch.object(bridge, "send_whatsapp_text"), \
              patch.object(bridge, "log"):
             self.assertTrue(bridge.try_handle_whatsapp_action(row))
         self.assertEqual(sent, ["Pronto: chamada registrada."])
         self.assertNotIn("devolutiva", sent[0].lower())
+
+    def test_resposta_da_maquina_sai_carimbada_com_o_id_da_acao(self):
+        """Sem carimbo, a trava da confirmação nunca abre.
+
+        `fabio_acao_confirmacao_segura` decide olhando o `wa_message_id` da
+        última fala do Fábio: fala da máquina carrega o id da ação, fala do LLM
+        entra nula. O preview já nascia carimbado (`fabio-preview:<acao>`, 090);
+        a resposta de TEXTO não — e é ela que costuma ser a última coisa que o
+        professor lê antes de responder "sim".
+        """
+        row = professor_row()
+        bridge.WHATSAPP_REGISTRO_MODE = "on"
+        carimbos = []
+        action_result = {"handled": True, "reply": "Atualizei o rascunho.",
+                         "code": "correction_applied", "action_id": "acao-1"}
+        with patch.object(bridge, "tratar_mensagem_professor", return_value=action_result), \
+             patch.object(bridge, "insert_fabio_response_for_row",
+                          side_effect=lambda value, text, channel, wa_message_id=None: carimbos.append(wa_message_id)), \
+             patch.object(bridge, "send_whatsapp_text"), \
+             patch.object(bridge, "log"):
+            self.assertTrue(bridge.try_handle_whatsapp_action(row))
+        self.assertEqual(len(carimbos), 1)
+        self.assertIsNotNone(carimbos[0])
+        self.assertIn("acao-1", carimbos[0])
+
+    def test_carimbo_e_unico_por_envio_para_nao_bater_no_indice(self):
+        """`fcm_wa_msg_uq` é único: carimbo repetido derrubaria a resposta."""
+        row = professor_row()
+        bridge.WHATSAPP_REGISTRO_MODE = "on"
+        carimbos = []
+        action_result = {"handled": True, "reply": "Ainda não gravei.",
+                         "code": "pending_question", "action_id": "acao-1"}
+        with patch.object(bridge, "tratar_mensagem_professor", return_value=action_result), \
+             patch.object(bridge, "insert_fabio_response_for_row",
+                          side_effect=lambda value, text, channel, wa_message_id=None: carimbos.append(wa_message_id)), \
+             patch.object(bridge, "send_whatsapp_text"), \
+             patch.object(bridge, "log"):
+            bridge.try_handle_whatsapp_action(row)
+            bridge.try_handle_whatsapp_action(row)
+        self.assertEqual(len(carimbos), 2)
+        self.assertNotEqual(carimbos[0], carimbos[1])
 
     def test_multi_message_batch_bypasses_new_action_path(self):
         first = professor_row(kind="audio", text="trabalhei ritmo")

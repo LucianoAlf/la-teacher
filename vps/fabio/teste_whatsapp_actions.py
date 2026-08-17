@@ -11,8 +11,11 @@ from fabio_whatsapp_intents import reduzir_shortlist  # noqa: E402
 
 class FakeBackend:
     def __init__(self, action=None, candidates=None, readback_status="aguardando_confirmacao",
-                 participacao=None, participacao_explode=False):
+                 participacao=None, participacao_explode=False, confirmacao_segura=True):
         self.action = action
+        # `None` = o banco não respondeu. A trava tem que ler isso como INSEGURO;
+        # se ela abrir no silêncio, ela abre justamente no dia em que quebra.
+        self.confirmacao_segura = confirmacao_segura
         self.candidates = candidates or []
         self.calls = []
         self.uploads = []
@@ -102,6 +105,10 @@ class FakeBackend:
                 alvo["descartado"] = True
                 alvo["motivo"] = payload.get("p_motivo")
             return {"ok": True}
+        if name == "fabio_acao_confirmacao_segura":
+            if self.confirmacao_segura is None:
+                return None
+            return {"ok": True, "segura": bool(self.confirmacao_segura)}
         if name == "fabio_confirmar_registro":
             return {"ok": True, "registro_id": payload["p_registro_id"], "gravadas": 1, "ausentes_pulados": 0}
         if name == "fabio_atualizar_fatia":
@@ -1274,6 +1281,78 @@ class AmbiguoSemSinalNaoAbreAcaoTest(unittest.TestCase):
             professor_context(kind="audio", text="A Sofia faltou e trabalhamos respiração",
                               media_url="https://media/1"), backend)
         self.assertEqual(result["code"], "confirm_audio_intent")
+
+
+class ConfirmacaoRespondeAQuemPerguntouTest(unittest.TestCase):
+    """O "sim" só vale para a ação que FALOU por último.
+
+    Reproduz o 15/08/2026 do Isaque (professor 10), reconstruído do banco e do
+    log da VPS:
+
+      16:53  o LLM mostra preview da aula das 14h (Jeremias) e das 15h
+             (Marcelo) — mas a acao viva na maquina e a das 13h (Billy)
+      16:55  "Juliana fez aula no lugar do jeremias" + "Sim" chegam colados;
+             `message_batch_collected count=2` -> a maquina e PULADA inteira
+      16:56  o LLM promete: "Ajustei... Posso gravar esse registro agora?
+             Responde sim"
+      16:57  "Sim" sozinha -> a maquina roda e confirma a acao ativa: a das 13h
+      17:03  carimbo: T_Sa_13, 13:00  <- aula errada no prontuario
+
+    Consertar so o lote NAO resolveria: se a maquina tivesse pego o "Sim" das
+    16:55, ela gravaria a das 13h do mesmo jeito. O que separa uma confirmacao
+    legitima de uma sequestrada e QUEM falou por ultimo com o professor.
+    """
+
+    @staticmethod
+    def _acao_registro():
+        return {"id": "acao-1", "professor_id": 25, "wa_message_id": "old",
+                "tipo": "confirmar_registro", "estado": "aberta",
+                "registro_id": "reg-1", "payload": {}}
+
+    def test_nao_grava_quando_quem_falou_por_ultimo_foi_o_llm(self):
+        backend = FakeBackend(action=self._acao_registro(), confirmacao_segura=False)
+        result = tratar_mensagem_professor(professor_context(text="sim"), backend)
+        names = [name for name, _ in backend.calls]
+        self.assertNotIn("fabio_confirmar_registro", names)
+        self.assertEqual(result["code"], "confirm_restate")
+
+    def test_a_pergunta_de_volta_diz_QUAL_aula_esta_em_jogo(self):
+        """Repetir "quer confirmar?" sem dizer o que e devolve o professor ao
+        mesmo escuro que criou o erro."""
+        backend = FakeBackend(action=self._acao_registro(), confirmacao_segura=False)
+        result = tratar_mensagem_professor(professor_context(text="sim"), backend)
+        self.assertIn("14:00", result["reply"])
+        self.assertIn("11/08", result["reply"])
+
+    def test_grava_normalmente_quando_a_ultima_fala_foi_da_propria_acao(self):
+        backend = FakeBackend(action=self._acao_registro(), confirmacao_segura=True)
+        result = tratar_mensagem_professor(professor_context(text="sim"), backend)
+        self.assertEqual(result["code"], "confirmed")
+        self.assertIn("fabio_confirmar_registro", [name for name, _ in backend.calls])
+
+    def test_banco_mudo_e_tratado_como_inseguro_nao_como_liberado(self):
+        """Fail-safe. A trava que so funciona quando o banco responde e uma
+        trava que abre sozinha justamente no dia ruim."""
+        backend = FakeBackend(action=self._acao_registro(), confirmacao_segura=None)
+        result = tratar_mensagem_professor(professor_context(text="sim"), backend)
+        self.assertNotIn("fabio_confirmar_registro", [name for name, _ in backend.calls])
+        self.assertEqual(result["code"], "confirm_restate")
+
+    def test_a_trava_vale_para_a_chamada_tambem(self):
+        acao = {"id": "acao-1", "professor_id": 25, "wa_message_id": "old",
+                "tipo": "confirmar_chamada", "estado": "aberta", "aula_id": 101,
+                "payload": {"alunos_ausentes": [7]}}
+        backend = FakeBackend(action=acao, confirmacao_segura=False)
+        result = tratar_mensagem_professor(professor_context(text="sim"), backend)
+        self.assertNotIn("fabio_confirmar_chamada_acao", [name for name, _ in backend.calls])
+        self.assertEqual(result["code"], "confirm_restate")
+
+    def test_cancelar_e_corrigir_nao_passam_pela_trava(self):
+        """A trava protege a ESCRITA. Cancelar nao grava nada — travar seria
+        prender o professor com uma acao que ele quer justamente derrubar."""
+        backend = FakeBackend(action=self._acao_registro(), confirmacao_segura=False)
+        result = tratar_mensagem_professor(professor_context(text="cancela"), backend)
+        self.assertEqual(result["code"], "cancelled")
 
 
 if __name__ == "__main__":

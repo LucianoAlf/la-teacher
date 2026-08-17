@@ -20,6 +20,7 @@ import sys
 import threading
 import time
 import unicodedata
+import uuid
 from datetime import date, datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -770,7 +771,8 @@ def mark_done(message_id: str) -> None:
         log("mark_done_failed", status=r.status_code, body=r.text[:300])
 
 
-def insert_fabio_response_for_row(source_row: Dict[str, Any], content: str, channel: str) -> Dict[str, Any]:
+def insert_fabio_response_for_row(source_row: Dict[str, Any], content: str, channel: str,
+                                  wa_message_id: Optional[str] = None) -> Dict[str, Any]:
     tipo = source_row.get("identidade_tipo") or "professor"
     row = {
         "identidade_tipo": tipo,
@@ -779,6 +781,10 @@ def insert_fabio_response_for_row(source_row: Dict[str, Any], content: str, chan
         "content": content,
         "channel": channel,
     }
+    # Carimbo de autoria. Nulo = falou o LLM; com id de acao = falou a maquina.
+    # E disso que `fabio_acao_confirmacao_segura` vive.
+    if wa_message_id:
+        row["wa_message_id"] = wa_message_id
     if tipo == "admin":
         row["usuario_id"] = int(source_row["usuario_id"])
     else:
@@ -3187,8 +3193,21 @@ def _shadow_whatsapp_action(row: Dict[str, Any]) -> None:
     )
 
 
-def _send_whatsapp_action_reply(row: Dict[str, Any], reply: str) -> None:
-    insert_fabio_response_for_row(row, reply, "whatsapp")
+def _send_whatsapp_action_reply(row: Dict[str, Any], reply: str,
+                                action_id: Optional[str] = None) -> None:
+    """Fala da maquina sai ASSINADA com o id da acao que a produziu.
+
+    O preview ja nascia assinado (`fabio-preview:<acao>`, migration 090). A
+    resposta de texto nao — e ela costuma ser a ultima coisa que o professor le
+    antes de responder "sim". Sem essa assinatura,
+    `fabio_acao_confirmacao_segura` nao consegue distinguir a maquina do LLM e
+    trava toda confirmacao legitima.
+
+    O sufixo aleatorio existe porque `fcm_wa_msg_uq` e unico: duas respostas da
+    mesma acao colidiriam, e a colisao derrubaria a resposta ao professor.
+    """
+    carimbo = f"fabio-acao:{action_id}:{uuid.uuid4().hex[:8]}" if action_id else None
+    insert_fabio_response_for_row(row, reply, "whatsapp", wa_message_id=carimbo)
     send_whatsapp_text(int(row["professor_id"]), reply)
 
 
@@ -3207,7 +3226,7 @@ def try_handle_whatsapp_action(row: Dict[str, Any]) -> Optional[bool]:
         return None
     reply = result.get("reply")
     if reply:
-        _send_whatsapp_action_reply(row, str(reply))
+        _send_whatsapp_action_reply(row, str(reply), result.get("action_id"))
     log(
         "whatsapp_registro_action_handled",
         id=row.get("id"),
