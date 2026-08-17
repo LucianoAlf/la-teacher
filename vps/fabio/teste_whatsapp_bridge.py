@@ -919,6 +919,94 @@ class BridgeIntegrationTest(unittest.TestCase):
         self.assertEqual(len(carimbos), 2)
         self.assertNotEqual(carimbos[0], carimbos[1])
 
+    # ── O LLM para de prometer o que ele nao tem mao pra fazer ──────────────
+    # 15/08/2026: com uma acao pendente da aula das 13h, o LLM conduziu sozinho
+    # uma conversa sobre a das 14h e terminou com "Posso gravar esse registro
+    # agora? Responde sim". Ele nao tem como gravar nada — mas o "sim" que ele
+    # pediu foi colhido pela maquina, na aula errada.
+    def _carregar(self, resposta, channel="whatsapp"):
+        row = dict(professor_row(), channel=channel)
+        with patch.object(bridge, "sb_post") as post, patch.object(bridge, "log"):
+            post.return_value = type("R", (), {
+                "status_code": 200, "json": lambda self: resposta, "text": ""})()
+            bridge._carregar_acao_ativa(row)
+        return row
+
+    def test_sem_acao_pendente_o_bloco_nao_entra(self):
+        row = self._carregar({"ok": True, "codigo": "sem_acao_ativa", "acao": None})
+        self.assertEqual(bridge._bloco_acao_pendente(row), "")
+
+    def test_com_acao_pendente_o_bloco_proibe_prometer_gravacao(self):
+        row = self._carregar({"ok": True, "codigo": "acao_ativa",
+                              "acao": {"id": "acao-1", "tipo": "confirmar_registro",
+                                       "estado": "aberta", "aula_id": 267604}})
+        bloco = bridge._bloco_acao_pendente(row)
+        self.assertIn("AÇÃO PENDENTE", bloco)
+        for proibido in ("ajustei", "gravei", "posso gravar", "responde sim"):
+            self.assertIn(proibido, bloco.lower())
+
+    def test_no_app_nem_consulta_porque_a_maquina_e_do_whatsapp(self):
+        row = self._carregar({"ok": True, "codigo": "acao_ativa",
+                              "acao": {"id": "acao-1", "tipo": "confirmar_registro"}},
+                             channel="app")
+        self.assertNotIn("_acao_ativa", row)
+        self.assertEqual(bridge._bloco_acao_pendente(row), "")
+
+    def test_banco_fora_do_ar_nao_derruba_o_prompt(self):
+        """Consulta que explode calaria o Fábio inteiro. Falhar aqui é seguir
+        sem o bloco, nunca sem resposta."""
+        row = professor_row()
+        with patch.object(bridge, "sb_post", side_effect=RuntimeError("banco fora do ar")), \
+             patch.object(bridge, "log"):
+            bridge._carregar_acao_ativa(row)
+        self.assertNotIn("_acao_ativa", row)
+        self.assertEqual(bridge._bloco_acao_pendente(row), "")
+
+    def test_o_prompt_do_professor_carrega_o_bloco_quando_ha_acao(self):
+        """O bloco só serve se chegar ao prompt. Sem esta, ele pode existir
+        perfeito e nunca ser montado."""
+        row = dict(professor_row(), _acao_ativa={"id": "acao-1", "tipo": "confirmar_registro"})
+        prompt, _calls = self.build_prompt_isolated(
+            row, AssertionError("conversa normal nao consulta pendencias"))
+        self.assertIn("AÇÃO PENDENTE", prompt)
+
+    def test_o_lote_que_pula_a_maquina_ainda_avisa_o_LLM_da_acao_aberta(self):
+        """O fio, não só a peça.
+
+        Este é O caso do incidente: duas mensagens coladas viram lote, o lote
+        pula `try_handle_whatsapp_action` inteiro e quem responde é o LLM. Se o
+        `_carregar_acao_ativa` não for chamado nesse caminho, o bloco pode estar
+        perfeito e nunca ser montado — que foi como eu já entreguei "wiring
+        pronto" para código inalcançável antes.
+        """
+        first = professor_row(text="Juliana fez aula no lugar do jeremias")
+        second = dict(professor_row(text="Sim"), id="chat-2", wa_message_id="wa-2")
+        vistas = []
+        acao = {"ok": True, "codigo": "acao_ativa",
+                "acao": {"id": "acao-1", "tipo": "confirmar_registro", "estado": "aberta"}}
+
+        def sb_post_falso(path, body, **_kwargs):
+            if path.endswith("/fabio_acao_ativa"):
+                return type("R", (), {"status_code": 200,
+                                      "json": lambda self: acao, "text": ""})()
+            raise AssertionError(f"RPC inesperada no lote: {path}")
+
+        bridge.WHATSAPP_REGISTRO_MODE = "on"
+        with patch.object(bridge, "claim_next_message", return_value=first), \
+             patch.object(bridge, "collect_message_batch", return_value=[first, second]), \
+             patch.object(bridge, "sb_post", side_effect=sb_post_falso), \
+             patch.object(bridge, "generate_answer",
+                          side_effect=lambda row: (vistas.append(row.get("_acao_ativa")), ("ok", "test"))[1]), \
+             patch.object(bridge, "insert_fabio_response_for_row"), \
+             patch.object(bridge, "send_whatsapp_text"), \
+             patch.object(bridge, "_send_row_whatsapp"), \
+             patch.object(bridge, "mark_done"), \
+             patch.object(bridge, "log"):
+            self.assertTrue(bridge.process_one())
+        self.assertEqual(len(vistas), 1)
+        self.assertIsNotNone(vistas[0], "o LLM respondeu sem saber da acao aberta")
+        self.assertEqual(vistas[0]["id"], "acao-1")
+
     def test_multi_message_batch_bypasses_new_action_path(self):
         first = professor_row(kind="audio", text="trabalhei ritmo")
         second = dict(professor_row(kind="audio", text="trabalhei repertório"), id="chat-2", wa_message_id="wa-2")

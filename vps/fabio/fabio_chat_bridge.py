@@ -2780,6 +2780,80 @@ def _consulta_vence_atalho_no_texto(texto: str) -> bool:
         return False
 
 
+def _bloco_acao_pendente(row: Dict[str, Any]) -> str:
+    """Havendo registro em aberto, o Fábio narra — não promete, não pede "sim".
+
+    15/08/2026, professor 10: com a ação da aula das 13h pendente na máquina, o
+    LLM conduziu sozinho uma conversa inteira sobre a das 14h e fechou com
+    "Ajustei... Posso gravar esse registro agora? Responde sim". Ele não tem
+    mão pra gravar nada — mas o "sim" que ele pediu foi colhido pela máquina, na
+    aula errada, e virou prontuário.
+
+    A trava da confirmação (`fabio_acao_confirmacao_segura`) impede o estrago;
+    este bloco impede a CONFUSÃO, que é onde ele nasce. São camadas diferentes
+    do mesmo defeito: uma boca que promete o que as mãos não fazem.
+
+    Este bloco NÃO consulta o banco: ele lê a ação que `_carregar_acao_ativa`
+    já pôs na linha. `build_prompt` tem um contrato caro de I/O — existe teste
+    afirmando que conversa normal não dispara RPC nenhuma — e engordá-lo com
+    mais uma ida ao banco por mensagem seria pagar caro pelo caso raro.
+    """
+    try:
+        acao = row.get("_acao_ativa")
+        if not isinstance(acao, dict) or not acao.get("id"):
+            return ""
+        tipo = str(acao.get("tipo") or "registro")
+        return (
+            "\nAÇÃO PENDENTE NA MÁQUINA DE REGISTRO — E ELA NÃO É SUA:\n"
+            f"Existe um registro em aberto esperando resposta do professor (tipo: {tipo}).\n"
+            "Quem grava, corrige e cancela é a máquina, lendo as palavras dele "
+            "(\"sim\", \"corrige...\", \"cancela\"). Você NÃO consegue gravar, "
+            "ajustar nem cancelar nada — você só conversa.\n"
+            "Como responder:\n"
+            "- NUNCA diga \"ajustei\", \"gravei\", \"salvei\" ou \"atualizei o registro\". "
+            "Você não fez — e dizer que fez é a mentira que já custou caro aqui.\n"
+            "- NUNCA pergunte \"posso gravar?\" e NUNCA peça \"responde sim\". "
+            "O \"sim\" do professor pertence à máquina: em 15/08/2026 você pediu um "
+            "\"sim\" sobre a aula das 14h enquanto a máquina segurava a das 13h, e "
+            "a aula errada foi parar no prontuário do aluno.\n"
+            "- Se ele está corrigindo algo do registro, diga que ainda não foi gravado "
+            "e peça que ele mande a correção numa mensagem só — quem lê é a máquina.\n"
+            "- Responda curto. Aqui você é a voz, não a mão.\n"
+        )
+    except Exception as exc:  # noqa: BLE001
+        log("bloco_acao_pendente_falhou", professor_id=row.get("professor_id"),
+            error=str(exc)[:200])
+        return ""
+
+
+def _carregar_acao_ativa(row: Dict[str, Any]) -> None:
+    """Põe a ação pendente na linha, pro prompt saber que ela existe.
+
+    Mora aqui e não no `build_prompt` porque a consulta é do FLUXO, não da
+    montagem do texto — e porque o caso que mais importa é justamente o do
+    lote, em que `try_handle_whatsapp_action` desiste sem nem olhar a ação.
+
+    Falhar aqui é seguir sem o bloco, nunca sem resposta.
+    """
+    if (row.get("channel") or "app") != "whatsapp":
+        return  # a máquina de registro só existe no WhatsApp
+    if (row.get("identidade_tipo") or "professor") != "professor":
+        return
+    professor_id = row.get("professor_id")
+    if not professor_id:
+        return
+    try:
+        r = sb_post("/rest/v1/rpc/fabio_acao_ativa", {"p_professor_id": int(professor_id)})
+        if getattr(r, "status_code", 500) >= 400:
+            return
+        dados = r.json()
+        acao = dados.get("acao") if isinstance(dados, dict) else None
+        if isinstance(acao, dict) and acao.get("id"):
+            row["_acao_ativa"] = acao
+    except Exception as exc:  # noqa: BLE001
+        log("carregar_acao_ativa_falhou", professor_id=professor_id, error=str(exc)[:200])
+
+
 def _bloco_consulta_letiva(row: Dict[str, Any]) -> str:
     """Consulta letiva do professor. Falha aqui nunca derruba o prompt."""
     try:
@@ -2891,6 +2965,7 @@ def build_prompt(row: Dict[str, Any]) -> str:
             + capacidade_professor(row)
             + ESCOPO_PROFESSOR
             + _bloco_consulta_letiva(row)
+            + _bloco_acao_pendente(row)
         )
     return f"""Canal: chat livre do Fábio com professor/admin da LA Music.
 Use a skill chat-fabio-la-music como guia principal de personalidade, roteamento e guardrails.
@@ -3335,6 +3410,9 @@ def process_one() -> bool:
         log("processed_message_async_admin_analysis", id=first_row.get("id"), batch_count=row.get("_batch_count", 1))
         return True
 
+    # O LLM vai responder. Ele precisa saber que existe registro em aberto —
+    # senão promete gravar (15/08) e o "sim" do professor vira aula errada.
+    _carregar_acao_ativa(row)
     try:
         answer, answer_source = generate_answer(row)
         log("answer_generated", id=first_row.get("id"), source=answer_source, batch_count=row.get("_batch_count", 1))
