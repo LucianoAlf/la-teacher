@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Literal
 
 AudioIntent = Literal["registro", "conversa", "ambiguo"]
@@ -531,3 +531,133 @@ def validar_patch_correcao(saida: dict[str, Any], rascunho: dict[str, Any], rost
         elif not isinstance(value, str) or not value.strip() or len(value) > 4000:
             return {"ok": False, "motivo": "valor_invalido"}
     return {"ok": True, "registro_id": rascunho["id"], "aluno_id": aluno_id, "campos": dict(fields)}
+
+
+# ── Consulta letiva (Fase 1) ────────────────────────────────────────────────
+# O professor pergunta sobre a PRÓPRIA vida letiva: "quantas aulas eu dei de
+# 11/08 a 15/08?", "quantas no Recreio?", "quem faltou?". Nasceu do pedido do
+# prof. Valdo em 16/08, que o Fábio não soube responder.
+#
+# O extrator é DETERMINÍSTICO de propósito: é ele a trava. Quando não consegue
+# isolar o período, devolve None e o Fábio PERGUNTA — foi justamente o chute
+# (intenção "ambigua" virando chamada) que sequestrou a conversa do Valdo e
+# terminou em "não gravei nada".
+
+_CONSULTA_AULAS = re.compile(
+    r"\bquantas?\s+aulas?\b|\btotal\s+de\s+aulas?\b|\baulas?\s+que\s+eu\s+dei\b|\bministrei\b"
+)
+_CONSULTA_PRESENCA = re.compile(
+    r"\bquais?\s+alunos?\b.*\bfalt|\bquem\s+faltou\b|\bfaltaram\b|\bfaltas?\b|\bpresen[çc]as?\b"
+)
+_DATA_EXPLICITA = re.compile(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b")
+
+
+def _data_de(dia: str, mes: str, ano: str | None, hoje: date) -> date | None:
+    try:
+        a = int(ano) if ano else hoje.year
+        if a < 100:
+            a += 2000
+        return date(a, int(mes), int(dia))
+    except ValueError:
+        return None  # "32/13" não é data; não inventa
+
+
+def resolver_periodo(texto: str, hoje: date) -> tuple[date, date] | None:
+    """Isola o período pedido na fala. Devolve None quando não há período.
+
+    None NÃO é falha: é o gatilho para o Fábio perguntar em vez de assumir
+    "hoje". Ver `atalho-chuta-default-em-vez-de-se-calar`.
+    """
+    hay = _norm(texto)
+
+    # 1) datas explícitas ("de 11/08 até 15/08") — a forma que o Valdo usou.
+    achadas = [d for d in (_data_de(dia, mes, ano, hoje)
+                           for dia, mes, ano in _DATA_EXPLICITA.findall(hay))
+               if d is not None]
+    if len(achadas) >= 2:
+        achadas.sort()
+        return achadas[0], achadas[-1]
+    if len(achadas) == 1:
+        return achadas[0], achadas[0]
+
+    # 2) formas relativas
+    if re.search(r"\bontem\b", hay):
+        d = hoje - timedelta(days=1)
+        return d, d
+    if re.search(r"\bhoje\b", hay):
+        return hoje, hoje
+    if re.search(r"\bsemana passada\b", hay):
+        inicio = hoje - timedelta(days=hoje.weekday() + 7)   # segunda anterior
+        return inicio, inicio + timedelta(days=6)
+    if re.search(r"\b(essa|esta) semana\b", hay):
+        return hoje - timedelta(days=hoje.weekday()), hoje
+    if re.search(r"\bm[eê]s passado\b", hay):
+        fim = hoje.replace(day=1) - timedelta(days=1)
+        return fim.replace(day=1), fim
+    if re.search(r"\b(esse|este) m[eê]s\b", hay):
+        return hoje.replace(day=1), hoje
+    return None
+
+
+def parece_consulta_letiva(texto: str) -> bool:
+    """A fala é uma PERGUNTA sobre a vida letiva (não um lançamento de aula)?
+
+    Puro e sem dependência de data/unidade porque quem chama é o roteador em
+    `fabio_whatsapp_actions`, que não conhece nenhum dos dois. Serve só para
+    impedir que uma pergunta abra ação de chamada; período e unidade são
+    resolvidos depois, no bridge.
+    """
+    hay = _norm(texto)
+    return bool(_CONSULTA_AULAS.search(hay) or _CONSULTA_PRESENCA.search(hay))
+
+
+def extrair_consulta_letiva(texto: str, hoje: date, unidades: list[str]) -> dict[str, Any] | None:
+    """Parâmetros da consulta, ou None quando não é consulta / falta período."""
+    hay = _norm(texto)
+    if _CONSULTA_AULAS.search(hay):
+        metrica = "aulas"
+    elif _CONSULTA_PRESENCA.search(hay):
+        metrica = "presencas"
+    else:
+        return None
+
+    periodo = resolver_periodo(texto, hoje)
+    if periodo is None:
+        return None
+
+    unidade = None
+    for nome in unidades or []:
+        alvo = _norm(nome)
+        if alvo and re.search(rf"\b{re.escape(alvo)}\b", hay):
+            unidade = nome
+            break
+
+    return {"metrica": metrica, "inicio": periodo[0], "fim": periodo[1], "unidade": unidade}
+
+
+def montar_chamada_consulta(row: dict[str, Any], hoje: date,
+                            unidades: list[str]) -> dict[str, Any] | None:
+    """Traduz a mensagem em (rpc, payload) pronto pro bridge disparar.
+
+    A IDENTIDADE NASCE AQUI, e nasce da LINHA: `row["professor_id"]`. O texto do
+    professor nunca decide de quem é o dado — se ele escrever "sou o professor
+    25", o payload continua saindo com o id da linha dele. Esta função é pura de
+    propósito: é o que torna esse ataque testável sem subir o bridge.
+    """
+    professor_id = row.get("professor_id")
+    if not professor_id:
+        return None
+    texto = str(row.get("content") or row.get("media_extracted_text") or "")
+    pedido = extrair_consulta_letiva(texto, hoje, unidades)
+    if not pedido:
+        return None
+
+    payload: dict[str, Any] = {
+        "p_professor_id": int(professor_id),
+        "p_inicio": pedido["inicio"].isoformat(),
+        "p_fim": pedido["fim"].isoformat(),
+    }
+    if pedido["metrica"] == "aulas":
+        payload["p_unidade"] = pedido["unidade"]
+        return {"rpc": "fabio_professor_resumo_aulas", "payload": payload, "pedido": pedido}
+    return {"rpc": "fabio_professor_presencas_periodo", "payload": payload, "pedido": pedido}

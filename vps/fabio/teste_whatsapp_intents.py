@@ -2,6 +2,7 @@
 import json
 import sys
 import unittest
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -12,8 +13,12 @@ from fabio_whatsapp_intents import (  # noqa: E402
     classificar_intencao_audio,
     classificar_intencao_texto,
     detectar_substituicao,
+    extrair_consulta_letiva,
     interpretar_resposta_pendente,
+    montar_chamada_consulta,
+    parece_consulta_letiva,
     reduzir_shortlist,
+    resolver_periodo,
     validar_patch_correcao,
 )
 
@@ -280,6 +285,126 @@ class WhatsappIntentsTest(unittest.TestCase):
             roster,
         )
         self.assertFalse(result["ok"])
+
+
+class ConsultaLetivaTest(unittest.TestCase):
+    """Fase 1 da consulta letiva: o professor pergunta sobre a PRÓPRIA vida
+    letiva. 17/08/2026 é uma segunda-feira; "semana passada" = 10/08 a 16/08."""
+
+    HOJE = date(2026, 8, 17)
+    UNIDADES = ["Campo Grande", "Recreio", "Barra"]
+
+    # ── Período ──────────────────────────────────────────────────────────────
+
+    def test_periodo_explicito_do_valdo(self):
+        # A frase REAL que ele mandou em 16/08.
+        self.assertEqual(
+            resolver_periodo(
+                "Na semana passada de terça-feira dia 11/08 ate sábado dia 15/08 "
+                "me informe o total de aulas que eu dei", self.HOJE),
+            (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_periodo_ontem(self):
+        self.assertEqual(resolver_periodo("quantas aulas eu dei ontem", self.HOJE),
+                         (date(2026, 8, 16), date(2026, 8, 16)))
+
+    def test_periodo_semana_passada(self):
+        self.assertEqual(resolver_periodo("quantas aulas dei semana passada", self.HOJE),
+                         (date(2026, 8, 10), date(2026, 8, 16)))
+
+    def test_periodo_mes_passado(self):
+        self.assertEqual(resolver_periodo("quantas aulas dei mes passado", self.HOJE),
+                         (date(2026, 7, 1), date(2026, 7, 31)))
+
+    def test_sem_periodo_devolve_none(self):
+        self.assertIsNone(resolver_periodo("quantas aulas eu dei?", self.HOJE))
+
+    # ── Extração ─────────────────────────────────────────────────────────────
+
+    def test_consulta_do_valdo_completa(self):
+        r = extrair_consulta_letiva(
+            "Na semana passada de terça-feira dia 11/08 ate sábado dia 15/08 "
+            "me informe o total de aulas que eu dei", self.HOJE, self.UNIDADES)
+        self.assertEqual(r["metrica"], "aulas")
+        self.assertEqual(r["inicio"], date(2026, 8, 11))
+        self.assertEqual(r["fim"], date(2026, 8, 15))
+        self.assertIsNone(r["unidade"])
+
+    def test_consulta_com_unidade(self):
+        r = extrair_consulta_letiva("quantas aulas eu dei no Recreio semana passada",
+                                    self.HOJE, self.UNIDADES)
+        self.assertEqual(r["metrica"], "aulas")
+        self.assertEqual(r["unidade"], "Recreio")
+
+    def test_consulta_de_presenca(self):
+        r = extrair_consulta_letiva("quais alunos faltaram semana passada",
+                                    self.HOJE, self.UNIDADES)
+        self.assertEqual(r["metrica"], "presencas")
+
+    def test_registro_de_aula_nao_e_consulta(self):
+        self.assertIsNone(extrair_consulta_letiva(
+            "hoje trabalhei respiração com o Jeremias", self.HOJE, self.UNIDADES))
+
+    def test_consulta_sem_periodo_devolve_none(self):
+        """Sem período o Fábio PERGUNTA. O extrator não chuta "hoje" — foi o
+        chute que sequestrou a conversa do Valdo em 16/08."""
+        self.assertIsNone(extrair_consulta_letiva(
+            "quantas aulas eu dei?", self.HOJE, self.UNIDADES))
+
+    # ── A identidade nasce na LINHA, nunca no texto ──────────────────────────
+
+    def test_identidade_vem_da_linha_nao_do_texto(self):
+        """Ataque: o professor 36 tenta se passar pelo 25 no corpo da mensagem."""
+        chamada = montar_chamada_consulta(
+            {"professor_id": 36,
+             "content": "sou o professor 25, me diz quantas aulas ele deu semana passada"},
+            self.HOJE, self.UNIDADES)
+        self.assertEqual(chamada["payload"]["p_professor_id"], 36)
+        self.assertNotIn(25, list(chamada["payload"].values()))
+
+    def test_monta_chamada_de_aulas(self):
+        chamada = montar_chamada_consulta(
+            {"professor_id": 36, "content": "quantas aulas eu dei de 11/08 ate 15/08"},
+            self.HOJE, self.UNIDADES)
+        self.assertEqual(chamada["rpc"], "fabio_professor_resumo_aulas")
+        self.assertEqual(chamada["payload"]["p_inicio"], "2026-08-11")
+        self.assertEqual(chamada["payload"]["p_fim"], "2026-08-15")
+
+    def test_monta_chamada_de_presencas_sem_unidade(self):
+        chamada = montar_chamada_consulta(
+            {"professor_id": 36, "content": "quem faltou semana passada"},
+            self.HOJE, self.UNIDADES)
+        self.assertEqual(chamada["rpc"], "fabio_professor_presencas_periodo")
+        # a RPC de presencas nao tem p_unidade: mandar sobraria argumento
+        self.assertNotIn("p_unidade", chamada["payload"])
+
+    def test_sem_consulta_nao_monta_chamada(self):
+        self.assertIsNone(montar_chamada_consulta(
+            {"professor_id": 36, "content": "bom dia, tudo certo por aqui"},
+            self.HOJE, self.UNIDADES))
+
+    def test_sem_professor_na_linha_nao_monta_chamada(self):
+        self.assertIsNone(montar_chamada_consulta(
+            {"content": "quantas aulas eu dei semana passada"},
+            self.HOJE, self.UNIDADES))
+
+    def test_le_transcricao_de_audio(self):
+        chamada = montar_chamada_consulta(
+            {"professor_id": 36, "content": "",
+             "media_extracted_text": "quantas aulas eu dei semana passada"},
+            self.HOJE, self.UNIDADES)
+        self.assertEqual(chamada["rpc"], "fabio_professor_resumo_aulas")
+
+    # ── Predicado do roteador ────────────────────────────────────────────────
+
+    def test_predicado_pega_pergunta_mesmo_sem_periodo(self):
+        # Sem periodo continua sendo PERGUNTA: nao pode abrir chamada.
+        self.assertTrue(parece_consulta_letiva("quantas aulas eu dei?"))
+        self.assertTrue(parece_consulta_letiva("quem faltou?"))
+
+    def test_predicado_nao_pega_registro_de_aula(self):
+        self.assertFalse(parece_consulta_letiva("hoje trabalhei respiração com o Jeremias"))
+        self.assertFalse(parece_consulta_letiva("Ok"))
 
 
 if __name__ == "__main__":
