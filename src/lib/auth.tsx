@@ -68,16 +68,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === 'PASSWORD_RECOVERY') setRecuperacao(true)
     })
 
-    // Refresh proativo ao voltar pro primeiro plano (padrão do LA Organizer,
-    // Sprint 27 — mesmo bug, já resolvido lá). Causa: o timer de
-    // autoRefreshToken do supabase-js só roda com o app em foreground. Este
-    // PWA fica horas fechado/em background, o token expira nesse meio tempo,
-    // e ninguém dispara a renovação — o professor era forçado a logar de novo
-    // (bug do Matheus no piloto). refreshSession() só renova de fato se
-    // faltar pouco pro vencimento, então é barato chamar sempre.
+    // Ao voltar pro primeiro plano, revalida a sessão. O motivo original
+    // continua valendo: o timer de autoRefreshToken do supabase-js só roda com
+    // o app em foreground, e este PWA fica horas fechado — o token vence nesse
+    // meio-tempo e ninguém renova.
+    //
+    // MAS AQUI ERA getSession(), NÃO refreshSession() (corrigido em 17/08/2026).
+    // O comentário antigo afirmava que "refreshSession() só renova de fato se
+    // faltar pouco pro vencimento". Fui no fonte do auth-js: é FALSO —
+    // `_refreshSession` chama `_callRefreshToken` incondicionalmente e ROTACIONA
+    // o token toda vez. Medido em auth.refresh_tokens: 420 tokens do Matheus num
+    // dia só, mediana de 6s entre rotações. Cada rotação revoga a anterior, o
+    // que abre corrida: quem ainda segurar o token velho leva 400 não-retryable,
+    // e aí o auth-js DESTRÓI a sessão (`_removeSession`) se o access token já
+    // tiver vencido — logout.
+    //
+    // getSession() faz o certo: só renova se estiver vencido, e preserva a
+    // sessão quando a falha é de rede (o app volta ao ar sem exigir login).
     const aoFicarVisivel = () => {
       if (document.visibilityState === 'visible') {
-        supabase.auth.refreshSession().catch(() => {
+        supabase.auth.getSession().catch(() => {
           /* falha silenciosa — o próximo request autenticado revalida */
         })
       }
