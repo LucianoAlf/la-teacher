@@ -683,6 +683,25 @@ def tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBa
     revision = _handle_devolutiva_revision(backend, context)
     if revision is not None:
         return revision
+    # A CONSULTA VENCE TUDO — antes da acao pendente E antes de classificar audio.
+    #
+    # "Quantas aulas eu dei de 11/08 a 15/08?" e pergunta, nao resposta a "qual
+    # aula?" nem lancamento de conteudo. Quem responde e o bridge, injetando a
+    # RPC no prompt. Este break-out mora aqui em cima, e nao mais so no caminho
+    # de texto-sem-acao, porque o Valdo (17/08) perguntou POR AUDIO e com uma
+    # `escolher_aula_chamada` aberta desde a noite de 16/08: os dois desvios que
+    # ficavam ABAIXO — o `if action:` e o `classificar_intencao_audio` —
+    # engoliam a consulta antes de ela ser reconhecida, e cada audio dele virava
+    # "ainda nao sei de qual aula voce esta falando".
+    #
+    # A acao pendente NAO e cancelada aqui de proposito: se o professor estava
+    # mesmo no meio de uma chamada e so quis conferir um numero, a chamada
+    # continua de pe pra proxima resposta dele. O predicado e estreito
+    # (interrogativo: "quantas/quais/total/ministrei/quem faltou"), entao nao
+    # rouba uma resposta legitima de "qual aula?" (ver teste do refinamento).
+    text = str(context.get("text") or context.get("media_extracted_text") or "")
+    if parece_consulta_letiva(text):
+        return _result("conversation", handled=False, forward=True)
     action = _action(backend, context)
     if action:
         # GUARDAR É INCONDICIONAL; rotear é que depende de estado.
@@ -718,7 +737,7 @@ def tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBa
                 "gente fechar o anterior, ele entra.)"
             )
         return _drenar_parqueados(backend, context, resultado)
-    text = str(context.get("text") or context.get("media_extracted_text") or "")
+    # `text` e a consulta ja foram tratados no topo (a consulta vence tudo).
     if context.get("kind") == "audio":
         intent = classificar_intencao_audio(text, context.get("llm_json"))
         if intent == "conversa":
@@ -728,11 +747,6 @@ def tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBa
             action = _start(backend, context, "confirmar_intencao_audio", storage_path, {"transcricao": text, "intencao": "ambiguo"})
             return _result("confirm_audio_intent", reply="Quer registrar esse áudio como conteúdo de aula?", action_id=str(action["id"]))
         return _start_from_candidates(backend, dict(context, text=text), "registro", _pool(backend, context, "registro"), storage_path)
-    # A CONSULTA VENCE O ROTEADOR. "Quantas aulas eu dei semana passada?" e
-    # pergunta, nao lancamento: nao pode abrir chamada nem consultar o pool.
-    # Quem responde e o bridge, injetando o dado da RPC no prompt.
-    if parece_consulta_letiva(text):
-        return _result("conversation", handled=False, forward=True)
 
     intent = classificar_intencao_texto(text, context.get("llm_json"))
     if intent == "conversa":

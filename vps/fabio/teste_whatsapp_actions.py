@@ -164,6 +164,74 @@ def professor_context(**overrides):
 
 
 class WhatsappActionsTest(unittest.TestCase):
+    # ── A consulta letiva vence TUDO — inclusive audio e acao pendente ────────
+    # Medido em 17/08/2026, na fala REAL do Valdo (por AUDIO): "lista o total de
+    # aulas que eu ministrei de terca 11/08 a sabado 15/08". Ele tinha uma
+    # `escolher_aula_chamada` aberta desde a noite de 16/08 (a ferida do "Ok"),
+    # entao cada audio dele virava "ainda nao sei de qual aula voce esta
+    # falando" e a consulta nunca era alcancada. Dois buracos ao mesmo tempo:
+    #   (A) o caminho de AUDIO nunca checava parece_consulta_letiva;
+    #   (B) uma acao pendente curto-circuitava antes de qualquer checagem.
+    # Meus testes ao vivo nao pegaram porque falar_com_fabio.py manda TEXTO e
+    # nunca com acao aberta.
+    CONSULTA_VALDO = ("Fala, Fabio, bom dia. Me faz um favor? Lista pra mim o "
+                      "numero total de aulas que eu ministrei na semana passada, "
+                      "de terca 11/08 a sabado 15/08?")
+
+    def test_audio_consulta_letiva_forwards_without_opening_action(self):
+        # Buraco (A): audio de consulta, SEM acao pendente. Nao pode abrir
+        # confirmar_intencao_audio -- e pergunta, nao lancamento.
+        backend = FakeBackend()
+        result = tratar_mensagem_professor(
+            professor_context(kind="audio", text=self.CONSULTA_VALDO, media_url="https://media/1"),
+            backend,
+        )
+        self.assertEqual(result["code"], "conversation")
+        self.assertFalse(result["handled"])
+        self.assertTrue(result["forward_to_hermes"])
+        self.assertFalse(backend.uploads)
+        self.assertFalse([c for c in backend.calls if c[0] == "fabio_iniciar_acao"])
+
+    def test_audio_consulta_letiva_breaks_out_of_pending_call_action(self):
+        # Buraco (B): a MESMA consulta, agora com a chamada pendente aberta do
+        # Valdo. Tem que sair da acao (forward), nao virar "qual aula?".
+        action = {
+            "id": "acao-1", "professor_id": 36, "wa_message_id": "chamada-original",
+            "tipo": "escolher_aula_chamada", "estado": "aberta", "candidatas": [],
+            "payload": {"transcricao": "bater chamada", "intencao": "ambiguo"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-15", "hora": "14:00", "curso": "Guitarra T"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(kind="audio", professor_id=36, wa_message_id="consulta-nova",
+                              text=self.CONSULTA_VALDO, media_url="https://media/1"),
+            backend,
+        )
+        self.assertEqual(result["code"], "conversation")
+        self.assertFalse(result["handled"])
+        self.assertTrue(result["forward_to_hermes"])
+        # Nao pode ter caido no dead-end da chamada.
+        self.assertNotIn(result["code"], {"choose_call_class", "refine_class", "no_candidate"})
+
+    def test_pending_call_still_accepts_a_real_class_refinement(self):
+        # A trava e ESTREITA: uma resposta de verdade a "qual aula?" continua
+        # refinando. Nao e pra consulta engolir o fluxo legitimo de chamada.
+        action = {
+            "id": "acao-1", "professor_id": 36, "wa_message_id": "chamada-original",
+            "tipo": "escolher_aula_chamada", "estado": "aberta", "candidatas": [],
+            "payload": {"transcricao": "bater chamada", "intencao": "ambiguo"},
+        }
+        backend = FakeBackend(action=action, candidates=[
+            {"aula_id": 101, "data": "2026-08-15", "hora": "14:00", "curso": "Guitarra T"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(professor_id=36, wa_message_id="refine-1",
+                              text="foi a aula de sabado as 14h"),
+            backend,
+        )
+        self.assertNotEqual(result["code"], "conversation")
+
     def test_audio_conversation_forwards_without_upload_or_rpc(self):
         backend = FakeBackend()
         result = tratar_mensagem_professor(professor_context(kind="audio", text="Como foi seu dia?", media_url="https://media/1"), backend)
