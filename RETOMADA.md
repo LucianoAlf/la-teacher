@@ -68,6 +68,29 @@
 > distintos" — é falso (39 vs 30); o invariante certo é **nenhum balde repete o
 > mesmo aluno no mesmo dia**.
 >
+> ## ⚠️ 17/08 — o MESMO pedido do Valdo falhou 3x, por 3 buracos (`19e98ea`, `d05d959`, `3c7173d`)
+> As três eram a mesma doença: **eu testei o caminho que EU uso, não o dele.**
+> | # | buraco | por que meu teste não pegou |
+> |---|---|---|
+> | 1 | atalho engolia a pergunta | testei a RPC, não o roteador |
+> | 2 | áudio + ação presa desde 16/08 | `falar_com_fabio` manda **texto**, sem estado |
+> | 3 | **data falada** "dia 11 do 8" | meu regex só lia `11/08` — como **eu** escrevo |
+>
+> No 3º ele respondeu *"não tenho a agenda carregada… se quiser, eu confiro e te
+> digo"* — **a promessa vazia que essa feature existe pra matar**, reaberta pelo
+> caminho de trás: `parece_consulta_letiva`=True (roteador liberou) e
+> `resolver_periodo`=None (bloco morreu **em silêncio**, sem a regra
+> anti-promessa).
+>
+> **Conserto em 2 camadas** (`3c7173d`): `_DATA_FALADA` + `_DATA_MES_EXTENSO`
+> **e** — o que importa mais — o bloco parou de falhar em silêncio: consulta sem
+> período agora injeta instrução pra **PERGUNTAR**, proibindo "vou conferir e te
+> trago". Isso é o que segura a **próxima** forma que eu não imaginar.
+> 7 testes com as transcrições **literais**; 4/4 mutantes (o M3 sobreviveu na 1ª
+> rodada e denunciou asserção faltando). Ao vivo: **36 aulas**; e "naquele
+> período que a gente falou" → *"Qual período, Valdo? Me fala de que dia a que
+> dia"*.
+>
 > ## ⚠️ 17/08 tarde — o Valdo testou POR ÁUDIO e falhou; CONSERTADO (`d05d959`)
 > A consulta letiva só quebrava o roteador no caminho de **texto sem ação
 > pendente**. O Valdo perguntou **por áudio**, e ainda tinha uma
