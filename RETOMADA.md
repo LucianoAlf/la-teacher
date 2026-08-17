@@ -1,5 +1,64 @@
 # RETOMADA — LA Teacher
 
+> # 🟢 CONSULTA LETIVA DO PROFESSOR — Fase 1 COMPLETA, EM SHADOW (17/08)
+>
+> **De onde veio:** o prof. **Valdo (36)** perguntou no WhatsApp em 16/08
+> *"quantas aulas eu dei de 11/08 a 15/08?"*. O Fábio não soube, **prometeu**
+> ("eu olho e te trago" — sem ter ferramenta), e o **"Ok"** dele virou uma ação
+> de chamada que terminou em *"Não gravei nada"*. O Alf: "o Fábio precisa ser
+> parceiro do professor". Pode tudo da vida letiva; **nada de financeiro**.
+>
+> **Arquitetura (A):** o **bridge** busca via RPC canônica com o `professor_id`
+> **da linha da mensagem**, e o Fábio só **narra**. O `no_mcp` dele fica intacto
+> — ele ganha a resposta, não o banco. Ferramenta própria/MCP (B) é destino
+> futuro, só depois de resolver identidade no gateway.
+>
+> | task | o que é | estado |
+> |---|---|---|
+> | 1 | RPC `fabio_professor_resumo_aulas` | ✅ `18dcadf` · **aplicada** · 8/8 |
+> | 2 | RPC `fabio_professor_presencas_periodo` | ✅ `7d46dfe` + conserto `e71265a` · **aplicada** · 9/9 |
+> | 3 | extrator determinístico (`montar_chamada_consulta`) | ✅ `61c4949` |
+> | 4 | roteador: dúvida sem sinal não abre chamada | ✅ `ac364a9` · 97 testes |
+> | 5 | wiring no bridge | ✅ `304824b` · **NO AR em SHADOW** |
+>
+> **Shadow provado ao vivo** (perguntando pro Fábio como o Valdo): loga
+> `consulta_letiva … modo shadow, injetou:false, total_aulas 36, CG 25,
+> Recreio 11` e **a resposta ao professor não muda**. Presença roteia pra outra
+> RPC; pergunta comum não aciona nada (zero ruído).
+>
+> **Números canônicos** (11–15/08): Valdo **36 aulas** (CG 25 / Recreio 11;
+> linha crua daria **74**), presenças Valdo **31 presentes / 9 faltas**;
+> Rodrigo (35) **23 / 5 / 4 / 7** (presentes / faltas / provável / não aplicável).
+>
+> ## ⚠️ O defeito que só apareceu CONVERSANDO com o Fábio
+> A RPC de presenças tinha a **mesma armadilha da aula-gêmea** que eu tratei nas
+> aulas e esqueci ali: o Fábio listou "Gabriel" e "Lavynea" **duas vezes**.
+> `presentes` estava quase **dobrado** (Valdo 61 em vez de 31). **Nenhum teste
+> pegou** — eu afirmei a contagem **crua da view**, que é certa pra view e
+> **errada pro professor**. Conserto: dedup **por balde**.
+> **Por balde, não através deles:** a primeira tentativa colapsava
+> `(aluno, aula_op)` global e zerava `nao_aplicavel` (7→0), porque existem
+> **conflitos reais** (a Emily tem `falta_confirmada` **e** `aula_justificada`
+> na mesma aula). Pelo mesmo motivo caiu o invariante "os baldes somam os pares
+> distintos" — é falso (39 vs 30); o invariante certo é **nenhum balde repete o
+> mesmo aluno no mesmo dia**.
+>
+> ## PRÓXIMO PASSO
+> **Observar a shadow com uso real por alguns dias.** O piloto (Valdo 36 +
+> Matheus 25) está **NÃO liberado** — é decisão do Alf. Pra ligar:
+> `FABIO_CONSULTA_LETIVA_MODO=piloto` no service e restart. Ler o shadow com:
+> ```bash
+> ssh -i ~/.ssh/id_ed25519_lahq_fabio_claude_code fabio@89.116.73.186 \
+>   'grep consulta_letiva ~/.hermes/logs/fabio-chat-bridge.log | tail -20'
+> ```
+> **Fora de escopo, pra coordenação (Hugo/secretaria):** 9 pares aluno/aula com
+> presença **conflitante** só na semana do Rodrigo. Não é pro Fábio resolver.
+>
+> Spec: `docs/superpowers/specs/2026-08-17-consulta-letiva-professor-design.md`
+> Plano: `docs/superpowers/plans/2026-08-17-consulta-letiva-professor.md`
+>
+> ---
+
 > # 🧠 ARQUITETURA DE INTELIGÊNCIA DO FÁBIO — 15/08, em execução faseada
 >
 > **A virada:** o Alf + Alfredo pediram pra PARAR de empilhar reject/regex no
