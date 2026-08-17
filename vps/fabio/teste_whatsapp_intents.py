@@ -13,6 +13,7 @@ from fabio_whatsapp_intents import (  # noqa: E402
     classificar_intencao_audio,
     classificar_intencao_texto,
     detectar_substituicao,
+    consulta_vence_atalho,
     extrair_consulta_letiva,
     interpretar_resposta_pendente,
     montar_chamada_consulta,
@@ -405,6 +406,55 @@ class ConsultaLetivaTest(unittest.TestCase):
     def test_predicado_nao_pega_registro_de_aula(self):
         self.assertFalse(parece_consulta_letiva("hoje trabalhei respiração com o Jeremias"))
         self.assertFalse(parece_consulta_letiva("Ok"))
+
+
+class ConsultaVenceAtalhoTest(unittest.TestCase):
+    """O atalho do bridge responde de UM dia, da agenda, sem filtro de unidade.
+
+    Quando a consulta canonica pede algo que esse formato nao sabe representar,
+    o atalho tem que se calar -- senao ele responde primeiro, com o numero de
+    outra pergunta, e o bloco da consulta nem chega a rodar.
+    """
+
+    HOJE = date(2026, 8, 17)          # segunda
+    UNIDADES = ["Campo Grande", "Recreio", "Barra"]
+
+    def vence(self, texto):
+        return consulta_vence_atalho(texto, self.HOJE, self.UNIDADES)
+
+    def test_periodo_de_varios_dias_vence_o_atalho(self):
+        # A pergunta que o Valdo mandou em 16/08. O atalho pegava o dia 11 e
+        # respondia "5 aulas" pra uma pergunta que vale 36.
+        self.assertTrue(self.vence("quantas aulas eu dei de 11/08 a 15/08?"))
+        self.assertTrue(self.vence("quantas aulas eu dei semana passada?"))
+        self.assertTrue(self.vence("total de aulas esse mes"))
+
+    def test_filtro_de_unidade_vence_o_atalho_mesmo_num_dia_so(self):
+        # O atalho nao filtra unidade: responderia o dia INTEIRO como se fosse
+        # so o Recreio.
+        self.assertTrue(self.vence("quantas aulas eu dei ontem no Recreio?"))
+
+    def test_pergunta_de_presenca_vence_o_atalho(self):
+        # "quantos alunos faltaram ontem" casa com o contador do atalho, que
+        # devolveria alunos NA AGENDA -- o oposto da pergunta.
+        self.assertTrue(self.vence("quantos alunos faltaram ontem?"))
+        self.assertTrue(self.vence("quem faltou semana passada?"))
+
+    def test_pergunta_de_um_dia_so_deixa_o_atalho_trabalhar(self):
+        # Um dia, sem unidade: e exatamente o que o atalho sabe responder, e
+        # rapido. Nao e pra tirar isso dele.
+        self.assertFalse(self.vence("quantas aulas eu tenho hoje?"))
+        self.assertFalse(self.vence("quantas aulas eu dei ontem?"))
+
+    def test_sem_periodo_no_texto_nao_vence(self):
+        # Sem periodo o extrator devolve None; a trava de dia do proprio atalho
+        # e que decide, e ela ja sabe se calar.
+        self.assertFalse(self.vence("quantas aulas eu dei?"))
+
+    def test_conversa_e_registro_nao_vencem(self):
+        self.assertFalse(self.vence("hoje trabalhei respiracao com o Jeremias"))
+        self.assertFalse(self.vence("Ok"))
+        self.assertFalse(self.vence("bom dia, tudo bem?"))
 
 
 if __name__ == "__main__":

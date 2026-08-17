@@ -37,6 +37,7 @@ from fabio_whatsapp_actions import FabioWhatsappBackend, tratar_mensagem_profess
 from fabio_whatsapp_intents import (
     classificar_intencao_audio,
     classificar_intencao_texto,
+    consulta_vence_atalho,
     montar_chamada_consulta,
 )
 from fabio_registro_normalization_contract import sanear_readback_para_preview
@@ -2560,7 +2561,13 @@ def generate_answer(row: Dict[str, Any]) -> tuple[str, str]:
     text = row.get("content") or row.get("media_extracted_text") or ""
     if tipo == "professor":
         pedido_pendencias, pergunta_pendencias_relatada = _analisar_intencao_de_pendencias(text)
-        if not pedido_pendencias and not pergunta_pendencias_relatada:
+        # A consulta letiva vence o atalho pelo mesmo motivo que a pendência
+        # vence: o atalho responde de UM dia da agenda, sem filtro de unidade, e
+        # roda ANTES do build_prompt — onde mora o bloco da consulta. Quando ele
+        # casa com uma pergunta que não cabe nesse formato, responde primeiro e
+        # com o número de outra pergunta. Ver consulta_vence_atalho().
+        consulta_manda = _consulta_vence_atalho_no_texto(text)
+        if not pedido_pendencias and not pergunta_pendencias_relatada and not consulta_manda:
             fast = try_fast_response(row)
             if fast:
                 return fast, "fast_path"
@@ -2749,6 +2756,21 @@ def _unidades_nomes() -> list[str]:
         except Exception as exc:
             log("consulta_letiva_unidades_falhou", error=str(exc)[-200:])
     return _UNIDADES_CACHE
+
+
+def _consulta_vence_atalho_no_texto(texto: str) -> bool:
+    """O atalho tem que se calar nesta pergunta? Falha fechada em False.
+
+    Fechar em False é o lado seguro aqui: no pior caso o Fábio responde como
+    respondia antes do bloco existir. Fechar em True calaria o atalho por um
+    erro de rede e derrubaria a resposta rápida de todo mundo.
+    """
+    try:
+        return consulta_vence_atalho(
+            texto, date.fromisoformat(today_brt()), _unidades_nomes())
+    except Exception as exc:
+        log("consulta_vence_atalho_falhou", error=str(exc)[-200:])
+        return False
 
 
 def _bloco_consulta_letiva(row: Dict[str, Any]) -> str:

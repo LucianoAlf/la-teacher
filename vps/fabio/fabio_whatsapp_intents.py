@@ -635,6 +635,37 @@ def extrair_consulta_letiva(texto: str, hoje: date, unidades: list[str]) -> dict
     return {"metrica": metrica, "inicio": periodo[0], "fim": periodo[1], "unidade": unidade}
 
 
+def consulta_vence_atalho(texto: str, hoje: date, unidades: list[str]) -> bool:
+    """True quando o atalho determinístico do bridge tem que se calar.
+
+    O atalho (`try_fast_response`) responde de `professor_context(prof, dia)`:
+    UM dia, da AGENDA, sem filtro de unidade. Ele roda ANTES do `build_prompt`,
+    que é onde mora o bloco da consulta — então quando ele casa com uma pergunta
+    que o formato dele não sabe representar, ele responde primeiro, com o número
+    de outra pergunta, e a consulta canônica nem chega a rodar.
+
+    Medido em 17/08/2026, na pergunta que o Valdo mandou: "quantas aulas eu dei
+    de 11/08 a 15/08?" pegava a PRIMEIRA data do intervalo e devolvia as 5 aulas
+    do dia 11 — a resposta certa era 36. Nenhum log de consulta_letiva saía.
+
+    Três formas de a pergunta não caber no atalho:
+      - período de mais de um dia  → ele só sabe um;
+      - filtro de unidade          → ele devolveria o dia inteiro como se fosse
+                                     só daquela unidade;
+      - pergunta de presença       → o contador dele conta aluno NA AGENDA, que
+                                     é o oposto de "quem faltou".
+
+    Pergunta de um dia só, sem unidade, sobre aula: continua no atalho — é o que
+    ele sabe fazer, e rápido.
+    """
+    consulta = extrair_consulta_letiva(texto, hoje, unidades)
+    if consulta is None:
+        return False
+    return (consulta["metrica"] == "presencas"
+            or consulta["unidade"] is not None
+            or consulta["inicio"] != consulta["fim"])
+
+
 def montar_chamada_consulta(row: dict[str, Any], hoje: date,
                             unidades: list[str]) -> dict[str, Any] | None:
     """Traduz a mensagem em (rpc, payload) pronto pro bridge disparar.

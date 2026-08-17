@@ -368,6 +368,46 @@ class BridgeIntegrationTest(unittest.TestCase):
         fast_mock.assert_called_once_with(row)
         hermes_mock.assert_not_called()
 
+    # ── O atalho engolia a consulta letiva (medido em 17/08/2026) ─────────────
+    # O `try_fast_response` roda ANTES do `build_prompt`, e o bloco da consulta
+    # mora dentro do build_prompt. Na pergunta que o Valdo mandou — "quantas
+    # aulas eu dei de 11/08 a 15/08?" — o atalho casava "quantas aulas", pegava
+    # a PRIMEIRA data do intervalo e respondia as 5 aulas do dia 11. A resposta
+    # certa era 36, e log de consulta_letiva nenhum saía.
+
+    def test_generate_answer_consulta_de_periodo_nao_pode_cair_no_atalho(self):
+        row = professor_row(professor_id=36, text="quantas aulas eu dei de 11/08 a 15/08?")
+
+        with patch.object(bridge, "try_fast_response", return_value="5 AULAS DO DIA 11") as fast_mock, \
+             patch.object(bridge, "today_brt", return_value="2026-08-17"), \
+             patch.object(bridge, "_unidades_nomes", return_value=["Campo Grande", "Recreio"]), \
+             patch.object(bridge, "recent_history_for_row", return_value=[]), \
+             patch.object(bridge, "professor_context", return_value={"ok": True}), \
+             patch.object(bridge, "pedagogical_prefetch", return_value=None), \
+             patch.object(bridge, "_agenda_de_outro_dia", return_value=None), \
+             patch.object(bridge, "sb_post", return_value=RpcResponse({"ok": True, "total_aulas": 36})), \
+             patch.object(bridge, "run_hermes_api", return_value="resposta Hermes") as hermes_mock:
+            answer, source = bridge.generate_answer(row)
+
+        self.assertEqual((answer, source), ("resposta Hermes", "hermes_api"))
+        fast_mock.assert_not_called()
+        hermes_mock.assert_called_once()
+
+    def test_generate_answer_pergunta_de_um_dia_so_continua_no_atalho(self):
+        # A trava e estreita de proposito: um dia, sem unidade, sobre aula, e
+        # exatamente o que o atalho sabe responder -- e em 1,4s em vez de 12s.
+        row = professor_row(professor_id=36, text="quantas aulas eu tenho hoje?")
+
+        with patch.object(bridge, "try_fast_response", return_value="agenda rápida") as fast_mock, \
+             patch.object(bridge, "today_brt", return_value="2026-08-17"), \
+             patch.object(bridge, "_unidades_nomes", return_value=["Campo Grande", "Recreio"]), \
+             patch.object(bridge, "run_hermes_api") as hermes_mock:
+            answer, source = bridge.generate_answer(row)
+
+        self.assertEqual((answer, source), ("agenda rápida", "fast_path"))
+        fast_mock.assert_called_once_with(row)
+        hermes_mock.assert_not_called()
+
     def test_invalid_content_shapes_are_unavailable_without_erasing_presence(self):
         bad_item = content_payload()
         bad_item.update({"total_aulas": 1, "total_alunos": 1, "aulas": [{}]})
