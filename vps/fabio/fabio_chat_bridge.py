@@ -710,7 +710,22 @@ def _claim_specific_message(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def collect_message_batch(first_row: Dict[str, Any]) -> list[Dict[str, Any]]:
-    """Debounce bursty professor/admin chat and claim follow-up bubbles."""
+    """Debounce bursty professor/admin chat and claim follow-up bubbles.
+
+    EXCETO durante um registro em aberto. O lote existe pra conversa ("oi" +
+    "tudo bem?" = uma resposta só), e a guarda `_batch_count != 1` lá embaixo
+    existe pra um lote não ABRIR ação com texto concatenado. Nenhuma das duas
+    coisas vale quando já existe registro pendente: ali cada mensagem é um ATO
+    ("corrige o aluno", "sim"), e juntá-las faz a máquina ser pulada inteira —
+    foi assim que em 15/08/2026 o LLM ficou sozinho conduzindo a conversa e o
+    "sim" do professor acabou gravando a aula errada.
+
+    Bônus: sem debounce, o professor no meio de um registro é respondido na
+    hora, que é quando ele mais está esperando.
+    """
+    _carregar_acao_ativa(first_row)
+    if first_row.get("_acao_ativa"):
+        return [first_row]
     batch = [first_row]
     debounce_seconds = MESSAGE_DEBOUNCE_SECONDS
     if (first_row.get("channel") or "app") == "whatsapp":
@@ -2835,6 +2850,8 @@ def _carregar_acao_ativa(row: Dict[str, Any]) -> None:
 
     Falhar aqui é seguir sem o bloco, nunca sem resposta.
     """
+    if row.get("_acao_ativa"):
+        return  # já carregada nesta passagem (o `collect_message_batch` pergunta antes)
     if (row.get("channel") or "app") != "whatsapp":
         return  # a máquina de registro só existe no WhatsApp
     if (row.get("identidade_tipo") or "professor") != "professor":

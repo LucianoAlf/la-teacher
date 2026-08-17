@@ -970,6 +970,66 @@ class BridgeIntegrationTest(unittest.TestCase):
             row, AssertionError("conversa normal nao consulta pendencias"))
         self.assertIn("AÇÃO PENDENTE", prompt)
 
+    # ── Com registro em aberto, mensagem colada nao vira lote ───────────────
+    # O lote existe pra conversa ("oi" + "tudo bem?" = uma resposta so) e a
+    # guarda `_batch_count != 1` existe pra um lote nao ABRIR acao com texto
+    # concatenado. Nenhum dos dois vale durante um registro: ali cada mensagem
+    # e um ATO ("corrige o aluno", "sim"), e engoli-los foi o que deixou o LLM
+    # sozinho no 15/08. Enquanto ha acao aberta, cada mensagem anda sozinha.
+    def _coletar(self, acao, channel="whatsapp"):
+        first = dict(professor_row(), channel=channel)
+        dormiu, coletou = [], []
+
+        def sb_post_falso(path, body, **_kwargs):
+            if path.endswith("/fabio_acao_ativa"):
+                return type("R", (), {"status_code": 200,
+                                      "json": lambda self: acao, "text": ""})()
+            raise AssertionError(f"RPC inesperada: {path}")
+
+        def sb_get_falso(path, filtros=None, **_kwargs):
+            coletou.append(path)
+            return [dict(professor_row(), id="chat-2", wa_message_id="wa-2")]
+
+        with patch.object(bridge, "sb_post", side_effect=sb_post_falso), \
+             patch.object(bridge, "sb_get", side_effect=sb_get_falso), \
+             patch.object(bridge, "_claim_specific_message", side_effect=lambda r: r), \
+             patch.object(bridge.time, "sleep", side_effect=lambda s: dormiu.append(s)), \
+             patch.object(bridge, "log"):
+            lote = bridge.collect_message_batch(first)
+        return lote, dormiu, coletou, first
+
+    def test_com_registro_em_aberto_a_mensagem_anda_sozinha(self):
+        acao = {"ok": True, "codigo": "acao_ativa",
+                "acao": {"id": "acao-1", "tipo": "confirmar_registro", "estado": "aberta"}}
+        lote, dormiu, coletou, _first = self._coletar(acao)
+        self.assertEqual(len(lote), 1)
+        self.assertEqual(coletou, [], "nao pode nem varrer mensagem pra juntar")
+        self.assertEqual(dormiu, [], "e nao espera o debounce: responde na hora")
+
+    def test_sem_registro_em_aberto_o_lote_continua_juntando(self):
+        """A conversa normal não muda: "oi" + "tudo bem?" seguem virando uma
+        resposta só."""
+        vazio = {"ok": True, "codigo": "sem_acao_ativa", "acao": None}
+        lote, dormiu, coletou, _first = self._coletar(vazio)
+        self.assertEqual(len(lote), 2)
+        self.assertTrue(coletou)
+        self.assertTrue(dormiu)
+
+    def test_a_acao_encontrada_e_reaproveitada_e_nao_consultada_de_novo(self):
+        acao = {"ok": True, "codigo": "acao_ativa",
+                "acao": {"id": "acao-1", "tipo": "confirmar_registro", "estado": "aberta"}}
+        _lote, _dormiu, _coletou, first = self._coletar(acao)
+        self.assertEqual((first.get("_acao_ativa") or {}).get("id"), "acao-1")
+        # CONTAR, não levantar: `_carregar_acao_ativa` engole exceção de
+        # propósito (falhar ali não pode calar o Fábio), então um
+        # `side_effect=AssertionError` seria engolido junto e o teste passaria
+        # com a segunda consulta acontecendo. O mutante provou isso.
+        segundas = []
+        with patch.object(bridge, "sb_post", side_effect=lambda *a, **k: segundas.append(a)), \
+             patch.object(bridge, "log"):
+            bridge._carregar_acao_ativa(first)
+        self.assertEqual(segundas, [], "consultou a ação de novo na mesma passagem")
+
     def test_o_lote_que_pula_a_maquina_ainda_avisa_o_LLM_da_acao_aberta(self):
         """O fio, não só a peça.
 
