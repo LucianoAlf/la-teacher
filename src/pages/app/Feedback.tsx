@@ -1,7 +1,7 @@
-import { Toast, useToast } from '../../components/ui'
+import { useNavigate } from 'react-router-dom'
+import { ScreenHeader, Toast, useToast } from '../../components/ui'
 import { MesaFeedback } from '../../features/feedback'
 import { AppFrame } from './AppFrame'
-import { AppHeader } from './AppHeader'
 import { AppNav } from './AppNav'
 
 /**
@@ -20,13 +20,15 @@ import { AppNav } from './AppNav'
  */
 export default function FeedbackPage() {
   const { message, visible, show } = useToast()
+  const navigate = useNavigate()
 
   return (
     <AppFrame>
-      <AppHeader />
+      {/* Empilhada (sai da Home ou de Alunos), não aba: seta de voltar, como
+          toda tela empilhada. Mesmo defeito que a Devolutivas tinha. */}
+      <ScreenHeader title="Feedback do mês" onBack={() => navigate(-1)} />
 
-      <div className="flex-1 overflow-y-auto px-5 pb-[calc(96px_+_env(safe-area-inset-bottom))] pt-3">
-        <h1 className="mb-3 text-[17px] font-bold text-text-primary">Feedback do mês</h1>
+      <div className="flex-1 overflow-y-auto px-5 pb-[calc(96px_+_env(safe-area-inset-bottom))] pt-1">
         <MesaFeedback show={show} />
       </div>
 

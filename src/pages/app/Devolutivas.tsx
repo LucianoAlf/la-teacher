@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Badge, Button, Card, EmptyState, Toast, useToast } from '../../components/ui'
+import { useNavigate } from 'react-router-dom'
+import { Badge, Button, Card, EmptyState, ScreenHeader, Toast, useToast } from '../../components/ui'
 import {
   definirDestinatarioDevolutiva,
   devolutivasAguardando,
@@ -12,7 +13,6 @@ import {
 } from '../../lib/api'
 import { assinaturaIntencaoDevolutiva } from '../../features/registro/camposCanonicos'
 import { AppFrame } from './AppFrame'
-import { AppHeader } from './AppHeader'
 import { AppNav } from './AppNav'
 
 type Versao = 'normal' | 'apoio_casa'
@@ -404,6 +404,7 @@ function CardAguardando({
 /** /app/devolutivas — o que o Fábio escreveu, pro professor conferir e mandar. */
 export default function DevolutivasPage() {
   const { message, visible, show } = useToast()
+  const navigate = useNavigate()
   const [itens, setItens] = useState<DevolutivaPendente[] | null>(null)
   const [aguardando, setAguardando] = useState<DevolutivaAguardando[]>([])
   const [erro, setErro] = useState(false)
@@ -441,11 +442,15 @@ export default function DevolutivasPage() {
 
   return (
     <AppFrame>
-      <AppHeader />
+      {/* Tela EMPILHADA (sai da Home), não aba: leva ScreenHeader com seta,
+          igual a toda tela empilhada do app. Estava com o AppHeader — o header
+          da Home, que cumprimenta e não tem voltar — e o professor ficava sem
+          saída pelo app (Isaque, 17/08). Quem tem TabBar embaixo (Início,
+          Alunos, Agenda) é que não precisa de seta. */}
+      <ScreenHeader title="Devolutivas" onBack={() => navigate(-1)} />
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-[calc(96px_+_env(safe-area-inset-bottom))] pt-2">
         <div>
-          <h1 className="text-[17px] font-bold text-text-primary">Devolutivas</h1>
           <p className="text-[13px] text-text-secondary">
             Eu escrevi a partir do seu registro. Confere, ajusta se quiser — quem manda é você.
           </p>
