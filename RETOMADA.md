@@ -1,5 +1,71 @@
 # RETOMADA — LA Teacher
 
+> # 🚰 TORNEIRA DA DEVOLUTIVA NO WHATSAPP — 1 caminho fechado, 2 EM ABERTO (17/08)
+>
+> **O Alf já tinha pedido pra fechar isso antes, e continuou disparando** — ele
+> viu professores recebendo. Eu medi e confirmei: **não tinha parado**.
+>
+> **Regra do Alf, textual:** *"a devolutiva fica dentro do app, só, a não ser que
+> o professor peça a devolutiva lá no WhatsApp"*.
+>
+> ## ✅ Caminho 1 — OFERTA (fechado, `876464f`, migration aplicada)
+> `fabio_devolutivas_a_oferecer` + serviço `fabio-devolutiva-oferta.timer`
+> (roda a cada 5 min na VPS).
+>
+> | origem do registro | devolutivas | ofertadas no WhatsApp |
+> |---|---|---|
+> | **app** | 125 | **94** — última **17/08 17:10** |
+> | whatsapp | 7 | 0 |
+>
+> **Estava invertido.** A 095 pôs uma trava pro ofertador não competir com o
+> `registro_recibo`; a trava exclui quem **tem** recibo no WhatsApp — que é quem
+> registrou por lá. O registro do **app não tem recibo**, então nunca era
+> excluído. Conserto: `and tronco.origem is distinct from 'app'`.
+>
+> ⚠️ **O teste que eu escrevi primeiro era VAZIO e um mutante provou:** afirmava
+> "a RPC não devolve nada de origem app" contra produção e **passava com a trava
+> anulada** — porque a oferta é uma **fila drenada a cada 5 min**, então a RPC
+> devolve zero quase sempre por já ter sido esvaziada, não pela regra. Reescrito
+> pra **semear** o par (clone de linha real via temp table, trocando só a
+> origem). **4/4 mutantes morrem**, incluindo "desliga tudo" — morto pela
+> asserção de que o **WhatsApp nativo continua elegível**.
+>
+> ## 🔴 EM ABERTO 1 — o recibo também leva a devolutiva
+> `registro_recibo` (canal whatsapp) **carrega o rascunho dentro**
+> (`fabio_notification_worker.py`, ~linha 1200: `📝 Rascunho de devolutiva:`).
+> ```
+> origem app      → 26 recibos enviados, último 12/08 17:59  ← parou sozinho, NÃO SEI POR QUÊ
+> origem whatsapp →  7 recibos enviados, último 17/08 20:01  ← correto
+> ```
+> Se voltar a disparar pra `app`, **volta a vazar por aí**. Não mexi porque não
+> entendi o que o desligou. Consulta pra retomar:
+> ```sql
+> select t.origem, count(*), max(n.enviada_em)
+> from public.fabio_notificacoes n
+> join public.fabio_registros_aula t on t.id::text = n.referencia_id and t.parent_id is null
+> where n.tipo='registro_recibo' and n.canal='whatsapp' group by 1;
+> ```
+>
+> ## 🔴 EM ABERTO 2 — o dado não fecha, e isso ameaça o conserto
+> `fabio_registros_aula` diz que o **último registro com `origem='app'` é de
+> 18/07** (147 no total) — mas devolutivas de origem app continuaram nascendo
+> nos últimos 10 dias. Ou **o app parou de marcar `origem='app'`**, ou o worker
+> processa fila velha.
+>
+> **Isto importa muito:** se o app hoje grava com **outra origem**, a trava que
+> eu acabei de aplicar **não o alcança** e o vazamento continua com outro nome.
+> É a primeira coisa a medir. Consulta:
+> ```sql
+> select origem, count(*), min(criado_em), max(criado_em)
+> from public.fabio_registros_aula where parent_id is null group by 1;
+> ```
+>
+> ## PRÓXIMO PASSO
+> Investigar os dois abertos **nesta ordem** (o 2 primeiro — ele decide se o
+> conserto do caminho 1 vale). Só depois dizer que a torneira fechou.
+>
+> ---
+
 > # 🔓 UX DO APP: 3 QUEIXAS DOS PROFESSORES — RESOLVIDAS (17/08)
 >
 > A consulta letiva **fluiu** (Valdo, Isaque, Matheus usando). O que travava era
