@@ -170,8 +170,10 @@ begin
     (select (x->>'aulas')::int from jsonb_array_elements(v_res->'por_unidade') x where x->>'unidade'='Campo Grande') = 3
     and (select (x->>'aulas')::int from jsonb_array_elements(v_res->'por_unidade') x where x->>'unidade'='Recreio') = 1,
     v_res->>'por_unidade');
-  perform pg_temp.checar('docker: registradas 2 / sem_registro 2',
-    (v_res->>'registradas')::int = 2 and (v_res->>'sem_registro')::int = 2,
+  -- 3 registradas: a aula 7 so aparece porque o registro (que aponta pro id
+  -- par 8) tambem passa pelo fn_aula_operacional_id. Com o join ingenuo daria 2.
+  perform pg_temp.checar('docker: registradas 3 / sem_registro 1',
+    (v_res->>'registradas')::int = 3 and (v_res->>'sem_registro')::int = 1,
     format('%s/%s', v_res->>'registradas', v_res->>'sem_registro'));
   perform pg_temp.checar('docker: outro professor nao vaza',
     (public.fabio_professor_resumo_aulas(99, date '2026-08-11', date '2026-08-15', null)->>'total_aulas')::int = 0,
@@ -248,7 +250,12 @@ begin
              exists (
                select 1
                  from public.fabio_registros_aula r
-                where r.aula_id = b.aula_op
+                -- O REGISTRO TAMBEM PRECISA SER COLAPSADO. Medido em 17/08:
+                -- 2 de 149 troncos dos ultimos 60 dias apontam pra linha de
+                -- EVENTO duplicada, nao pro id operacional. Comparar
+                -- `r.aula_id = b.aula_op` cru perderia esses — a aula
+                -- apareceria como "sem registro" tendo registro.
+                where coalesce(public.fn_aula_operacional_id(r.aula_id), r.aula_id) = b.aula_op
                   and r.parent_id is null
                   and r.status in ('confirmado', 'gravado_emusys')
              ) as tem_registro
@@ -333,8 +340,14 @@ create table public.fabio_registros_aula (
 insert into public.fabio_registros_aula (aula_id, parent_id, status, professor_id) values
   (1, null, 'gravado_emusys', 36),
   (3, null, 'confirmado', 36),
-  (5, null, 'rascunho', 36);   -- rascunho NAO conta como registrada
+  (5, null, 'rascunho', 36),   -- rascunho NAO conta como registrada
+  -- O registro que aponta pra linha de EVENTO (id par), nao pro operacional.
+  -- Existe de verdade: 2 de 149 troncos em 60 dias. Sem esta linha o fixture
+  -- nao alcanca o caso e o mutante do join ingenuo passaria por morto.
+  (8, null, 'gravado_emusys', 36);
 ```
+
+Com esse fixture: 4 aulas operacionais, **3 registradas** (1, 3 e — via colapso — 7) e **1 sem registro** (a 5, que só tem rascunho).
 
 Mutantes (cada um tem que morrer **por asserção**, não por erro de sintaxe):
 
@@ -347,18 +360,24 @@ Mutantes (cada um tem que morrer **por asserção**, não por erro de sintaxe):
 | 5 | remover `and ae.professor_id = p_professor_id` | vaza aula de outro professor |
 | 6 | trocar o filtro `p_unidade` por sempre-verdadeiro | recorte por unidade para de recortar |
 | 7 | acrescentar `'valor_hora_aula', 120` ao `jsonb_build_object` do retorno | **a fronteira do financeiro**: o teste de catálogo tem que matar isso |
+| 8 | trocar `coalesce(public.fn_aula_operacional_id(r.aula_id), r.aula_id) = b.aula_op` por `r.aula_id = b.aula_op` | o registro que aponta pra linha de evento some (3 → 2 registradas) |
 
 > O mutante 7 é o que prova que a fronteira é porta e não promessa. O bootstrap
 > do Docker precisa incluir a parte de catálogo do `.test.sql` (a asserção
 > `nenhum identificador financeiro no corpo`), senão ele morre por nada e passa
 > por morto — verde não-falsificado.
+>
+> O mutante 8 nasceu de uma observação do Alf, e a medição deu razão a ele:
+> 2 de 149 troncos dos últimos 60 dias apontam pra linha de evento. **A semana do
+> Valdo dá 17 nos dois jeitos** — por isso a prova tem que vir do fixture Docker,
+> que alcança o caso; o dado de produção sozinho não alcançaria.
 
 - [ ] **Step 7: Rodar os mutantes**
 
 ```bash
 node scripts/mutantes-20260817120000.mjs
 ```
-Esperado: `OK baseline verde` + `6/6 mutantes mortos`. Se algum sobreviver, o teste não cobre o caso — **corrigir o teste, nunca afrouxar o mutante**.
+Esperado: `OK baseline verde` + `8/8 mutantes mortos`. Se algum sobreviver, o teste não cobre o caso — **corrigir o teste, nunca afrouxar o mutante**.
 
 - [ ] **Step 8: Commit**
 
@@ -366,6 +385,8 @@ Esperado: `OK baseline verde` + `6/6 mutantes mortos`. Se algum sobreviver, o te
 git add supabase/migrations/20260817120000_consulta_letiva_resumo_aulas.sql supabase/migrations/20260817120000_consulta_letiva_resumo_aulas.test.sql scripts/mutantes-20260817120000.mjs
 git commit -m "feat(consulta-letiva): RPC de resumo de aulas do professor (dedup por aula operacional)"
 ```
+
+🛑 **PARE AQUI.** A migration NÃO vai para produção nesta tarefa. Trazer a evidência (rollback verde + 8/8 mutantes) e esperar o OK do Alf.
 
 ---
 
@@ -600,7 +621,7 @@ Mutantes:
 ```bash
 node scripts/mutantes-20260817130000.mjs
 ```
-Esperado: `OK baseline verde` + `6/6 mutantes mortos`.
+Esperado: `OK baseline verde` + `7/7 mutantes mortos`.
 
 - [ ] **Step 7: Commit**
 
@@ -608,6 +629,8 @@ Esperado: `OK baseline verde` + `6/6 mutantes mortos`.
 git add supabase/migrations/20260817130000_consulta_letiva_presencas.sql supabase/migrations/20260817130000_consulta_letiva_presencas.test.sql scripts/mutantes-20260817130000.mjs
 git commit -m "feat(consulta-letiva): RPC de presencas do professor com os baldes separados"
 ```
+
+🛑 **PARE AQUI.** Mesma regra: sem migration viva sem OK explícito do Alf.
 
 ---
 
