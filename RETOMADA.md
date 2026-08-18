@@ -57,6 +57,46 @@
 > ---
 
 
+> # 🔴→🟢 "DE 11 A 15 DE AGOSTO" CONSULTAVA SO O DIA 15 — NO AR (18/08)
+>
+> Achado **medindo o custo da passada extra**, nao procurando bug. A pergunta
+> canonica do Valdo saia do bridge como `inicio=15/08 fim=15/08` e o Fabio
+> respondia *"consultei o dia 15/08: foram 7 aulas"* para uma pergunta de cinco
+> dias. Silencioso, com cara de resposta certa.
+>
+> | como o professor fala | antes | agora |
+> |---|---|---|
+> | "de 11 a 15 de agosto" | 15/08 (1 dia) | 11–15/08 ✓ |
+> | "entre 11 e 15 de agosto" | 15/08 (1 dia) | 11–15/08 ✓ |
+> | "do dia 11 ao dia 15 de agosto" | 15/08 (1 dia) | 11–15/08 ✓ |
+> | "de 11/08 a 15/08" | ok | ok |
+>
+> **Causa:** `_DATA_MES_EXTENSO` exige o mes colado em CADA dia, e brasileiro
+> diz o mes UMA vez, no fim. O `11` ficava orfao, sobrava uma data so, e uma
+> data so vira `inicio == fim`. Valia para faltas tambem. O que impediu virar
+> mentira lisa foi o guardrail que obriga o Fabio a dizer o periodo consultado.
+>
+> **Commit `ce46ad7`**, deployado na VPS e bridge reiniciado. Suite da VPS
+> identica a linha de base medida ANTES do deploy (6/6), 4/4 mutantes mortos
+> por assercao (`python3 mutantes_intervalo_mes_uma_vez.py`).
+>
+> **Provado conversando** (`falar_com_fabio.py --sem-historico`):
+> 1. "de 11 a 15 de agosto" → **36 aulas**, 25 Campo Grande + 11 Recreio;
+> 2. caso oposto, "de 11/08 a 15/08" → **36 aulas**, identico;
+> 3. pergunta comum ("bom dia") → sem ruido, sem consulta injetada;
+> 4. "das 8 as 10 da manha" → **pergunta o periodo** em vez de inventar mes.
+>
+> ⚠️ **O teste de mutacao me pegou.** Dois mutantes SOBREVIVERAM na primeira
+> rodada: eu tinha escrito no comentario duas travas (o lookbehind da data
+> digitada e o `as` fora dos conectores) que **teste nenhum sustentava**. Nao
+> afrouxei a assercao nem apaguei a trava — escrevi os dois testes que
+> distinguem. E uma terceira trava eu quebrei escrevendo, e um teste ANTIGO
+> pegou: em "de 11 de 8 ate 15 de 8" o padrao lia o mes `8` da primeira data
+> como dia inicial.
+>
+> ---
+
+
 > # 🧭 DECISÃO DO ALF (18/08) — DUAS FRENTES, DESACOPLADAS
 >
 > Palavra dele, na íntegra do que decide:
@@ -89,6 +129,28 @@
 > `hermes-platform-toolsets.yaml.txt` documenta a razão: o gateway é **sem
 > sessão** (`run_hermes_api` manda só `{model, messages, stream}`), então
 > ferramenta ligada vale pra qualquer professor — por isso `no_mcp`.
+>
+> ## Custo da passada extra, medido (gate do Alf, 18/08)
+>
+> | | mediana |
+> |---|---|
+> | hoje, uma passada | **8,3s** |
+> | passada 1 (so o pedido em JSON) | **~7s** |
+> | **duas passadas** | **~15–16s** |
+>
+> Encolhi o prompt da passada 1 de **12.024 → 424 chars** (28x) e economizei
+> **0,6s**: o custo e overhead fixo por chamada no gateway, **nao** prefill.
+> Minha hipotese de "passada 1 sai barata" estava errada.
+>
+> Com o prompt CHEIO a passada 1 **derivou**: inventou nome de campo
+> (`aulas_ministradas`) e incluiu `professor_id` na resposta. Com o prompt
+> pequeno saiu o schema exato, 4/4 identicos. **A passada 1 tem que ter prompt
+> proprio e curto** — nao e otimizacao, e o que mantem o modelo longe de
+> escolher identidade.
+>
+> **Decisao do Alf apos a medicao:** A vira **fallback**, nao substituto. O
+> extrator deterministico segue como caminho rapido; se voltar vazio ou ambiguo,
+> paga-se a passada. Se A tambem falhar, o Fabio PERGUNTA o periodo.
 >
 > ⚠️ **Consequência pro plano:** "caminho produto imediato" **não é construir o
 > padrão — ele já está no ar**. O que falta é outra coisa: hoje cada capacidade
