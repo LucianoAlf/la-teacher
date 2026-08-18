@@ -57,6 +57,58 @@
 > ---
 
 
+> # 🕸️ PASSADA A — REDE DE SEGURANCA, EM SHADOW (18/08)
+>
+> Contrato do Alf cumprido item a item. Spec:
+> `docs/superpowers/specs/2026-08-18-passada-a-fallback-consulta-letiva.md`.
+> Commit `3991530`, deployado, bridge no ar.
+>
+> **Desenho:** deterministico primeiro; se voltar vazio E o gate abrir, uma
+> passada curta no modelo devolve `{consulta, inicio, fim, unidade}` e **o
+> bridge executa** com o `professor_id` da linha. Schema fechado: chave fora do
+> contrato **rejeita o payload inteiro** — nao "limpa e segue", porque limpar
+> faria funcionar e esconderia que o modelo desobedeceu.
+>
+> `chamada_do_pedido` foi extraida de `montar_chamada_consulta`: os dois
+> caminhos disparam a MESMA RPC, sem segunda copia da regua.
+>
+> ## Por que SHADOW e nao ligado
+>
+> Varredura das **165 mensagens de professor dos ultimos 60 dias**: o gate de
+> hoje pega 12, um gate largo pegaria 37 — e das **30 que so o largo pega**, a
+> maioria e **registro de aula** ("quero registrar a aula de piano T, turma
+> P_QUI_19, do dia 6 de agosto") e **carteira** ("quantos alunos eu tenho no
+> total?"), que esta fora da metrica por contrato.
+>
+> ⚠️ **Depois do conserto do parser (`ce46ad7`), nao sobrou no corpus uma
+> consulta que A resgataria.** A razao pra ter A e a cauda que o corpus nao
+> enumera — e o canal so esta em `todos` desde 17/08. Por isso `shadow`:
+> calcula, loga `consulta_fallback`, **nao injeta**. `on` quando o log disser.
+>
+> ⚠️ **Custo do shadow, dito na cara:** nas mensagens que abrem o gate (~22%,
+> ~0,6/dia) o professor paga os ~7s da passada **sem receber o beneficio** —
+> medido ao vivo, 18,5s numa resposta que em shadow ainda termina em pergunta.
+> E o preco da janela de medicao; se incomodar, `FABIO_CONSULTA_FALLBACK_MODO=off`.
+>
+> ## Provado ao vivo (shadow)
+>
+> | caso | A acordou? | resultado |
+> |---|---|---|
+> | "quanto que eu trabalhei na semana retrasada?" | **sim** | `03–09/08`, schema exato, sem `professor_id` |
+> | "quero registrar a aula de piano T, turma P_QUI_19…" | **nao** | gate barrou registro |
+> | "de 11 a 15 de agosto" (deterministico resolve) | **nao** | caminho rapido venceu |
+>
+> 30 testes no modulo, **7/7 mutantes mortos por assercao** — inclusive o
+> "limpa o campo extra e segue", que e o atalho tentador. Um mutante sobreviveu
+> na 1a rodada: o teste do `"nenhuma"` passava por falta de datas, nao por
+> respeitar o `"nenhuma"`.
+>
+> **Ligar depende de:** deixar rodar alguns dias e ler `consulta_fallback` —
+> quantas vezes `aceito: true`, e se o que ele aceitou era mesmo consulta.
+>
+> ---
+
+
 > # 🔴→🟢 "DE 11 A 15 DE AGOSTO" CONSULTAVA SO O DIA 15 — NO AR (18/08)
 >
 > Achado **medindo o custo da passada extra**, nao procurando bug. A pergunta
