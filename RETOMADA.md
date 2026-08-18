@@ -57,6 +57,56 @@
 > ---
 
 
+> # 🤐 ITEM 4 — A BOCA DO FABIO, FECHADA NO AR (18/08)
+>
+> Commits `6e4764b` (tranca) + `12dcb55` (acao). Deployado, bridge no ar.
+>
+> **Nao e prompt, e maquina — e o motivo e medido.** `CAPACIDADE_PROFESSOR`
+> existe desde 10/08, escrito depois de a Daiana ouvir "registro salvo" com
+> ZERO escritas, e comeca com *"leia antes de prometer qualquer coisa"*. Nas
+> **281 respostas a professor dos ultimos 60 dias** ele prometeu **7 vezes**,
+> a maioria DEPOIS desse bloco existir.
+>
+> **O discriminador** (saiu do corpus, verdadeiro por construcao): promessa
+> sobre **consulta** e SEMPRE falsa — nao existe fila que entregue um numero
+> depois. Promessa sobre **audio/registro** pode ser verdade: existe fila,
+> worker e preview. *"Guardei esse audio aqui, assim que a gente fechar o
+> anterior ele entra"* e honesta, e detector ingenuo mataria ela junto (5 das 8
+> frases parecidas do corpus sao verdadeiras).
+>
+> **Falso positivo na populacao inteira: zero.** 7 marcadas em 281, e as 7 sao
+> promessa. A sequencia do Valdo em 17/08 mostra o ciclo: 13:27 "se quiser, eu
+> confiro" -> 13:29 "eu confiro esse periodo" -> 13:30 "vou conferir e te passo
+> o total". Disse sim tres vezes, recebeu tres promessas.
+>
+> **A acao:** marcou -> UMA regeneracao com instrucao curta -> se ainda
+> prometer, cai na `FRASE_HONESTA` inteira. Nunca cirurgia de texto.
+> `_ha_fluxo_pendente` erra pro lado de NAO mexer.
+>
+> **Provado ao vivo** com a pergunta que gerou a promessa de 10/08 (divisao da
+> carteira por unidade). 3 rodadas, o modelo prometeu em 2 (`posso conferir`,
+> `posso olhar`); as 2 regeneracoes sairam honestas, nenhuma caiu na frase fixa.
+>
+> Fixtures sao a fala REAL (3 promessas + 9 inocentes); a unica inventada esta
+> marcada. 10 testes, 5/5 mutantes por assercao. Um sobreviveu na 1a rodada: a
+> exclusao de "pode deixar" nao era sustentada por teste.
+>
+> **Gate/rollback:** `FABIO_PROMESSA_MODO=on|shadow|off` (default `on`). Valor
+> invalido cai em shadow — nunca agir no escuro.
+>
+> ## Fila do item 4 em diante (ordem do Alf)
+> 1. memoria pedagogica do aluno ("qual o conteudo da ultima aula da Luiza?");
+> 2. retrospectiva "como foram minhas aulas hoje?";
+> 3. carteira por unidade — **e a que gerou a promessa de 10/08**;
+> 5 e 6 (manual curto + sinal de vida no "ta ai?") entram junto se couberem.
+>
+> ⚠️ **Achado de passagem, nao e desta mudanca:** `fabio_contexto_professor`
+> estourou `statement timeout` (57014) em 1 de 4 chamadas. Se repetir, e
+> pendencia propria.
+>
+> ---
+
+
 > # 🕸️ PASSADA A — REDE DE SEGURANCA, EM SHADOW (18/08)
 >
 > Contrato do Alf cumprido item a item. Spec:
