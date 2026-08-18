@@ -20,6 +20,10 @@ _TEXT_INTENTS = {"chamada", "conversa", "ambiguo"}
 _AFFIRMATIVE = {
     "sim", "s", "pode", "confirmo", "confirmado", "confirma", "manda",
     "vamos", "ok", "okay", "certo", "isso", "isso mesmo", "pode gravar",
+    # 18/08/2026: "Grava" (imperativo de gravar) caía em `conversa` e o LLM
+    # inventava "a confirmação está com a máquina agora". A trava do "sim
+    # responde a quem perguntou" segue gateando a escrita de verdade.
+    "grava", "grave", "gravar",
 }
 _CANCEL_WORDS = ("cancela", "cancelar", "cancele", "deixa pra la", "deixa isso", "esquece")
 _DEFER_WORDS = ("depois", "mais tarde", "outra hora", "amanha", "amanhã")
@@ -35,6 +39,17 @@ _CONTENT_WORDS = (
 _CONVERSATION_WORDS = (
     "oi", "ola", "olá", "como", "como foi", "agenda", "quem e", "quem é", "obrigado",
     "valeu", "me ajuda", "pode me ajudar", "qual", "quando", "onde",
+)
+# Correção de CONTEÚDO num rascunho aberto: o professor manda editar o que o
+# Fábio escreveu ("tira o solfejo", "troca o repertório", "corrige o objetivo").
+# 18/08/2026, prof 10: "Tira solfejo, 'do re mi fá' é o nome da música" caía em
+# `conversa`, o LLM dizia "entra como repertório" e NADA era corrigido. A
+# máquina tem que OUVIR; aplicar de verdade um patch estruturado é a etapa
+# seguinte — por ora ela responde honesto que não conseguiu, em vez de o LLM
+# mentir que fez. A correção de PRESENÇA é tratada logo acima, tem prioridade.
+_CORRECAO_CONTEUDO_WORDS = (
+    "tira", "tirar", "troca", "trocar", "corrige", "corrigir", "corrija",
+    "muda", "mudar", "arruma", "arrumar", "conserta", "consertar",
 )
 _TEXTUAL_FIELDS = {
     "objetivo", "materiais", "repertorio", "marco_ref", "anotacao_pedagogica",
@@ -501,6 +516,10 @@ def interpretar_resposta_pendente(texto: str, acao: dict[str, Any]) -> dict[str,
     if tipo in {"confirmar_registro", "confirmar_chamada"} and (
         hay.startswith("nao ") or hay.startswith("não ") or " veio" in hay or " faltou" in hay
     ) and any(word in hay for word in ("veio", "vieram", "faltou", "faltaram", "troca", "corrige", "correcao", "correção")):
+        return {"tipo": "correcao", "texto": texto.strip()}
+    if tipo in {"confirmar_registro", "confirmar_chamada"} and any(
+        re.search(rf"\b{verbo}\b", hay) for verbo in _CORRECAO_CONTEUDO_WORDS
+    ):
         return {"tipo": "correcao", "texto": texto.strip()}
     if hay in _AFFIRMATIVE or any(hay.startswith(word + " ") for word in _AFFIRMATIVE):
         return {"tipo": "confirmar_intencao" if tipo.startswith("confirmar_intencao") else "confirmar"}

@@ -1500,5 +1500,52 @@ class AcaoFantasmaDoIsaqueTest(unittest.TestCase):
                       .replace("\u00e3", "a"))
 
 
+class MaquinaOuveGravaETiraXTest(unittest.TestCase):
+    """18/08/2026, prof 10 (Isaque). As duas mensagens que o F\u00e1bio deixou o LLM
+    responder por cima, mentindo.
+
+    - "Grava" (17:01) tinha que gravar de verdade \u2014 e a trava do "sim responde a
+      quem perguntou" continua protegendo (grava inseguro N\u00c3O grava).
+    - "Tira solfejo\u2026" (16:54) tinha que ser ouvida como corre\u00e7\u00e3o e respondida com
+      honestidade, NUNCA virar o objetivo da aula (o extrator antigo despejava o
+      texto da corre\u00e7\u00e3o em `campos.objetivo`, corrompendo o rascunho).
+    """
+
+    def _acao_registro(self):
+        return {
+            "id": "acao-1", "professor_id": 25, "wa_message_id": "old",
+            "tipo": "confirmar_registro", "estado": "aberta", "registro_id": "reg-1",
+            "payload": {
+                "rascunho": {"id": "fat-1", "aluno_id": 7, "status": "aguardando_confirmacao"},
+                "roster": [{"aluno_id": 7, "nome": "Sofia"}],
+            },
+        }
+
+    def test_grava_grava_de_verdade(self):
+        backend = FakeBackend(action=self._acao_registro())
+        result = tratar_mensagem_professor(professor_context(text="Grava"), backend)
+        self.assertEqual(result["code"], "confirmed")
+        self.assertIn("fabio_confirmar_registro", [n for n, _ in backend.calls])
+
+    def test_grava_inseguro_nao_grava(self):
+        # A trava vale pra "grava" igual vale pra "sim": se a m\u00e1quina n\u00e3o falou
+        # por \u00faltimo, n\u00e3o grava \u2014 repergunta.
+        backend = FakeBackend(action=self._acao_registro(), confirmacao_segura=False)
+        result = tratar_mensagem_professor(professor_context(text="Grava"), backend)
+        self.assertNotEqual(result["code"], "confirmed")
+        self.assertNotIn("fabio_confirmar_registro", [n for n, _ in backend.calls])
+
+    def test_tira_solfejo_responde_honesto_e_nao_corrompe_objetivo(self):
+        backend = FakeBackend(action=self._acao_registro())
+        result = tratar_mensagem_professor(
+            professor_context(text="Tira solfejo, 'do re mi f\u00e1' \u00e9 o nome da m\u00fasica"), backend)
+        # Honesto: a m\u00e1quina PERGUNTA, n\u00e3o afirma que corrigiu.
+        self.assertEqual(result["code"], "correction_question")
+        # E nada foi escrito no rascunho \u2014 em especial, o texto da corre\u00e7\u00e3o N\u00c3O
+        # virou objetivo=<"Tira solfejo\u2026">.
+        self.assertNotIn("fabio_atualizar_fatia", [n for n, _ in backend.calls])
+        self.assertNotIn("fabio_confirmar_registro", [n for n, _ in backend.calls])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -607,7 +607,13 @@ def _correction_output(text: str, action: dict[str, Any], readback: dict[str, An
     hay = text.lower()
     presence = "ausente" if any(word in hay for word in ("faltou", "faltaram", "não veio", "nao veio")) else "presente" if any(word in hay for word in ("veio", "vieram", "presente")) else None
     if not presence:
-        return {"registro_id": draft.get("id"), "aluno_id": draft.get("aluno_id"), "campos": {"objetivo": text}}
+        # 18/08/2026: despejar o texto da correção em `objetivo` CORROMPE o
+        # rascunho — "Tira solfejo, do re mi fá é o nome da música" viraria o
+        # objetivo da aula. Sem um extrator estruturado de conteúdo (a etapa
+        # seguinte), devolvemos patch VAZIO: `validar_patch_correcao` rejeita e a
+        # máquina responde honesto ("qual aluno e qual informação?"), em vez de o
+        # LLM mentir que corrigiu OU de gravar lixo no prontuário do aluno.
+        return {"registro_id": draft.get("id"), "aluno_id": draft.get("aluno_id"), "campos": {}}
     matches = [row for row in roster if isinstance(row, dict) and row.get("nome") and str(row["nome"]).lower() in hay]
     if len(matches) != 1:
         return {"registro_id": draft.get("id"), "aluno_id": None, "campos": {"presenca": presence}}

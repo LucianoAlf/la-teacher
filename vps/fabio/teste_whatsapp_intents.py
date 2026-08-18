@@ -519,10 +519,6 @@ class DataFaladaTest(unittest.TestCase):
         self.assertIsNone(resolver_periodo("quantas aulas eu dei?", self.HOJE))
 
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
-
-
 class IntervaloComMesDitoUmaVezTest(unittest.TestCase):
     """O jeito brasileiro de falar intervalo: o mês vem UMA vez, no fim.
 
@@ -623,3 +619,60 @@ class IntervaloComMesDitoUmaVezTest(unittest.TestCase):
     def test_dia_impossivel_continua_sem_periodo(self):
         # Sem período o contrato é PERGUNTAR, nunca chutar.
         self.assertIsNone(self._periodo("quantas aulas eu dei de 32 a 35 de agosto?"))
+
+
+class MaquinaOuveGravaETiraXTest(unittest.TestCase):
+    """18/08/2026, professor 10 (Isaque). Duas mentiras do Fábio, medidas no log.
+
+    - "Grava" (17:01) caiu em `conversa` → o LLM disse "a confirmação está com a
+      máquina de registro agora" e a máquina NÃO gravou. Registro ficou
+      `aguardando_confirmacao`.
+    - "Tira solfejo, 'do re mi fá' é o nome da música" (16:54) caiu em `conversa`
+      → o LLM disse "entra como repertório, não como solfejo" e NADA foi
+      corrigido (`fabio_registro_correcoes` vazia).
+
+    "Grava"/"grave" tem que virar CONFIRMAR — a trava do "sim responde a quem
+    perguntou" (`_confirmacao_responde_a_maquina`) segue protegendo a escrita.
+    "Tira X"/"troca X"/"corrige" tem que virar CORRECAO: a máquina OUVE, em vez
+    de o LLM inventar que fez.
+    """
+
+    REGISTRO = {"tipo": "confirmar_registro"}
+
+    def test_grava_vira_confirmar(self):
+        self.assertEqual(
+            interpretar_resposta_pendente("Grava", self.REGISTRO)["tipo"], "confirmar")
+
+    def test_grave_vira_confirmar(self):
+        self.assertEqual(
+            interpretar_resposta_pendente("Grave", self.REGISTRO)["tipo"], "confirmar")
+
+    def test_grava_isso_vira_confirmar(self):
+        self.assertEqual(
+            interpretar_resposta_pendente("grava isso", self.REGISTRO)["tipo"], "confirmar")
+
+    def test_tira_solfejo_frase_real_do_isaque_vira_correcao(self):
+        resposta = interpretar_resposta_pendente(
+            "Tira solfejo, 'do re mi fá' é o nome da música", self.REGISTRO)
+        self.assertEqual(resposta["tipo"], "correcao")
+
+    def test_troca_repertorio_vira_correcao(self):
+        self.assertEqual(
+            interpretar_resposta_pendente("troca o repertório para Fur Elise", self.REGISTRO)["tipo"],
+            "correcao")
+
+    def test_conversa_comum_nao_e_engolida_por_correcao(self):
+        # A detecção de correção NÃO pode virar um funil que engole conversa.
+        self.assertEqual(
+            interpretar_resposta_pendente("que resumo bacana, ficou ótimo", self.REGISTRO)["tipo"],
+            "conversa")
+
+    def test_correcao_de_presenca_continua_valendo(self):
+        # Regressão: a correção de presença que já funcionava não pode quebrar.
+        self.assertEqual(
+            interpretar_resposta_pendente("na verdade o Arthur faltou", self.REGISTRO)["tipo"],
+            "correcao")
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
