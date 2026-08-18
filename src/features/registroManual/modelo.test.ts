@@ -5,6 +5,8 @@ import {
   contarDiferencasRascunho,
   detectarSobrescritas,
   mesclarCacheComRoster,
+  seloAoEditar,
+  seloAoGuardarLocal,
   type FatiaManual,
 } from './modelo'
 
@@ -120,5 +122,54 @@ describe('conflito de rascunho manual', () => {
     expect(resultado).toHaveLength(3)
     expect(resultado.find((fatia) => fatia.id === 'arthur')?.campos.objetivo).toBe('Objetivo local')
     expect(resultado.find((fatia) => fatia.id === 'caio')?.alunoNome).toBe('Caio')
+  })
+})
+
+describe('selo de salvamento quando o professor digita', () => {
+  // Medido no harness em 18/08/2026: 37 teclas produziam 76 trocas no cabeçalho —
+  // "Não salvo" (71,7px) ⇄ "Só neste aparelho" (109px), duas por tecla. A tecla
+  // não muda a notícia; só o PRIMEIRO caractere depois de um salvamento muda.
+  it('não re-anuncia quando o texto já está guardado neste aparelho', () => {
+    expect(seloAoEditar('local')).toBe('local')
+  })
+
+  it('avisa assim que o professor sai do estado salvo', () => {
+    expect(seloAoEditar('salvo')).toBe('nao_salvo')
+  })
+
+  it('avisa também quando digita por cima de um salvamento em voo', () => {
+    expect(seloAoEditar('salvando')).toBe('nao_salvo')
+  })
+
+  it('mantém o aviso de que a gravação local falhou', () => {
+    expect(seloAoEditar('nao_salvo')).toBe('nao_salvo')
+  })
+
+  // O conflito é uma decisão que o professor ainda deve ("usar servidor" ou
+  // "manter o que digitei"). Digitar não é decidir: apagar o aviso escondia os
+  // dois botões, destravava o "Revisar e confirmar" e fazia a página pular.
+  it('não apaga o conflito de versão — digitar não é decidir', () => {
+    expect(seloAoEditar('conflito')).toBe('conflito')
+  })
+})
+
+describe('selo quando o gravador local responde', () => {
+  // O `.then` do gravador local é a SEGUNDA porta que publica estado por tecla.
+  // Medido no harness: consertar só a porta síncrona não bastou — com o conflito
+  // na tela, uma tecla ainda apagava o banner por este caminho.
+  it('confirma que o texto ficou guardado neste aparelho', () => {
+    expect(seloAoGuardarLocal('nao_salvo', true)).toBe('local')
+  })
+
+  it('acusa quando nem no aparelho deu para guardar', () => {
+    expect(seloAoGuardarLocal('nao_salvo', false)).toBe('nao_salvo')
+  })
+
+  it('não apaga o conflito nem quando a gravação local dá certo', () => {
+    expect(seloAoGuardarLocal('conflito', true)).toBe('conflito')
+  })
+
+  it('não apaga o conflito quando a gravação local falha', () => {
+    expect(seloAoGuardarLocal('conflito', false)).toBe('conflito')
   })
 })

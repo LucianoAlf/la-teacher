@@ -114,3 +114,43 @@ export function mesclarCacheComRoster(
     return local ? { ...servidor, campos: limparCamposManuais(local.campos as Record<string, unknown>) } : servidor
   })
 }
+
+/** Estados do selo de salvamento do caderno manual. */
+export type EstadoSalvamento = 'salvo' | 'salvando' | 'local' | 'nao_salvo' | 'conflito'
+
+/**
+ * Para onde o selo vai quando o professor digita — o estado ANTERIOR manda.
+ *
+ * Uma tecla quase nunca é notícia nova. Antes, toda tecla publicava
+ * `nao_salvo` e o gravador local devolvia `local` ~1ms depois: medido no
+ * harness, 37 teclas viravam 76 trocas no cabeçalho, o rótulo pulando entre
+ * 71,7px ("Não salvo") e 109px ("Só neste aparelho"). Era a tremida.
+ *
+ * - `local` fica: o texto JÁ está guardado neste aparelho; digitar mais não
+ *   desfaz isso, e re-anunciar é só barulho.
+ * - `conflito` fica: é uma decisão que o professor ainda deve ("usar servidor"
+ *   ou "manter o que digitei"). Apagar por causa de uma tecla escondia os dois
+ *   botões, destravava o "Revisar e confirmar" e fazia a página pular.
+ * - o resto (`salvo`, `salvando`) vira `nao_salvo`: aí a notícia mudou de
+ *   verdade — saiu do que estava no servidor.
+ */
+export function seloAoEditar(atual: EstadoSalvamento): EstadoSalvamento {
+  if (atual === 'local' || atual === 'conflito') return atual
+  return 'nao_salvo'
+}
+
+/**
+ * Para onde o selo vai quando o gravador local (IndexedDB) devolve resposta.
+ *
+ * Esta é a SEGUNDA porta que publica estado a cada tecla, e consertar só a
+ * síncrona não bastou: medido no harness em 18/08/2026, com o conflito na tela
+ * uma única tecla ainda apagava o banner por aqui — junto com os dois botões de
+ * decisão e a trava do "Revisar e confirmar".
+ *
+ * `conflito` manda em cima de tudo enquanto o professor não decidir. O resto é
+ * o que já era: guardou → `local`; não guardou → `nao_salvo`.
+ */
+export function seloAoGuardarLocal(atual: EstadoSalvamento, guardado: boolean): EstadoSalvamento {
+  if (atual === 'conflito') return 'conflito'
+  return guardado ? 'local' : 'nao_salvo'
+}

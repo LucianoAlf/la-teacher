@@ -20,7 +20,10 @@ import {
   detectarSobrescritas,
   limparCamposManuais,
   mesclarCacheComRoster,
+  seloAoEditar,
+  seloAoGuardarLocal,
   type CampoManual,
+  type EstadoSalvamento,
   type FatiaManual,
   type OperacaoCopia,
 } from './modelo'
@@ -58,7 +61,6 @@ function camposDoTronco(campos: Record<string, unknown>): Record<string, string>
 }
 
 type Fase = 'carregando' | 'erro' | 'ok'
-type EstadoSalvamento = 'salvo' | 'salvando' | 'local' | 'nao_salvo' | 'conflito'
 type ResultadoSalvamento = 'salvo' | 'desatualizado' | 'ocupado' | 'erro' | 'conflito'
 
 interface RecuperacaoConflito {
@@ -247,11 +249,11 @@ export default function RegistroManualPage() {
     setFatias(proximas)
     geracaoRef.current += 1
     const geracao = geracaoRef.current
-    setSalvamento('nao_salvo')
+    setSalvamento(seloAoEditar)
     setEdicao((valor) => valor + 1)
     void guardarLocal(proximas).then((guardado) => {
       if (geracao === geracaoRef.current && geracao > geracaoSalvaRef.current && !salvandoRef.current) {
-        setSalvamento(guardado ? 'local' : 'nao_salvo')
+        setSalvamento((atual) => seloAoGuardarLocal(atual, guardado))
       }
     })
   }
@@ -347,11 +349,11 @@ export default function RegistroManualPage() {
     setTroncoCampos(proximos)
     geracaoRef.current += 1
     const geracao = geracaoRef.current
-    setSalvamento('nao_salvo')
+    setSalvamento(seloAoEditar)
     setEdicao((atual) => atual + 1)
     void guardarLocal(fatiasRef.current).then((guardado) => {
       if (geracao === geracaoRef.current && geracao > geracaoSalvaRef.current && !salvandoRef.current) {
-        setSalvamento(guardado ? 'local' : 'nao_salvo')
+        setSalvamento((atual) => seloAoGuardarLocal(atual, guardado))
       }
     })
   }

@@ -52,9 +52,51 @@
 > kind, code e prévia. Se repetir, eu vejo em vez de deduzir.
 >
 > ## PENDENTE
-> - A "tremida ao digitar" no formulário de registro (relato do Matheus, 20:55)
->   — **não olhei ainda**.
 > - Avisar Isaque e Matheus que o caminho está consertado.
+>
+> ---
+
+
+> # 🔴→🟢 A TREMIDA AO DIGITAR — CAUSA MEDIDA E CONSERTADA (18/08)
+>
+> Relato do **Matheus** (17/08, 20:55), no **caderno da aula**
+> (`/app/registro-manual/:aulaId`). Reproduzido em harness que monta a tela real
+> com a rede dublada (`npm run diag`, ver `src/__diag__/README.md`) — a tela
+> exige login + aula do dia + roster, e sem isso não havia como reproduzir.
+>
+> **A causa:** a edição publicava estado sem olhar o que já estava na tela.
+> `alterarFatias`/`editarTronco` faziam `setSalvamento('nao_salvo')` a cada
+> tecla, e o `.then` do gravador local devolvia `'local'` ~1ms depois. Medido:
+> **37 teclas = 74 trocas** no selo do cabeçalho, "Não salvo" (71,7px) ⇄ "Só
+> neste aparelho" (109px). Duas por tecla, com o bloco do título encolhendo
+> 191,7→176px junto. O estado intermediário durava 1ms — nunca foi notícia pra
+> um humano, só barulho.
+>
+> **O que mais estava nessa mesma linha (achado ao medir, não ao ler):** com o
+> conflito de versão na tela, **uma tecla apagava o banner inteiro** — junto com
+> os botões "Usar servidor"/"Manter o que digitei" — e **destravava o "Revisar e
+> confirmar"**. Voltava ~1s depois, quando o autosave reconflitava: a página
+> pulando de um lado pro outro.
+>
+> **O conserto** (`modelo.ts`, duas funções puras usadas nos 4 pontos):
+> `seloAoEditar` — `local` e `conflito` ficam; o resto vira `nao_salvo`.
+> `seloAoGuardarLocal` — `conflito` manda enquanto o professor não decidir.
+>
+> ⚠️ **Consertar só a porta síncrona NÃO bastou** — o harness mostrou o banner
+> ainda sumindo pelo `.then`. Duas portas publicavam estado por tecla.
+>
+> | régua idêntica, 37 teclas | trocas no cabeçalho |
+> |---|---|
+> | antes (mutante 1) | **74** |
+> | depois | **2** (só no começo da rajada) |
+>
+> Provas: 23 testes em `modelo.test.ts` (162 na suíte), **3 mutantes mortos por
+> asserção**, conflito verificado ao vivo (banner e trava firmes em 5 teclas),
+> layout conferido a **390×844 e 1400×900**. `tsc` e `build` limpos.
+>
+> **Não é a tremida:** o custo por tecla é 1,5ms (mediana, 18 textareas) — mas
+> medido em **desktop**; num celular antigo com turma grande pode pesar mais.
+> Só o cabeçalho se mexia: cartão, campo e rolagem ficaram em 0px de deslocamento.
 >
 > ---
 
