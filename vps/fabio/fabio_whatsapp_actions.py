@@ -383,6 +383,66 @@ def _select_and_enqueue_audio(backend: FabioWhatsappBackend, context: dict[str, 
     return _result("audio_enqueued", reply=reply, action_id=str(action["id"]), audio_id=audio_id)
 
 
+def _citacao_do_audio(action: dict[str, Any]) -> str:
+    previa = str((action.get("payload") or {}).get("transcricao") or "").strip()[:140]
+    return f' ("{previa}…")' if previa else ""
+
+
+def _pergunta_pendente(action: dict[str, Any]) -> str:
+    """A pendencia que esta na frente, dita com o AUDIO citado e com saida.
+
+    18/08/2026: o Isaque recebeu "ainda nao sei de qual aula voce esta falando"
+    sobre um audio de ONTEM, sem citacao e sem *cancela*. Ele nao tinha como
+    saber do que a maquina falava nem como se livrar dela.
+    """
+    citacao = _citacao_do_audio(action)
+    if str(action.get("tipo") or "").startswith("confirmar_intencao"):
+        return (f"Antes, preciso fechar um áudio anterior{citacao}: era conteúdo de aula "
+                "pra registrar? Responde *sim* pra seguir com ele, ou *cancela* pra "
+                "descartar aquele.")
+    return (f"Antes, preciso saber de qual aula era um áudio anterior{citacao}. "
+            "Me diz o dia e o horário ou o nome do aluno — ou responde *cancela* "
+            "pra descartar aquele.")
+
+
+def _continuar_apos_intencao(backend: FabioWhatsappBackend, context: dict[str, Any],
+                             fluxo: str, action: dict[str, Any]) -> dict[str, Any]:
+    """O espelho de `_start_from_candidates` para uma acao que JA existe.
+
+    Depois de `intencao_confirmada` o banco transiciona a MESMA linha para
+    escolher_aula_*; os eventos seguintes se aplicam a ela. E quando a
+    shortlist volta "nenhuma", a acao e CANCELADA em vez de ficar aberta:
+    pergunta sem candidata e pergunta que nenhuma resposta fecha — foi a
+    fantasma que sequestrou o canal do professor 10 por 18 horas.
+    """
+    candidates = _pool(backend, context, fluxo)
+    shortlist = reduzir_shortlist(str(context.get("text") or ""), candidates)
+    if shortlist["status"] == "nenhuma":
+        _event(backend, action, context, "cancelado", {"motivo": "sem_candidata_apos_intencao"})
+        if action.get("storage_path"):
+            backend.remove_audio(str(action["storage_path"]))
+        return _result("no_candidate",
+                       reply=("Não encontrei uma aula elegível com segurança pra esse áudio, "
+                              "então cancelei essa pendência. Nada foi gravado."),
+                       action_id=str(action["id"]))
+    ids = [int(item["aula_id"]) for item in shortlist["candidatas"]]
+    if not shortlist.get("truncada"):
+        _event(backend, action, context, "shortlist_definida", {"candidatas": ids})
+    if shortlist["status"] == "discriminante":
+        _event(backend, action, context, "pergunta_refinada", {})
+        return _result("refine_class", reply=shortlist["pergunta"], action_id=str(action["id"]))
+    if shortlist["status"] == "perguntar":
+        return _result("choose_audio_class" if fluxo == "registro" else "choose_call_class",
+                       reply=shortlist["pergunta"], action_id=str(action["id"]))
+    aula_id = int(shortlist["aula_id"])
+    if fluxo == "registro":
+        return _select_and_enqueue_audio(backend, context, action, aula_id,
+                                         _roster_da_aula(candidates, aula_id))
+    _event(backend, action, context, "aula_escolhida", {"aula_id": aula_id})
+    return _result("call_preview", reply="Encontrei a aula. Quem esteve presente? Confirma essa chamada?",
+                   action_id=str(action["id"]), aula_id=aula_id)
+
+
 def _start_from_candidates(backend: FabioWhatsappBackend, context: dict[str, Any], fluxo: str, candidates: list[dict[str, Any]], storage_path: str | None) -> dict[str, Any]:
     shortlist = reduzir_shortlist(str(context.get("text") or ""), candidates)
     if shortlist["status"] == "nenhuma":
@@ -641,13 +701,27 @@ def _handle_existing_action(backend: FabioWhatsappBackend, context: dict[str, An
     if refined is not None:
         return refined
     if kind == "confirmar_intencao":
-        if action.get("tipo") == "confirmar_intencao_audio":
-            _event(backend, action, context, "intencao_confirmada", {})
-            next_context = dict(context, text=action.get("payload", {}).get("transcricao") or "")
-            return _start_from_candidates(backend, next_context, "registro", _pool(backend, next_context, "registro"), action.get("storage_path"))
+        # A MESMA trava do confirmar_registro/chamada, que faltava aqui.
+        # 18/08/2026: o "Confirma tudo" do Isaque chegou 8min depois de o LLM
+        # falar por ultimo e confirmou a pergunta de ONTEM — um audio que ele
+        # nem lembrava. A repergunta CITA o audio: repetir "quer registrar?"
+        # sem dizer o que devolveria o professor ao mesmo escuro.
+        if not _confirmacao_responde_a_maquina(backend, context, action):
+            return _result(
+                "confirm_intent_restate",
+                reply=(f"Só confirmando antes de seguir: você quer dizer *sim* pra um "
+                       f"áudio anterior{_citacao_do_audio(action)}? Se for isso, responde "
+                       "*sim* de novo. Se não, responde *cancela* que eu descarto aquele."),
+                action_id=str(action["id"]),
+            )
+        fluxo = "registro" if action.get("tipo") == "confirmar_intencao_audio" else "chamada"
         _event(backend, action, context, "intencao_confirmada", {})
         next_context = dict(context, text=action.get("payload", {}).get("transcricao") or "")
-        return _start_from_candidates(backend, next_context, "chamada", _pool(backend, next_context, "chamada"), None)
+        # NUNCA _start aqui: o `intencao_confirmada` ja TRANSICIONOU esta acao
+        # no banco (mesma linha, tipo novo). Abrir outra por cima e o que o
+        # banco recusa — e em 18/08 essa recusa virou RuntimeError, derrubou o
+        # poller e prendeu a mensagem do professor por 3 minutos.
+        return _continuar_apos_intencao(backend, next_context, fluxo, action)
     if kind == "correcao":
         readback = None
         if action.get("registro_id"):
@@ -755,6 +829,31 @@ def _handle_devolutiva_revision(backend: FabioWhatsappBackend, context: dict[str
 
 
 def tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBackend) -> dict[str, Any]:
+    """Porta unica da maquina. Excecao aqui dentro NUNCA vaza pro poller.
+
+    18/08/2026: uma RuntimeError (`fabio_iniciar_acao_recusado`) atravessou
+    esta funcao, derrubou o poll_loop e prendeu a mensagem do professor por 3
+    minutos ate o stale reclaim. Erro de maquina vira resposta honesta e
+    mensagem processada — e NAO abre a porta do LLM (`forward=False`): o LLM
+    respondendo por cima de um estado meio-mutado e a receita das duas bocas.
+
+    AssertionError passa direto de proposito: e o duble de teste acusando RPC
+    inesperada, e mascarar isso transformaria bug de teste em verde.
+    """
+    try:
+        return _tratar_mensagem_professor(contexto, backend)
+    except AssertionError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        return _result(
+            "machine_error",
+            reply=("Tive um erro aqui do meu lado ao processar essa mensagem e "
+                   "não gravei nada. Me manda de novo em um instante?"),
+            erro=str(exc)[:300],
+        )
+
+
+def _tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBackend) -> dict[str, Any]:
     context = dict(contexto or {})
     if not context.get("professor_id") or not context.get("wa_message_id"):
         return _result("invalid_context", handled=False, forward=True)
@@ -809,7 +908,20 @@ def tratar_mensagem_professor(contexto: dict[str, Any], backend: FabioWhatsappBa
                 # a pergunta pendente do professor continua valendo.
                 guardado = None
         resultado = _handle_existing_action(backend, context, action)
-        if guardado and resultado.get("reply"):
+        if guardado and resultado.get("code") == "conversation":
+            # 18/08/2026: os 3 audios do Isaque foram parqueados MAS o professor
+            # nunca soube — "conversation" descartava o aviso junto com o reply
+            # da maquina, o LLM respondia bonito por cima, e ele mandou
+            # "Confirma tudo" achando que os 3 estavam prontos. Audio parqueado
+            # responde pela MAQUINA: o que foi guardado, o que esta na frente,
+            # e como se livrar da pendencia. Texto de conversa segue livre.
+            resultado = _result(
+                "audio_parked_pending",
+                reply=("Guardei esse áudio — ele entra assim que a gente fechar a "
+                       f"pendência anterior.\n\n{_pergunta_pendente(action)}"),
+                action_id=str(action["id"]),
+            )
+        elif guardado and resultado.get("reply"):
             resultado["reply"] = (
                 f"{resultado['reply']} (Guardei esse áudio aqui — assim que a "
                 "gente fechar o anterior, ele entra.)"

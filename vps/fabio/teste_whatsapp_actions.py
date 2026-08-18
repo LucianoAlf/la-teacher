@@ -44,6 +44,14 @@ class FakeBackend:
         if name == "fabio_aulas_candidatas":
             return {"ok": True, "codigo": "candidatas_prontas", "candidatas": self.candidates}
         if name == "fabio_iniciar_acao":
+            # PRODUCAO RECUSA segunda acao aberta — medido em 18/08/2026:
+            # `poller_error: fabio_iniciar_acao_recusado` no incidente do
+            # "Confirma tudo" do Isaque. O duble era MAIS permissivo que o
+            # banco (sobrescrevia a acao aberta) e foi por isso que o bug do
+            # confirmar-intencao passou verde. Duble permissivo e verde que
+            # nao vale — terceira vez que esta licao aparece NESTE arquivo.
+            if isinstance(self.action, dict) and self.action.get("estado", "aberta") == "aberta":
+                return {"ok": False, "codigo": "acao_ja_aberta"}
             self.action = {
                 "id": self.action_id,
                 "professor_id": payload["p_professor_id"],
@@ -1353,6 +1361,143 @@ class ConfirmacaoRespondeAQuemPerguntouTest(unittest.TestCase):
         backend = FakeBackend(action=self._acao_registro(), confirmacao_segura=False)
         result = tratar_mensagem_professor(professor_context(text="cancela"), backend)
         self.assertEqual(result["code"], "cancelled")
+
+
+
+
+class AcaoFantasmaDoIsaqueTest(unittest.TestCase):
+    """O incidente de 18/08/2026, professor 10, reconstruido do log e do banco.
+
+    Uma `confirmar_intencao_audio` aberta em 17/08 20:51 (transcricao que era
+    CONVERSA: "Nao, uma aula foi sete horas com a Helena...") ficou 18h viva.
+    No dia seguinte: 3 audios limpos cairam em "conversa" mudos, e o "Confirma
+    tudo" confirmou a pergunta DE ONTEM — a maquina transicionou a acao, tentou
+    abrir uma SEGUNDA acao (fabio_iniciar_acao_recusado), o poller morreu, e 3
+    minutos depois o professor recebeu "Ainda nao sei de qual aula voce esta
+    falando" sobre um audio que ele nem lembrava que existia.
+    """
+
+    def _acao_fantasma(self):
+        return {
+            "id": "acao-fantasma", "professor_id": 10,
+            "wa_message_id": "audio-de-ontem",
+            "tipo": "confirmar_intencao_audio", "estado": "aberta",
+            "candidatas": [],
+            "storage_path": "whatsapp/10/ontem.mp3",
+            "payload": {"transcricao": ("Nao, uma aula foi sete horas com a "
+                                         "Helena e outra aula foi sete com a Giovana."),
+                        "intencao": "ambiguo"},
+        }
+
+    def test_confirmar_intencao_continua_na_mesma_acao_sem_iniciar_outra(self):
+        # A raiz do crash: apos `intencao_confirmada` a ACAO JA TRANSICIONOU no
+        # banco (mesma linha, tipo novo). Abrir outra acao por cima e o que o
+        # banco recusa — e a recusa virava excecao e derrubava o poller.
+        backend = FakeBackend(action=self._acao_fantasma(), candidates=[
+            {"aula_id": 101, "data": "2026-08-17", "hora": "19:00", "curso": "Piano T"},
+            {"aula_id": 102, "data": "2026-08-17", "hora": "20:00", "curso": "Canto T"},
+        ])
+        result = tratar_mensagem_professor(
+            professor_context(professor_id=10, wa_message_id="sim-1", text="sim"),
+            backend,
+        )
+        self.assertNotEqual(result["code"], "machine_error")
+        self.assertFalse([c for c in backend.calls if c[0] == "fabio_iniciar_acao"],
+                         "confirmar intencao NAO pode tentar abrir segunda acao")
+        self.assertEqual(result["action_id"], "acao-fantasma")
+
+    def test_confirmar_intencao_sem_candidata_cancela_em_vez_de_virar_fantasma(self):
+        # O estado exato da fantasma: transcricao de conversa, pool sem aula
+        # compativel -> shortlist "nenhuma". Deixar a acao aberta cria uma
+        # pergunta que NENHUMA resposta fecha. Tem que cancelar e dizer isso.
+        backend = FakeBackend(action=self._acao_fantasma(), candidates=[])
+        result = tratar_mensagem_professor(
+            professor_context(professor_id=10, wa_message_id="sim-2", text="sim"),
+            backend,
+        )
+        self.assertEqual(result["code"], "no_candidate")
+        eventos = [c[1]["p_evento"] for c in backend.calls if c[0] == "fabio_aplicar_evento_acao"]
+        self.assertIn("cancelado", eventos,
+                      "sem candidata a acao tem que ser CANCELADA, nao ficar aberta")
+
+    def test_confirma_fora_de_hora_repergunta_citando_o_audio_de_ontem(self):
+        # Item 3 da fatia: a trava do "sim responde a quem perguntou" nao
+        # cobria confirmar_intencao_*. O "Confirma tudo" das 15:07 veio 8min
+        # depois de o LLM falar por ultimo — inseguro — e confirmou a pergunta
+        # de ONTEM. Reperguntar tem que CITAR o audio, senao o professor
+        # continua sem saber do que a maquina esta falando.
+        backend = FakeBackend(action=self._acao_fantasma(), confirmacao_segura=False,
+                              candidates=[{"aula_id": 101}])
+        result = tratar_mensagem_professor(
+            professor_context(professor_id=10, wa_message_id="confirma-tudo",
+                              text="Confirma tudo"),
+            backend,
+        )
+        self.assertEqual(result["code"], "confirm_intent_restate")
+        self.assertIn("sete horas com a Helena", str(result["reply"]),
+                      "a repergunta tem que citar o audio em jogo")
+        eventos = [c[1]["p_evento"] for c in backend.calls if c[0] == "fabio_aplicar_evento_acao"]
+        self.assertNotIn("intencao_confirmada", eventos,
+                         "confirmacao insegura NAO pode transicionar a acao")
+
+    def test_audio_de_registro_parqueado_avisa_e_repete_a_pergunta_pendente(self):
+        # Os 3 audios de 18/08 foram parqueados (a maquina parou de destruir),
+        # mas o professor NUNCA soube: o resultado era conversation/forward, o
+        # LLM respondia bonito, e o aviso "guardei" era descartado junto com o
+        # reply da maquina. Ele mandou "Confirma tudo" achando que os 3 estavam
+        # prontos pra confirmar.
+        backend = FakeBackend(action=self._acao_fantasma())
+        result = tratar_mensagem_professor(
+            professor_context(professor_id=10, wa_message_id="audio-hugo", kind="audio",
+                              text=("Aula das Dez com Hugo. Nos tocamos o Clair de Lune "
+                                    "e fizemos leitura."),
+                              media_url="https://media/hugo"),
+            backend,
+        )
+        self.assertTrue(result["handled"], "audio parqueado NAO pode virar conversa muda")
+        self.assertFalse(result["forward_to_hermes"])
+        self.assertEqual(result["code"], "audio_parked_pending")
+        reply = str(result["reply"])
+        self.assertIn("Guardei", reply)
+        self.assertIn("sete horas com a Helena", reply,
+                      "tem que dizer QUAL pendencia esta na frente")
+        self.assertIn("cancela", reply.lower(),
+                      "tem que oferecer a saida — era o que faltava pro Isaque")
+        self.assertEqual(len(backend.parqueados), 1)
+
+    def test_texto_de_conversa_com_acao_aberta_continua_indo_pro_llm(self):
+        # A mudanca e SO para audio parqueado: texto de conversa segue livre.
+        backend = FakeBackend(action=self._acao_fantasma())
+        result = tratar_mensagem_professor(
+            professor_context(professor_id=10, wa_message_id="txt-1",
+                              text="qual e o cnpj da escola mesmo?"),
+            backend,
+        )
+        self.assertEqual(result["code"], "conversation")
+        self.assertFalse(result["handled"])
+        self.assertTrue(result["forward_to_hermes"])
+
+    def test_erro_de_maquina_vira_resposta_honesta_nao_excecao(self):
+        # O poller morreu com a RuntimeError e a mensagem ficou 3 minutos presa
+        # ate o stale reclaim. Erro de maquina tem que virar resposta honesta E
+        # mensagem processada — nunca excecao vazando pro loop.
+        class BackendQueExplode(FakeBackend):
+            def rpc(self, name, payload):
+                if name == "fabio_aulas_candidatas":
+                    raise RuntimeError("banco fora do ar (simulado)")
+                return super().rpc(name, payload)
+
+        backend = BackendQueExplode(action=self._acao_fantasma())
+        result = tratar_mensagem_professor(
+            professor_context(professor_id=10, wa_message_id="sim-3", text="sim"),
+            backend,
+        )
+        self.assertEqual(result["code"], "machine_error")
+        self.assertTrue(result["handled"])
+        self.assertFalse(result["forward_to_hermes"],
+                         "erro de maquina NAO abre a porta do LLM (duas bocas)")
+        self.assertIn("nao gravei nada", str(result["reply"]).lower()
+                      .replace("\u00e3", "a"))
 
 
 if __name__ == "__main__":
