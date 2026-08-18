@@ -1,5 +1,32 @@
 # RETOMADA — LA Teacher
 
+> # 🔴 DECISÃO DO ALF (18/08 noite): WhatsApp registro DESLIGADO — professor volta pro app
+>
+> Cansado dos problemas do canal WhatsApp (Isaque disparando um por minuto), o Alf
+> mandou **parar de apagar incêndio e consertar direito**. Movimento:
+> - **`FABIO_WHATSAPP_REGISTRO_MODE=off`** no `~/.hermes/.env` da VPS (era `on`).
+>   Backup `.env.bak-whatsapp-off-20260818-222207`. Bridge reiniciada, `off` ativo.
+> - Efeito: áudio/registro no WhatsApp **não aciona a máquina** (gate em
+>   `try_handle_whatsapp_action:3465` → `return None`); o LLM responde "registra no
+>   app" (capacidade sem registro, linha 2781). **Saída intacta** (briefing/
+>   cobrança/governança são cron→edge, não passam por aqui).
+> - **Professores voltam a registrar pelo APP** (registro manual, sólido).
+>
+> **Plano de religar, escalonado (NÃO religar direto no `on`):**
+> `off` (agora) → **reescrever o miolo** (a máquina dona da conversa; LLM proibido
+> de alegar ação que não fez — mata a classe "duas bocas") → `pilot` só com o
+> **Matheus (25)** via `FABIO_WHATSAPP_REGISTRO_PILOT_IDS=25` (teste controlado) →
+> `on` só quando redondo.
+>
+> **PRÓXIMO PASSO combinado:** trazer o DESENHO dessa virada (brainstorm →
+> spec → plano), não mais palavra no regex. Ainda não codar o rewrite.
+>
+> Nota: o conserto `52c86a1` (grava/tira X) continua no ar e correto — mas com o
+> registro `off` ele só volta a importar quando religar o `pilot`.
+>
+> ---
+
+
 > # 🟢 "PIOROU?" DO ISAQUE — MEDIDO: nada perdido, sem regressão nossa (18/08 noite)
 >
 > O Alf mandou os prints achando que a gente quebrou o Fábio. **Não quebramos.**
