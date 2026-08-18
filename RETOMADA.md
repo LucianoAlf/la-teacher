@@ -92,13 +92,34 @@
 > como producao — era mais permissivo e foi por isso que o bug passou verde.
 > 71 testes, 6/6 mutantes por assercao na primeira rodada.
 >
-> ## PROXIMO: o relato novo do Isaque (15/08 so gravou repertorio)
-> Prints do Historico da turma: 15/08 com badge "ULTIMA AULA" mostrando SO
-> repertorio ("Marcelo: You wont see mee" / "Jeremias: Amor de filha"), sem
-> conteudo/objetivo — dias anteriores tem os tres campos. HIPOTESE a verificar
-> (nao conclusao): 15/08 foi o dia do incidente do "sim que gravou a aula
-> errada", e o formato "Nome: musica" tem cara do fluxo de CORRECAO. Medir nos
-> registros + fabio_registro_correcoes antes de afirmar qualquer coisa.
+> ## ✅ INVESTIGADO (18/08): "15/08 so repertorio" — nada se perdeu; e o Historico da turma que nao le
+> A hipotese da correcao estava ERRADA. Medido no banco + codigo:
+>
+> - Os registros de 15/08 do Isaque estao **cheios** (objetivo+conteudo+
+>   repertorio). "You wont see mee"/"Amor de filha" foram gravados **manual pelo
+>   app** em 17-18/08 (backfill), origem=app, versao 6 e 10.
+> - O buraco e a ASSIMETRIA de onde o conteudo mora. Numa turma, o registro tem
+>   um **pai** (`parent_id is null`, `aluno_id` null) e **filhos** por aluno.
+>   - Caminho **audio**: o Fabio poe objetivo/atividades/repertorio no **pai**.
+>   - Caminho **manual** (caderno "uma ficha por aluno"): o professor escreve
+>     tudo nas **fichas dos alunos** (filhos) e o **tronco/pai fica so com
+>     presenca**.
+> - O RPC `app_historico_turma` le objetivo/conteudo/repertorio-da-turma
+>   **SO do pai**; dos filhos so puxa o repertorio por aluno. Pai vazio →
+>   a tela mostra so "Marcelo: musica / Jeremias: musica". O conteudo EXISTE,
+>   a tela nao alcanca.
+> - **Sistemico, nao do Isaque:** pai de turma por AUDIO = 173/174 com conteudo;
+>   por MANUAL = **0/22** com conteudo. Todo registro manual de turma cai nisso.
+>
+> **NAO consertei — e decisao de produto (fork):**
+> - (A, recomendado) o `app_historico_turma` cai pro conteudo por-aluno quando o
+>   pai esta vazio: read-only, backfilla os 22 de graca, respeita a realidade
+>   (cada aluno da turma faz coisa diferente). Muda o layout da tela pra mostrar
+>   objetivo/conteudo por aluno.
+> - (B) o formulario manual passa a preencher o tronco: espelha o audio, mas
+>   forca um objetivo unico numa turma onde cada aluno faz coisa distinta, e nao
+>   conserta os 22 ja gravados.
+> Aguardando a chamada do Alf. Isaque pode ser tranquilizado: **nada foi perdido**.
 >
 > ---
 
