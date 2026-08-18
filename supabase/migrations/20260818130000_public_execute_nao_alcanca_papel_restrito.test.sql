@@ -105,11 +105,15 @@ begin
 
   -- Fixa o mapa de hoje: se um papel restrito GANHAR funcao nova, o teste cai e
   -- alguem decide de proposito, em vez de descobrir depois.
-  perform pg_temp.checar('mapa de alcance nominal fixado (sol 5 / mila 1 / lia 1 / maria 18)',
+  -- Sol foi de 5 pra 6 nesta fatia, DE PROPOSITO: `get_cron_health` era o unico
+  -- uso herdado real medido no pg_stat_statements, e virou grant nominal antes
+  -- da revogacao. O mapa fixado acusou a mudanca — que e exatamente pra isso
+  -- que ele existe.
+  perform pg_temp.checar('mapa de alcance nominal fixado (sol 6 / mila 1 / lia 1 / maria 18)',
     (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
       where n.nspname='public' and p.prokind='f' and p.prosecdef
         and exists (select 1 from unnest(coalesce(p.proacl,'{}')) a
-                     where a::text like 'sol_acesso_restrito=%')) = 5
+                     where a::text like 'sol_acesso_restrito=%')) = 6
     and (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
           where n.nspname='public' and p.prokind='f' and p.prosecdef
             and exists (select 1 from unnest(coalesce(p.proacl,'{}')) a

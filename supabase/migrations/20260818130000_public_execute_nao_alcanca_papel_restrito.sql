@@ -26,6 +26,24 @@
 -- Trigger não se preocupa: a permissão de função de gatilho é checada na
 -- CRIAÇÃO do trigger, não a cada disparo.
 
+-- ── ANTES de revogar: devolver nominalmente a quem REALMENTE usava ──────────
+--
+-- Medido no `pg_stat_statements` (janela de 5 dias e 15 horas, 48,5 milhoes de
+-- chamadas, cobrindo uma semana util inteira): entre os seis papeis restritos,
+-- o UNICO uso herdado das 38 foi `sol_acesso_restrito` chamando
+-- `get_cron_health` (5 vezes). Sem esta linha, a revogacao quebraria esse
+-- caminho — e quebrar em silencio e o modo de falha que este projeto inteiro
+-- existe pra evitar.
+--
+-- ⚠️ Limite honesto da evidencia: o `pg_stat_statements` guarda no maximo alguns
+-- milhares de consultas distintas (hoje ha 4.868 registradas) e descarta as
+-- menos usadas. Um chamador MUITO raro — um cron mensal, por exemplo — pode nao
+-- aparecer nessa janela. Por isso o rollback foi escrito antes
+-- (`scripts/rollback/2026-08-18-camada1-fabio.sql`) e o sintoma e barulhento:
+-- `permission denied for function`, que aparece em log, nao corrompe dado e se
+-- conserta com um grant nominal.
+grant execute on function public.get_cron_health() to sol_acesso_restrito;
+
 do $function$
 declare
   r record;

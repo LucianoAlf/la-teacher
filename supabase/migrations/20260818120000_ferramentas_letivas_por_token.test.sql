@@ -104,11 +104,14 @@ begin
     format('%s executaveis = %s herdadas do PUBLIC + 2 desta fatia',
       cardinality(v_executaveis), cardinality(v_executaveis) - 2));
 
-  perform pg_temp.checar('GAP HERDADO fixado: 38 security definer abertas ao PUBLIC',
+  -- Eram 38 quando esta assercao nasceu; a `130000` (mesma fatia) fechou todas.
+  -- O numero fixado agora e ZERO: qualquer funcao definer que volte a ser aberta
+  -- ao PUBLIC reabre a porta lateral pros papeis restritos, e o teste cai.
+  perform pg_temp.checar('gap do PUBLIC fechado: ZERO security definer aberta',
     (select count(*) from pg_proc p2
       join pg_namespace n2 on n2.oid = p2.pronamespace
      where n2.nspname = 'public' and p2.prokind = 'f' and p2.prosecdef
-       and exists (select 1 from unnest(coalesce(p2.proacl,'{}')) a where a::text like '=%')) = 38,
+       and exists (select 1 from unnest(coalesce(p2.proacl,'{}')) a where a::text like '=%')) = 0,
     format('%s hoje — se subiu, alguem abriu mais uma porta ao PUBLIC',
       (select count(*) from pg_proc p2
         join pg_namespace n2 on n2.oid = p2.pronamespace
