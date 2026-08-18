@@ -57,6 +57,48 @@
 > ---
 
 
+> # 🧭 DECISÃO DO ALF (18/08) — DUAS FRENTES, DESACOPLADAS
+>
+> Palavra dele, na íntegra do que decide:
+>
+> 1. **Fábio consultivo NÃO depende do saneamento pra avançar.** Segue via
+>    bridge + RPC inline, igual Maria.
+> 2. **Segurança (PUBLIC EXECUTE + papel restrito + crachá) avança como frente
+>    própria** — aceita como frente controlada, mas **com ritual: janela +
+>    smoke + rollback**. Não é "faz no impulso".
+> 3. **MCP/ferramenta livre no Fábio só DEPOIS** da casa fechada e smokeada.
+>
+> Ele revisou a posição por causa da evidência do `pg_stat_statements` (um único
+> uso herdado real em 5 dias, `sol_acesso_restrito → get_cron_health`, já virado
+> grant nominal). **A janela ainda não foi marcada** — as migrations da camada 1
+> (100000/110000/120000/130000 + `scripts/rollback/2026-08-18-camada1-fabio.sql`)
+> seguem **escritas, testadas em rollback e NÃO aplicadas**.
+>
+> ## O que eu medi antes de escrever "igual Maria"
+>
+> **A Maria** (banco, 18/08): papel `maria_lareport_rpc` com **18 grants
+> nominais**, todos `security definer`, e as funções são **feitas pra ela**
+> (`maria_lareport_buscar_alunos`, `..._faltas_periodo`, `..._professor_carteira`).
+> A fronteira dela é por **argumento** (`uuid` da unidade) — o que só é seguro
+> porque **quem chama é o servidor, não o modelo**. Ela não roda nesta VPS.
+>
+> **O Fábio JÁ É esse padrão.** `build_prompt` (`fabio_chat_bridge.py`) pré-busca
+> tudo via `service_role` escopado por `professor_id`: `professor_context`,
+> `pedagogical_prefetch`, `agenda_stats`, `_agenda_de_outro_dia`,
+> `pendencias_prefetch`, `_bloco_consulta_letiva`, `_bloco_acao_pendente`. E
+> `hermes-platform-toolsets.yaml.txt` documenta a razão: o gateway é **sem
+> sessão** (`run_hermes_api` manda só `{model, messages, stream}`), então
+> ferramenta ligada vale pra qualquer professor — por isso `no_mcp`.
+>
+> ⚠️ **Consequência pro plano:** "caminho produto imediato" **não é construir o
+> padrão — ele já está no ar**. O que falta é outra coisa: hoje cada capacidade
+> depende de um **detector de intenção escrito à mão** (`parece_consulta_letiva`,
+> `montar_chamada_consulta`, `_agenda_de_outro_dia`). O bridge tem que **adivinhar
+> o que o professor quer antes de poder buscar**. É esse o regex que prende.
+>
+> ---
+
+
 > # 🔴→🟢 A TREMIDA AO DIGITAR — CAUSA MEDIDA E CONSERTADA (18/08)
 >
 > Relato do **Matheus** (17/08, 20:55), no **caderno da aula**
