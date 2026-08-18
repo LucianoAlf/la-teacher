@@ -49,6 +49,7 @@ from fabio_consulta_fallback import (  # noqa: E402
     motivo_da_recusa,
     validar_pedido,
 )
+from fabio_promessa import classificar_promessa  # noqa: E402
 from fabio_registro_normalization_contract import sanear_readback_para_preview
 
 HERMES_HOME = Path(os.getenv("HERMES_HOME", "/home/fabio/.hermes"))
@@ -2585,6 +2586,93 @@ def try_fast_response(row: Dict[str, Any]) -> Optional[str]:
     return _format_day_schedule(ctx, dia)
 
 
+PROMESSA_MODO = os.getenv("FABIO_PROMESSA_MODO", "on").strip().lower()
+if PROMESSA_MODO not in {"off", "shadow", "on"}:
+    PROMESSA_MODO = "shadow"     # valor estranho observa, nunca age no escuro
+
+# Instrução curta e literal do contrato do Alf (18/08/2026).
+CORRECAO_PROMESSA = (
+    "\n\n[CORRECAO OBRIGATORIA] Voce prometeu entregar depois, mas nao ha "
+    "fluxo/ferramenta que execute isso. Responda agora com o que sabe ou "
+    "pergunte o dado faltante. Nao diga que vai conferir, olhar, verificar, "
+    "trazer, passar ou avisar depois."
+)
+
+# Rede embaixo da rede. Nao e cirurgia de texto: e substituicao inteira, para
+# nao existir a possibilidade de uma frase mutilada chegar no professor.
+FRASE_HONESTA = (
+    "Desse ponto eu não consigo te dar o número agora, e não tenho como "
+    "conferir depois e te trazer. Me diz o período (de que dia a que dia) que "
+    "eu respondo na hora."
+)
+
+
+def _ha_fluxo_pendente(row: Dict[str, Any]) -> bool:
+    """Existe fila/worker/preview vivo pra este professor AGORA?
+
+    É o que separa "assim que sair o preview, eu te aviso" (verdade, tem fila)
+    de "te passo o total" (mentira, consulta não tem fila). Na dúvida devolve
+    True: errar para o lado de NÃO mexer na resposta é o lado barato.
+    """
+    if row.get("_acao_ativa"):
+        return True
+    professor_id = row.get("professor_id")
+    if not professor_id:
+        return True
+    try:
+        r = sb_get("/rest/v1/fabio_fila_audios", {
+            "select": "id",
+            "professor_id": f"eq.{int(professor_id)}",
+            "status": "in.(pendente,processando,aguardando_confirmacao)",
+            "limit": "1",
+        })
+        return bool(r)
+    except Exception as exc:  # noqa: BLE001
+        log("promessa_fluxo_indeterminado", professor_id=professor_id,
+            error=str(exc)[:160])
+        return True
+
+
+def _sem_promessa_vazia(row: Dict[str, Any], prompt: str, resposta: str,
+                        professor_id: int, channel: str) -> str:
+    """Item 4 do Alf: fechar a boca quando não há ferramenta que cumpra.
+
+    Por que aqui e não no prompt: `CAPACIDADE_PROFESSOR` existe desde 10/08 e
+    começa com "leia antes de prometer qualquer coisa" — e, medido sobre as 281
+    respostas a professor dos últimos 60 dias, o Fábio prometeu 7 vezes mesmo
+    assim. Prompt é probabilístico.
+
+    Uma regeneração só, com instrução curta. Se a segunda ainda prometer, cai
+    numa frase fixa — nunca se edita o texto do modelo pela metade.
+    """
+    if PROMESSA_MODO == "off" or not resposta:
+        return resposta
+    achado = classificar_promessa(resposta, _ha_fluxo_pendente(row))
+    if not achado:
+        return resposta
+
+    log("promessa_sem_fluxo", professor_id=professor_id, modo=PROMESSA_MODO,
+        tipo=achado["tipo"], gatilho=achado["gatilho"], tentativa=1,
+        trecho=str(resposta)[:200])
+    if PROMESSA_MODO == "shadow":
+        return resposta
+
+    try:
+        segunda = run_hermes_api(prompt + CORRECAO_PROMESSA,
+                                 professor_id=professor_id, channel=channel)
+    except Exception as exc:  # noqa: BLE001
+        log("promessa_regeneracao_falhou", professor_id=professor_id,
+            error=str(exc)[:200])
+        return FRASE_HONESTA
+
+    de_novo = classificar_promessa(segunda, _ha_fluxo_pendente(row))
+    log("promessa_regenerada", professor_id=professor_id, tentativa=2,
+        ainda_prometeu=de_novo is not None,
+        tipo=None if not de_novo else de_novo["tipo"],
+        trecho=str(segunda)[:200])
+    return FRASE_HONESTA if de_novo else segunda
+
+
 def generate_answer(row: Dict[str, Any]) -> tuple[str, str]:
     tipo = row.get("identidade_tipo") or "professor"
     text = row.get("content") or row.get("media_extracted_text") or ""
@@ -2635,7 +2723,8 @@ def generate_answer(row: Dict[str, Any]) -> tuple[str, str]:
         return run_hermes_oneshot(prompt), "hermes_cli_admin"
 
     try:
-        return run_hermes_api(prompt, professor_id=professor_id, channel=channel), "hermes_api"
+        bruta = run_hermes_api(prompt, professor_id=professor_id, channel=channel)
+        return _sem_promessa_vazia(row, prompt, bruta, professor_id, channel), "hermes_api"
     except Exception as e:
         log("hermes_api_failed", professor_id=professor_id, usuario_id=usuario_id,
             identidade_tipo=tipo, channel=channel, error=str(e)[-800:])
