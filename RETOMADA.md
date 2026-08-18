@@ -57,6 +57,49 @@
 > ---
 
 
+> # 🧠 ITEM 1 (MEMORIA PEDAGOGICA) — JA EXISTE. O BURACO E OUTRO (18/08)
+>
+> **NAO construir.** Fui escrever a RPC e o `pedagogical_prefetch` ja devolve
+> `ultima_aula_cronologica` e `ultimo_registro_com_conteudo`, e o intent ja casa
+> "conteudo da ultima", "relembrar", "ultima aula".
+>
+> Eu tinha inferido o buraco de a PERGUNTA existir, nao de a resposta ser ruim —
+> medir a maquina em vez da verdade. Fui ler a conversa real (Matheus, 14/07):
+>
+> | quem | o que disse |
+> |---|---|
+> | prof | "qual o conteudo da ultima aula da Luiza, pra eu relembrar aqui?" |
+> | Fabio | "Tenho duas aulas da Luiza hoje: Teclado 14h e Canto 15h. Qual delas?" |
+> | prof | "a de canto" |
+> | Fabio | "Pra Luiza em Canto eu nao tenho o conteudo registrado pra te devolver com seguranca. Pra nao inventar: [4 passos de retomada]" |
+>
+> Ele **desambiguou o curso** e **se recusou a inventar**. Conferido no banco:
+> **zero registros da Luiza antes de 14/07**. O Fabio falou a verdade.
+>
+> ## O buraco real: nao ha o que lembrar
+>
+> `vw_aderencia_registro_professor`:
+>
+> | mes | aulas | com registro | cobertura | via Fabio |
+> |---|---|---|---|---|
+> | jun | 4.874 | 2.138 | **43,9%** | 0 |
+> | jul | 3.384 | 798 | **23,6%** | 17 |
+> | ago | 2.581 | 718 | **27,8%** | 179 |
+>
+> ~72% das aulas de agosto sem registro nenhum. Construir consulta de memoria
+> pedagogica seria plugar numa tabela vazia 3 de cada 4 vezes.
+>
+> ⚠️ Precisao do que eu afirmo: a view conta se existe REGISTRO, nao se ele tem
+> conteudo pedagogico util. O numero de conteudo aproveitavel e <= 27,8%.
+>
+> O canal do Fabio cresce (0 -> 17 -> 179) mas ainda e 1/4 dos registros. A
+> alavanca de "o professor consegue relembrar" e **registro acontecendo** — que
+> e exatamente onde caiu o trabalho do dia inteiro (parser, promessa, guarda da
+> confirmacao, tremida).
+>
+> ---
+
+
 > # 🤐 ITEM 4 — A BOCA DO FABIO, FECHADA NO AR (18/08)
 >
 > Commits `6e4764b` (tranca) + `12dcb55` (acao). Deployado, bridge no ar.
