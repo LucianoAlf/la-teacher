@@ -1,5 +1,50 @@
 # RETOMADA — LA Teacher
 
+> # 🟢 "PIOROU?" DO ISAQUE — MEDIDO: nada perdido, sem regressão nossa (18/08 noite)
+>
+> O Alf mandou os prints achando que a gente quebrou o Fábio. **Não quebramos.**
+> Medido no log + banco:
+> - **Único crash de hoje = 15:07** (`fabio_iniciar_acao_recusado`), o incidente
+>   fantasma de ANTES do fix `806869f`. Depois do fix: **zero crash** a tarde
+>   inteira. E às 16:49 o `audio_parked_pending` (nossa peça) funcionou.
+> - **Nada perdido:** 4 áudios de hoje (Hugo/Arthur/Nicolas/Caio) intactos na fila
+>   de parqueados; registro do Arthur salvo.
+>
+> **O que estava travando (tudo pré-existente):** UMA ação `confirmar_registro`
+> aberta (Arthur 15h) segurava a fila — cada áudio novo parqueava atrás dela e o
+> Isaque não confirmava porque brigava com o "solfejo". E o Fábio **mentia** duas
+> vezes: "Grava" (17:01) e "Tira solfejo" (16:54) caíam em `conversa` → o LLM
+> dizia "gravei"/"corrigido" e a máquina NÃO fazia nada (log: `code=conversation`;
+> `fabio_registro_correcoes` vazia).
+>
+> ## ✅ DESTRAVADO (operacional, provado no Emusys)
+> Corrigi os campos do Arthur (Dó Ré Mi Fá = música, tirei solfejo) → gravei via
+> `fabio_confirmar_registro` → fechei a ação (`fabio_acao_ativa(10)` =
+> `sem_acao_ativa`). Anotação no Emusys: `tem_solfejo=false, tem_musica=true`.
+>
+> ## ✅ CONSERTO NO AR (`52c86a1`, deployado + bridge reiniciado)
+> `interpretar_resposta_pendente` agora OUVE:
+> - **"grava"/"grave"/"gravar" → confirmar** (a trava do "sim seguro" segue).
+> - **"tira X"/"troca X"/"corrige" → correcao**; e `_correction_output` parou de
+>   despejar o texto no `objetivo` (corrompia o rascunho) → sem extrator, responde
+>   HONESTO "qual aluno e informação?". Sem mentira, sem corrupção.
+> - Bônus: guard `__main__` do teste_intents movido pro fim — **16 testes não
+>   rodavam** sob o runner da casa (54→70). Ver [[guard-main-no-meio-esconde-testes-do-runner]].
+> Provas: intents 77/77, actions 74/74, 4/4 mutantes na VPS, fantasma 6/6.
+>
+> ## PENDENTE desta frente
+> - **Os 4 áudios parqueados drenam na próxima mensagem do Isaque** (um a um, cada
+>   um pede confirmação). Avisar: "manda qualquer mensagem que entram".
+> - **Aplicar de verdade a correção de conteúdo por chat** ("move Dó Ré Mi Fá
+>   sozinho") = próxima feature, precisa de extrator estruturado (padrão passada A).
+> - **O engarrafamento** (professor manda vários áudios com uma pendência aberta)
+>   segue aberto — é o problema ①, design maior.
+> - **`histórico da turma` do manual só mostra repertório** (investigado antes):
+>   fork A/B aguardando tua chamada.
+>
+> ---
+
+
 > # 🔍 VARREDURA: quanto trabalho de professor se perdeu em silêncio (18/08)
 >
 > Depois dos relatos do Isaque e do Matheus, o Alf mandou varrer o corpus antes
