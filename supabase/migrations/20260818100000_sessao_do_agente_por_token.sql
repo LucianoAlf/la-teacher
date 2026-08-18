@@ -27,7 +27,13 @@ create table if not exists public.fabio_agente_sessoes (
   -- Só o hash. O token cru existe uma vez, na resposta da cunhagem.
   token_hash text not null unique,
   professor_id integer not null,
-  -- De qual mensagem esta capacidade nasceu: dá rastro sem guardar segredo.
+  -- ⚠️ AUDITORIA, NÃO VÍNCULO (revisão do Alfredo, item 7).
+  -- De qual mensagem esta capacidade nasceu. NÃO é validado na resolução, e
+  -- não tem como ser: a chamada de ferramenta chega ao banco sem nenhuma
+  -- referência de conversa — a descoberta de MCP do Hermes é global e sem
+  -- contexto de sessão (`hermes_cli/mcp_startup.py`). Prometer "vínculo com a
+  -- conversa" seria escrever uma garantia que ninguém checa. O que segura é
+  -- TTL curto + teto de usos + escopo da RPC.
   origem_mensagem_id uuid,
   criado_em timestamptz not null default now(),
   expira_em timestamptz not null,
@@ -114,6 +120,9 @@ as $function$
 declare
   v_hash text;
   v_sessao public.fabio_agente_sessoes%rowtype;
+  v_professor integer;
+  v_usos integer;
+  v_max_usos integer;
 begin
   if nullif(btrim(coalesce(p_token, '')), '') is null then
     return jsonb_build_object('ok', false, 'codigo', 'token_ausente');
@@ -121,37 +130,47 @@ begin
 
   v_hash := encode(extensions.digest(btrim(p_token), 'sha256'), 'hex');
 
-  -- `for update`: duas ferramentas na mesma resposta nao podem consumir o
-  -- mesmo uso duas vezes e passar do teto sem ninguem ver.
+  -- CONSUMO ATÔMICO (revisão do Alfredo, item 6).
+  --
+  -- A validação e o consumo são UMA instrução: as condições vivem no `where`,
+  -- então duas ferramentas disparadas na mesma resposta não conseguem ler o
+  -- mesmo `usos` e gravar o mesmo incremento. A versão anterior lia com
+  -- `for update` e decidia em PL/pgSQL — correta sob lock, mas a garantia
+  -- dependia de eu ter posto o lock no lugar certo. Aqui ela é do motor.
+  update public.fabio_agente_sessoes s
+     set usos = s.usos + 1
+   where s.token_hash = v_hash
+     and s.revogado_em is null
+     and s.expira_em > now()
+     and s.usos < s.max_usos
+  returning s.professor_id, s.usos, s.max_usos
+       into v_professor, v_usos, v_max_usos;
+
+  if found then
+    return jsonb_build_object(
+      'ok', true,
+      'professor_id', v_professor,
+      'assinatura', left(v_hash, 8),
+      'usos', v_usos,
+      'max_usos', v_max_usos
+    );
+  end if;
+
+  -- Não consumiu. Agora sim uma leitura, só para DIZER O MOTIVO — ela não
+  -- decide nada: a porta já fechou acima.
   select * into v_sessao
     from public.fabio_agente_sessoes
-   where token_hash = v_hash
-   for update;
+   where token_hash = v_hash;
 
   if not found then
     return jsonb_build_object('ok', false, 'codigo', 'token_desconhecido');
-  end if;
-  if v_sessao.revogado_em is not null then
+  elsif v_sessao.revogado_em is not null then
     return jsonb_build_object('ok', false, 'codigo', 'token_revogado');
-  end if;
-  if v_sessao.expira_em <= now() then
+  elsif v_sessao.expira_em <= now() then
     return jsonb_build_object('ok', false, 'codigo', 'token_expirado');
-  end if;
-  if v_sessao.usos >= v_sessao.max_usos then
+  else
     return jsonb_build_object('ok', false, 'codigo', 'token_esgotado');
   end if;
-
-  update public.fabio_agente_sessoes
-     set usos = usos + 1
-   where id = v_sessao.id;
-
-  return jsonb_build_object(
-    'ok', true,
-    'professor_id', v_sessao.professor_id,
-    'assinatura', left(v_hash, 8),
-    'usos', v_sessao.usos + 1,
-    'max_usos', v_sessao.max_usos
-  );
 end
 $function$;
 
@@ -187,4 +206,10 @@ revoke all on function public.fabio_agente_revogar_sessao(uuid)
   from public, anon, authenticated, service_role;
 grant execute on function public.fabio_agente_revogar_sessao(uuid) to service_role;
 
-revoke all on table public.fabio_agente_sessoes from public, anon, authenticated;
+-- Item 2 da revisao do Alfredo: revogacao EXPLICITA, service_role incluso.
+-- O Supabase concede por padrao a service_role; foi assim que a camada
+-- append-only quase nasceu frouxa em 15/08. `fabio_professor_agente` e
+-- revogado na migration do papel (20260818110000), logo que ele existe —
+-- nao da pra revogar de um papel que ainda nao foi criado.
+revoke all on table public.fabio_agente_sessoes
+  from public, anon, authenticated, service_role;
