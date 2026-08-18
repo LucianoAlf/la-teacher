@@ -1,5 +1,64 @@
 # RETOMADA — LA Teacher
 
+> # 🔍 VARREDURA: quanto trabalho de professor se perdeu em silêncio (18/08)
+>
+> Depois dos relatos do Isaque e do Matheus, o Alf mandou varrer o corpus antes
+> de seguir. **Resposta: dois casos em 45 dias, os dois já conhecidos.** Nenhum
+> terceiro escondido.
+>
+> | professor | quando | o que o Fábio disse | o que aconteceu |
+> |---|---|---|---|
+> | Matheus (25) | 17/08 13:33 | *"Confirmação recebida — estou finalizando o registro da aula da Valentina"* | **nada foi gravado**; ele refez às 20:07 |
+> | Isaque (10) | 15/08 16:56 | *"Ajustei: a aula das 14h foi da Juliana… Posso gravar?"* | gravou a aula **ERRADA** (13h) |
+>
+> ⚠️ **A primeira régua que eu escrevi deu 16 casos, e 15 eram falsos positivos.**
+> 14 eram o **worker de recibo** carimbando registros da véspera em lote (existem,
+> só foram confirmados fora da janela de ±45 min), e 1 era
+> *"Cancelei essa ação. **Nada foi gravado** no prontuário"* — o oposto de uma
+> promessa, pego por filtro de negação incompleto. A assinatura do defeito real é
+> a fala **conversacional** do LLM, nunca o carimbo estruturado (`✅ Registro
+> confirmado …`) que a máquina emite.
+>
+> **Limite honesto:** a régua procura frases (`confirmação recebida`, `ajustei`,
+> `finalizando o registro`, `posso gravar`…). Se o LLM prometer com outras
+> palavras, ela não pega. E ela mede "houve registro por perto", então no caso do
+> Isaque marcou ✅ — houve registro, só que da aula errada.
+>
+> ## Isaque — o que sumiu, medido
+> As aulas de **15/08 14h (Jeremias)** e **15h (Marcelo)** só têm registro criado
+> em **18/08 09:02 e 09:03, manualmente por ele**. Os do WhatsApp nunca
+> existiram. Causa: o "duas bocas" já consertado (`524b4d2`, `dcafebf`,
+> `db8932d`).
+>
+> ## Matheus — dois problemas no mesmo dia
+> 1. **13:29** — áudio com o parecer inteiro da Valentina. Não existia ação
+>    nenhuma (a 1ª do dia foi 20:04) e o áudio **nunca foi enfileirado**
+>    (`fabio_fila_audios` só tem linha a partir das 20:04). O LLM inventou o
+>    fluxo inteiro, inclusive a confirmação.
+> 2. **22:25** — rascunho órfão da mesma aula (a de 20:07 já estava gravada).
+>    **DESCARTADO em 18/08** (tronco `124f4129…` + fatia), com guarda de status
+>    pra não encostar no gravado. O bom seguiu intacto: `gravado_emusys`, 1
+>    devolutiva.
+>
+> ⚠️ **O que eu NÃO sei:** por que a máquina não assumiu o áudio das 13:29. Três
+> hipóteses morreram medindo — não foi lote (`batch_count: 1`), não foi o
+> break-out da consulta (`parece_consulta_letiva` dá **False** na fala real dele)
+> e não foi o modo do canal (está `on`). Rodando a **transcrição real** contra o
+> código de hoje, ela vira `audio_enqueued` corretamente. O build daquele minuto
+> subiu 13:55 UTC e a `d05d959` só entrou às 16:43 UTC — 14 min depois.
+>
+> **Conserto do que impedia investigar** (`a46f23d`, no ar): a recusa da máquina
+> era **silenciosa**. Agora toda recusa vira `whatsapp_registro_nao_assumiu` com
+> kind, code e prévia. Se repetir, eu vejo em vez de deduzir.
+>
+> ## PENDENTE
+> - A "tremida ao digitar" no formulário de registro (relato do Matheus, 20:55)
+>   — **não olhei ainda**.
+> - Avisar Isaque e Matheus que o caminho está consertado.
+>
+> ---
+
+
 > # 🔴→🟢 O "SIM" QUE GRAVOU A AULA ERRADA — 3 camadas CONSERTADAS (17/08)
 >
 > **O incidente**, reconstruído do banco + log da VPS (professor **Isaque, 10**,
@@ -614,9 +673,11 @@
 > cd vps/fabio && python -m unittest teste_whatsapp_actions      # 36 testes
 > # deployar:
 > scp -i ~/.ssh/id_ed25519_lahq_fabio_claude_code vps/fabio/ARQ.py fabio@89.116.73.186:~/fabio-chat-bridge/
-> ssh ... 'cd ~/fabio-chat-bridge && sed -i "s/$//" ARQ.py >   && /home/fabio/.hermes/hermes-agent/venv/bin/python -m unittest teste_whatsapp_actions >   && systemctl --user restart fabio-chat-bridge.service'
+> ssh ... 'cd ~/fabio-chat-bridge && sed -i "s/
+$//" ARQ.py >   && /home/fabio/.hermes/hermes-agent/venv/bin/python -m unittest teste_whatsapp_actions >   && systemctl --user restart fabio-chat-bridge.service'
 > ```
-> ⚠️ `sed -i "s/$//"` é obrigatório: o repo é CRLF. Backups `.bak-laco-isaque-*`
+> ⚠️ `sed -i "s/
+$//"` é obrigatório: o repo é CRLF. Backups `.bak-laco-isaque-*`
 > ficaram na VPS. O `fabio-aviso-comercial.timer` foi parado e **religado**
 > (`active`) — conferir se algum dia parecer mudo.
 >
