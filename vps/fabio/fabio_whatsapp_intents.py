@@ -566,6 +566,46 @@ _MESES = {
 _DATA_MES_EXTENSO = re.compile(
     rf"\b(\d{{1,2}})\s+de\s+({'|'.join(_MESES)})\b")
 
+# O MÊS É DITO UMA VEZ, NO FIM — é assim que brasileiro fala intervalo.
+#
+# Medido em produção em 18/08/2026: "quantas aulas eu dei de 11 a 15 de agosto?"
+# resolvia para 15/08–15/08, e o Fábio devolvia a conta de UM dia para uma
+# pergunta de cinco. As regras acima exigem o mês colado em CADA dia, então o
+# `11` ficava órfão, sobrava uma data só, e uma data só vira inicio == fim.
+# Valia igual para "entre 11 e 15 de agosto" e "do dia 11 ao dia 15 de agosto",
+# e também para faltas.
+#
+# `(?<![\d/-])` impede que o primeiro número seja pedaço de uma data digitada:
+# sem ele, "de 11/08 a 15/08" leria o "08" como dia inicial e o período viraria
+# 08/08–15/08 — quebraria a forma que já funcionava para consertar a que não.
+#
+# `as` fica DE FORA da lista de conectores de propósito: "das 8 as 10 da manhã"
+# é horário, não intervalo de dias. Sem período reconhecido o contrato é
+# PERGUNTAR, que é melhor do que inventar mês para um horário.
+_INTERVALO_MES_UMA_VEZ = re.compile(
+    rf"(?<![\d/-])\b(\d{{1,2}})\s+(?:a|ate|ao|e)\s+(?:o\s+)?(?:dia\s+)?"
+    rf"(\d{{1,2}})\s+d[eo]\s+({'|'.join(_MESES)}|\d{{1,2}})\b")
+
+# Mesma família: "de 11 a 15/08" — o mês só aparece grudado no fim do intervalo.
+_INTERVALO_ATE_DATA_DIGITADA = re.compile(
+    r"(?<![\d/-])\b(\d{1,2})\s+(?:a|ate|ao|e)\s+(?:o\s+)?(?:dia\s+)?"
+    r"(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b")
+
+
+_MES_DE_DATA_ANTERIOR = re.compile(r"\d{1,2}\s+d[eo]\s+$")
+
+
+def _e_mes_de_data_anterior(hay: str, inicio: int) -> bool:
+    """O número que abre o intervalo é, na verdade, o MÊS da data anterior?
+
+    Pego por um teste que já existia, ao consertar o intervalo de mês dito uma
+    vez: em "de 11 de 8 ate 15 de 8" o padrão casava a partir do `8` de
+    "11 de 8" e o período virava 08/08–15/08. O `(?<![\\d/-])` do padrão não
+    alcança isso porque aqui o número vem depois de um ESPAÇO, não de barra —
+    e o `re` do Python não aceita lookbehind de largura variável.
+    """
+    return bool(_MES_DE_DATA_ANTERIOR.search(hay[:inicio]))
+
 
 def _data_de(dia: str, mes: str, ano: str | None, hoje: date) -> date | None:
     try:
@@ -587,13 +627,26 @@ def resolver_periodo(texto: str, hoje: date) -> tuple[date, date] | None:
 
     # 1) datas explícitas, nas TRÊS formas que aparecem de verdade:
     #    digitada ("de 11/08 até 15/08"), falada ("do dia 11 do 8 até o dia 15
-    #    do 8" — o Valdo, por áudio) e mês por extenso ("11 de agosto").
+    #    do 8" — o Valdo, por áudio) e mês por extenso ("11 de agosto"), mais o
+    #    intervalo em que o mês aparece UMA vez ("de 11 a 15 de agosto").
     #    Data impossível ("32 do 13") continua devolvendo None em vez de virar
     #    data torta: `_data_de` recusa, e sem período o contrato é PERGUNTAR.
     brutas = list(_DATA_EXPLICITA.findall(hay))
     brutas += [(dia, mes, None) for dia, mes in _DATA_FALADA.findall(hay)]
     brutas += [(dia, str(_MESES[mes]), None)
                for dia, mes in _DATA_MES_EXTENSO.findall(hay)]
+    # As duas pontas do intervalo herdam o MESMO mês, dito uma vez só.
+    for m in _INTERVALO_MES_UMA_VEZ.finditer(hay):
+        if _e_mes_de_data_anterior(hay, m.start()):
+            continue
+        d1, d2, mes = m.groups()
+        numero = str(_MESES[mes]) if mes in _MESES else mes
+        brutas += [(d1, numero, None), (d2, numero, None)]
+    for m in _INTERVALO_ATE_DATA_DIGITADA.finditer(hay):
+        if _e_mes_de_data_anterior(hay, m.start()):
+            continue
+        d1, d2, mes, ano = m.groups()
+        brutas += [(d1, mes, ano or None), (d2, mes, ano or None)]
     achadas = [d for d in (_data_de(dia, mes, ano, hoje)
                            for dia, mes, ano in brutas)
                if d is not None]

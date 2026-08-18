@@ -521,3 +521,105 @@ class DataFaladaTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class IntervaloComMesDitoUmaVezTest(unittest.TestCase):
+    """O jeito brasileiro de falar intervalo: o mês vem UMA vez, no fim.
+
+    Medido em produção em 18/08/2026, com a pergunta canônica do Valdo:
+    "quantas aulas eu dei de 11 a 15 de agosto?" saía
+    `inicio=2026-08-15 fim=2026-08-15` e o Fábio respondia "consultei o dia
+    15/08: foram 7 aulas" — a pergunta era de cinco dias. O `11` ficava órfão
+    porque `_DATA_MES_EXTENSO` exige o mês colado em CADA dia.
+
+    O número errado chegava ao professor com cara de resposta certa; só o
+    guardrail que obriga a dizer o período consultado impedia a mentira lisa.
+    """
+
+    HOJE = date(2026, 8, 18)
+
+    def _periodo(self, frase):
+        return resolver_periodo(frase, self.HOJE)
+
+    def test_de_11_a_15_de_agosto(self):
+        self.assertEqual(self._periodo("quantas aulas eu dei de 11 a 15 de agosto?"),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_entre_11_e_15_de_agosto(self):
+        self.assertEqual(self._periodo("quantas aulas eu dei entre 11 e 15 de agosto?"),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_do_dia_11_ao_dia_15_de_agosto(self):
+        self.assertEqual(self._periodo("quantas aulas dei do dia 11 ao dia 15 de agosto?"),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_ate_com_mes_por_extenso(self):
+        self.assertEqual(self._periodo("quantas aulas eu dei de 11 até 15 de agosto?"),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_mesma_falha_na_forma_falada_do_mes(self):
+        # O Whisper escreve o mês como número: "de 11 a 15 do 8".
+        self.assertEqual(self._periodo("quantas aulas eu dei de 11 a 15 do 8?"),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_mesma_falha_quando_so_o_fim_e_data_digitada(self):
+        # "de 11 a 15/08" — o mês também é dito uma vez só.
+        self.assertEqual(self._periodo("quantas aulas eu dei de 11 a 15/08?"),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_vale_para_faltas_tambem(self):
+        consulta = extrair_consulta_letiva(
+            "quantas faltas tive de 11 a 15 de agosto?", self.HOJE, [])
+        self.assertEqual(consulta["metrica"], "presencas")
+        self.assertEqual((consulta["inicio"], consulta["fim"]),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_intervalo_de_varios_dias_tira_a_pergunta_do_atalho(self):
+        # O atalho só sabe UM dia; com o período certo ele tem que se calar.
+        self.assertTrue(consulta_vence_atalho(
+            "quantas aulas eu dei de 11 a 15 de agosto?", self.HOJE, []))
+
+    # ── as formas que JÁ funcionavam não podem quebrar ────────────────────
+    def test_nao_quebra_data_digitada_completa(self):
+        self.assertEqual(self._periodo("quantas aulas eu dei de 11/08 a 15/08?"),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_nao_quebra_dia_unico(self):
+        self.assertEqual(self._periodo("quantas aulas eu dei dia 11 do 8?"),
+                         (date(2026, 8, 11), date(2026, 8, 11)))
+
+    def test_nao_quebra_semana_passada(self):
+        self.assertEqual(self._periodo("quantas aulas eu dei na semana passada?"),
+                         (date(2026, 8, 10), date(2026, 8, 16)))
+
+    # ── o que NÃO pode virar data ─────────────────────────────────────────
+    def test_faixa_de_horario_nao_e_intervalo_de_dias(self):
+        # "das 8 as 10" é horário; virar 08/?? a 10/?? seria inventar período.
+        self.assertIsNone(self._periodo("quantas aulas eu dei das 8 as 10 da manha?"))
+
+    def test_mes_da_data_anterior_nao_vira_dia_inicial(self):
+        # Regressao que o meu proprio padrao criou e um teste antigo pegou:
+        # em "de 11 de 8 ate 15 de 8" ele casava a partir do `8` de "11 de 8"
+        # e o periodo virava 08/08-15/08.
+        self.assertEqual(self._periodo("quantas aulas de 11 de 8 ate 15 de 8?"),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_mes_de_data_digitada_nao_abre_o_intervalo(self):
+        # Trava que o mutante 2 mostrou que eu AFIRMAVA sem provar. Em
+        # "de 11/8 a 15 de agosto" o `8` de "11/8" e mes, nao dia inicial;
+        # sem o lookbehind do padrao o periodo viraria 08/08-15/08.
+        self.assertEqual(self._periodo("quantas aulas eu dei de 11/8 a 15 de agosto?"),
+                         (date(2026, 8, 11), date(2026, 8, 15)))
+
+    def test_faixa_de_horario_nao_vira_intervalo_de_dias(self):
+        # Trava que o mutante 4 mostrou que eu AFIRMAVA sem provar: `as` fica
+        # fora dos conectores porque "das 8 as 10" e HORARIO. Com ele na lista,
+        # "das 8 as 10 de agosto" viraria um periodo de tres dias (08 a 10/08).
+        # O 10/08 abaixo vem do mes por extenso e e comportamento anterior a
+        # esta mudanca — o que se prova aqui e que nao virou intervalo.
+        self.assertEqual(self._periodo("quantas aulas eu dei das 8 as 10 de agosto?"),
+                         (date(2026, 8, 10), date(2026, 8, 10)))
+
+    def test_dia_impossivel_continua_sem_periodo(self):
+        # Sem período o contrato é PERGUNTAR, nunca chutar.
+        self.assertIsNone(self._periodo("quantas aulas eu dei de 32 a 35 de agosto?"))
