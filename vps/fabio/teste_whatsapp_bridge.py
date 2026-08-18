@@ -1067,6 +1067,25 @@ class BridgeIntegrationTest(unittest.TestCase):
         self.assertIsNotNone(vistas[0], "o LLM respondeu sem saber da acao aberta")
         self.assertEqual(vistas[0]["id"], "acao-1")
 
+    def test_recusa_da_maquina_deixa_rastro_no_log(self):
+        """O silêncio foi o que impediu a investigação do caso do Matheus.
+
+        17/08: um áudio com o parecer inteiro da aula chegou, a máquina devolveu
+        handled=False, o LLM respondeu "Confirmação recebida — estou finalizando
+        o registro" e nada foi gravado. No log dava pra ver o áudio entrando e a
+        resposta saindo — e NADA no meio. Recusa sem rastro é defeito invisível.
+        """
+        row = professor_row(kind="audio", text="parecer da aula da Valentina, repertorio Monalisa")
+        bridge.WHATSAPP_REGISTRO_MODE = "on"
+        eventos = []
+        with patch.object(bridge, "tratar_mensagem_professor",
+                          return_value={"handled": False, "code": "conversation"}),              patch.object(bridge, "log", side_effect=lambda msg, **kw: eventos.append((msg, kw))):
+            self.assertIsNone(bridge.try_handle_whatsapp_action(row))
+        recusas = [kw for msg, kw in eventos if msg == "whatsapp_registro_nao_assumiu"]
+        self.assertEqual(len(recusas), 1)
+        self.assertEqual(recusas[0]["kind"], "audio")
+        self.assertIn("Valentina", recusas[0]["previa"])
+
     def test_multi_message_batch_bypasses_new_action_path(self):
         first = professor_row(kind="audio", text="trabalhei ritmo")
         second = dict(professor_row(kind="audio", text="trabalhei repertório"), id="chat-2", wa_message_id="wa-2")

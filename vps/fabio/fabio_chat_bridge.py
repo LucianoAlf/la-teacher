@@ -3315,6 +3315,27 @@ def try_handle_whatsapp_action(row: Dict[str, Any]) -> Optional[bool]:
         return None
     result = tratar_mensagem_professor(_whatsapp_action_context(row), FabioBridgeBackend())
     if not result.get("handled"):
+        # A RECUSA TAMBEM E DECISAO, E PRECISA APARECER.
+        #
+        # 17/08, professor 25: um audio com o parecer inteiro da aula chegou, a
+        # maquina devolveu handled=False, o LLM respondeu sozinho e disse
+        # "Confirmacao recebida — estou finalizando o registro". Nada foi
+        # gravado. Ao investigar, o log nao tinha UMA linha dessa decisao: deu
+        # pra ver o audio entrando e a resposta do LLM saindo, e nada no meio.
+        # Tres hipoteses minhas morreram sem resposta por falta deste registro.
+        #
+        # Audio e o caso grave: ali sempre existe conteudo de aula que alguem
+        # ditou, e "nao e comigo" significa que esse conteudo vai virar conversa
+        # em vez de prontuario.
+        log(
+            "whatsapp_registro_nao_assumiu",
+            id=row.get("id"),
+            professor_id=row.get("professor_id"),
+            kind=row.get("kind"),
+            code=result.get("code"),
+            tem_acao=bool(result.get("action_id")),
+            previa=str(row.get("media_extracted_text") or row.get("content") or "")[:160],
+        )
         return None
     reply = result.get("reply")
     if reply:
