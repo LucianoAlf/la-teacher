@@ -40,7 +40,14 @@ from fabio_whatsapp_intents import (
     classificar_intencao_texto,
     consulta_vence_atalho,
     montar_chamada_consulta,
+    chamada_do_pedido,
     parece_consulta_letiva,
+)
+from fabio_consulta_fallback import (  # noqa: E402
+    deve_tentar_fallback,
+    montar_prompt_pedido,
+    motivo_da_recusa,
+    validar_pedido,
 )
 from fabio_registro_normalization_contract import sanear_readback_para_preview
 
@@ -2871,11 +2878,70 @@ def _carregar_acao_ativa(row: Dict[str, Any]) -> None:
         log("carregar_acao_ativa_falhou", professor_id=professor_id, error=str(exc)[:200])
 
 
+CONSULTA_FALLBACK_MODO = (os.getenv("FABIO_CONSULTA_FALLBACK_MODO", "shadow")
+                          .strip().lower())
+if CONSULTA_FALLBACK_MODO not in {"off", "shadow", "on"}:
+    CONSULTA_FALLBACK_MODO = "off"     # valor estranho fecha, nunca abre
+
+
+def _passada_a(row: Dict[str, Any], hoje: date, unidades: list) -> Optional[Dict[str, Any]]:
+    """Passada A — a rede de segurança, SÓ quando o determinístico volta vazio.
+
+    Contrato do Alf (18/08/2026): o modelo diz O QUE consultar, nunca DE QUEM.
+    `p_professor_id` sai de `row["professor_id"]` via `chamada_do_pedido`, e o
+    schema da passada não tem campo de identidade — se vier um, `validar_pedido`
+    rejeita o payload inteiro em vez de limpar e seguir.
+
+    Nasce em `shadow`: calcula, loga e NÃO injeta. Motivo medido — no corpus de
+    60 dias (165 mensagens de professor), depois do conserto do parser em
+    `ce46ad7` não sobrou consulta que A resgataria; as que só um gate largo
+    pegaria são registro de aula e carteira. Ligar antes de medir seria pagar
+    ~7s por uma rede que talvez não pegue nada. `on` quando o log disser que sim.
+    """
+    if CONSULTA_FALLBACK_MODO == "off":
+        return None
+    texto = str(row.get("content") or row.get("media_extracted_text") or "")
+    if not deve_tentar_fallback(texto):
+        return None
+    professor_id = row.get("professor_id")
+    try:
+        bruto = run_hermes_api(montar_prompt_pedido(texto, hoje),
+                               professor_id=professor_id, channel=row.get("channel"))
+    except Exception as exc:  # noqa: BLE001
+        log("consulta_fallback_erro", professor_id=professor_id, error=str(exc)[-200:])
+        return None
+
+    pedido = validar_pedido(bruto, hoje, unidades)
+    log("consulta_fallback",
+        professor_id=professor_id,
+        modo=CONSULTA_FALLBACK_MODO,
+        aceito=pedido is not None,
+        motivo=None if pedido else motivo_da_recusa(bruto),
+        # O bruto do modelo entra TRUNCADO e só quando foi recusado: é o que
+        # permite ver a deriva sem transformar o log num despejo de resposta.
+        bruto=None if pedido else str(bruto)[:200],
+        pedido=None if not pedido else {
+            "metrica": pedido["metrica"],
+            "inicio": pedido["inicio"].isoformat(),
+            "fim": pedido["fim"].isoformat(),
+            "unidade": pedido["unidade"],
+        },
+        texto=texto[:160])
+
+    if pedido is None or CONSULTA_FALLBACK_MODO != "on":
+        return None
+    return chamada_do_pedido(professor_id, pedido)
+
+
 def _bloco_consulta_letiva(row: Dict[str, Any]) -> str:
     """Consulta letiva do professor. Falha aqui nunca derruba o prompt."""
     try:
-        chamada = montar_chamada_consulta(
-            row, date.fromisoformat(today_brt()), _unidades_nomes())
+        hoje = date.fromisoformat(today_brt())
+        unidades = _unidades_nomes()
+        chamada = montar_chamada_consulta(row, hoje, unidades)
+        if not chamada:
+            # Item 3 do contrato: A só entra DEPOIS de o determinístico falhar.
+            chamada = _passada_a(row, hoje, unidades)
         if not chamada:
             # SILÊNCIO AQUI É O QUE PRODUZ A PROMESSA VAZIA.
             #

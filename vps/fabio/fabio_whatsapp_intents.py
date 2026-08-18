@@ -759,6 +759,20 @@ def montar_chamada_consulta(row: dict[str, Any], hoje: date,
     if not pedido:
         return None
 
+    return chamada_do_pedido(professor_id, pedido)
+
+
+def chamada_do_pedido(professor_id: Any, pedido: dict[str, Any]) -> dict[str, Any]:
+    """(rpc, payload) a partir de um pedido já validado — a ÚNICA porta da RPC.
+
+    Existe para que a passada A (`fabio_consulta_fallback`) dispare exatamente a
+    mesma consulta do caminho determinístico, em vez de repetir o nome da RPC e
+    o formato do payload num segundo lugar. Duas cópias da mesma régua é como
+    uma delas envelhece sem ninguém ver.
+
+    `p_professor_id` vem SEMPRE do argumento — que o bridge tira da linha. Nem
+    o texto do professor nem o modelo têm como influenciar este campo.
+    """
     payload: dict[str, Any] = {
         "p_professor_id": int(professor_id),
         "p_inicio": pedido["inicio"].isoformat(),
