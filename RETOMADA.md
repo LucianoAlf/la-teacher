@@ -57,6 +57,52 @@
 > ---
 
 
+> # 👻→🟢 A ACAO FANTASMA DO ISAQUE — CONSERTADA NO AR (18/08, tarde)
+>
+> Relato dele por print: mandou 3 aulas por audio, pediu "Confirma tudo", e o
+> Fabio respondeu "ainda nao sei de qual aula voce esta falando". Commit
+> `806869f`, deployado, bridge no ar, suite da VPS 8/8.
+>
+> **A historia, medida do log + banco:** uma `confirmar_intencao_audio` aberta
+> em **17/08 20:51** (nascida de um audio que era CONVERSA — "Nao, uma aula foi
+> sete horas com a Helena..." — e nunca respondida porque ele registrou pelo
+> app 20s depois) ficou **18h viva**. Hoje 14:58, os 3 audios limpos (Hugo 10h,
+> Arthur 11h, Nicolas 14h) foram **parqueados** mas cairam em "conversa" mudos
+> — o professor nunca soube do parking, o LLM respondeu bonito por cima. As
+> 15:07 o "Confirma tudo" confirmou a pergunta **de ontem**: a acao
+> transicionou, a maquina tentou abrir uma SEGUNDA acao
+> (`fabio_iniciar_acao_recusado`), **o poller morreu** e a mensagem ficou 3
+> minutos presa ate o stale reclaim.
+>
+> **Operacional (feito na hora, via RPC canonica com motivo):** fantasma
+> `8bf3a7d2` cancelada; audio parqueado da Helena de 17/08 descartado (aula
+> 298595 ja gravada via app). **Os 3 audios de hoje seguem parqueados** —
+> entram um a um na proxima mensagem dele (cada *sim* de confirmacao puxa o
+> proximo da fila).
+>
+> **Os 4 consertos** (todos com teste + mutante):
+> 1. confirmar_intencao continua na MESMA acao; shortlist vazia CANCELA em vez
+>    de deixar aberta — e assim que a fantasma nasce;
+> 2. a trava do "sim responde a quem perguntou" agora cobre confirmar_intencao_*
+>    e a repergunta CITA o audio em jogo;
+> 3. audio parqueado responde pela MAQUINA (guardei + qual pendencia + *cancela*);
+> 4. excecao na maquina vira resposta honesta, mensagem processada, forward=False.
+>
+> O duble de teste tambem: `fabio_iniciar_acao` agora RECUSA segunda acao,
+> como producao — era mais permissivo e foi por isso que o bug passou verde.
+> 71 testes, 6/6 mutantes por assercao na primeira rodada.
+>
+> ## PROXIMO: o relato novo do Isaque (15/08 so gravou repertorio)
+> Prints do Historico da turma: 15/08 com badge "ULTIMA AULA" mostrando SO
+> repertorio ("Marcelo: You wont see mee" / "Jeremias: Amor de filha"), sem
+> conteudo/objetivo — dias anteriores tem os tres campos. HIPOTESE a verificar
+> (nao conclusao): 15/08 foi o dia do incidente do "sim que gravou a aula
+> errada", e o formato "Nome: musica" tem cara do fluxo de CORRECAO. Medir nos
+> registros + fabio_registro_correcoes antes de afirmar qualquer coisa.
+>
+> ---
+
+
 > # 🧠 ITEM 1 (MEMORIA PEDAGOGICA) — JA EXISTE. O BURACO E OUTRO (18/08)
 >
 > **NAO construir.** Fui escrever a RPC e o `pedagogical_prefetch` ja devolve
