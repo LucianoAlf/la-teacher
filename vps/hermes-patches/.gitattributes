@@ -1,0 +1,4 @@
+# Estes arquivos rodam na VPS (Linux). CRLF quebra shell (^M) e o patch.
+# Força LF sempre, independente do core.autocrlf de quem clona.
+*.sh   text eol=lf
+*.patch text eol=lf

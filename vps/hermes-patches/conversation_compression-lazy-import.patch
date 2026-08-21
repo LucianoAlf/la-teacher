@@ -1,0 +1,26 @@
+diff --git a/agent/conversation_compression.py b/agent/conversation_compression.py
+index a2b2643bf..e72d6b48f 100644
+--- a/agent/conversation_compression.py
++++ b/agent/conversation_compression.py
+@@ -66,7 +66,9 @@ from datetime import datetime
+ from pathlib import Path
+ from typing import Any, Callable, Dict, List, Optional, Tuple
+
+-from agent.auxiliary_client import AuxiliaryExplicitCancellation
++# AuxiliaryExplicitCancellation e importado LAZY dentro de compress_context (unico uso).
++# auxiliary_client e um modulo enorme e pode estar meio-carregado quando este modulo
++# e importado pela via de replay de compressao -> ImportError re-entrante (medido 21/08/2026).
+ from agent.context_engine import (
+     automatic_compaction_status_message,
+     sanitize_memory_context,
+@@ -2272,6 +2274,10 @@ def compress_context(
+         prompt — the session is NOT rotated.  Callers should detect the
+         no-op via ``len(returned) == len(input)`` and stop the retry loop.
+     """
++    # Import lazy (runtime): auxiliary_client pode estar meio-carregado quando este
++    # modulo carrega pela via de replay de compressao -> ImportError re-entrante (21/08/2026).
++    # Em runtime a classe REAL ja existe (mesma identidade p/ raise/except).
++    from agent.auxiliary_client import AuxiliaryExplicitCancellation
+     _compressor_attempt_snapshot = _snapshot_compressor_attempt_state(
+         agent.context_compressor
+     )
