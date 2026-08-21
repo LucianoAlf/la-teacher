@@ -1,5 +1,59 @@
 # RETOMADA — LA Teacher
 
+> # ✅ DEFEITO ① (áudio sem-roster travava CALADO) — CONSERTADO na VPS + provado (21/08)
+>
+> **Sintoma:** Isaque grava guitarra 14h no app → nunca vira registro, e a cobrança
+> "sem registro" cai dias depois sem explicação nenhuma.
+>
+> **Causa-raiz (medida):** pipeline = app→fila→edge `fabio-registro-aula` (só
+> despachante: signed url + POST HMAC pro Hermes)→VPS Hermes transcreve+normaliza.
+> Na normalização, com o roster da aula vazio (`roster_invalido`), o tool
+> `fabio_registro_aula_tool.py` (branch linha 810) SÓ devolvia o motivo pro agente e
+> NÃO carimbava a fila. A linha ficava em `status='transcrito'`; o retry
+> (`fn_fabio_retry_fila`, jobid 34, exige `tentativas<3`) queimava 3 e abandonava
+> calado. E TODO o maquinário de aviso/retomada (que EXISTE e roda: worker
+> `fabio_notification_worker.py`, timer `fabio-sem-roster` a cada 15min, view
+> `vw_fila_audio_sem_roster`, `fn_fila_audio_retomar_por_roster`) exige `status IN
+> (erro, erro_terminal)` → nunca enxergava o áudio. O aviso `registro_sem_roster`
+> secou em 16/08 por isso (worker faminto: `{"results": []}` toda batida).
+>
+> **Fix (VPS, backup `fabio_registro_aula_tool.py.bak-sem-roster-20260821`):** a
+> branch de roster passa a chamar `fabio_atualizar_status_audio(audio_id,'erro',
+> f"normalizacao_invalida: {codigo}")` — igual à irmã (falha de RPC, que já fazia).
+> `erro`/`transitorio` é o ÚNICO par legal no CHECK `fabio_fila_audios_erro_tipo_check`
+> (pré-voo salvou o conserto: `erro_tipo='sem_roster'` era PROIBIDO pelo CHECK).
+> Teste RED→GREEN + mutante (erro→normalizado quebra) em
+> `~/fabio-tests/teste_roster_terminaliza.py`. Gateway reiniciado, sem erro de import.
+>
+> **Backfill:** áudio do Isaque (`3fe985d2-a698-44d4-b601-21ace6cbd747`, guitarra
+> G_Qui_14 20/08 14h, transcrição Blue/yung kai preservada) movido pra `status='erro'`.
+> Provado: entra em `fabio_fila_sem_roster_a_avisar(grace=0)` e a mensagem renderiza
+> pelo builder real ("Oi, Isaque! ... Seu áudio está guardado. Assim que a secretaria
+> lançar os alunos dessa turma, eu processo sozinho e te aviso"). O `fabio-sem-roster.timer`
+> envia sozinho após a graça de 30min.
+>
+> **Aluno (verificado no dado sincronizado — sync de hoje 03:05 UTC):** a turma de
+> guitarra do Isaque (G_Qui_14, quinta 14h) está com ZERO aluno. Único aluno de
+> guitarra dele = **Yuri Gomes Pereira (aluno_id 1852, emusys 3590, lead 14233,
+> nascido 2007)**: matrícula-base Canto, guitarra como LEAD; roster populou na aula
+> de 03/09 mas NÃO na de 20/08 (buraco de conciliação de lead). Antônio (722) migrou
+> pra Teclado. Pra a retomada auto-religar, o Yuri precisa ser conciliado na turma de
+> guitarra (coordenação/Emusys). NÃO fabriquei roster.
+>
+> **Daiana (prof 3) — NÃO é bug de servidor:** 17 áudios gravados no Emusys + 1 de
+> 20/08 aguardando ela tocar "Confirmar"; os 3 "não registrados" são rascunhos
+> MANUAIS que ela começou e não finalizou (15-19/08); os que ela acha que sumiram
+> nunca subiram do aparelho (client-side, não medível daqui). Falta: confiabilidade/
+> visibilidade de upload no celular (front — Daiana e Matheus).
+>
+> **PRÓXIMO PASSO:** (a) coordenação conciliar o Yuri na guitarra → a retomada fecha o
+> registro do Isaque sozinha; (b) front: confiabilidade/visibilidade de upload de
+> áudio no celular; (c) textos já entregues pro Alf mandar (Isaque + Daiana).
+>
+> ---
+
+
+
 > # 🟢 APP: experimental ia pra porta do aluno em 2 das 3 telas — CONSERTADO (20/08)
 >
 > Isaque, no APP (não WhatsApp): microfone da **aula do Thiago (experimental)**
