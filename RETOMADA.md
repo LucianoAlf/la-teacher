@@ -1,5 +1,44 @@
 # RETOMADA — LA Teacher
 
+> # ✅ BRIEFING: "última aula" agora é a última PRESENTE + aviso de falta (21/08)
+>
+> **Pedido do Isaque (via Alf):** no briefing matinal, quando o aluno faltou, a
+> linha vinha "✅ Trabalho feito: aluna ausente" (ou em branco) — inútil. Ele
+> precisa (a) saber que o aluno FALTOU na última, e (b) ver o conteúdo da última
+> aula em que o aluno esteve PRESENTE, pra relembrar o que deu.
+>
+> **Causa (medida):** `fabio_briefing_matinal` pegava a última aula com QUALQUER
+> conteúdo, sem excluir falta. Aluno em falta longa (Vanessa, Isaque/Piano:
+> `falta_confirmada` desde antes de 16/07) trazia a anotação do Emusys "aluna
+> ausente" como trabalho feito.
+>
+> **Fix (migration `20260821120000_briefing_ultima_aula_presente_e_aviso_de_falta`,
+> aplicada no banco + arquivo no repo):** a LATERAL da "última aula" agora exclui
+> `falta_confirmada`/`falta_provavel` (via `vw_aluno_presenca_semantica_v1`) — pega
+> a última PRESENÇA. E uma 2ª LATERAL devolve `faltou_data`/`faltou_recente`. O
+> worker (`fabio_notification_worker.py`, `_ultima_aula_lines`, backup
+> `.bak-faltou-20260821`) renderiza "⚠️ Faltou na última aula · data" + "última
+> aula presente · data" + conteúdo real.
+>
+> **Provado ao vivo (função temp __t21 vs viva + render end-to-end):**
+> - Vanessa: antes 20/08 "aluna ausente" → depois 18/06 "Foco: Usar as 2 mãos /
+>   Trabalho feito: Leitura de partitura... / Repertório: Cuckuo" + ⚠️ faltou 20/08.
+> - Júlia: idem (Piratas do caribe, 13/08 + ⚠️ 20/08).
+> - Antônio, Isabela, João Vitor, Pedro (presentes): IDÊNTICOS, sem flag falsa.
+>
+> O worker roda por timer (`fabio-briefing-matheus`, 08h BRT) — pega o código novo
+> na próxima batida, sem daemon pra reiniciar.
+>
+> **Nota do caso guitarra do Isaque:** a matrícula do Antônio está como Teclado no
+> Emusys (oficial), mas ele pode estar experimentando guitarra — o Alf confirma com
+> o Isaque/equipe. O áudio de guitarra 20/08 segue guardado e religa sozinho quando
+> a matrícula/aula desse horário for acertada. O "Yuri" que eu havia inferido era
+> colisão de emusys_student_id entre unidades (retirado).
+>
+> ---
+
+
+
 > # ✅ DEFEITO ① (áudio sem-roster travava CALADO) — CONSERTADO na VPS + provado (21/08)
 >
 > **Sintoma:** Isaque grava guitarra 14h no app → nunca vira registro, e a cobrança
