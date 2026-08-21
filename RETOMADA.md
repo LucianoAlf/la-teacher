@@ -1,5 +1,50 @@
 # RETOMADA — LA Teacher
 
+> # ✅ TRAVA versionada do patch do Hermes + monitor-saude-fabio (21/08) — commit 143857c
+>
+> **Problema:** o fix do bug de ImportError (conversation_compression) vivia como
+> edição solta no checkout do Hermes (NousResearch/hermes-agent, v0.20.5). O updater
+> do Hermes faz `git stash --include-untracked -> reset --hard -> stash pop`, e o pop
+> conflita e PERDE o patch quando a versão nova toca o arquivo (visto na Lia hoje).
+> Modo de falha silencioso. Plano A (Alf): patch versionado + reaplicação + trava.
+>
+> **Entregue (tudo no repo, commit 143857c):**
+> - `vps/hermes-patches/conversation_compression-lazy-import.patch` — o diff.
+> - `vps/hermes-patches/apply.sh` — idempotente, limpa __pycache__, aplica, **NÃO
+>   reinicia** (Alf: restart cego duplica o bot → 409, mecanismo que derrubou a Sol
+>   hoje; o gateway do Fábio já rodou fora do systemd), **fail-loud** se o patch não
+>   aplicar. Provado nos 2 caminhos (já-corrigido no Fábio + aplicar contra o .bak =
+>   idêntico ao vivo). Parametrizado por HERMES_HOME (roda igual em fabio/mila/lia).
+> - `vps/hermes-patches/hermes-patch-guard.sh` — **roda como ROOT** (cron), varre
+>   /home/*/.hermes/.../conversation_compression.py dos 7 agentes e grava em
+>   `hermes_patch_status`. Cobre Mila/Lia (o apply.sh é por-usuário e o fabio não lê
+>   o ~/.hermes dos outros). **FALTA você/Hugo pôr no cron root** (eu não tenho root).
+> - `supabase/functions/monitor-saude-fabio/` (edge, cron `monitor-saude-fabio`
+>   jobid 162, a cada 10min): checa **áudio empacado** (>30min em transcrevendo/
+>   transcrito) + lê `hermes_patch_status`, alerta no MESMO WhatsApp (5521966583325).
+>   Feita SEPARADA do monitor-saude-webhook de propósito (aquele está no LA Report,
+>   167 commits atrás + deploy≠local = risco de regressão).
+> - migration `20260821150000_hermes_patch_status` + RPC de upsert.
+> - `.gitattributes` forçando LF nos .sh/.patch (CRLF quebra na VPS).
+>
+> **A trava JÁ provou valor na 1ª execução:** achou **2 áudios do Isaque presos**
+> (Teclado sexta 13h/14h, da Juliana Mei Jin Ma, vítimas do mesmo bug pré-fix) e
+> alertou. Recuperei os dois → registros `712446cb` e `47dd6921`, aguardando
+> confirmação. (Somados à guitarra do Antônio `84ca9bb7` de mais cedo = 3 gravações
+> do Isaque salvas hoje.)
+>
+> **PENDENTE (não é meu — precisa de root/dono):**
+> 1. **Pôr `hermes-patch-guard.sh` no cron root** (você/Hugo) — sem ele a cobertura
+>    cross-agente não existe e `hermes_patch_status` fica vazia (o monitor não alarma
+>    vazio de propósito).
+> 2. **Patchar Mila e Lia** (rodar `apply.sh` como cada usuário) ANTES do próximo
+>    restart delas — hoje rodam código antigo em memória (uptime 13d/17d), bug latente.
+> 3. **Postar a issue** no NousResearch/hermes-agent (rascunho pronto).
+>
+> ---
+
+
+
 > # ✅ BUG do GATEWAY Hermes (ImportError re-entrante na compressão) + gravação do Isaque salva (21/08)
 >
 > **Contexto:** ao reprocessar a gravação de guitarra do Isaque (20/08), o turno do
