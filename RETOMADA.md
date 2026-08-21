@@ -1,5 +1,36 @@
 # RETOMADA — LA Teacher
 
+> # 🟢 APP: experimental ia pra porta do aluno em 2 das 3 telas — CONSERTADO (20/08)
+>
+> Isaque, no APP (não WhatsApp): microfone da **aula do Thiago (experimental)**
+> caía em "Guardei sua gravação · `aula_experimental_usa_porta_propria`", preso.
+>
+> **Causa (medida no preview ao vivo, front+back):** a régua da experimental
+> (`tratadoComoExperimental`) vivia DENTRO do `Agenda.tsx`. A **Home** e a
+> **AlunoDetalhe** abrem as mesmas portas e **não** passavam por ela — o
+> microfone da Home ia direto pra `/app/gravar` (porta do aluno), onde a
+> experimental não tem aluno e o banco recusa. O conserto de 15/08 corrigiu **1
+> das 3 telas**. Régua local = o defeito.
+>
+> **Fix (`5d1e3ff`, no repo):** extraí `destinoSessao` (puro, testado) em
+> `features/agenda/sessao.ts`; Home, Agenda e AlunoDetalhe passam por ele. Prova
+> ao vivo: microfone do Thiago na Home agora devolve o aviso e **fica em `/app`**
+> (não vai mais pra porta do aluno). 10/10 sessao.test, tsc limpo, 166/166 vitest.
+>
+> **Pendente desta frente:**
+> - **Precisa BUILDAR + publicar** o front pra chegar no PWA do Isaque (é PWA;
+>   HTML é network-first, pega rápido). O preview local já tem.
+> - **A gravação presa no aparelho do Isaque** (cache client-side) não some
+>   sozinha — ele toca **"Descartar esta gravação"**; essa porta nunca ia aceitar.
+> - **Thiago não tem `vinculo_id`** (lead↔aula não casou) → registro "não abre"
+>   por desenho até o reconciliador casar. É outra frente (matching da
+>   experimental), não esta.
+> - Ideia de polish: a tela de resiliência tratar `aula_experimental_usa_porta_propria`
+>   como erro TERMINAL (sugerir descartar) em vez de oferecer "Tentar agora" fútil.
+>
+> ---
+
+
 > # 🔴 DECISÃO DO ALF (18/08 noite): WhatsApp registro DESLIGADO — professor volta pro app
 >
 > Cansado dos problemas do canal WhatsApp (Isaque disparando um por minuto), o Alf
