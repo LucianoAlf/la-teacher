@@ -9,6 +9,7 @@ import { CardSessoesDoDia } from '../../features/agenda/CardSessoesDoDia'
 import { SemanaStrip } from '../../features/agenda/SemanaStrip'
 import { useSessoes } from '../../features/agenda/useSessoes'
 import { useSemana } from '../../features/agenda/useSemana'
+import { destinoSessao, type AcaoSessao } from '../../features/agenda/sessao'
 import { AppFrame } from './AppFrame'
 import { AppHeader } from './AppHeader'
 import { AppNav } from './AppNav'
@@ -49,48 +50,23 @@ export default function AgendaPage() {
    * saber é o que AINDA dá pra fazer.
    */
   /**
-   * A régua da experimental, UMA vez, para TODAS as portas da linha.
-   *
-   * Até 15/08/2026 só `abrirSessao` ramificava. O microfone e o "preencher" da
-   * MESMA linha não: caíam direto no trilho do aluno, onde a experimental não
-   * tem aluno nenhum — o lead aparece em `aula_alunos_emusys` com `aluno_id`
-   * nulo, o roster sai vazio e o contrato recusa (corretamente: ele se nega a
-   * inventar um aluno). O áudio entrava na fila e morria em silêncio; cinco
-   * áudios de professor se perderam assim, de 10/08 a 14/08.
-   *
-   * Duas portas na mesma linha com réguas diferentes é o defeito. Agora a
-   * ramificação é uma função só, e quem quiser abrir uma porta nova passa por
-   * ela. O banco virou rede embaixo disto (`aula_experimental_usa_porta_propria`
-   * em `fn_enfileirar_audio_core`), porque é PWA: professor com bundle em cache
-   * continuaria mandando pelo trilho errado por dias depois do deploy.
-   *
-   * Devolve `true` quando já tratou a navegação — o chamador para aí.
+   * Abrir/gravar/preencher passam pela MESMA régua de rota — `destinoSessao`
+   * em features/agenda/sessao. A régua mora LÁ, não aqui: Home e AlunoDetalhe
+   * abrem as mesmas portas da mesma linha, e deixá-la local a esta tela foi o
+   * que deixou o microfone da Home mandar a experimental pela porta do aluno em
+   * 20/08 (`/app/gravar` → `aula_experimental_usa_porta_propria`).
    */
-  const tratadoComoExperimental = (sessao: SessaoAula): boolean => {
-    if (!sessao.experimental) return false
-    if (sessao.vinculo_id == null) {
-      // Sem promessa de prazo NEM de aviso: hoje nada notifica quando o
-      // vínculo aparece. Diz o que é, o que segue funcionando, e a quem
-      // recorrer se o dia da aula chegar assim.
-      show('Essa experimental ainda não casou com a agenda, então o registro dela não abre. A aula acontece normal — se chegar o dia assim, fala com a coordenação.')
-      return true
+  const irPara = (sessao: SessaoAula, acao: AcaoSessao) => {
+    const destino = destinoSessao(sessao, acao)
+    if (destino.tipo === 'aviso') {
+      show(destino.texto)
+      return
     }
-    navigate(`/app/experimental/${sessao.vinculo_id}`)
-    return true
+    navigate(destino.rota, { state: { sessao } })
   }
-
-  const abrirSessao = (sessao: SessaoAula) => {
-    if (tratadoComoExperimental(sessao)) return
-    navigate(`/app/chamada/${sessao.aula_id_ancora}`, { state: { sessao } })
-  }
-  const gravarAula = (sessao: SessaoAula) => {
-    if (tratadoComoExperimental(sessao)) return
-    navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
-  }
-  const preencherAula = (sessao: SessaoAula) => {
-    if (tratadoComoExperimental(sessao)) return
-    navigate(`/app/registro-manual/${sessao.aula_id_ancora}`, { state: { sessao } })
-  }
+  const abrirSessao = (sessao: SessaoAula) => irPara(sessao, 'chamada')
+  const gravarAula = (sessao: SessaoAula) => irPara(sessao, 'gravar')
+  const preencherAula = (sessao: SessaoAula) => irPara(sessao, 'manual')
 
   return (
     <AppFrame>

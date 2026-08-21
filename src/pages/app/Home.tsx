@@ -11,7 +11,7 @@ import { CardSessoesDoDia } from '../../features/agenda/CardSessoesDoDia'
 import { DateNav } from '../../features/agenda/DateNav'
 import { useSessoes } from '../../features/agenda/useSessoes'
 import { buscarPendencias, buscarPendentesHoje, type Pendencias } from '../../features/agenda/pendencias'
-import { horaSessao, JANELA_POS_AULA_DIAS, tituloSessao } from '../../features/agenda/sessao'
+import { destinoSessao, horaSessao, JANELA_POS_AULA_DIAS, tituloSessao, type AcaoSessao } from '../../features/agenda/sessao'
 import { descreverFalhaFila } from '../../features/registro/camposCanonicos'
 import { itemPodeSerReenviado, type ItemFilaLocal, useFilaOffline } from '../../features/registro/filaOffline'
 import { descartarItemFila, destinoRetomadaFila, tentarNovamenteItemFila } from '../../features/registro/uploadAudio'
@@ -30,12 +30,21 @@ export default function HomePage() {
   const { estado, recarregar } = useSessoes(data)
   const { itens: filaOffline } = useFilaOffline(session?.user.id)
   const [itemFilaEmAcao, setItemFilaEmAcao] = useState<string | null>(null)
-  const abrirChamada = (sessao: SessaoAula) =>
-    navigate(`/app/chamada/${sessao.aula_id_ancora}`, { state: { sessao } })
-  const gravarAula = (sessao: SessaoAula) =>
-    navigate(`/app/gravar/${sessao.aula_id_ancora}`, { state: { sessao } })
-  const preencherAula = (sessao: SessaoAula) =>
-    navigate(`/app/registro-manual/${sessao.aula_id_ancora}`, { state: { sessao } })
+  // MESMA régua do Agenda (`destinoSessao`): a experimental do dia tem porta
+  // própria. Antes destes handlers iam DIRETO pra /app/gravar etc., e por isso
+  // o microfone da Home mandava a experimental do Thiago pela porta do aluno em
+  // 20/08 (`aula_experimental_usa_porta_propria`). A régua é uma só, testada.
+  const irPara = (sessao: SessaoAula, acao: AcaoSessao) => {
+    const destino = destinoSessao(sessao, acao)
+    if (destino.tipo === 'aviso') {
+      show(destino.texto)
+      return
+    }
+    navigate(destino.rota, { state: { sessao } })
+  }
+  const abrirChamada = (sessao: SessaoAula) => irPara(sessao, 'chamada')
+  const gravarAula = (sessao: SessaoAula) => irPara(sessao, 'gravar')
+  const preencherAula = (sessao: SessaoAula) => irPara(sessao, 'manual')
 
   const tentarFila = async (item: ItemFilaLocal) => {
     setItemFilaEmAcao(item.id)

@@ -14,7 +14,7 @@ import { hojeBRT } from '../../lib/date'
 import { cx } from '../../lib/cx'
 import { AppFrame } from './AppFrame'
 import { useSessoes } from '../../features/agenda/useSessoes'
-import { horaSessao, podeGravar, statusSessao, tituloSessao } from '../../features/agenda/sessao'
+import { destinoSessao, horaSessao, podeGravar, statusSessao, tituloSessao } from '../../features/agenda/sessao'
 import { ParagrafoRegistro, SecaoRegistro } from '../../features/ficha/registroSecoes'
 
 type Estado =
@@ -97,7 +97,13 @@ export default function AlunoDetalhePage() {
             alunoId={idNum}
             sessaoCarregando={estadoSessoes.fase === 'carregando'}
             sessaoGravavel={sessaoGravavel}
-            onGravar={(s) => navigate(`/app/gravar/${s.aula_id_ancora}`, { state: { sessao: s } })}
+            onGravar={(s) => {
+              // Mesma régua das outras telas: uma ficha de aluno matriculado
+              // nunca traz experimental, mas o roteamento passa por aqui para
+              // que nenhuma porta abra a experimental pela porta do aluno.
+              const destino = destinoSessao(s, 'gravar')
+              if (destino.tipo === 'navegar') navigate(destino.rota, { state: { sessao: s } })
+            }}
           />
         )}
       </div>

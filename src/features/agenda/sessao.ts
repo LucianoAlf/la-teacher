@@ -269,3 +269,43 @@ export function contarChamadasFeitas(sessoes: SessaoAula[], now: Date = new Date
     return st === 'chamada_feita' || st === 'faltaram'
   }).length
 }
+
+// ---------------------------------------------------------------------------
+// Roteamento das ações da linha (chamada / gravar / preencher) — UMA régua
+// ---------------------------------------------------------------------------
+
+export const AVISO_EXPERIMENTAL_SEM_VINCULO =
+  'Essa experimental ainda não casou com a agenda, então o registro dela não abre. A aula acontece normal — se chegar o dia assim, fala com a coordenação.'
+
+export type AcaoSessao = 'chamada' | 'gravar' | 'manual'
+export type DestinoSessao =
+  | { tipo: 'navegar'; rota: string }
+  | { tipo: 'aviso'; texto: string }
+
+const ROTA_BASE: Record<AcaoSessao, string> = {
+  chamada: '/app/chamada/',
+  gravar: '/app/gravar/',
+  manual: '/app/registro-manual/',
+}
+
+/**
+ * A régua da experimental, UMA vez, para TODAS as telas e portas da linha.
+ *
+ * Vive aqui — e não dentro de uma tela — porque Home, Agenda e AlunoDetalhe
+ * abrem as MESMAS portas da mesma linha. Até 15/08 só o Agenda ramificava; em
+ * 20/08 o microfone da Home mandava a experimental do Thiago pela porta do
+ * aluno (`/app/gravar`), onde ela não tem aluno e o banco recusa
+ * (`aula_experimental_usa_porta_propria`) — e o áudio ficava preso na
+ * resiliência retentando a porta errada. Régua local = duas portas com réguas
+ * diferentes = o defeito. Uma função só, testada, é o fim dele.
+ *
+ * A experimental sem vínculo lead↔aula não abre registro (o vínculo é a chave
+ * de todo o ciclo); a linha diz isso e a ação devolve um AVISO, não uma porta.
+ */
+export function destinoSessao(sessao: SessaoAula, acao: AcaoSessao): DestinoSessao {
+  if (sessao.experimental === true) {
+    if (sessao.vinculo_id == null) return { tipo: 'aviso', texto: AVISO_EXPERIMENTAL_SEM_VINCULO }
+    return { tipo: 'navegar', rota: `/app/experimental/${sessao.vinculo_id}` }
+  }
+  return { tipo: 'navegar', rota: `${ROTA_BASE[acao]}${sessao.aula_id_ancora}` }
+}

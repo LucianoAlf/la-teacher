@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AlunoSessao, SessaoAula } from '../../lib/api'
-import { agruparSessoes } from './sessao'
+import { agruparSessoes, AVISO_EXPERIMENTAL_SEM_VINCULO, destinoSessao } from './sessao'
 
 const aluno = (id: number, nome: string): AlunoSessao => ({
   aluno_id: id,
@@ -61,5 +61,42 @@ describe('agruparSessoes', () => {
 
     expect(resultado).toHaveLength(1)
     expect(resultado[0].aula_id_ancora).toBe(400)
+  })
+})
+
+describe('destinoSessao — a régua da experimental, uma só para todas as telas', () => {
+  const base = sessao(500, 'individual', [aluno(1, 'Thiago Fernandes Rios')])
+  const ACOES = ['chamada', 'gravar', 'manual'] as const
+
+  it('aula normal vai pra porta certa de cada ação', () => {
+    expect(destinoSessao(base, 'gravar')).toEqual({ tipo: 'navegar', rota: '/app/gravar/500' })
+    expect(destinoSessao(base, 'chamada')).toEqual({ tipo: 'navegar', rota: '/app/chamada/500' })
+    expect(destinoSessao(base, 'manual')).toEqual({ tipo: 'navegar', rota: '/app/registro-manual/500' })
+  })
+
+  it('experimental COM vínculo vai pra porta própria — nunca a do aluno', () => {
+    const exp = { ...base, experimental: true, vinculo_id: 77 }
+    for (const acao of ACOES) {
+      expect(destinoSessao(exp, acao)).toEqual({ tipo: 'navegar', rota: '/app/experimental/77' })
+    }
+  })
+
+  it('experimental SEM vínculo avisa e não abre porta nenhuma', () => {
+    const exp = { ...base, experimental: true, vinculo_id: null }
+    for (const acao of ACOES) {
+      expect(destinoSessao(exp, acao)).toEqual({ tipo: 'aviso', texto: AVISO_EXPERIMENTAL_SEM_VINCULO })
+    }
+  })
+
+  it('REGRESSÃO 20/08 (Thiago, na Home): experimental NUNCA cai em /app/gravar', () => {
+    // A Home mandava a experimental direto pra /app/gravar (porta do aluno),
+    // onde o banco recusa com aula_experimental_usa_porta_propria. A régua tem
+    // que impedir isso em QUALQUER tela que a use — com ou sem vínculo.
+    for (const vinculo_id of [9, null]) {
+      const exp = { ...base, experimental: true, vinculo_id }
+      const d = destinoSessao(exp, 'gravar')
+      const rota = d.tipo === 'navegar' ? d.rota : ''
+      expect(rota.startsWith('/app/gravar/')).toBe(false)
+    }
   })
 })
