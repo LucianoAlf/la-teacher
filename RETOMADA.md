@@ -1,5 +1,41 @@
 # RETOMADA — LA Teacher
 
+> # ✅ BUG do GATEWAY Hermes (ImportError re-entrante na compressão) + gravação do Isaque salva (21/08)
+>
+> **Contexto:** ao reprocessar a gravação de guitarra do Isaque (20/08), o turno do
+> agente crashava com `ImportError: cannot import name 'AuxiliaryExplicitCancellation'
+> from 'agent.auxiliary_client'`. Reproduzido: os imports funcionam em ISOLAMENTO —
+> não é circular puro, é **re-entrância**: `conversation_compression.py:69` importava
+> a classe no topo, e `auxiliary_client` (módulo ENORME) estava meio-carregado quando
+> a via `_replay_compression_warning` (run_agent.py) importava compression pela 1ª vez.
+> Disparava sempre que a compressão era acionada — e `prompt_len` de TODO registro-aula
+> é ~31.7K, no limiar. Áudios de 20/08 normalizaram (código anterior); o restart do
+> gateway das 09:45 provavelmente expôs a v0.20.5.
+>
+> **Fix (VPS, backup `agent/conversation_compression.py.bak-lazyimport-20260821`):**
+> removido o import de topo (linha 69) → **import lazy dentro de `compress_context`**
+> (único uso, linhas 3046 raise / 3053 except). Em runtime `auxiliary_client` já está
+> 100% carregado → classe REAL (mesma identidade p/ raise/except). Ninguém importa a
+> classe DE `conversation_compression` (só de `auxiliary_client`), então seguro.
+> Gateway reiniciado, startup limpo. **PROVADO:** o áudio do Isaque passou pela
+> compressão sem ImportError e normalizou.
+>
+> ⚠️ **É código de FRAMEWORK (Hermes v0.20.5), não do app.** Num upgrade do Hermes
+> o patch pode ser sobrescrito — reaplicar ou confirmar que o fix subiu upstream.
+>
+> **Gravação do Isaque (20/08):** a turma de guitarra G_Qui_14 era FANTASMA (Emusys
+> devolvia turma vazia; Arthur encerrou, sync cancelou as futuras). O áudio (guitarra,
+> "Blue / As It Was / técnica") foi repontado da turma-fantasma pra aula REAL do
+> Antônio naquele horário (Teclado T_Qui_14, op_id 34037256, ele presente) e
+> reprocessado → **registro `84ca9bb7` (tronco) + fatia `44522d19` do Antônio (722)**,
+> `aguardando_confirmacao`. Auditado em audit_log (acao=salvar_aula). O Isaque confirma
+> no app. Nota: conteúdo de guitarra numa aula de teclado (Antônio experimentando) —
+> coordenação decide se a matrícula vira guitarra.
+>
+> ---
+
+
+
 > # ✅ BRIEFING: "última aula" agora é a última PRESENTE + aviso de falta (21/08)
 >
 > **Pedido do Isaque (via Alf):** no briefing matinal, quando o aluno faltou, a
