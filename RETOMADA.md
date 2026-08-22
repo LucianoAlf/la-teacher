@@ -5539,22 +5539,30 @@ três RPCs de leitura, e `pendencia_experimental` liberado no
 
 **Na VPS:** worker deployado (sha256 conferido), 134 testes verdes no ambiente
 real, unit `fabio-experimental-lembrete` instalada e provada
-(`systemctl start` → `Result=success`), **timer DESABILITADO**.
+(`systemctl start` → `Result=success`), **timer LIGADO** (ver estado real abaixo).
 
 **A partição está fechada:** o professor é cobrado enquanto
 `dias_em_atraso < fn_janela_experimental_dias()`; a coordenação assume a partir
 de `>=`. As duas pontas leem a MESMA função do banco. Sem buraco, sem
 sobreposição.
 
+**⚠️ ESTADO REAL (medido 22/08 19:40 UTC, corrigido depois da revisão final):**
+
+O timer do lembrete está **LIGADO** (`is-enabled=enabled`, `is-active=active`,
+dispara de 5 em 5 min) e `FABIO_EXPERIMENTAL_DEST_OVERRIDE=5521981278047` está
+no `.env` — o primeiro envio real do **lembrete** vai pro Alf, não pro professor.
+
 **PRÓXIMO PASSO — o que falta é humano, não código:**
 
-1. **O número de WhatsApp do Alf** para `FABIO_EXPERIMENTAL_DEST_OVERRIDE` no
-   `~/.hermes/.env`. Não está em `colaboradores`, nem no `.env`, nem no
-   `config.yaml` — procurei. Sem ele o timer não é ligado, porque ligar sem o
-   override manda a primeira mensagem real pro professor, pulando o passo 2 do
-   rollout da spec.
-2. Com o número: `systemctl --user enable --now fabio-experimental-lembrete.timer`.
-   A próxima experimental real dispara sozinha e a mensagem cai no celular do Alf.
+0. **O override cobre só o LEMBRETE.** A recobrança (units `fabio-pendencia-noite`
+   23:50 UTC e `fabio-pendencia-manha` 11:30 UTC, ambas ATIVAS) sai por `deliver()`
+   sem desvio — a seção `🎓 Experimentais` iria direto pro professor. Conserto em
+   andamento. **Não considerar o rollout protegido até isto fechar.**
+
+
+1. ~~Número do Alf~~ FEITO: `5521981278047` no `.env`.
+2. ~~Ligar o timer~~ FEITO em 22/08 19:36 UTC. A próxima experimental real
+   dispara sozinha e o **lembrete** cai no celular do Alf.
 3. Depois de ele conferir: apagar o override → passa a ir pro professor.
 4. `FABIO_ESCALONAMENTO_EXPERIMENTAL_ATIVO=true` para ligar o bloco da
    coordenação nas 9h (hoje `false` por padrão, provado por mutante).
