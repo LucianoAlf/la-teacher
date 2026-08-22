@@ -63,7 +63,11 @@ as $$
         'quando', to_char(v.data_hora_fim at time zone 'America/Sao_Paulo', 'DD/MM HH24:MI'),
         'dias_em_atraso', v.dias_em_atraso
       )
-      order by v.dias_em_atraso desc
+      -- dias_em_atraso e floor(epoch/86400): granularidade de dia inteiro,
+      -- entao empate e a regra, nao a excecao. Sem desempate por vinculo_id
+      -- o plano decide a ordem entre empatados, e isso muda a mensagem sem
+      -- nada quebrar.
+      order by v.dias_em_atraso desc, v.vinculo_id
     ), '[]'::jsonb))
   from public.vw_experimental_pendencia v
   where v.dias_em_atraso >= public.fn_janela_experimental_dias();

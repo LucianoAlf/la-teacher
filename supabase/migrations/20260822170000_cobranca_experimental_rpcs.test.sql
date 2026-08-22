@@ -17,6 +17,42 @@ begin
     raise exception 'ABORTADO: fn_data_corte_experimental esta em % (esperado 2026-08-22) — provavel vazamento de uma rodada anterior deste teste; conferir antes de rodar', public.fn_data_corte_experimental();
   end if;
 
+  -- === PERMISSAO (FALHOU 11) — logo no comeco, antes do cenario sintetico.
+  -- Nao depende de nenhum dado: se FALHOU 1..10 quebrar mais adiante, o
+  -- teste aborta ali e esta checagem — a que mais precisa sobreviver — nunca
+  -- chega a rodar. As RPCs sao security definer (rodam como o dono; RLS das
+  -- tabelas de baixo nao protege nada) e a view expoe nome de aluno/curso/
+  -- unidade/professor. O schema public e o schema exposto do PostgREST, com
+  -- default privileges pra anon/authenticated — objeto novo nasce alcancavel
+  -- pela chave publicavel do PWA se ninguem revogar explicitamente. Isso ja
+  -- vazou uma vez (as 3 RPCs + a view nasceram com anon=X/authenticated=X).
+  --
+  -- has_function_privilege/has_table_privilege em vez de regex no texto do
+  -- ACL: a régua textual (~ '(anon|authenticated)=X') é cega ao "=X" de
+  -- PUBLIC — se alguém revogar só de anon/authenticated e a função ficar
+  -- com GRANT ... TO PUBLIC (ex.: copiar a linha de revoke da view, que não
+  -- lista public, em vez da linha da função), o ACL vira
+  -- "{=X/postgres,postgres=X/postgres,...}" — sem "anon=" nem "authenticated="
+  -- textual — e anon continua podendo executar. has_function_privilege
+  -- resolve PUBLIC, ACL nula e papel intermediário de uma vez, porque
+  -- pergunta o privilégio EFETIVO, não o texto do ACL.
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname in ('fn_experimental_lembrete_alvos',
+                         'fn_experimental_pendencia_do_professor',
+                         'fn_experimental_escalonadas')
+       and (has_function_privilege('anon', p.oid, 'execute')
+         or has_function_privilege('authenticated', p.oid, 'execute'))
+    union all
+    select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relname = 'vw_experimental_pendencia'
+       and (has_table_privilege('anon', c.oid, 'select')
+         or has_table_privilege('authenticated', c.oid, 'select'))
+  ) then
+    raise exception 'FALHOU 11: RPC ou view de cobranca alcancavel por anon/authenticated';
+  end if;
+
   -- === CENARIO SINTETICO ===
   -- A view vw_experimental_pendencia fica em 0 linhas por horas seguidas —
   -- é o normal do dia a dia (aula recém-encerrada ainda não virou pendência,
@@ -133,30 +169,6 @@ begin
   end if;
   if exists (select 1 from jsonb_array_elements(r->'linhas') x where (x->>'vinculo_id')::bigint = v_vinc_b) then
     raise exception 'FALHOU 10: escalonadas trouxe B (1 dia, dentro da janela): %', r;
-  end if;
-
-  -- === permissao: as RPCs sao security definer (rodam como o dono, RLS das
-  -- tabelas de baixo nao protege nada) e a view expoe nome de aluno/curso/
-  -- unidade/professor. O schema public e o schema exposto do PostgREST, com
-  -- default privileges pra anon/authenticated — objeto novo nasce alcancavel
-  -- pela chave publicavel do PWA se ninguem revogar explicitamente. Isso ja
-  -- vazou uma vez (as 3 RPCs + a view nasceram com anon=X/authenticated=X) e
-  -- passou por 3 rodadas de teste porque nenhum dos 10 asserts acima cobre
-  -- permissao — só forma e filtro. Vazamento de permissao so morre com
-  -- assert de permissao.
-  if exists (
-    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public'
-       and p.proname in ('fn_experimental_lembrete_alvos',
-                         'fn_experimental_pendencia_do_professor',
-                         'fn_experimental_escalonadas')
-       and p.proacl::text ~ '(anon|authenticated)=X'
-    union all
-    select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'public' and c.relname = 'vw_experimental_pendencia'
-       and c.relacl::text ~ '(anon|authenticated)=[a-zA-Z]*r'
-  ) then
-    raise exception 'FALHOU 11: RPC ou view de cobranca alcancavel por anon/authenticated';
   end if;
 
   raise exception 'VERDE: RPCs ok (cenario sintetico A/B/C + asserts originais)';
