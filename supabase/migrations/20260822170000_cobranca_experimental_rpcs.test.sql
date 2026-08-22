@@ -135,5 +135,29 @@ begin
     raise exception 'FALHOU 10: escalonadas trouxe B (1 dia, dentro da janela): %', r;
   end if;
 
+  -- === permissao: as RPCs sao security definer (rodam como o dono, RLS das
+  -- tabelas de baixo nao protege nada) e a view expoe nome de aluno/curso/
+  -- unidade/professor. O schema public e o schema exposto do PostgREST, com
+  -- default privileges pra anon/authenticated — objeto novo nasce alcancavel
+  -- pela chave publicavel do PWA se ninguem revogar explicitamente. Isso ja
+  -- vazou uma vez (as 3 RPCs + a view nasceram com anon=X/authenticated=X) e
+  -- passou por 3 rodadas de teste porque nenhum dos 10 asserts acima cobre
+  -- permissao — só forma e filtro. Vazamento de permissao so morre com
+  -- assert de permissao.
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname in ('fn_experimental_lembrete_alvos',
+                         'fn_experimental_pendencia_do_professor',
+                         'fn_experimental_escalonadas')
+       and p.proacl::text ~ '(anon|authenticated)=X'
+    union all
+    select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relname = 'vw_experimental_pendencia'
+       and c.relacl::text ~ '(anon|authenticated)=[a-zA-Z]*r'
+  ) then
+    raise exception 'FALHOU 11: RPC ou view de cobranca alcancavel por anon/authenticated';
+  end if;
+
   raise exception 'VERDE: RPCs ok (cenario sintetico A/B/C + asserts originais)';
 end $$;
