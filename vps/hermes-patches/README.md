@@ -61,6 +61,31 @@ identidade para `raise`/`except`; um stand-in quebraria o `except`).
 > `__pycache__`** depois do `reset --hard` (o reset pode deixar bytecode
 > dessincronizado).
 
+### O outro estrago do mesmo update: dependência trocada (22/08/2026)
+
+O patch acima conserta código do Hermes. Mas o update quebra o **nosso** código
+por um segundo caminho: **trocando dependência da venv**. Em 22/08 o pacote
+`mcp` foi para **2.0.0**, que **removeu `mcp.server.fastmcp`** e renomeou
+`FastMCP` → `MCPServer`; o `fabio_presence_mcp.py` parou de importar, o gateway
+não conseguiu subir o MCP e ele sumiu do `ps`.
+
+Conserto (em `vps/fabio/fabio_presence_mcp.py`, tolerante às duas versões):
+
+```python
+try:
+    from mcp.server.fastmcp import FastMCP  # mcp 1.x
+except ModuleNotFoundError:                 # mcp 2.x
+    from mcp.server import MCPServer as FastMCP
+```
+
+Duas lições que valem para o próximo update:
+
+- **Não precisou reiniciar o gateway**: o `mcp_stdio_watchdog.py` respawna o
+  MCP sozinho assim que o import para de falhar. Restart de gateway do Fábio é
+  o passo perigoso (roda à mão, duplica bot → 409) — aqui era desnecessário.
+- **Script nosso que só existe no disco da VPS some no próximo update, em
+  silêncio.** Por isso o par da presença agora é versionado em `vps/fabio/`.
+
 ## Como usar (depois de CADA update do Hermes)
 
 ```bash
@@ -102,6 +127,23 @@ Só root cobre todos. **Precisa ser instalado no cron root por você/Hugo** (eu 
 tenho root) — enquanto não estiver, a cobertura cross-agente não existe e a
 `hermes_patch_status` fica vazia (o `monitor-saude-fabio` não alarma vazio, só
 quando há linhas).
+
+**(c) trava de import na auditoria** (`vps/fabio/fabio_auditoria.py`,
+`check_mcps_importam`, roda 7h e 21h e cai no mesmo WhatsApp). As duas camadas
+acima cuidam do PATCH; esta cuida da **dependência**. Ela lê os `mcp_servers`
+do `config.yaml`, e para cada MCP que é script NOSSO em python roda o import
+**no interpretador que o gateway usa**.
+
+> Por que não bastava olhar o `ps`: o processo velho segue vivo com o código
+> antigo **em memória**, então o `ps` fica verde e o alarme fica mudo até
+> alguém reiniciar — e o restart é justamente quando ninguém está olhando.
+> Importar mede o **disco**. É a mesma lição do "restart carrega a release
+> latente". Falsificada contra o bug real: rodada na cópia pré-fix, devolve
+> `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`.
+>
+> Binário de terceiro (`postgres-mcp`) e wrapper `.sh` ficam **fora** de
+> propósito — rodar `-c "import ..."` neles seria alarme falso. Testes:
+> `vps/fabio/teste_mcps_importam.py` (14 casos, 5/5 mutantes mortos).
 
 Fluxo: `guard root (varre) -> hermes_patch_status -> monitor-saude-fabio (lê + alerta)`.
 

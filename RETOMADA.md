@@ -1,5 +1,50 @@
 # RETOMADA — LA Teacher
 
+> # ✅ MCP de presença de volta + trava de IMPORT (22/08) — commits 5f0ca53, 98a0501
+>
+> **Alerta das 7h de 22/08** (do `monitor-saude-fabio`/auditoria): "MCP de
+> presença (`fabio_presence_mcp.py`) não aparece nos processos".
+>
+> **Causa raiz (medida):** o update do Hermes subiu a dependência `mcp` para
+> **2.0.0**, que **removeu `mcp.server.fastmcp`** e renomeou `FastMCP` →
+> `MCPServer`. O script quebrava na importação → o gateway não subia o MCP →
+> sumia do `ps`. **Segundo estrago do mesmo update** (o 1º foi o ImportError
+> re-entrante do gateway, 21/08) — mas por um caminho DIFERENTE: lá era código
+> do Hermes, aqui é **dependência trocada** quebrando código NOSSO.
+>
+> **Feito:**
+> - Fix tolerante às duas versões (`try` mcp 1.x / `except ModuleNotFoundError`
+>   → `MCPServer as FastMCP`). Verificado por **handshake stdio real**: sobe e
+>   lista as 2 ferramentas.
+> - **NÃO reiniciei o gateway** — o `mcp_stdio_watchdog.py` respawnou sozinho
+>   assim que o import parou de falhar (MCP vivo, e segue **1 só** processo de
+>   gateway). O Alf tinha autorizado o restart; ficou desnecessário, e restart
+>   do gateway do Fábio é o passo perigoso (roda à mão → 409).
+> - **Versionado o que só existia na VPS**: `fabio_presence_mcp.py`,
+>   `fabio_presence_governance.py`, `configure_uazapi_webhook.py`. Também
+>   sincronizado `fabio_notification_worker.py` (a VPS tinha o fix de 21/08 do
+>   briefing e o repo estava no 15/08) e `teste_agenda_dia_pedido.py`
+>   (direção INVERSA: o repo tinha a seção 7 que a VPS não tinha).
+> - **Trava nova** `check_mcps_importam` na auditoria (7h/21h): importa cada MCP
+>   nosso **no interpretador do gateway**. O `ps` só vê o agora — processo velho
+>   fica verde em memória e o estrago só aparece no restart. 14/14 testes,
+>   **5/5 mutantes mortos** (1 sobreviveu no 1º round e virou o caso 2b), e
+>   falsificada contra o bug real (pré-fix → `ModuleNotFoundError`).
+> - Bateria completa do bridge: **9/9 arquivos de teste passando**; serviços
+>   `active`.
+>
+> **PENDENTE (não é meu / precisa de decisão):**
+> 1. Os 3 itens do bloco de 21/08 abaixo seguem abertos (guard root no cron,
+>    patchar Mila e Lia, postar a issue upstream).
+> 2. **4 áudios velhos (10–15/08) em `erro`/`transitorio` que nunca convergem**
+>    — o auditor "reenfileira" todo dia e eles falham de novo, então o relatório
+>    diz "Corrigi sozinho: 4 áudios" toda manhã sem consertar nada. Causas:
+>    `falha ao gerar signed url` e `roster canônico vazio`. Precisa decidir:
+>    terminalizar (marcar como perdidos) ou atacar a causa. Alarme que mente
+>    todo dia ensina a ignorar o alarme.
+>
+> ---
+>
 > # ✅ TRAVA versionada do patch do Hermes + monitor-saude-fabio (21/08) — commit 143857c
 >
 > **Problema:** o fix do bug de ImportError (conversation_compression) vivia como
