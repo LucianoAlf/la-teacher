@@ -77,6 +77,74 @@ EVENTS = {
     "feedback": EventSpec("feedback_lembrete", "governanca", DEFAULT_FEEDBACK_TIME),
 }
 
+# A referência que liga a notificação ao vínculo. É ela que aciona o índice
+# uq_fabio_notif_por_referencia (UNIQUE em referencia_tipo, referencia_id,
+# canal) e garante UM lembrete por vínculo — pra sempre, não por dia. O
+# lembrete imediato existe pra criar o hábito no calor da aula; quem insiste
+# depois é a recobrança (noite/manhã) e o escalonamento, cada um com a trava
+# dele. Mudar este literal desliga a trava sem erro nenhum aparecer.
+REFERENCIA_TIPO_EXPERIMENTAL = "experimental_vinculo"
+
+EVENTS["experimental_lembrete"] = EventSpec(
+    "pendencia_experimental", "governanca", DEFAULT_PENDENCIA_TIME)
+
+
+def format_lembrete_experimental(linha: Dict[str, Any]) -> str:
+    nome = (linha.get("nome_aluno") or "o lead").strip()
+    hora = (linha.get("hora_fim") or "").strip()
+    quando = f", {hora}" if hora else ""
+    return (
+        f"🎓 *Experimental agora há pouco — {nome}{quando}*\n\n"
+        "Manda a devolutiva enquanto está fresco: o comercial usa ela pra falar "
+        "com a família ainda hoje. É rápido — grava o áudio e confirma. 🎤"
+    )
+
+
+def run_experimental_lembrete(channel: str, dry_run: bool = False) -> Dict[str, Any]:
+    spec = EVENTS["experimental_lembrete"]
+    alvos = (rpc("fn_experimental_lembrete_alvos", {"p_minutos": 20}) or {}).get("linhas") or []
+    resultados = []
+    for linha in alvos:
+        pid = linha.get("professor_id")
+        vinculo = linha.get("vinculo_id")
+        if not pid or not vinculo:
+            continue
+        corpo = format_lembrete_experimental(linha)
+        if dry_run:
+            resultados.append({"vinculo_id": vinculo, "status": "dry_run_ready"})
+            continue
+        claim = rpc("fabio_claim_notificacao_por_referencia", {
+            "p_professor_id": int(pid),
+            "p_tipo": spec.tipo,
+            "p_categoria": spec.categoria,
+            "p_canal": channel,
+            "p_corpo": corpo,
+            "p_referencia_tipo": REFERENCIA_TIPO_EXPERIMENTAL,
+            "p_referencia_id": str(vinculo),
+            "p_titulo": "Experimental sem devolutiva",
+            "p_lease_minutos": 10,
+        }) or {}
+        if not claim.get("claimed"):
+            resultados.append({"vinculo_id": vinculo, "status": "ja_avisado"})
+            continue
+        notificacao_id = claim.get("notificacao_id")
+        lease_token = claim.get("lease_token")
+        try:
+            deliver(pid, channel, corpo)
+            # O claim POR REFERENCIA escreve lease_token; mark_sent SEM token
+            # nao casa com nenhum lado da cerca (018) e a notificacao fica
+            # presa em 'processando' com a mensagem ja entregue.
+            if not mark_sent(notificacao_id, lease_token):
+                log("notificacao_enviada_mas_nao_fechada",
+                    notificacao_id=str(notificacao_id), professor_id=pid)
+                resultados.append({"vinculo_id": vinculo, "status": "entregue_mas_nao_fechada"})
+                continue
+            resultados.append({"vinculo_id": vinculo, "status": "enviada"})
+        except Exception as exc:
+            mark_failed(notificacao_id, str(exc), lease_token)
+            resultados.append({"vinculo_id": vinculo, "status": "falhou", "erro": str(exc)[:200]})
+    return {"ok": True, "alvos": len(alvos), "resultados": resultados}
+
 
 def log(msg: str, **fields: Any) -> None:
     bridge.log(f"notify_worker_{msg}", **fields)
@@ -1739,7 +1807,7 @@ def run_sem_roster(channel: str, dry_run: bool, professor_id: Optional[int] = No
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "registro_recibo", "registro-recibo", "sem_roster", "sem-roster", "escalonamento", "feedback", "all"], default="all")
+    parser.add_argument("--event", choices=["briefing", "pendencia", "devolutiva", "registro_recibo", "registro-recibo", "sem_roster", "sem-roster", "escalonamento", "feedback", "experimental_lembrete", "all"], default="all")
     parser.add_argument("--professor-id", type=int)
     parser.add_argument("--channel", choices=["whatsapp", "app"], default=DEFAULT_CHANNEL)
     parser.add_argument("--dry-run", action="store_true")
@@ -1791,6 +1859,23 @@ def main() -> int:
             log("event_result", **r)
         results.extend(sem_roster_results)
         if args.event == "sem_roster":
+            payload = {"ok": True, "results": results}
+            print(json.dumps(payload, ensure_ascii=False) if args.json else payload)
+            return 0
+
+    # Lembrete imediato da experimental: cron próprio de 5 em 5 minutos, fora
+    # do "all" pelo mesmo motivo do sem_roster — a rodada das 8h não é o lugar
+    # pra isso, e a janela de atraso é curta (não é horário fixo do dia).
+    if "experimental_lembrete" in selected:
+        try:
+            exp_result = run_experimental_lembrete(args.channel, args.dry_run)
+        except Exception as exc:
+            exp_result = {"ok": False, "error": str(exc)[:500]}
+        log("event_result", event="experimental_lembrete",
+            status="ok" if exp_result.get("ok") else "error",
+            alvos=exp_result.get("alvos"))
+        results.append({"event": "experimental_lembrete", **exp_result})
+        if args.event == "experimental_lembrete":
             payload = {"ok": True, "results": results}
             print(json.dumps(payload, ensure_ascii=False) if args.json else payload)
             return 0
