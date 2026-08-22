@@ -15,6 +15,13 @@ import os
 import sys
 from unittest.mock import patch
 
+# O corpo das mensagens carrega emoji (🎓🎤). Sem isto, um console que não
+# fala UTF-8 (cp1252 do Windows, por exemplo) morre com UnicodeEncodeError
+# NO MEIO do print das FALHAS — o exit code continua != 0 (o CI não mente),
+# mas quem revisa perde a lista de falhas bem na hora que mais precisa dela.
+# Aconteceu de verdade na revisão desta task.
+sys.stdout.reconfigure(errors="replace")
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fabio_notification_worker as worker  # noqa: E402
 from fabio_notification_worker import (  # noqa: E402
@@ -96,12 +103,16 @@ for termo in ("vinculo", "vinculo_id", str(LINHA["vinculo_id"])):
 class FakeBackend:
     """Dublê do lado servidor: registra toda chamada, nunca toca a rede."""
 
-    def __init__(self, alvos, *, pode_notificar=True, falhar_claim_para=None):
+    def __init__(self, alvos, *, pode_notificar=True, falhar_claim_para=None,
+                 falhar_claim_sempre=False):
         self.alvos = alvos
         self.pode_notificar = pode_notificar
         # referencia_id que deve explodir o claim (simula 502 transitório) —
         # usado só no caso de isolamento por alvo (I4).
         self.falhar_claim_para = falhar_claim_para
+        # simula o C1 real: TODO claim morre com 23514 (tipo fora da
+        # allowlist) — usado no caso 14 (N1: journal por alvo).
+        self.falhar_claim_sempre = falhar_claim_sempre
         self.chamadas_alvos = []   # corpo de cada chamada a fn_experimental_lembrete_alvos
         self.claims = []           # corpo de cada chamada de claim
         self._claimadas = set()    # (tipo, referencia_id, canal) já entregues
@@ -118,6 +129,12 @@ class FakeBackend:
         if name == "fabio_claim_notificacao_por_referencia":
             self.claims.append(dict(body))
             ref_id = body.get("p_referencia_id")
+            if self.falhar_claim_sempre:
+                raise RuntimeError(
+                    'rpc fabio_claim_notificacao_por_referencia 400: '
+                    '{"code":"23514","message":"new row for relation '
+                    '\\"fabio_notificacoes\\" violates check constraint '
+                    '\\"fabio_notificacoes_tipo_check\\""}')
             if self.falhar_claim_para is not None and ref_id == self.falhar_claim_para:
                 raise RuntimeError("rpc fabio_claim_notificacao_por_referencia 502: bad gateway")
             chave = (body.get("p_referencia_tipo"), ref_id, body.get("p_canal"))
@@ -240,6 +257,42 @@ checar("13. run nao propaga a excecao do 1o alvo", True, r13.get("ok"))
 checar("13. 1o alvo registra erro isolado", "erro", r13["resultados"][0]["status"])
 checar("13. 2o alvo AINDA e processado (nao foi engolido)",
        "enviada", r13["resultados"][1]["status"])
+
+# ── 14. cenário C1 real: TODO claim morre com 23514 — o journal tem que ────
+# mostrar o erro por alvo, não "ok" com tudo falhando. Mata a regressão do
+# N1: agregar um log só por rodada e descartar o `erro` de cada resultado
+# (foi exatamente o isolamento por alvo do I4 que tornou isto alcançável —
+# antes, a exceção vazava pra fora do laço inteiro e o `except` do main()
+# era quem preenchia "error"; isolado por alvo, aquele `except` nunca mais
+# roda, e o campo "error" do topo do retorno nunca existiu).
+#
+# Replica literalmente o laço novo de main(): `for r in resultados: log(...)`.
+ALVO_4A = {"vinculo_id": 900, "aula_id": 1, "professor_id": 10,
+           "nome_aluno": "Aluno D1", "curso_nome": "Violão", "unidade_nome": "Barra",
+           "hora_fim": "09:00", "horas_em_atraso": 0}
+ALVO_4B = {"vinculo_id": 901, "aula_id": 2, "professor_id": 10,
+           "nome_aluno": "Aluno D2", "curso_nome": "Violão", "unidade_nome": "Barra",
+           "hora_fim": "09:10", "horas_em_atraso": 0}
+backend14 = FakeBackend([ALVO_4A, ALVO_4B], falhar_claim_sempre=True)
+r14 = rodar(backend14)
+
+logadas: list[dict] = []
+with patch.object(worker, "log", side_effect=lambda msg, **f: logadas.append(f)):
+    for _r in r14.get("resultados") or []:
+        worker.log("event_result", **_r)
+
+checar("14. retorno.ok continua True (nao propaga)", True, r14.get("ok"))
+checar("14. 'error' no TOPO do retorno nao existe (a forma e por resultado)",
+       False, "error" in r14)
+checar("14. os DOIS alvos falharam de verdade", ["erro", "erro"],
+       [x["status"] for x in r14["resultados"]])
+checar("14. o journal tem UMA linha por alvo", 2, len(logadas))
+checar("14. NENHUMA linha do journal diz status=ok", True,
+       all(linha.get("status") != "ok" for linha in logadas))
+checar("14. cada linha carrega o erro de verdade (nao None)", True,
+       all(linha.get("erro") for linha in logadas))
+checar("14. cada linha carrega o vinculo (pra saber QUAL alvo falhou)",
+       {900, 901}, {linha.get("vinculo_id") for linha in logadas})
 
 print(f"\n{total - len(falhas)}/{total} passaram")
 if falhas:

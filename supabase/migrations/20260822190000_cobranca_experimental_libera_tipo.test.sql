@@ -33,6 +33,21 @@ begin
     raise exception 'FALHOU 0: fabio_notificacoes_tipo_check nao existe mais';
   end if;
 
+  -- 0b. sentinela do N2 (revisão): a migration original tinha feito
+  -- `drop constraint` + `add constraint` sem reinstalar o COMMENT — o
+  -- aviso escrito na 20260815120000 pra evitar a QUINTA mordida sumiu de
+  -- produção bem na migration que consertava a quarta. Sem este caso, um
+  -- `drop constraint`/`add constraint` futuro pode repetir o apagão em
+  -- silêncio: nenhum dos casos 1-3 percebe a ausência do COMMENT.
+  if obj_description(
+    (select oid from pg_constraint
+      where conrelid = 'public.fabio_notificacoes'::regclass
+        and conname = 'fabio_notificacoes_tipo_check'),
+    'pg_constraint'
+  ) is null then
+    raise exception 'FALHOU 0b: o COMMENT da fabio_notificacoes_tipo_check sumiu de novo';
+  end if;
+
   -- 1. o tipo NOVO — este é o claim real que o worker faz a cada 5 minutos
   r := public.fabio_claim_notificacao_por_referencia(
     v_prof, 'pendencia_experimental', 'governanca', 'whatsapp',

@@ -126,7 +126,10 @@ def run_experimental_lembrete(channel: str, dry_run: bool = False) -> Dict[str, 
         vinculo = linha.get("vinculo_id")
         if not pid or not vinculo:
             continue
-        resultado: Dict[str, Any] = {"vinculo_id": vinculo, "status": "init"}
+        resultado: Dict[str, Any] = {
+            "professor_id": pid, "event": "experimental_lembrete",
+            "vinculo_id": vinculo, "status": "init",
+        }
         try:
             prof = por_id.get(int(pid))
             if not prof:
@@ -1916,11 +1919,20 @@ def main() -> int:
         try:
             exp_result = run_experimental_lembrete(args.channel, args.dry_run)
         except Exception as exc:
-            exp_result = {"ok": False, "error": str(exc)[:500]}
-        log("event_result", event="experimental_lembrete",
-            status="ok" if exp_result.get("ok") else "error",
-            alvos=exp_result.get("alvos"), error=exp_result.get("error"))
-        results.append({"event": "experimental_lembrete", **exp_result})
+            # Mesma forma de {"ok", "resultados"} que o caminho feliz -- o
+            # laco de log abaixo nao precisa de um ramo especial pra isto.
+            exp_result = {"ok": False, "alvos": 0, "resultados": [
+                {"event": "experimental_lembrete", "status": "error", "error": str(exc)[:500]},
+            ]}
+        # Um log POR RESULTADO, como registro_recibo/sem_roster/devolutiva/
+        # feedback fazem (`for r in resultados: log("event_result", **r)`).
+        # A versao anterior agregava num log so por rodada e o `erro` de
+        # cada alvo -- inclusive o que o isolamento por alvo (I4) passou a
+        # capturar -- era montado e descartado: o journal dizia "ok" com
+        # 100% dos alvos falhando, pra sempre, a cada 5 minutos.
+        for r in exp_result.get("resultados") or []:
+            log("event_result", **r)
+        results.extend(exp_result.get("resultados") or [])
         if args.event == "experimental_lembrete":
             payload = {"ok": True, "results": results}
             print(json.dumps(payload, ensure_ascii=False) if args.json else payload)
