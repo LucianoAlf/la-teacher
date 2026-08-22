@@ -1,5 +1,54 @@
 # RETOMADA — LA Teacher
 
+> # 📋 Cobrança da devolutiva da EXPERIMENTAL — spec e plano prontos (22/08)
+>
+> **Spec:** `docs/superpowers/specs/2026-08-22-cobranca-devolutiva-experimental-design.md` (commit 75cac43, **aprovada pelo Alf**)
+> **Plano:** `docs/superpowers/plans/2026-08-22-cobranca-devolutiva-experimental.md` (commit 609b011)
+> **Execução:** subagente por tarefa. **O Alf pediu: NÃO usar haiku** — Sonnet 5 e Opus.
+>
+> **O problema (medido, 30 dias):** 169 experimentais encerradas sem conteúdo,
+> só 23 aparecem na cobrança, **146 invisíveis** — 49 delas de professor que TEM
+> o app. Causa: `vw_registro_pendencia` faz `JOIN alunos ON al.id = r.aluno_id`
+> e o lead entra no roster com `aluno_id` NULO. O Fábio nunca cobrou uma
+> experimental.
+>
+> **O que NÃO é problema (verificado, não reabrir):** a regra "professor lança →
+> presença automática + aviso ao comercial" existe e está certa (migration 038),
+> provada em rollback; o canal está em produção; e o carimbo lead×aluno já existe
+> em 3 camadas (categoria da aula, `emusys_lead_id` no roster, tabelas separadas).
+>
+> **Decisões do Alf no brainstorm:** gatilho = lead `experimental_realizada` (a
+> equipe passa a dar presença na CHEGADA do lead); cadência = lembrete ao fim da
+> aula → recobra à noite → manhã seguinte → escala em 3 dias; professor sem app
+> **fica fora**; UMA mensagem com seção carimbada; view nova (a de aluno não é
+> tocada).
+>
+> **Peça que o brainstorm revelou:** a **data de corte 22/08**. Sem ela o dia 1
+> despeja **27 escalonamentos** de backlog na coordenação; com ela nasce com **2**.
+>
+> **Constatado no código antes de planejar (poupou trabalho):** a trava de
+> duplicata já existe — `uq_fabio_notif_por_referencia` é UNIQUE em
+> (`referencia_tipo`,`referencia_id`,`canal`), então "uma vez por vínculo" sai de
+> graça usando `referencia_tipo='experimental_vinculo'`. E ⚠️ `mark_sent` EXIGE
+> `lease_token` quando o claim é por referência — sem ele a notificação fica presa
+> em `processando` com a mensagem já entregue (aconteceu 03/08).
+>
+> ## ✅ Feito hoje, antes do plano
+>
+> - **2 devolutivas entregues ao comercial** (autorizado pelo Alf): Antônio Soares
+>   (Bateria, Matheus Reis, Recreio → Daiana) — **parada há 12 dias** — e Raquel
+>   Silvestre (Canto, Daiana, Campo Grande → Vitória). Ambas: presença virou
+>   `presente` fonte `professor_la_teacher`, vínculo `realizado`, aviso `enviada`
+>   11:27. Roteamento por unidade (`unidade_contato_comercial`) funcionando:
+>   Barra→Kailane, Recreio→Daiana, CG→Vitória.
+> - **SEGURADA a do Davi** (Isaque): áudio de 15s gerou frase sem sentido
+>   ("remfah de mobile") e `devolutiva_familia`/`proximos_passos` VAZIOS. Mandar
+>   pro comercial seria pior que não mandar. **Pendente: pedir ao Isaque que
+>   regrave** — ou o Alf autorizar mandar assim.
+>
+> ---
+>
+
 > # 🔎 AUDITORIA da devolutiva experimental (22/08) — a máquina está inteira, falta o gatilho
 >
 > Pergunta do Alf: *"de aluno está cobrando; será que de aula experimental não
