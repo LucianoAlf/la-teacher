@@ -7,6 +7,16 @@ declare
   v_lead_a integer; v_lead_b integer; v_lead_c integer;
   v_vinc_a bigint; v_vinc_b bigint; v_vinc_c bigint;
 begin
+  -- SENTINELA DE VAZAMENTO — antes de qualquer insert ou DDL. Este teste
+  -- redefine fn_data_corte_experimental() em produção (ver comentário mais
+  -- abaixo); se uma rodada anterior tiver perdido o raise exception final
+  -- por algum motivo, o corte fica preso em 2000-01-01 e todo run seguinte
+  -- rodaria sobre uma régua errada, em silêncio. Aborta alto e explícito em
+  -- vez de deixar isso passar despercebido.
+  if public.fn_data_corte_experimental() <> date '2026-08-22' then
+    raise exception 'ABORTADO: fn_data_corte_experimental esta em % (esperado 2026-08-22) — provavel vazamento de uma rodada anterior deste teste; conferir antes de rodar', public.fn_data_corte_experimental();
+  end if;
+
   -- === CENARIO SINTETICO ===
   -- A view vw_experimental_pendencia fica em 0 linhas por horas seguidas —
   -- é o normal do dia a dia (aula recém-encerrada ainda não virou pendência,
@@ -30,6 +40,9 @@ begin
   -- no fim deste bloco aborta a transação implícita do comando inteiro e
   -- desfaz esta redefinição (DDL é transacional) junto com os dados
   -- sintéticos — não precisa de restore manual.
+  -- ⚠️ QUEM FOR EDITAR: o raise exception do fim do bloco É o que desfaz
+  -- isto. Tirá-lo (p.ex. "pra ver o resultado sem abortar") deixa
+  -- fn_data_corte_experimental() = 2000-01-01 valendo em PRODUÇÃO.
   execute $ddl$
     create or replace function public.fn_data_corte_experimental()
     returns date language sql immutable parallel safe
