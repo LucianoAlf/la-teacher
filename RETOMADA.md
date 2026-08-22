@@ -1,5 +1,44 @@
 # RETOMADA — LA Teacher
 
+> # ✅ Raquel e Davi recuperados — o reconciliador ignora uma chave que já existe (22/08)
+>
+> Os dois experimentais que eu tinha terminalizado foram **recuperados**. O que
+> mudou: achei que o casamento lead↔aula era inferência por nome. Não é — **o
+> próprio lead já carrega `emusys_aula_id`**, e ele bate EXATO com a aula onde o
+> professor gravou (Raquel 744195, Davi 260689). O reconciliador
+> (`fn_reconciliar_experimental_por_lead`) casa por **chave natural**
+> (professor+horário+curso) e **não usa `emusys_aula_id`** — por isso devolvia
+> `sem_par` com a resposta na mesa.
+>
+> Casado com `casado_por='manual'` (a allowlist do CHECK só aceita
+> `chave_natural|manual|emusys_lead_id`; usar `emusys_lead_id` seria mentir
+> sobre a chave) e `vinculado_por='correcao_22ago_emusys_aula_id_com_audio'`.
+> **Testado em rollback ANTES: rodei o reconciliador depois de casar e ele NÃO
+> desfaz** — o casamento é durável, não vira briga de duas chaves.
+>
+> Registros gerados (ambos `aguardando_confirmacao` do professor):
+> - **Raquel Silvestre** — `10bf797a`, 773 chars, 3 campos (anotação +
+>   devolutiva família + próximos passos). Campo Grande, 11/08 16:00–16:25,
+>   Sala 6 Canto, Canto T, profª **Daiana**.
+> - **Davi Nakashima** — `ec77c23a`, 140 chars, só anotação (áudio de 15s).
+>   Barra, 13/08 18:00–19:00, Studio, profº **Isaque**.
+>
+> **Fila 100% resolvida:** os 4 encalhados viraram 3 recuperados
+> (Antônio `6cb10906`, Raquel `10bf797a`, Davi `ec77c23a`) + 1 terminalizado
+> (`7893ce03`, arquivo ausente). Auditoria diz `fila de áudios limpa`.
+>
+> **DEFEITO DE PRODUTO em aberto (vale corrigir na régua, não caso a caso):**
+> o reconciliador deveria tentar `emusys_aula_id` como chave antes de desistir.
+> Hoje há **10 vínculos** com `aula_local_id` nulo cujo lead JÁ tem
+> `emusys_aula_id` resolvível. Nenhum deles tem áudio de professor (então não
+> há prova do nosso lado) — mas 3 estão como lead `experimental_realizada` com
+> vínculo `faltou`: Rafael Alberigi (Recreio 12/08 19h, Musicalização Bebês),
+> Zion Rafael (Recreio 19/08 15h, Musicalização Bebês), Gilson Nunes (Recreio
+> 21/08 13h, Teclado). Todos em aula de TURMA (a aula já tem 2 vínculos), então
+> o casamento por ID sozinho não resolve — precisa de regra pra turma.
+>
+> ---
+>
 > # ✅ Fila de áudios LIMPA + repositórios em dia (22/08)
 >
 > **Alarme diário calou.** O relatório agora diz `fila de áudios limpa` e sobra
