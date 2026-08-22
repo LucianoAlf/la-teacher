@@ -1,12 +1,15 @@
 # ~/.config/systemd/user/fabio-experimental-lembrete.service
 [Unit]
-Description=Fábio — lembra o professor da devolutiva logo após a experimental
+Description=Fabio - lembra o professor da devolutiva logo apos a aula experimental
+After=network-online.target
 
 [Service]
 Type=oneshot
 WorkingDirectory=/home/fabio/fabio-chat-bridge
 EnvironmentFile=/home/fabio/.hermes/.env
-ExecStart=/usr/bin/flock -n /tmp/fabio-experimental-lembrete.lock /usr/bin/python3 fabio_notification_worker.py --event experimental_lembrete --channel whatsapp --json
+ExecStart=/usr/bin/flock -n /tmp/fabio-experimental-lembrete.lock /usr/bin/python3 /home/fabio/fabio-chat-bridge/fabio_notification_worker.py --event experimental_lembrete --channel whatsapp --json
+StandardOutput=append:/home/fabio/.hermes/logs/fabio-experimental-lembrete.out.log
+StandardError=append:/home/fabio/.hermes/logs/fabio-experimental-lembrete.err.log
 
 # ~/.config/systemd/user/fabio-experimental-lembrete.timer
 [Unit]
@@ -16,6 +19,8 @@ Description=Dispara o lembrete da experimental a cada 5 minutos
 OnBootSec=2min
 OnUnitActiveSec=5min
 AccuracySec=30s
+Persistent=false
+Unit=fabio-experimental-lembrete.service
 
 [Install]
 WantedBy=timers.target
