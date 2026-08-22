@@ -287,14 +287,32 @@ _CAMPOS = [
 def _ultima_aula_lines(aluno: Dict[str, Any]) -> list[str]:
     """Bloco de um aluno. O nome vem em negrito, sozinho na linha e com um
     respiro embaixo (pedido do Alf) — antes ele ficava no meio de
-    'Aluno(a): fulano' e se perdia na rolagem."""
+    "Aluno(a): fulano" e se perdia na rolagem.
+
+    Pedido do Isaque (21/08): se o aluno faltou na última aula, avisar isso
+    ("Faltou na última aula · data") — MAS o conteúdo mostrado deve ser o da
+    última aula em que ele esteve PRESENTE (a RPC já entrega assim), nunca
+    "aluna ausente" nem em branco."""
     cabecalho = [f"👤 *{display_student_name(aluno)}*", ""]
     ultima = aluno.get("ultima_aula") if isinstance(aluno, dict) else None
 
+    faltou_br = _format_date_br(aluno.get("faltou_data")) if isinstance(aluno, dict) else ""
+    aviso_falta = (
+        [f"⚠️ *Faltou na última aula · {faltou_br}*"]
+        if (isinstance(aluno, dict) and aluno.get("faltou_recente") and faltou_br)
+        else []
+    )
+    rotulo_ultima = "última aula presente" if aviso_falta else "última aula"
+
     if not isinstance(ultima, dict) or not ultima:
         resumo = _encurtar(aluno.get("resumo_ultima_aula") if isinstance(aluno, dict) else "")
-        return cabecalho + ([f"✅ *Trabalho feito:* {resumo}"] if resumo
-                            else ["_Sem conteúdo registrado da última aula._"])
+        if resumo:
+            corpo = [f"✅ *Trabalho feito:* {resumo}"]
+        elif aviso_falta:
+            corpo = []
+        else:
+            corpo = ["_Sem conteúdo registrado da última aula._"]
+        return cabecalho + aviso_falta + corpo
 
     dados = {chave: _clean_text(ultima.get(chave)) for chave, _, _ in _CAMPOS}
     for chave in ("trabalho_feito", "foco"):
@@ -309,7 +327,7 @@ def _ultima_aula_lines(aluno: Dict[str, Any]) -> list[str]:
     corpo: list[str] = []
     data_br = _format_date_br(ultima.get("data"))
     if data_br:
-        corpo.append(f"_última aula · {data_br}_")
+        corpo.append(f"_{rotulo_ultima} · {data_br}_")
     campos_com_texto = 0
     for chave, emoji, rotulo in _CAMPOS:
         valor = _encurtar(dados.get(chave, ""))
@@ -318,7 +336,7 @@ def _ultima_aula_lines(aluno: Dict[str, Any]) -> list[str]:
             campos_com_texto += 1
     if not campos_com_texto:
         corpo.append("_Sem conteúdo registrado da última aula._")
-    return cabecalho + corpo
+    return cabecalho + aviso_falta + corpo
 
 
 def _summary_lines_for_class(alunos: list[Dict[str, Any]]) -> list[str]:
