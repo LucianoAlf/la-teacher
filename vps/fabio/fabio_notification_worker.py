@@ -948,6 +948,18 @@ def montar_escalonamento(rows: list) -> list:
     return mensagens
 
 
+def _dias_em_atraso_txt(l: Dict[str, Any]) -> str:
+    """'há quanto tempo', defensivo contra chave ausente.
+
+    `l.get('dias_em_atraso')` sozinho renderiza a string 'None' quando a
+    chave falta — nada quebra, e a mensagem sai com '· há None dia(s)' pra
+    coordenação (I2, revisão 22/08/2026). Não uso `or '?'`: `dias_em_atraso`
+    pode ser um `int` e `0 or '?'` viraria '?' errado.
+    """
+    dias = l.get("dias_em_atraso")
+    return str(dias) if dias is not None else "?"
+
+
 def format_escalonamento_experimental(linhas: Optional[list], teto: Optional[int] = None) -> Optional[str]:
     """Bloco da experimental no escalonamento à coordenação.
 
@@ -960,27 +972,36 @@ def format_escalonamento_experimental(linhas: Optional[list], teto: Optional[int
     régua fecha a pendência só com devolutiva CONFIRMADA, então um lead que
     nunca for confirmado nunca sai da lista — a coordenação precisa do
     total honesto. Se o corte fosse na RPC, a mensagem das 9h cresceria pra
-    sempre sem ninguém decidir isso. Quem corta é a mensagem: mostra os N
-    primeiros (já ordenados por dias_em_atraso desc, vinculo_id — vindo da
-    própria RPC) e diz "+X mais" — mesmo padrão que format_pendencias já usa
-    pra lista de aulas do aluno ("e mais N."), em vez de inventar um segundo
-    jeito de truncar no mesmo arquivo.
+    sempre sem ninguém decidir isso.
+
+    Ruling 18 (22/08/2026, revisão): o teto corta DETALHE, não corta GENTE.
+    A RPC ordena por dias_em_atraso desc — sem rodapé, os N primeiros
+    lugares ficam PERMANENTEMENTE ocupados pelos leads mais velhos (que
+    nunca saem da lista, por desenho), e os leads que acabaram de passar da
+    janela viravam só um número. format_escalonamento (:840) já resolveu
+    isso pro aluno com o rodapé "*Também atrasados*" — "ninguém some da
+    lista", só o detalhe é que é racionado por gravidade. Este bloco
+    espelha o mesmo desenho: os N primeiros levam bloco completo (aluno,
+    unidade, quando, professor, dias); o resto leva uma linha (nome + dias),
+    nunca zero linhas.
     """
     if not linhas:
         return None
     limite = ESCALONAMENTO_EXPERIMENTAL_TETO if teto is None else teto
-    mostrar = linhas if limite <= 0 else linhas[:limite]
-    resto = 0 if limite <= 0 else len(linhas) - len(mostrar)
+    detalhados = linhas if limite <= 0 else linhas[:limite]
+    resto = [] if limite <= 0 else linhas[limite:]
 
     blocos = ["🎓 *Experimentais sem devolutiva*"]
-    for l in mostrar:
+    for l in detalhados:
         blocos.append(
             f"• *{l.get('nome_aluno') or 'lead'}* — {l.get('unidade_nome') or '?'}, "
             f"{l.get('quando') or '?'} · prof. {l.get('professor_nome') or '?'} "
-            f"· há {l.get('dias_em_atraso')} dia(s)"
+            f"· há {_dias_em_atraso_txt(l)} dia(s)"
         )
     if resto:
-        blocos.append(f"e mais {resto}.")
+        blocos.append("*Também atrasados*")
+        for l in resto:
+            blocos.append(f"· {l.get('nome_aluno') or 'lead'} — há {_dias_em_atraso_txt(l)} dia(s)")
     blocos.append("_O comercial não recebeu o retorno dessas experimentais._")
     return "\n".join(blocos)
 
@@ -990,14 +1011,18 @@ def linhas_experimental_escalonadas() -> list:
 
     Fonte separada de pendencias_escalonadas (aluno). Uma falha aqui NÃO pode
     derrubar o escalonamento do aluno, que já funciona — mesmo Ruling 15 da
-    Task 4 (capturar só a busca nova, logar alto, seguir sem ela).
+    Task 4 (capturar só a busca nova, logar alto, seguir sem ela). O
+    desempacotamento (`.get("linhas")`) mora DENTRO do `try` (revisão
+    22/08/2026, minor): uma resposta de shape inesperado (ex.: não é dict)
+    tem que cair no mesmo isolamento, não vazar um `AttributeError` cru pra
+    quem chamou.
     """
     try:
         data = rpc("fn_experimental_escalonadas", {})
+        return (data or {}).get("linhas") or []
     except Exception as exc:
         log("escalonamento_experimental_falhou", error=str(exc)[:300])
         return []
-    return (data or {}).get("linhas") or []
 
 
 def montar_mensagens_escalonamento(mensagens_aluno: list, linhas_exp: list) -> list:
@@ -1013,6 +1038,83 @@ def montar_mensagens_escalonamento(mensagens_aluno: list, linhas_exp: list) -> l
     if not bloco_exp:
         return list(mensagens_aluno)
     return list(mensagens_aluno) + [bloco_exp]
+
+
+def rodar_escalonamento(professor_id: Optional[int], dry_run: bool) -> Dict[str, Any]:
+    """Um resultado só: o escalonamento da coordenação (aluno + experimental).
+
+    Extraída de dentro de main() (I1, revisão 22/08/2026 do coordenador): o
+    fio que ligava montar_mensagens_escalonamento ao despacho não tinha
+    NENHUM teste — apagar as duas linhas de chamada de dentro de main()
+    deixava a suíte 22/22 verde do mesmo jeito, porque cada peça isolada
+    continuava certa sozinha. Com o corpo do despacho aqui, dá pra chamar
+    esta função direto do teste e provar que a ligação existe de verdade,
+    e main() vira só uma chamada — um mutante que apagar essa chamada quebra
+    o teste que lê `inspect.getsource(main)` (ver
+    teste_escalonamento_experimental.py).
+    """
+    enviadas = 0
+    experimental_enviado = False
+    linhas_exp: list = []
+    try:
+        linhas = pendencias_escalonadas(professor_id)
+        mensagens_aluno = montar_escalonamento(linhas)
+        professores = len({r.get("professor_id") for r in linhas})
+
+        # I5 (revisão 22/08/2026): fn_experimental_escalonadas() não recebe
+        # professor_id — é visão de coordenação, sempre a escola inteira.
+        # A unit systemd fabio-escalonamento.service roda hoje com
+        # --professor-id 25 e SEM --dry-run ("ATIVO, só professor 25");
+        # buscar a experimental nesse modo vazaria a lista da escola
+        # inteira pro grupo da coordenação. Pular é a única opção segura;
+        # pular em SILÊNCIO trocaria um defeito por outro, então loga.
+        if professor_id is not None:
+            log("escalonamento_experimental_pulado",
+                motivo="professor_id setado -- recorte de teste, nao coordenacao")
+        else:
+            linhas_exp = linhas_experimental_escalonadas()
+
+        n_aluno = len(mensagens_aluno)
+        mensagens = montar_mensagens_escalonamento(mensagens_aluno, linhas_exp)
+
+        if not mensagens:
+            return {"event": "escalonamento", "status": "sem_pendencia_escalonada"}
+        if dry_run:
+            return {"event": "escalonamento", "status": "dry_run_ready",
+                    "professores": professores, "experimentais": len(linhas_exp),
+                    "mensagens": len(mensagens),
+                    "content_preview": "\n\n>>> PRÓXIMA MENSAGEM >>>\n\n".join(mensagens)}
+        for i, corpo in enumerate(mensagens):
+            # O grupo recebe indice e unidades EM ORDEM. Enviar em rajada
+            # deixa a ordem por conta do WhatsApp, e indice que chega
+            # depois do corpo nao serve de indice.
+            if i:
+                _time.sleep(1.2)
+            # I4 (revisão 22/08/2026): evento explícito por mensagem — o
+            # bloco da experimental é sempre a ÚLTIMA (índice >= n_aluno).
+            # Sem isso, o journal grava "escalonamento_enviado" idêntico
+            # pra uma unidade do aluno e pro bloco da experimental, e
+            # contar OCORRÊNCIA em vez de EVENTO já causou incidente nesta
+            # casa (ver docstring de enviar_grupo).
+            evento = "escalonamento" if i < n_aluno else "escalonamento_experimental"
+            enviar_grupo(corpo, evento=evento)
+            enviadas += 1
+            if evento == "escalonamento_experimental":
+                experimental_enviado = True
+        return {"event": "escalonamento", "status": "sent", "professores": professores,
+                "experimentais": len(linhas_exp), "mensagens": enviadas}
+    except Exception as exc:
+        # `enviadas` conta o que JA foi pro grupo: falhar na 3ª de 4 nao é
+        # o mesmo que não ter enviado nada. E o bloco da experimental é
+        # sempre o ÚLTIMO da fila — se a falha aconteceu antes dele sair, a
+        # coordenação ficou sem a lista e o journal precisa dizer isso
+        # explicitamente (I4), não só "enviadas=N" que exige que quem lê já
+        # saiba de cor a ordem das mensagens.
+        resultado = {"event": "escalonamento", "status": "error",
+                     "enviadas": enviadas, "error": str(exc)[:500]}
+        if linhas_exp and not experimental_enviado:
+            resultado["experimental_perdida"] = True
+        return resultado
 
 
 MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -2101,46 +2203,15 @@ def main() -> int:
     # por professor.
     if "escalonamento" in due_events:
         due_events = [e for e in due_events if e != "escalonamento"]
-        enviadas = 0
-        try:
-            linhas = pendencias_escalonadas(args.professor_id)
-            mensagens = montar_escalonamento(linhas)
-            professores = len({r.get("professor_id") for r in linhas})
-
-            # Experimental: fonte e janela PROPRIAS (fn_experimental_escalonadas,
-            # 3 dias -- fn_janela_experimental_dias), independentes de
-            # pendencias_escalonadas (aluno).
-            linhas_exp = linhas_experimental_escalonadas()
-            mensagens = montar_mensagens_escalonamento(mensagens, linhas_exp)
-
-            if not mensagens:
-                results.append({"event": "escalonamento", "status": "sem_pendencia_escalonada"})
-            elif args.dry_run:
-                results.append({"event": "escalonamento", "status": "dry_run_ready",
-                                "professores": professores,
-                                "experimentais": len(linhas_exp),
-                                "mensagens": len(mensagens),
-                                "content_preview": "\n\n>>> PRÓXIMA MENSAGEM >>>\n\n".join(mensagens)})
-            else:
-                for i, corpo in enumerate(mensagens):
-                    # O grupo recebe indice e unidades EM ORDEM. Enviar em
-                    # rajada deixa a ordem por conta do WhatsApp, e indice que
-                    # chega depois do corpo nao serve de indice.
-                    if i:
-                        _time.sleep(1.2)
-                    enviar_grupo(corpo)
-                    enviadas += 1
-                results.append({"event": "escalonamento", "status": "sent",
-                                "professores": professores,
-                                "experimentais": len(linhas_exp),
-                                "mensagens": enviadas})
-        except Exception as exc:
-            # `enviadas` conta o que JA foi pro grupo: falhar na 3ª de 4 nao é
-            # o mesmo que não ter enviado nada, e o log tem que saber a
-            # diferença antes de alguém decidir reenviar.
-            results.append({"event": "escalonamento", "status": "error",
-                            "enviadas": enviadas, "error": str(exc)[:500]})
-        log("event_result", **results[-1])
+        # Corpo inteiro mora em rodar_escalonamento() (I1, revisão
+        # 22/08/2026): antes vivia inline aqui dentro de main() e não tinha
+        # NENHUM teste — apagar as duas linhas que ligavam a experimental ao
+        # despacho deixava a suíte inteira verde. Não simplificar de volta
+        # pra inline sem repor a cobertura (ver
+        # teste_escalonamento_experimental.py, guarda por inspect.getsource).
+        resultado = rodar_escalonamento(args.professor_id, args.dry_run)
+        results.append(resultado)
+        log("event_result", **resultado)
 
     if "feedback" in due_events:
         due_events = [e for e in due_events if e != "feedback"]
