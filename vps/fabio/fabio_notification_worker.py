@@ -542,6 +542,24 @@ def _dias_em_atraso(aula: Dict[str, Any]) -> int:
     return 0
 
 
+def format_secao_experimental(linhas: Optional[list]) -> Optional[str]:
+    """Seção da experimental dentro da mensagem de pendências.
+
+    Carimbada e separada de propósito (pedido do Alf): lead não é aluno, e
+    misturar os dois na mesma lista apaga a diferença. Uma mensagem só, duas
+    seções — duas mensagens no mesmo horário competiriam por atenção.
+    """
+    if not linhas:
+        return None
+    itens = []
+    for l in linhas:
+        nome = (l.get("nome_aluno") or "lead").split()[0]
+        quando = l.get("quando") or ""
+        itens.append(f"{nome} ({quando})" if quando else nome)
+    return (f"🎓 *Experimentais* — {len(itens)} sem devolutiva: "
+            f"{', '.join(itens)} · _o comercial está esperando_")
+
+
 def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[str]:
     """Cobrança do professor.
 
@@ -551,10 +569,21 @@ def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[st
 
     O fecho manda abrir o APP de propósito: o registro por áudio no WhatsApp
     ainda não está ligado, e mandar áudio pro Fabio aqui não registra nada.
+
+    A seção da experimental (Task 4) é buscada ANTES dos early returns: quem
+    tem só experimental pendente — sem nenhuma aula de aluno atrasada, que é o
+    caso mais comum — precisa continuar recebendo a mensagem. Do jeito que a
+    função nasceu, os dois `return None` abaixo engoliriam essa seção inteira
+    (capacidade nova, caminho anterior que nunca alcança).
     """
-    if int(data.get("total_aulas") or 0) <= 0:
-        return None
+    secao_exp = format_secao_experimental(
+        (rpc("fn_experimental_pendencia_do_professor",
+             {"p_professor_id": int(prof.get("id") or 0)}) or {}).get("linhas"))
+
     nome = first_name(prof)
+    if int(data.get("total_aulas") or 0) <= 0:
+        return (f"*{nome}, tem experimental sem devolutiva.*\n\n{secao_exp}"
+                if secao_exp else None)
     aulas = data.get("aulas") or []
 
     # O que passou de ESCALONAMENTO_DIAS nao e mais cobranca do professor: subiu
@@ -570,7 +599,8 @@ def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[st
     # paragrafo acima diz evitar.
     aulas = [a for a in aulas if _dias_em_atraso(a) <= ESCALONAMENTO_DIAS]
     if not aulas:
-        return None
+        return (f"*{nome}, tem experimental sem devolutiva.*\n\n{secao_exp}"
+                if secao_exp else None)
 
     # Titulo e janela saem do conjunto JA FILTRADO. Antes o cabecalho era
     # montado com o total bruto, entao ele podia anunciar um numero maior do
@@ -606,6 +636,10 @@ def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[st
     if len(aulas) > mostradas:
         lines.append("")
         lines.append(f"e mais {len(aulas) - mostradas}.")
+
+    if secao_exp:
+        lines.append("")
+        lines.append(secao_exp)
 
     lines.append("")
     lines.append("É só abrir o app do LA Teacher e mandar o áudio de cada aula "
