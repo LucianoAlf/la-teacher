@@ -71,7 +71,11 @@ PROF = {"id": 42, "nome": "Ana Beatriz", "telefone_whatsapp": "5521999999999"}
 
 def fake_rpc_com_experimental(name, body):
     assert name == "fn_experimental_pendencia_do_professor"
-    assert body == {"p_professor_id": 42}, "professor_id errado (prof['id'], nao prof['professor_id']!)"
+    # N2: o id errado nao vira AssertionError (fixture opinando), vira dado —
+    # o professor_id trocado passa a nao achar nada, e quem mata o mutante M4
+    # e um checar() de verdade, nao um assert de teste que some sob -OO.
+    if body != {"p_professor_id": 42}:
+        return {"ok": True, "linhas": []}
     return {"ok": True, "linhas": [
         {"vinculo_id": 2275, "nome_aluno": "Davi Nakashima",
          "curso_nome": "Aula Experimental", "unidade_nome": "Barra",
@@ -122,6 +126,75 @@ with patch.object(worker, "rpc", side_effect=fake_rpc_com_experimental):
     msg_os_dois = worker.format_pendencias(PROF, DATA_COM_AULA)
 checar("9. aula + experimental: as duas secoes aparecem", True,
        msg_os_dois is not None and "Rafael" in msg_os_dois and "Davi" in msg_os_dois)
+
+
+# ---------------------------------------------------------------------------
+# I2 (revisao): "parecida" nao e "identica". Um mutante que tira o
+# `lines.append("")` de dentro da guarda `if secao_exp:` (passando a inserir
+# uma linha em branco a mais em TODA mensagem, inclusive de quem nao tem
+# experimental) sai 15/15 nos casos 1-9 porque nenhum deles compara a string
+# inteira — so trechos. Aqui a comparacao e byte a byte contra a mensagem de
+# aluno-so (sem experimental), a mesma que a Task 4 promete nao mudar.
+# ---------------------------------------------------------------------------
+
+MSG_ALUNO_SO_ESPERADO = (
+    "*Ana, ficou 1 aula de ontem sem registro.*\n"
+    "\n"
+    "sexta, 21/08\n"
+    "*14:00*  Violão · Rafael\n"
+    "\n"
+    f"{worker.FECHO_ABRIR_APP}"
+)
+
+checar("8c. mensagem aluno-so e IDENTICA byte a byte (nao so 'parecida')",
+       MSG_ALUNO_SO_ESPERADO, msg_so_aluno)
+
+
+# ---------------------------------------------------------------------------
+# Ruling 16 (Alf): a secao experimental respeita o MESMO corte de
+# ESCALONAMENTO_DIAS que a regua do aluno ja usa — quem passou da janela e
+# problema da coordenacao (Task 5), cobrar aqui tambem seria a cobranca em
+# dobro que o comentario do filtro de aulas ja existe pra evitar.
+# ---------------------------------------------------------------------------
+
+DENTRO_DA_JANELA = worker.ESCALONAMENTO_DIAS       # limite inclusivo: <= ainda cobra
+FORA_DA_JANELA = worker.ESCALONAMENTO_DIAS + 1     # passou: escalonou, nao cobra mais aqui
+
+
+def fake_rpc_janela_mista(name, body):
+    assert name == "fn_experimental_pendencia_do_professor"
+    return {"ok": True, "linhas": [
+        {"vinculo_id": 2275, "nome_aluno": "Davi Nakashima",
+         "curso_nome": "Aula Experimental", "unidade_nome": "Barra",
+         "quando": "21/08 18:00", "dias_em_atraso": DENTRO_DA_JANELA},
+        {"vinculo_id": 2280, "nome_aluno": "Raquel Prado",
+         "curso_nome": "Aula Experimental", "unidade_nome": "Tijuca",
+         "quando": "18/08 19:00", "dias_em_atraso": FORA_DA_JANELA},
+    ]}
+
+
+def fake_rpc_so_fora_da_janela(name, body):
+    assert name == "fn_experimental_pendencia_do_professor"
+    return {"ok": True, "linhas": [
+        {"vinculo_id": 2280, "nome_aluno": "Raquel Prado",
+         "curso_nome": "Aula Experimental", "unidade_nome": "Tijuca",
+         "quando": "18/08 19:00", "dias_em_atraso": FORA_DA_JANELA},
+    ]}
+
+
+with patch.object(worker, "rpc", side_effect=fake_rpc_janela_mista):
+    msg_janela_mista = worker.format_pendencias(PROF, {"total_aulas": 0})
+checar("11. lead DENTRO da janela aparece", True,
+       msg_janela_mista is not None and "Davi" in msg_janela_mista)
+checar("11b. lead FORA da janela (ja escalonado) NAO aparece", False,
+       msg_janela_mista is not None and "Raquel" in msg_janela_mista)
+
+# NEGATIVO: so tem lead fora da janela e nenhuma aula — ninguem sobra pra
+# cobrar, e a mensagem inteira tem que sumir (nao so a secao).
+with patch.object(worker, "rpc", side_effect=fake_rpc_so_fora_da_janela):
+    msg_so_fora = worker.format_pendencias(PROF, {"total_aulas": 0})
+checar("12. so lead escalonado e zero aulas: mensagem inteira e None", None,
+       msg_so_fora)
 
 
 # ---------------------------------------------------------------------------
