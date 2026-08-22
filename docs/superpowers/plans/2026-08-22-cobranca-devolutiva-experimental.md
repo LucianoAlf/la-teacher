@@ -89,8 +89,11 @@ begin
   select v.vinculo_id, v.aula_id into v_vinculo, v_aula
     from vw_experimental_pendencia v limit 1;
   if v_vinculo is not null then
-    insert into lead_experimental_registros (vinculo_id, status, anotacao_pedagogica)
-      values (v_vinculo, 'aguardando_confirmacao', 'teste');
+    -- unidade_id e NOT NULL sem default nesta tabela: omitir derruba o INSERT
+    -- por violacao de NOT NULL, e a falha PARECE o RED legitimo do passo 3.
+    insert into lead_experimental_registros (vinculo_id, unidade_id, status, anotacao_pedagogica)
+      select v_vinculo, a.unidade_id, 'aguardando_confirmacao', 'teste'
+        from aulas_emusys a where a.id = v_aula;
     if not exists (select 1 from vw_experimental_pendencia where vinculo_id = v_vinculo) then
       raise exception 'FALHOU 5: pendencia fechou com registro NAO confirmado (vinculo %)', v_vinculo;
     end if;
@@ -710,17 +713,50 @@ def format_secao_experimental(linhas: Optional[list]) -> Optional[str]:
             f"{', '.join(itens)} · _o comercial está esperando_")
 ```
 
-Em `format_pendencias`, após montar a seção de aulas, anexar:
+⚠️ **`format_pendencias` tem DOIS early returns que engoliriam a seção nova.**
+Conferido no arquivo: a função começa com
+`if int(data.get("total_aulas") or 0) <= 0: return None` e, depois do filtro de
+escalonamento, faz `if not aulas: return None`. O professor que tem **só**
+experimental pendente — o caso mais comum hoje (2 pendências, nenhuma de aula) —
+**nunca receberia a seção**. É o padrão "capacidade nova engolida por caminho
+anterior": o código novo está certo e inalcançável.
+
+A seção é buscada **antes** dos returns, e eles passam a considerá-la. A lista
+que a função monta chama-se `lines` (não `partes`):
 
 ```python
-    exp = (rpc("fn_experimental_pendencia_do_professor",
-               {"p_professor_id": int(prof.get("professor_id"))}) or {}).get("linhas")
-    secao = format_secao_experimental(exp)
-    if secao:
-        partes.append(secao)
+def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[str]:
+    # ... docstring existente ...
+    # A seção da experimental é buscada ANTES dos early returns: quem tem só
+    # experimental pendente (e nenhuma aula) precisa receber a mensagem.
+    secao_exp = format_secao_experimental(
+        (rpc("fn_experimental_pendencia_do_professor",
+             {"p_professor_id": int(prof.get("professor_id") or 0)}) or {}).get("linhas"))
+
+    nome = first_name(prof)
+    if int(data.get("total_aulas") or 0) <= 0:
+        # antes: return None
+        return f"*{nome}, tem experimental sem devolutiva.*\n\n{secao_exp}" if secao_exp else None
+    aulas = data.get("aulas") or []
+    aulas = [a for a in aulas if _dias_em_atraso(a) <= ESCALONAMENTO_DIAS]
+    if not aulas:
+        return f"*{nome}, tem experimental sem devolutiva.*\n\n{secao_exp}" if secao_exp else None
+
+    # ... todo o corpo existente que monta `lines`, sem alteração ...
+
+    # ANTES do fecho que manda abrir o app, anexar a seção:
+    if secao_exp:
+        lines.append("")
+        lines.append(secao_exp)
+
+    lines.append("")
+    lines.append("É só abrir o app do LA Teacher e mandar o áudio de cada aula "
+                 "— eu escrevo o resto. Se preferir, dá pra fechar tudo por lá mesmo.")
+    return "\n".join(lines)
 ```
 
-(`partes` é a lista de blocos que `format_pendencias` já junta; se o nome local for outro, usar o existente — não renomear.)
+Manter o corpo existente intacto — só mover `nome = first_name(prof)` para antes
+do primeiro return e inserir os trechos marcados.
 
 - [ ] **Step 4: Rodar o teste — verde**
 
@@ -887,12 +923,19 @@ Em `run_experimental_lembrete`, antes de `deliver`:
 ```python
         destino = EXPERIMENTAL_DEST_OVERRIDE or None
         if destino:
-            deliver_to_number(destino, corpo)   # helper já usado pelo aviso comercial
+            # Mesmo caminho do fabio_aviso_comercial_worker.py (linhas 74-86).
+            # NÃO existe deliver_to_number no worker — conferido.
+            r = bridge.uazapi_post("/send/text",
+                                   json=bridge.whatsapp_send_payload(destino, corpo))
+            if r.status_code >= 400:
+                raise RuntimeError(f"uazapi send/text {r.status_code}: {r.text[:300]}")
         else:
             deliver(pid, channel, corpo)
 ```
 
-(Se o worker não expuser `deliver_to_number`, usar o mesmo caminho que o `fabio_aviso_comercial_worker.py` usa para mandar a número fixo — **não** inventar cliente novo.)
+⚠️ Conferir a assinatura exata do POST em `vps/fabio/fabio_aviso_comercial_worker.py:74-86`
+e **copiá-la**, em vez de inventar cliente novo. Se o helper de POST tiver outro
+nome no `bridge`, usar o que o arquivo usa.
 
 - [ ] **Step 2: Instalar unit e timer na VPS, com override ligado**
 
