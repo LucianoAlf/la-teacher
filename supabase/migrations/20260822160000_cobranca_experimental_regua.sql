@@ -57,12 +57,19 @@ where
   and (a.data_hora_fim at time zone 'America/Sao_Paulo')::date >= public.fn_data_corte_experimental()
   -- não se cobra quem não tem a ferramenta
   and public.fn_professor_usa_app(a.professor_id)
-  -- fecha na CONFIRMAÇÃO: gravado e não confirmado o comercial não recebe
+  -- fecha na CONFIRMAÇÃO — allowlist, não denylist. `status` tem DEFAULT
+  -- 'rascunho' (NOT NULL) e o CHECK aceita rascunho|aguardando_confirmacao|
+  -- confirmado|descartado. Um denylist ("not in descartado/aguardando")
+  -- trataria 'rascunho' como "tem devolutiva" — e todo INSERT que omite o
+  -- status cai em 'rascunho' por default, fechando a pendência sem o
+  -- comercial nunca ter recebido nada. A allowlist erra pro lado seguro: um
+  -- status novo no futuro mantém a pendência ABERTA (cobra de mais, alguém
+  -- vê) em vez de fechá-la em silêncio (cobra de menos, ninguém vê).
   and not exists (
     select 1 from public.lead_experimental_registros r
      where r.vinculo_id = v.id
-       and r.status not in ('descartado', 'aguardando_confirmacao')
+       and r.status = 'confirmado'
   );
 
 comment on view public.vw_experimental_pendencia is
-  'Experimental realizada, do corte pra frente, cujo professor tem o app e ainda nao CONFIRMOU a devolutiva. Regua propria: a de aluno (vw_registro_pendencia) nao e tocada.';
+  'Experimental realizada, do corte pra frente, cujo professor tem o app e ainda nao CONFIRMOU a devolutiva. Fecha por ALLOWLIST (so status=confirmado fecha) de proposito: rascunho e o DEFAULT da tabela, e um denylist trataria omissao de status como devolutiva feita. Regua propria: a de aluno (vw_registro_pendencia) nao e tocada.';
