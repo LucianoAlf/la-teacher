@@ -5575,3 +5575,67 @@ no `.env` — o primeiro envio real do **lembrete** vai pro Alf, não pro profes
    de conta — não é coisa que eu faça. Enquanto não forem liberados, a máquina
    não alcança a maior parte do problema, porque a régua só cobra quem tem a
    ferramenta.
+
+---
+
+## FECHO 22/08/2026 — a cobrança da experimental está ENTREGUE
+
+Este bloco substitui o checkpoint acima onde houver divergência: ele é o
+último, e foi escrito com o estado **medido no fecho**, não lembrado.
+
+**Conferido agora:** `git status` limpo e em sync com `origin/main`; sha256 de
+7 arquivos do `vps/fabio` idênticos entre repo e VPS; no banco a view + as 5
+funções, 15 tipos no `fabio_notificacoes_tipo_check`, corte 2026-08-22, janela
+3 dias, e `vw_experimental_pendencia` **fechada para `anon`**.
+
+**O que isso conserta:** `vw_registro_pendencia` faz INNER JOIN em `alunos`, e
+no roster de uma experimental o lead entra com `aluno_id` NULO — o Fábio
+**nunca** tinha cobrado uma experimental. Eram 146 de 169 invisíveis à cobrança
+em 30 dias.
+
+Plano e spec em `docs/superpowers/`. Ledger com as 21 rulings e os incidentes em
+`.superpowers/sdd/2026-08-22-cobranca-devolutiva-experimental/progress.md`
+(git-ignored — **não sobrevive a `git clean`**).
+
+**A partição está fechada e provada:** o professor é cobrado enquanto
+`dias_em_atraso < fn_janela_experimental_dias()`; a coordenação assume a partir
+de `>=`. As duas pontas leem a MESMA função do banco.
+
+**O rollout está protegido nas 4 mensagens:** qualquer mensagem com a seção
+`🎓 Experimentais` é desviada pro WhatsApp do Alf (`5521981278047`). Professor
+sem experimental recebe a cobrança de aluno no próprio número — provado byte a
+byte (o `--dry-run` de `--event pendencia` na VPS dá o mesmo sha256 antes e
+depois do deploy, descontando só os campos de relógio).
+
+### O que continua aberto — nada disso é código
+
+1. **Primeiro envio real:** acontece sozinho na próxima experimental de um
+   professor com o app. Cai no celular do Alf.
+2. **Virar a chave:** esvaziar `FABIO_EXPERIMENTAL_DEST_OVERRIDE` no `~/.hermes/.env`.
+3. **Ligar a coordenação:** `FABIO_ESCALONAMENTO_EXPERIMENTAL_ATIVO=true`.
+   Desligado de propósito — o corte nasceu em 22/08, ninguém tem 3 dias de
+   atraso antes de terça 25/08.
+4. **12 professores SEM usuário no sistema** dão as experimentais órfãs (Erick
+   Cosme 21, Ana Beatriz 14, Gabriel Santos 10, Larissa 8, Gabriel Antony 7,
+   Israel 7, Joel 7, Caio 6, Marcos 6, Adriana 5, Matheus Lana 5, Alexandre 4).
+   É criação de acesso. **Enquanto não entrarem, a régua não os alcança — ela só
+   cobra quem tem a ferramenta.** Maior item da lista, e não é técnico.
+5. **Badge LEAD no app** — decisão 4b da spec que **nenhuma task adotou**. A
+   revisão final olhou: a lista de pendências monta de `minhaAgendaSessao`
+   filtrando `statusSessao === 'pendente'`, que é chamada não enviada, não
+   devolutiva não confirmada. O professor recebe a cobrança e **não acha o item
+   no app**. Frente de front-end própria.
+6. **Ordem do bloco do escalonamento:** hoje mostra os leads mais ANTIGOS. Se o
+   comercial se importa mais com o lead quente, é uma linha.
+
+### Dois erros meus deste dia, que o repo precisa lembrar
+
+- **Mandei WhatsApp pro professor errado.** Tinha o telefone do Isaque na tela e
+  passei `professor_id=50` de memória — 50 é o Alan Samico. Envio não tem
+  rollback. O Alf avisou o Alan; a correção foi enviada. Memória:
+  `id-chutado-manda-pra-pessoa-errada`.
+- **Propaguei uma frase falsa do repo pro código.** O `fabio-pendencia.systemd.txt`
+  dizia que a unit do escalonamento roda com `--professor-id 25`; a unit VIVA não
+  tem filtro nenhum. A mentira viajou repo → revisão → meu ledger → comentário no
+  código sem ninguém abrir o systemd. **Um `.txt` que descreve uma unit não é a
+  unit.**
