@@ -5554,10 +5554,14 @@ no `.env` — o primeiro envio real do **lembrete** vai pro Alf, não pro profes
 
 **PRÓXIMO PASSO — o que falta é humano, não código:**
 
-0. **O override cobre só o LEMBRETE.** A recobrança (units `fabio-pendencia-noite`
-   23:50 UTC e `fabio-pendencia-manha` 11:30 UTC, ambas ATIVAS) sai por `deliver()`
-   sem desvio — a seção `🎓 Experimentais` iria direto pro professor. Conserto em
-   andamento. **Não considerar o rollout protegido até isto fechar.**
+0. ~~O override cobre só o LEMBRETE~~ **RESOLVIDO** 22/08 20:08 UTC (commit a3e3bb5,
+   deployado e conferido por sha256). O desvio passou a valer para qualquer mensagem
+   que contenha a seção `🎓 Experimentais`, inclusive a recobrança das units
+   `fabio-pendencia-noite` e `-manha`. Professor **sem** experimental continua
+   recebendo a cobrança de aluno no próprio número — provado byte a byte: o
+   `--dry-run` de `--event pendencia` na VPS antes e depois do deploy dá o mesmo
+   sha256 descontando só os campos de relógio. **O rollout está protegido nas 4
+   mensagens.**
 
 
 1. ~~Número do Alf~~ FEITO: `5521981278047` no `.env`.
