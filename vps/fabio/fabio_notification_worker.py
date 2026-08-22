@@ -39,6 +39,12 @@ ESCALONAMENTO_BLOCOS_POR_UNIDADE = int(os.getenv("FABIO_ESCALONAMENTO_BLOCOS", "
 # Abaixo deste tamanho a lista cabe numa mensagem só e não se divide por
 # unidade — 4 notificações pra uma lista de 5 professores é cerimônia.
 ESCALONAMENTO_MENSAGEM_UNICA_MAX = int(os.getenv("FABIO_ESCALONAMENTO_UNICA_MAX", "6000"))
+# Ruling 10 (22/08/2026): fn_experimental_escalonadas() nao tem teto de
+# proposito — a regua fecha a pendencia so com devolutiva CONFIRMADA, entao
+# um lead que nunca for confirmado nunca sai da lista, e o total honesto
+# importa pra coordenacao. Quem corta e a MENSAGEM: mostra os N primeiros e
+# diz "+X mais", nunca a RPC.
+ESCALONAMENTO_EXPERIMENTAL_TETO = int(os.getenv("FABIO_ESCALONAMENTO_EXPERIMENTAL_TETO", "10"))
 # COORDENACAO PEDAGOGICA (Marcos Quintela, Juliane, Fabio). Puxado da UAZAPI.
 GRUPO_COORDENACAO_JID = os.getenv("FABIO_GRUPO_COORDENACAO_JID", "120363304349910605@g.us")
 DEFAULT_ESCALONAMENTO_TIME = os.getenv("FABIO_NOTIFY_ESCALONAMENTO_TIME", "09:00")
@@ -940,6 +946,73 @@ def montar_escalonamento(rows: list) -> list:
         if corpo:
             mensagens.append(corpo)
     return mensagens
+
+
+def format_escalonamento_experimental(linhas: Optional[list], teto: Optional[int] = None) -> Optional[str]:
+    """Bloco da experimental no escalonamento à coordenação.
+
+    Separado do escalonamento de aluno: a janela é de 3 dias
+    (fn_janela_experimental_dias), não 7, porque o lead esfria — e a fonte é
+    fn_experimental_escalonadas(), não fn_pendencias_escalonadas().
+
+    Ruling 10 (22/08/2026): o teto fica AQUI, na montagem da mensagem, NÃO
+    na RPC. fn_experimental_escalonadas() não tem teto de propósito: a
+    régua fecha a pendência só com devolutiva CONFIRMADA, então um lead que
+    nunca for confirmado nunca sai da lista — a coordenação precisa do
+    total honesto. Se o corte fosse na RPC, a mensagem das 9h cresceria pra
+    sempre sem ninguém decidir isso. Quem corta é a mensagem: mostra os N
+    primeiros (já ordenados por dias_em_atraso desc, vinculo_id — vindo da
+    própria RPC) e diz "+X mais" — mesmo padrão que format_pendencias já usa
+    pra lista de aulas do aluno ("e mais N."), em vez de inventar um segundo
+    jeito de truncar no mesmo arquivo.
+    """
+    if not linhas:
+        return None
+    limite = ESCALONAMENTO_EXPERIMENTAL_TETO if teto is None else teto
+    mostrar = linhas if limite <= 0 else linhas[:limite]
+    resto = 0 if limite <= 0 else len(linhas) - len(mostrar)
+
+    blocos = ["🎓 *Experimentais sem devolutiva*"]
+    for l in mostrar:
+        blocos.append(
+            f"• *{l.get('nome_aluno') or 'lead'}* — {l.get('unidade_nome') or '?'}, "
+            f"{l.get('quando') or '?'} · prof. {l.get('professor_nome') or '?'} "
+            f"· há {l.get('dias_em_atraso')} dia(s)"
+        )
+    if resto:
+        blocos.append(f"e mais {resto}.")
+    blocos.append("_O comercial não recebeu o retorno dessas experimentais._")
+    return "\n".join(blocos)
+
+
+def linhas_experimental_escalonadas() -> list:
+    """Busca fn_experimental_escalonadas() pro escalonamento da coordenação.
+
+    Fonte separada de pendencias_escalonadas (aluno). Uma falha aqui NÃO pode
+    derrubar o escalonamento do aluno, que já funciona — mesmo Ruling 15 da
+    Task 4 (capturar só a busca nova, logar alto, seguir sem ela).
+    """
+    try:
+        data = rpc("fn_experimental_escalonadas", {})
+    except Exception as exc:
+        log("escalonamento_experimental_falhou", error=str(exc)[:300])
+        return []
+    return (data or {}).get("linhas") or []
+
+
+def montar_mensagens_escalonamento(mensagens_aluno: list, linhas_exp: list) -> list:
+    """Anexa o bloco da experimental (se houver) à fila de mensagens do aluno.
+
+    Mensagem própria, apensada por último — não mistura no texto do
+    índice/unidade do aluno, que tem racionamento por gravidade próprio
+    (ESCALONAMENTO_BLOCOS_POR_UNIDADE) e não deve mudar de tamanho por causa
+    de um bloco de outra origem. Sem pendência experimental, devolve a lista
+    do aluno intacta — o escalonamento que já funciona não muda.
+    """
+    bloco_exp = format_escalonamento_experimental(linhas_exp)
+    if not bloco_exp:
+        return list(mensagens_aluno)
+    return list(mensagens_aluno) + [bloco_exp]
 
 
 MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -2033,11 +2106,19 @@ def main() -> int:
             linhas = pendencias_escalonadas(args.professor_id)
             mensagens = montar_escalonamento(linhas)
             professores = len({r.get("professor_id") for r in linhas})
+
+            # Experimental: fonte e janela PROPRIAS (fn_experimental_escalonadas,
+            # 3 dias -- fn_janela_experimental_dias), independentes de
+            # pendencias_escalonadas (aluno).
+            linhas_exp = linhas_experimental_escalonadas()
+            mensagens = montar_mensagens_escalonamento(mensagens, linhas_exp)
+
             if not mensagens:
                 results.append({"event": "escalonamento", "status": "sem_pendencia_escalonada"})
             elif args.dry_run:
                 results.append({"event": "escalonamento", "status": "dry_run_ready",
                                 "professores": professores,
+                                "experimentais": len(linhas_exp),
                                 "mensagens": len(mensagens),
                                 "content_preview": "\n\n>>> PRÓXIMA MENSAGEM >>>\n\n".join(mensagens)})
             else:
@@ -2051,6 +2132,7 @@ def main() -> int:
                     enviadas += 1
                 results.append({"event": "escalonamento", "status": "sent",
                                 "professores": professores,
+                                "experimentais": len(linhas_exp),
                                 "mensagens": enviadas})
         except Exception as exc:
             # `enviadas` conta o que JA foi pro grupo: falhar na 3ª de 4 nao é
