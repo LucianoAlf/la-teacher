@@ -1,5 +1,35 @@
 # RETOMADA — LA Teacher
 
+> # 🔧 Execução da cobrança da experimental — em andamento (22/08)
+>
+> Plano: `docs/superpowers/plans/2026-08-22-cobranca-devolutiva-experimental.md`
+> Ledger vivo: `.superpowers/sdd/2026-08-22-cobranca-devolutiva-experimental/progress.md`
+>
+> **Task 1 COMPLETA** (commits 73ee33a..544e9a7): `vw_experimental_pendencia`,
+> `fn_data_corte_experimental()` = 2026-08-22, `fn_janela_experimental_dias()` = 3.
+> Teste verde, mutantes mortos, revisão limpa.
+>
+> ⚠️ **Nota para quem auditar migrations:** o arquivo
+> `20260822160000_cobranca_experimental_regua.sql` foi corrigido **in-place**
+> depois de aplicado (troca de denylist por allowlist), então o ledger do
+> Supabase tem **DUAS versões** para um arquivo só: `20260822144447` e
+> `20260822150018`. O DDL é `create or replace`, idempotente, e o conteúdo do
+> arquivo bate byte a byte com a view aplicada (conferido na revisão). Não é
+> divergência de conteúdo — é ruído de ledger. Neste projeto o timestamp do
+> arquivo nunca bate com a versão do ledger de qualquer forma.
+>
+> **Achados que o processo pegou (todos eram defeitos MEUS, no plano/spec):**
+> 1. 🔴 A seção da experimental morreria nos dois early returns de
+>    `format_pendencias` — quem tem só experimental pendente não receberia nada.
+> 2. 🔴 `lead_experimental_registros.status` tem DEFAULT `'rascunho'`; o denylist
+>    que a spec pedia fecharia a pendência **sem o comercial receber nada**.
+>    Virou allowlist (`= 'confirmado'`).
+> 3. O INSERT do teste omitia `unidade_id` (NOT NULL sem default).
+> 4. `deliver_to_number` não existe no worker.
+>
+> ---
+
+
 > # 📋 Cobrança da devolutiva da EXPERIMENTAL — spec e plano prontos (22/08)
 >
 > **Spec:** `docs/superpowers/specs/2026-08-22-cobranca-devolutiva-experimental-design.md` (commit 75cac43, **aprovada pelo Alf**)
