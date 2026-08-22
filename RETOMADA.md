@@ -1,5 +1,53 @@
 # RETOMADA — LA Teacher
 
+> # ⚠️ CORREÇÃO: o conserto do reconciliador que eu propus era o ERRADO (22/08)
+>
+> O bloco de baixo diz "vale corrigir na régua: o reconciliador deveria tentar
+> `emusys_aula_id`". **O Alf mandou testar antes de aplicar. Testei. Não aplica.**
+>
+> **1) A chave nunca foi o problema.** A chave que a função JÁ usa
+> (`emusys_lead_id` do roster) bate PERFEITO em Raquel e Davi: 14755=14755 e
+> 7226=7226, mesma data, mesma unidade, experimental, não cancelada. Ela nunca
+> tentou porque o loop **pula lead que já tem vínculo em estado final**
+> (`and v.estado <> 'pendente'`) — os dois estavam `faltou` — e porque a janela
+> é `data_experimental between hoje-2 and hoje+7`.
+>
+> **2) A proposta valeria quase nada.** Simulado em SELECT puro: dos 10
+> candidatos, **8 ficam BLOQUEADOS** pelo índice único `uq_lead_exp_aula_ocupada`
+> (uma aula experimental só aceita UM vínculo vigente) e só **2 casariam**
+> (Daniela Andrade v339, Felipe Salgado v352) — nenhum com áudio de professor.
+> Os 3 do Recreio que eu tinha listado pra você cobrar estão entre os bloqueados.
+>
+> **3) O `faltou` não é default de casamento falho** — é espelho do funil.
+> `fn_reconciliar_experimental_aulas` linha 121:
+> `elsif v_lead.status = 'experimental_faltou' ... set estado = 'faltou'`.
+> E há decisão explícita (revisão do Alfredo) de NUNCA promover
+> `faltou -> realizado` automático: *"promover mentiria que a aula aconteceu"*.
+> Está certo como desenho.
+>
+> **O PROBLEMA REAL é 20x maior e é outro.** O comercial marca o lead como
+> faltou, depois corrige pra `experimental_realizada` — e o vínculo fica
+> congelado em `faltou` para sempre, sem ninguém ser avisado. Medido (60 dias,
+> 08/08–21/08):
+>
+> | | |
+> |---|---|
+> | leads em contradição (lead=realizada/convertido, vínculo=faltou) | **39** |
+> | com o professor marcado **presente** na aula | **35** |
+> | com áudio do professor | 2 |
+> | **com devolutiva gerada** | **0** |
+>
+> 39 experimentais que aconteceram e **nenhuma** virou devolutiva pro comercial
+> usar na conversão. Nada no sistema mostra isso hoje.
+>
+> **DECISÃO DO ALF (não apliquei nada):** o certo é promover `faltou` quando há
+> PROVA (professor presente / áudio / registro), ou pelo menos listar as 39 pra
+> coordenação. Promover sem prova é justamente o que o Alfredo proibiu — então
+> a régua da prova é decisão de negócio, não minha.
+>
+> ---
+>
+
 > # ✅ Raquel e Davi recuperados — o reconciliador ignora uma chave que já existe (22/08)
 >
 > Os dois experimentais que eu tinha terminalizado foram **recuperados**. O que
