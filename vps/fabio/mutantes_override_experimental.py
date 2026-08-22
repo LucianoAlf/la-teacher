@@ -96,6 +96,29 @@ MUTANTES = [
               "                            or f\"professor_id:{pid}\"))",
         "para": "                        destino_original=True)",
     },
+    {
+        "nome": "M5 -- run_event() nunca desvia (C2: as 2 recobrancas ficam de fora)",
+        "pega": "caso 22 -- com a secao experimental no corpo e o override"
+                " ligado, run_event() (recobranca noite/manha) TEM que desviar"
+                " pro destino configurado tambem, nao so o lembrete imediato",
+        "de": "        if contem_secao_experimental(content):\n"
+              "            override = resolve_experimental_override(pid, prof, content)\n"
+              "        else:\n"
+              "            override = {\"destino\": None, \"corpo\": content}",
+        "para": "        override = {\"destino\": None, \"corpo\": content}",
+    },
+    {
+        "nome": "M6 -- run_event() desvia SEMPRE, mesmo sem secao experimental"
+                " (o override vira mudo geral em vez de trilha experimental)",
+        "pega": "caso 20 -- cobranca de aluno PURA (sem secao experimental)"
+                " tem que continuar indo pro proprio numero do professor"
+                " mesmo com o override ligado",
+        "de": "        if contem_secao_experimental(content):\n"
+              "            override = resolve_experimental_override(pid, prof, content)\n"
+              "        else:\n"
+              "            override = {\"destino\": None, \"corpo\": content}",
+        "para": "        override = resolve_experimental_override(pid, prof, content)",
+    },
 ]
 
 

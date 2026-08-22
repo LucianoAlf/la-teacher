@@ -631,6 +631,15 @@ def _dias_em_atraso(aula: Dict[str, Any]) -> int:
     return 0
 
 
+# Carimbo da seção da experimental dentro da mensagem de pendências
+# (format_secao_experimental). É o mesmo texto usado por
+# `contem_secao_experimental` (C2, revisão 22/08/2026) pra decidir se uma
+# mensagem de `run_event` precisa passar pelo override de rollout — os dois
+# lugares têm que concordar, senão o gate para de bater com o que a seção
+# realmente produz.
+MARCADOR_SECAO_EXPERIMENTAL = "🎓 *Experimentais*"
+
+
 def format_secao_experimental(linhas: Optional[list]) -> Optional[str]:
     """Seção da experimental dentro da mensagem de pendências.
 
@@ -645,8 +654,27 @@ def format_secao_experimental(linhas: Optional[list]) -> Optional[str]:
         nome = (l.get("nome_aluno") or "lead").split()[0]
         quando = l.get("quando") or ""
         itens.append(f"{nome} ({quando})" if quando else nome)
-    return (f"🎓 *Experimentais* — {len(itens)} sem devolutiva: "
+    return (f"{MARCADOR_SECAO_EXPERIMENTAL} — {len(itens)} sem devolutiva: "
             f"{', '.join(itens)} · _o comercial está esperando_")
+
+
+def contem_secao_experimental(corpo: Optional[str]) -> bool:
+    """A mensagem carrega a seção da experimental (Task 4, format_secao_experimental)?
+
+    C2 (revisão 22/08/2026): o override de rollout (`EXPERIMENTAL_DEST_OVERRIDE`)
+    só desviava `run_experimental_lembrete` — as duas units de recobrança já
+    ativas em produção (`fabio-pendencia-noite`/`-manha`, 20:50 e 08:30 BRT)
+    chamam `run_event("pendencia", ...)` direto, sem NENHUM desvio, e
+    `format_pendencias` pode embutir esta mesma seção quando o professor tem
+    lead sem devolutiva. Sem este gate por CONTEÚDO, a primeira mensagem real
+    da trilha da experimental cairia direto no professor, sem ninguém ter
+    conferido — o mesmo buraco que o Passo 2 do rollout existe pra fechar.
+
+    O gate é por conteúdo, não por evento: cobrança de aluno pura (sem seção
+    experimental) continua indo pro próprio número do professor mesmo com o
+    override ligado — o override é da trilha experimental, não um mudo geral.
+    """
+    return MARCADOR_SECAO_EXPERIMENTAL in (corpo or "")
 
 
 FECHO_ABRIR_APP = ("É só abrir o app do LA Teacher e mandar o áudio de cada aula "
@@ -1910,7 +1938,29 @@ def run_event(event: str, prof: Dict[str, Any], channel: str, dry_run: bool, tar
         return result
     notification_id = claim.get("notificacao_id")
     try:
-        deliver(pid, channel, content)
+        # C2 (revisão 22/08/2026): mesmo desvio de `run_experimental_lembrete`,
+        # reaproveitado aqui — `resolve_experimental_override` e
+        # `enviar_uazapi_direto` já existem, não um segundo mecanismo. O gate
+        # é `contem_secao_experimental(content)`: cobrança de aluno pura sem
+        # a seção da experimental segue por `deliver()` normalmente, mesmo
+        # com o override ligado.
+        if contem_secao_experimental(content):
+            override = resolve_experimental_override(pid, prof, content)
+        else:
+            override = {"destino": None, "corpo": content}
+        if override["destino"]:
+            enviar_uazapi_direto(override["destino"], override["corpo"])
+            # Mesmo motivo do log em run_experimental_lembrete: sem ele a
+            # auditoria de fabio_notificacoes leria "professor avisado" quando
+            # quem recebeu foi o destino de teste.
+            log("experimental_override_ativo",
+                professor_id=pid, evento=event,
+                destino_override=override["destino"],
+                destino_original=(
+                    bridge.canonical_phone(prof.get("telefone_whatsapp") or "")
+                    or f"professor_id:{pid}"))
+        else:
+            deliver(pid, channel, content)
         mark_sent(notification_id)
         result["status"] = "sent"
     except Exception as exc:

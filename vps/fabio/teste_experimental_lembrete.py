@@ -104,7 +104,7 @@ class FakeBackend:
     """Dublê do lado servidor: registra toda chamada, nunca toca a rede."""
 
     def __init__(self, alvos, *, pode_notificar=True, falhar_claim_para=None,
-                 falhar_claim_sempre=False):
+                 falhar_claim_sempre=False, falhar_mark_sent_sempre=False):
         self.alvos = alvos
         self.pode_notificar = pode_notificar
         # referencia_id que deve explodir o claim (simula 502 transitório) —
@@ -113,6 +113,11 @@ class FakeBackend:
         # simula o C1 real: TODO claim morre com 23514 (tipo fora da
         # allowlist) — usado no caso 14 (N1: journal por alvo).
         self.falhar_claim_sempre = falhar_claim_sempre
+        # C1 (revisão 22/08/2026): força a RPC de marcar-enviada a devolver
+        # False sempre, não importa o corpo — usado pra provar que o worker
+        # RESPEITA o retorno (status vira 'entregue_mas_nao_fechada'), seja
+        # qual for o motivo da cerca ter recusado.
+        self.falhar_mark_sent_sempre = falhar_mark_sent_sempre
         self.chamadas_alvos = []   # corpo de cada chamada a fn_experimental_lembrete_alvos
         self.claims = []           # corpo de cada chamada de claim
         self._claimadas = set()    # (tipo, referencia_id, canal) já entregues
@@ -147,6 +152,17 @@ class FakeBackend:
                     "lease_token": f"lease-{len(self.claims)}"}
         if name == "fabio_marcar_notificacao_enviada":
             self.marcadas_enviadas.append(dict(body))
+            if self.falhar_mark_sent_sempre:
+                return False
+            # Mesma cerca da 018: o claim POR REFERENCIA escreve lease_token,
+            # entao mark_sent SEM p_lease_token no corpo nao casa com nenhum
+            # lado da cerca no banco real — a RPC devolve False (zero
+            # linhas), nunca True. Sem esta simulacao, o mutante "trocar
+            # mark_sent(notificacao_id, lease_token) por
+            # mark_sent(notificacao_id)" (C1) passa 100% verde neste fake,
+            # porque nada aqui reagia a token ausente.
+            if "p_lease_token" not in body:
+                return False
             return True
         if name == "fabio_marcar_notificacao_falhou":
             self.marcadas_falhas.append(dict(body))
@@ -380,6 +396,224 @@ checar("19. dry_run + override: nenhum envio de override sai", [], backend19.ove
 checar("19. dry_run + override: nenhum deliver sai", [], backend19.entregues)
 checar("19. dry_run + override: status dry_run_ready", "dry_run_ready",
        r19["resultados"][0]["status"])
+
+# ============================================================================
+# CASOS 20+ — C2 (revisão 22/08/2026): o override também cobre run_event().
+#
+# POR QUE ISTO EXISTE. Os casos 15-19 só provam o desvio dentro de
+# `run_experimental_lembrete` (o lembrete imediato). As DUAS units de
+# recobrança já ativas em produção (fabio-pendencia-noite/-manha, 20:50 e
+# 08:30 BRT) chamam `run_event("pendencia", ...)` direto — outro caminho de
+# código inteiro, com `claim_notification`/`mark_sent` diferentes do claim
+# por referência. Sem o gate em `run_event`, a primeira cobrança real da
+# trilha (a que carrega a seção 🎓 *Experimentais*) cairia direto no
+# professor mesmo com o override ligado — a partição do rollout valeria só
+# pra 1 das 4 mensagens.
+#
+# O gate é por CONTEÚDO (`contem_secao_experimental`), não por evento:
+# cobrança de aluno pura (sem a seção) tem que continuar indo pro próprio
+# número do professor mesmo com o override ligado, porque o override é da
+# trilha experimental — não um mudo geral do worker inteiro.
+# ============================================================================
+
+PROF_RUN_EVENT = {"id": 42, "nome": "Ana Beatriz",
+                   "telefone_whatsapp": "5521999999999", "ativo": True}
+
+DATA_SO_ALUNO_RUN_EVENT = {
+    "total_aulas": 1,
+    "aulas": [{"data": "2026-08-21", "hora": "14:00", "curso": "Violão",
+               "alunos": [{"primeiro_nome": "Rafael", "nome": "Rafael Souza"}],
+               "dias_em_atraso": 1}],
+}
+
+LINHA_EXPERIMENTAL_RUN_EVENT = {
+    "vinculo_id": 2275, "nome_aluno": "Davi Nakashima",
+    "curso_nome": "Aula Experimental", "unidade_nome": "Barra",
+    "quando": "21/08 18:00", "dias_em_atraso": 1,
+}
+
+
+def fazer_rpc_run_event(*, com_experimental: bool, estado: dict):
+    """Dublê de `rpc()` pro caminho de `run_event` (evento 'pendencia').
+
+    Nomes DIFERENTES do claim por referência: `fabio_claim_notificacao` (sem
+    lease) e `fabio_marcar_notificacao_enviada` sem `p_lease_token` — é
+    exatamente o caminho que as units de recobrança usam.
+    """
+    def rpc(name, body):
+        if name == "fn_fabio_pode_notificar":
+            return True
+        if name == "fabio_pendencias_professor":
+            return {"total_aulas": 0} if com_experimental else DATA_SO_ALUNO_RUN_EVENT
+        if name == "fn_experimental_pendencia_do_professor":
+            if com_experimental:
+                return {"ok": True, "linhas": [LINHA_EXPERIMENTAL_RUN_EVENT]}
+            return {"ok": True, "linhas": []}
+        if name == "fabio_claim_notificacao":
+            estado["claims"].append(dict(body))
+            return {"ok": True, "claimed": True,
+                    "notificacao_id": f"notif-run-event-{len(estado['claims'])}"}
+        if name == "fabio_marcar_notificacao_enviada":
+            estado["marcadas"].append(dict(body))
+            return True
+        raise AssertionError(f"rpc inesperado no fake de run_event: {name} {body}")
+    return rpc
+
+
+def rodar_run_event(event, prof, *, com_experimental, override, dry_run=False):
+    estado = {"claims": [], "marcadas": []}
+    entregues: list = []
+    overrides_enviados: list = []
+    logadas: list = []
+    with patch.object(worker, "rpc", side_effect=fazer_rpc_run_event(
+            com_experimental=com_experimental, estado=estado)), \
+         patch.object(worker, "deliver",
+                      side_effect=lambda pid, ch, corpo: entregues.append((pid, ch, corpo)) or {"ok": True}), \
+         patch.object(worker, "enviar_uazapi_direto",
+                      side_effect=lambda destino, corpo: overrides_enviados.append((destino, corpo))), \
+         patch.object(worker, "EXPERIMENTAL_DEST_OVERRIDE", override), \
+         patch.object(worker, "log", side_effect=lambda msg, **f: logadas.append({"msg": msg, **f})):
+        resultado = worker.run_event(event, prof, "whatsapp", dry_run)
+    return resultado, entregues, overrides_enviados, estado, logadas
+
+
+TELEFONE_CANONICO_PROF_RUN_EVENT = worker.bridge.canonical_phone(
+    PROF_RUN_EVENT["telefone_whatsapp"])
+
+# ── 20. cobrança de aluno PURA (sem seção experimental) ignora o override ──
+# É o caso que a spec pede por nome: "professor sem seção experimental tem
+# que continuar recebendo a cobrança de aluno normalmente, no próprio
+# número, mesmo com o override ligado". Sem o gate por conteúdo, este caso
+# vazaria pro destino de teste também.
+r20, entregues20, overrides20, estado20, _ = rodar_run_event(
+    "pendencia", PROF_RUN_EVENT, com_experimental=False, override="5521777770000")
+checar("20. sem secao experimental: status sent", "sent", r20.get("status"))
+checar("20. sem secao experimental: deliver() E chamado (nao desvia)", 1, len(entregues20))
+checar("20. sem secao experimental: NADA sai pelo caminho de override", [], overrides20)
+checar("20. sem secao experimental: foi pro professor de verdade", 42,
+       entregues20[0][0] if entregues20 else None)
+
+# ── 21. regressão: com experimental, override DESLIGADO segue normal ──────
+r21, entregues21, overrides21, _, _ = rodar_run_event(
+    "pendencia", PROF_RUN_EVENT, com_experimental=True, override="")
+checar("21. override vazio + com experimental: ainda vai por deliver()", 1, len(entregues21))
+checar("21. override vazio + com experimental: nada de override", [], overrides21)
+
+# ── 22. C2: com a seção experimental, override ligado DESVIA ──────────────
+# Mata o buraco relatado: a recobrança (run_event) tinha que respeitar o
+# MESMO desvio do lembrete imediato — antes deste conserto, run_event nem
+# olhava pra EXPERIMENTAL_DEST_OVERRIDE.
+r22, entregues22, overrides22, estado22, logadas22 = rodar_run_event(
+    "pendencia", PROF_RUN_EVENT, com_experimental=True, override="5521777770000")
+checar("22. com secao experimental + override: status sent", "sent", r22.get("status"))
+checar("22. com secao experimental + override: deliver() NAO e chamado", [], entregues22)
+checar("22. com secao experimental + override: saiu pelo caminho de override", 1, len(overrides22))
+checar("22. com secao experimental + override: foi pro numero configurado",
+       "5521777770000", overrides22[0][0] if overrides22 else None)
+
+corpo_enviado_22 = overrides22[0][1] if overrides22 else ""
+checar("22b. corpo carrega aviso de TESTE", True, "TESTE" in corpo_enviado_22)
+checar("22c. corpo cita o professor que seria o destinatario real", True,
+       "Ana Beatriz" in corpo_enviado_22)
+checar("22d. o texto ORIGINAL da cobranca (secao experimental) continua dentro",
+       True, "Davi" in corpo_enviado_22)
+
+# ── 23. o log carrega o destino ORIGINAL e o EVENTO, não só "houve override" ─
+logs_override_23 = [l for l in logadas22 if l["msg"] == "experimental_override_ativo"]
+checar("23. log de override emitido exatamente 1x", 1, len(logs_override_23))
+checar("23. log carrega o destino do override", "5521777770000",
+       (logs_override_23[0] if logs_override_23 else {}).get("destino_override"))
+checar("23. log carrega o destino ORIGINAL (telefone canonico do professor)",
+       TELEFONE_CANONICO_PROF_RUN_EVENT,
+       (logs_override_23[0] if logs_override_23 else {}).get("destino_original"))
+checar("23. log carrega o evento (pendencia)", "pendencia",
+       (logs_override_23[0] if logs_override_23 else {}).get("evento"))
+
+# ── 24. a fila fecha do mesmo jeito com override ligado (mark_sent chamado) ─
+checar("24. claim reservado normalmente mesmo com override", 1, len(estado22["claims"]))
+checar("24. mark_sent chamado (fila fecha, nao fica presa em 'processando')",
+       1, len(estado22["marcadas"]))
+
+# ============================================================================
+# CASOS 25+ — C1 (revisão 22/08/2026): invariante 4 sem teste, dois mutantes
+# vivos 58/58 verde.
+#
+# A spec diz "mutante vivo = trava sem teste". O CÓDIGO está certo — dois
+# ticks seguidos dão 'enviada' e depois 'ja_avisado', com uma entrega só.
+# O que faltava era o teste que DISTINGUE isso de um código sem a guarda.
+#
+# Nenhum dos fakes até o caso 24 exercitava `claimed=False` (o retorno do
+# SEGUNDO tick pro MESMO vínculo) nem um `mark_sent` que devolve False — por
+# isso os dois mutantes abaixo passavam 58/58. `FakeBackend.rpc` foi
+# ajustado (fabio_marcar_notificacao_enviada) pra simular a cerca real da
+# 018: corpo sem `p_lease_token` devolve False, nunca True — sem isso o
+# mutante "mark_sent(notificacao_id, lease_token) -> mark_sent(notificacao_id)"
+# não tinha como ser detectado por NENHUM caso desta bancada, nem os antigos.
+# ============================================================================
+
+# ── 25. dois ticks no MESMO FakeBackend = UMA entrega só ──────────────────
+# Mata a remoção da guarda `if not claim.get("claimed"): status='ja_avisado';
+# continue` (~:241): sem ela, o segundo tick reenviaria a MESMA cobrança —
+# e o timer roda de 5 em 5 minutos numa janela de 20, então o professor
+# levaria o mesmo lembrete pra sempre, sem erro nenhum no journal.
+backend25 = FakeBackend([ALVO_1])
+r25_tick1 = rodar(backend25)
+r25_tick2 = rodar(backend25)
+checar("25. tick 1: enviada", "enviada", r25_tick1["resultados"][0]["status"])
+checar("25. tick 2 (mesmo vinculo, mesmo backend): ja_avisado",
+       "ja_avisado", r25_tick2["resultados"][0]["status"])
+checar("25. EXATAMENTE uma entrega nos dois ticks somados", 1, len(backend25.entregues))
+checar("25. os dois ticks tentaram o claim (1 reservou, 1 foi recusado)",
+       2, len(backend25.claims))
+checar("25. so existe UMA notificacao marcada como enviada", 1,
+       len(backend25.marcadas_enviadas))
+
+# ── 26. mark_sent SEM p_lease_token não pode virar 'enviada' mentiroso ────
+# Mata a troca `mark_sent(notificacao_id, lease_token)` ->
+# `mark_sent(notificacao_id)` (~:264): o claim POR REFERÊNCIA sempre escreve
+# lease_token, então chamar mark_sent sem ele não casa com NENHUM lado da
+# cerca 018 no banco real — zero linhas afetadas, RPC devolve False, e a
+# notificação fica presa em 'processando' com a mensagem JÁ entregue. Pior
+# que "preso": a `fabio_claim_notificacao_por_referencia` re-reivindica
+# linha em 'processando' com lease vencido (lease de 10min contra janela de
+# 20) — SEGUNDA entrega no próximo tick.
+backend26 = FakeBackend([ALVO_1], falhar_mark_sent_sempre=True)
+r26 = rodar(backend26)
+checar("26. RPC de marcar-enviada recusa -> status NAO fecha como 'enviada'",
+       "entregue_mas_nao_fechada", r26["resultados"][0]["status"])
+checar("26. mesmo sem fechar, a mensagem FOI entregue (nao se perde silenciosamente)",
+       1, len(backend26.entregues))
+
+logadas26: list[dict] = []
+backend26b = FakeBackend([ALVO_1], falhar_mark_sent_sempre=True)
+with patch.object(worker, "rpc", side_effect=backend26b.rpc), \
+     patch.object(worker, "deliver", side_effect=backend26b.deliver), \
+     patch.object(worker, "enviar_uazapi_direto", side_effect=backend26b.enviar_override), \
+     patch.object(worker, "active_professors", return_value=PROFESSORES_FAKE), \
+     patch.object(worker, "EXPERIMENTAL_DEST_OVERRIDE", ""), \
+     patch.object(worker, "log", side_effect=lambda msg, **f: logadas26.append({"msg": msg, **f})):
+    worker.run_experimental_lembrete("whatsapp", dry_run=False)
+checar("26b. journal recebe 'notificacao_enviada_mas_nao_fechada' (nao fica calado)",
+       True, any(l["msg"] == "notificacao_enviada_mas_nao_fechada" for l in logadas26))
+
+# ── 27. a cerca simulada (018) pega o mutante de verdade: corpo sem token ──
+# Prova que o AJUSTE do fake (não só o caso novo) é o que fecha o buraco: se
+# o corpo do mark_sent não carregar p_lease_token, a RPC simulada já devolve
+# False sozinha — é essa reação que o mutante de código vai acionar quando a
+# arena rodar (ver mutantes_trava_experimental_lembrete.py).
+backend27 = FakeBackend([ALVO_1])
+with patch.object(worker, "rpc", side_effect=backend27.rpc), \
+     patch.object(worker, "deliver", side_effect=backend27.deliver), \
+     patch.object(worker, "enviar_uazapi_direto", side_effect=backend27.enviar_override), \
+     patch.object(worker, "active_professors", return_value=PROFESSORES_FAKE), \
+     patch.object(worker, "EXPERIMENTAL_DEST_OVERRIDE", ""):
+    # Chama mark_sent diretamente, do jeito que o mutante chamaria: sem token.
+    ok_sem_token = worker.mark_sent("notif-x")
+    ok_com_token = worker.mark_sent("notif-y", "lease-y")
+checar("27. mark_sent SEM lease_token: corpo simulado nao fecha (False)",
+       False, ok_sem_token)
+checar("27. mark_sent COM lease_token: corpo simulado fecha (True)",
+       True, ok_com_token)
 
 print(f"\n{total - len(falhas)}/{total} passaram")
 if falhas:
