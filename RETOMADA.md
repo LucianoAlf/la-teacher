@@ -5516,3 +5516,50 @@ validar esse tipo mantendo a enumeração fechada.
 **Próximo passo:** publicar o frontend do LA Teacher, manter o preview na prova
 do Matheus e continuar a ficha manual aprovada na branch separada
 `codex/registro-manual` (microfone + caderno, copiar campo + duplicar ficha).
+
+---
+
+## Checkpoint 22/08/2026 — cobrança da devolutiva da experimental NO AR (falta ligar)
+
+**Fato medido, não lembrança.** `git log --oneline 544e9a7..HEAD` = 12 commits;
+`systemctl --user list-unit-files "fabio-experimental-lembrete.*"` na VPS.
+
+A entrega que faz o Fábio cobrar o professor pela devolutiva da aula
+experimental está **implementada, deployada e provada** — e **desligada de
+propósito**. As 6 tasks do plano
+`docs/superpowers/plans/2026-08-22-cobranca-devolutiva-experimental.md`
+fecharam; o ledger com as 21 rulings está em
+`.superpowers/sdd/2026-08-22-cobranca-devolutiva-experimental/progress.md`
+(git-ignored, não sobrevive a `git clean`).
+
+**No banco (aplicado em produção):** `vw_experimental_pendencia`,
+`fn_data_corte_experimental()` = 2026-08-22, `fn_janela_experimental_dias()` = 3,
+três RPCs de leitura, e `pendencia_experimental` liberado no
+`fabio_notificacoes_tipo_check` (15 tipos, os 14 antigos preservados).
+
+**Na VPS:** worker deployado (sha256 conferido), 134 testes verdes no ambiente
+real, unit `fabio-experimental-lembrete` instalada e provada
+(`systemctl start` → `Result=success`), **timer DESABILITADO**.
+
+**A partição está fechada:** o professor é cobrado enquanto
+`dias_em_atraso < fn_janela_experimental_dias()`; a coordenação assume a partir
+de `>=`. As duas pontas leem a MESMA função do banco. Sem buraco, sem
+sobreposição.
+
+**PRÓXIMO PASSO — o que falta é humano, não código:**
+
+1. **O número de WhatsApp do Alf** para `FABIO_EXPERIMENTAL_DEST_OVERRIDE` no
+   `~/.hermes/.env`. Não está em `colaboradores`, nem no `.env`, nem no
+   `config.yaml` — procurei. Sem ele o timer não é ligado, porque ligar sem o
+   override manda a primeira mensagem real pro professor, pulando o passo 2 do
+   rollout da spec.
+2. Com o número: `systemctl --user enable --now fabio-experimental-lembrete.timer`.
+   A próxima experimental real dispara sozinha e a mensagem cai no celular do Alf.
+3. Depois de ele conferir: apagar o override → passa a ir pro professor.
+4. `FABIO_ESCALONAMENTO_EXPERIMENTAL_ATIVO=true` para ligar o bloco da
+   coordenação nas 9h (hoje `false` por padrão, provado por mutante).
+5. **12 professores sem usuário no sistema** dão as experimentais órfãs
+   (Erick Cosme 21, Ana Beatriz 14, Gabriel Santos 10, Larissa 8, …). É criação
+   de conta — não é coisa que eu faça. Enquanto não forem liberados, a máquina
+   não alcança a maior parte do problema, porque a régua só cobra quem tem a
+   ferramenta.
