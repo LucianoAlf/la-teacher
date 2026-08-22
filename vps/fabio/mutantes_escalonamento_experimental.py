@@ -2,11 +2,34 @@
 
 O `teste_escalonamento_experimental.py` roda contra fixtures e mocks, sem
 banco e sem rede. Teste assim passa fácil demais: se ele não morrer quando
-o defeito volta, ele só decora o commit — foi exatamente isso que a
-revisão de 22/08/2026 mediu: rodou 7 mutantes além dos que a primeira
+o defeito volta, ele só decora o commit.
+
+Rodada 2 da revisão (22/08/2026): rodou 7 mutantes além dos que a primeira
 versão desta arena tinha (fio de ligação em main(), segmento de
-dias_em_atraso, hora do "quando" truncada) e TRÊS sobreviveram, porque não
-existia teste nem mutante pra eles ainda.
+dias_em_atraso, hora do "quando" truncada) e TRÊS sobreviveram.
+
+Rodada 3: a guarda por `inspect.getsource` provou ser insuficiente — uma
+chamada COMENTADA ainda contém o texto e passaria do mesmo jeito. M7 passou
+a ser verificado também por um teste comportamental (roda main() de
+verdade); M15/M16 cobrem os outros dois mutantes plausíveis que só um
+teste assim pega (retorno descartado, log tirado). Ruling 19 (interruptor
+próprio, desligado por padrão) e Important 2 (divisão por unidade quando o
+bloco cresce demais) também entraram nesta rodada — M17 cobre a régua nova
+do interruptor.
+
+M6 (rodada 2: "guarda de intocabilidade" em `montar_mensagens_escalonamento`)
+foi REMOVIDO nesta rodada: depois que a função passou a lidar com uma
+LISTA de blocos (Important 2), `blocos_exp` vazio já é `[]`, e
+`list(mensagens_aluno) + []` é sempre igual a `list(mensagens_aluno)` --
+não sobrou nenhum "guard" pra remover que mude comportamento observável.
+Documentado aqui em vez de apagado em silêncio, pra quem notar a lacuna no
+número não achar que foi esquecimento.
+
+⚠️ QUEM FOR EDITAR O `while` da busca de N (case 17 do teste): ele TEM que
+ter teto (`_BUSCA_MAX`). Sem isso, o mutante M4 (Ruling 18 regride) capa o
+crescimento do texto pra sempre e a busca vira loop infinito de verdade —
+foi medido ao vivo nesta rodada (a arena travou rodando em background e
+precisou ser morta na mão). Ver comentário no próprio teste.
 
 Cada mutante aqui reintroduz UM defeito plausível — vários são decisões que
 a revisão pegou entrando (ou saindo) por engano da versão anterior deste
@@ -63,23 +86,15 @@ MUTANTES = [
                 "        return []",
     },
     {
-        "nome": "M6 — intocabilidade da fila do aluno perde a guarda",
-        "pega": "11a — sem experimental, a fila do aluno deixa de sair intacta",
-        "de": "    bloco_exp = format_escalonamento_experimental(linhas_exp)\n"
-              "    if not bloco_exp:\n"
-              "        return list(mensagens_aluno)\n"
-              "    return list(mensagens_aluno) + [bloco_exp]",
-        "para": "    bloco_exp = format_escalonamento_experimental(linhas_exp)\n"
-                "    return list(mensagens_aluno) + [bloco_exp]",
-    },
-    {
-        "nome": "M7 (I1) — o fio de ligação em main() é apagado",
-        "pega": "caso 20 — guarda por inspect.getsource(main): a rodada anterior deixava"
-                " isto passar 22/22 verde",
+        "nome": "M7 (I1) — o fio de ligação em main() é apagado (comentado)",
+        "pega": "casos 26a-c — SEQUÊNCIA de enviar_grupo: 0 mensagens saem, o"
+                " escalonamento inteiro morre em silêncio. Caso 29 (getsource) NÃO"
+                " pega isto sozinho: o texto da chamada continua no comentário.",
         "de": "        resultado = rodar_escalonamento(args.professor_id, args.dry_run)\n"
               "        results.append(resultado)\n"
               "        log(\"event_result\", **resultado)",
-        "para": "        results.append({\"event\": \"escalonamento\", \"status\": \"sem_pendencia_escalonada\"})",
+        "para": "        # resultado = rodar_escalonamento(args.professor_id, args.dry_run)\n"
+                "        results.append({\"event\": \"escalonamento\", \"status\": \"sem_pendencia_escalonada\"})",
     },
     {
         "nome": "M8 (I2) — o segmento 'há X dia(s)' some inteiro",
@@ -104,13 +119,21 @@ MUTANTES = [
     },
     {
         "nome": "M11 (I5) — o recorte por professor_id deixa de proteger a experimental",
-        "pega": "15a/15c — --professor-id vazaria a experimental da escola inteira",
-        "de": "        if professor_id is not None:\n"
+        "pega": "20a/20c — --professor-id vazaria a experimental da escola inteira"
+                " (mesmo com o interruptor do Ruling 19 ligado)",
+        "de": "        if not ESCALONAMENTO_EXPERIMENTAL_ATIVO:\n"
+              "            log(\"escalonamento_experimental_desativado\",\n"
+              "                motivo=\"FABIO_ESCALONAMENTO_EXPERIMENTAL_ATIVO desligado (padrao)\")\n"
+              "        elif professor_id is not None:\n"
               "            log(\"escalonamento_experimental_pulado\",\n"
               "                motivo=\"professor_id setado -- recorte de teste, nao coordenacao\")\n"
               "        else:\n"
               "            linhas_exp = linhas_experimental_escalonadas()",
-        "para": "        linhas_exp = linhas_experimental_escalonadas()",
+        "para": "        if not ESCALONAMENTO_EXPERIMENTAL_ATIVO:\n"
+                "            log(\"escalonamento_experimental_desativado\",\n"
+                "                motivo=\"FABIO_ESCALONAMENTO_EXPERIMENTAL_ATIVO desligado (padrao)\")\n"
+                "        else:\n"
+                "            linhas_exp = linhas_experimental_escalonadas()",
     },
     {
         "nome": "M12 (I4) — o bloco da experimental perde o evento próprio",
@@ -145,6 +168,43 @@ MUTANTES = [
                 "        log(\"escalonamento_experimental_falhou\", error=str(exc)[:300])\n"
                 "        return []\n"
                 "    return (data or {}).get(\"linhas\") or []",
+    },
+    {
+        "nome": "M15 (I1) — main() mantém a chamada, mas descarta o retorno",
+        "pega": "casos 27a/27b — o envio acontece de verdade, mas o resultado nunca"
+                " chega no payload/relatório do cron",
+        "de": "        resultado = rodar_escalonamento(args.professor_id, args.dry_run)\n"
+              "        results.append(resultado)\n"
+              "        log(\"event_result\", **resultado)",
+        "para": "        resultado = rodar_escalonamento(args.professor_id, args.dry_run)\n"
+                "        log(\"event_result\", **resultado)",
+    },
+    {
+        "nome": "M16 (I1) — main() mantém tudo, mas tira o log",
+        "pega": "caso 28 — o journal para de saber que o escalonamento rodou",
+        "de": "        resultado = rodar_escalonamento(args.professor_id, args.dry_run)\n"
+              "        results.append(resultado)\n"
+              "        log(\"event_result\", **resultado)",
+        "para": "        resultado = rodar_escalonamento(args.professor_id, args.dry_run)\n"
+                "        results.append(resultado)",
+    },
+    {
+        "nome": "M17 (Ruling 19) — o interruptor da experimental é removido",
+        "pega": "23a/23c/23d — desligado (o estado real hoje) volta a buscar e"
+                " mandar a experimental pro grupo sem nenhuma ativação humana",
+        "de": "        if not ESCALONAMENTO_EXPERIMENTAL_ATIVO:\n"
+              "            log(\"escalonamento_experimental_desativado\",\n"
+              "                motivo=\"FABIO_ESCALONAMENTO_EXPERIMENTAL_ATIVO desligado (padrao)\")\n"
+              "        elif professor_id is not None:\n"
+              "            log(\"escalonamento_experimental_pulado\",\n"
+              "                motivo=\"professor_id setado -- recorte de teste, nao coordenacao\")\n"
+              "        else:\n"
+              "            linhas_exp = linhas_experimental_escalonadas()",
+        "para": "        if professor_id is not None:\n"
+                "            log(\"escalonamento_experimental_pulado\",\n"
+                "                motivo=\"professor_id setado -- recorte de teste, nao coordenacao\")\n"
+                "        else:\n"
+                "            linhas_exp = linhas_experimental_escalonadas()",
     },
 ]
 

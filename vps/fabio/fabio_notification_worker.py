@@ -42,9 +42,24 @@ ESCALONAMENTO_MENSAGEM_UNICA_MAX = int(os.getenv("FABIO_ESCALONAMENTO_UNICA_MAX"
 # Ruling 10 (22/08/2026): fn_experimental_escalonadas() nao tem teto de
 # proposito — a regua fecha a pendencia so com devolutiva CONFIRMADA, entao
 # um lead que nunca for confirmado nunca sai da lista, e o total honesto
-# importa pra coordenacao. Quem corta e a MENSAGEM: mostra os N primeiros e
-# diz "+X mais", nunca a RPC.
+# importa pra coordenacao. Quem corta e a MENSAGEM: mostra os N primeiros em
+# detalhe. Ruling 18 (revisao) trocou o "+X mais" por um rodape de uma linha
+# por lead restante -- corte de DETALHE, nunca de GENTE.
 ESCALONAMENTO_EXPERIMENTAL_TETO = int(os.getenv("FABIO_ESCALONAMENTO_EXPERIMENTAL_TETO", "10"))
+# Ruling 19 (revisao 22/08/2026): interruptor PROPRIO do bloco da
+# experimental no escalonamento, DESLIGADO por padrao. A unit systemd
+# fabio-escalonamento.service roda hoje em producao com
+# `--event escalonamento --channel whatsapp --force` -- SEM --professor-id,
+# sem --dry-run (medido direto na VPS; o comentario anterior desta funcao
+# dizia "--professor-id 25", copiado de fabio-pendencia.systemd.txt, que
+# esta desatualizado em relacao a unit viva). Sem este interruptor, no
+# minuto em que a Task 6 copiar este arquivo pra VPS o timer das 9h manda o
+# bloco da experimental pro grupo real sem NENHUMA acao humana adicional --
+# o teto controla tamanho, nao existencia, e isso quebraria o passo 2 do
+# rollout da spec (primeiro envio real endereçado ao Alf, so depois virar a
+# chave). Precedente na casa: REGISTRO_RECIBO_MODE ("off" por padrao).
+ESCALONAMENTO_EXPERIMENTAL_ATIVO = os.getenv(
+    "FABIO_ESCALONAMENTO_EXPERIMENTAL_ATIVO", "false").lower() in {"1", "true", "yes", "sim"}
 # COORDENACAO PEDAGOGICA (Marcos Quintela, Juliane, Fabio). Puxado da UAZAPI.
 GRUPO_COORDENACAO_JID = os.getenv("FABIO_GRUPO_COORDENACAO_JID", "120363304349910605@g.us")
 DEFAULT_ESCALONAMENTO_TIME = os.getenv("FABIO_NOTIFY_ESCALONAMENTO_TIME", "09:00")
@@ -949,19 +964,41 @@ def montar_escalonamento(rows: list) -> list:
 
 
 def _dias_em_atraso_txt(l: Dict[str, Any]) -> str:
-    """'há quanto tempo', defensivo contra chave ausente.
+    """'há quanto tempo', defensivo contra chave ausente E contra zero.
 
     `l.get('dias_em_atraso')` sozinho renderiza a string 'None' quando a
     chave falta — nada quebra, e a mensagem sai com '· há None dia(s)' pra
     coordenação (I2, revisão 22/08/2026). Não uso `or '?'`: `dias_em_atraso`
-    pode ser um `int` e `0 or '?'` viraria '?' errado.
+    pode ser um `int` e `0 or '?'` viraria '?' errado — `0` é falsy em
+    Python mas é um valor VÁLIDO aqui (lead que passou da janela hoje mesmo).
     """
     dias = l.get("dias_em_atraso")
     return str(dias) if dias is not None else "?"
 
 
-def format_escalonamento_experimental(linhas: Optional[list], teto: Optional[int] = None) -> Optional[str]:
-    """Bloco da experimental no escalonamento à coordenação.
+def _unidade_experimental(l: Dict[str, Any]) -> str:
+    return l.get("unidade_nome") or "Sem unidade"
+
+
+def _por_unidade_experimental(linhas: list) -> Dict[str, list]:
+    """Agrupa os leads da experimental por unidade, maior grupo primeiro.
+
+    Mesma ideia de `_por_unidade` (mecanismo que a trilha do aluno já usa
+    pra dividir o escalonamento), mas a linha da experimental não carrega
+    uma lista de aulas por unidade como a do professor — é UMA unidade por
+    linha (`unidade_nome`), então o agrupamento é direto, sem precisar do
+    desempate por contagem de aulas que `_unidade_de_cobranca` resolve.
+    """
+    grupos: Dict[str, list] = {}
+    for l in linhas:
+        grupos.setdefault(_unidade_experimental(l), []).append(l)
+    ordem = sorted(grupos, key=lambda u: (-len(grupos[u]), u))
+    return {u: grupos[u] for u in ordem}
+
+
+def format_escalonamento_experimental(linhas: Optional[list], teto: Optional[int] = None,
+                                      unidade: Optional[str] = None) -> Optional[str]:
+    """Bloco da experimental no escalonamento à coordenação — uma unidade, ou tudo.
 
     Separado do escalonamento de aluno: a janela é de 3 dias
     (fn_janela_experimental_dias), não 7, porque o lead esfria — e a fonte é
@@ -983,7 +1020,14 @@ def format_escalonamento_experimental(linhas: Optional[list], teto: Optional[int
     lista", só o detalhe é que é racionado por gravidade. Este bloco
     espelha o mesmo desenho: os N primeiros levam bloco completo (aluno,
     unidade, quando, professor, dias); o resto leva uma linha (nome + dias),
-    nunca zero linhas.
+    nunca zero linhas. `teto` é aplicado a ESTA chamada (por unidade,
+    quando `unidade` é passado) — mesma convenção de
+    `format_escalonamento(rows, unidade=..., blocos=...)`.
+
+    `unidade` (Important 2, revisão 22/08/2026): quando setado, o título
+    carrega o nome da unidade — é o que
+    `montar_blocos_escalonamento_experimental` usa pra dividir a fila
+    quando o bloco combinado passa do tamanho de uma mensagem.
     """
     if not linhas:
         return None
@@ -991,7 +1035,11 @@ def format_escalonamento_experimental(linhas: Optional[list], teto: Optional[int
     detalhados = linhas if limite <= 0 else linhas[:limite]
     resto = [] if limite <= 0 else linhas[limite:]
 
-    blocos = ["🎓 *Experimentais sem devolutiva*"]
+    titulo = f"🎓 *Experimentais sem devolutiva · {unidade}*" if unidade else "🎓 *Experimentais sem devolutiva*"
+    # Minor (revisão 22/08/2026): sem total nenhum, quem lê às 9h tinha que
+    # contar linha pra saber se são 8 ou 80 -- exatamente o que a régua
+    # justifica a RPC sem teto ("a coordenação precisa do total honesto").
+    blocos = [titulo, f"_{_plural(len(linhas), 'lead', 'leads')}_"]
     for l in detalhados:
         blocos.append(
             f"• *{l.get('nome_aluno') or 'lead'}* — {l.get('unidade_nome') or '?'}, "
@@ -1004,6 +1052,34 @@ def format_escalonamento_experimental(linhas: Optional[list], teto: Optional[int
             blocos.append(f"· {l.get('nome_aluno') or 'lead'} — há {_dias_em_atraso_txt(l)} dia(s)")
     blocos.append("_O comercial não recebeu o retorno dessas experimentais._")
     return "\n".join(blocos)
+
+
+def montar_blocos_escalonamento_experimental(linhas: Optional[list], teto: Optional[int] = None) -> list:
+    """A fila de mensagens da experimental — uma só, ou dividida por unidade.
+
+    Important 2 (revisão 22/08/2026): Ruling 18 tirou o corte de GENTE
+    (ninguém some), mas isso sozinho faz o bloco crescer sem limite —
+    medido pelo revisor: 100 leads = 5.239 chars, 200 = 9.839; perto de 130
+    leads cruza os mesmos 6.000 chars (`ESCALONAMENTO_MENSAGEM_UNICA_MAX`)
+    que a trilha do aluno usa pra dividir por desenho. Em 30 dias houve 162
+    vínculos de experimental — é questão de semanas, não hipótese distante.
+    Mesmo mecanismo do irmão (`montar_escalonamento`): mensagem única se
+    couber, senão uma por unidade — só que aqui o agrupamento é direto por
+    `unidade_nome` (a linha da experimental não carrega lista de aulas por
+    unidade como a do professor faz).
+    """
+    if not linhas:
+        return []
+    unico = format_escalonamento_experimental(linhas, teto=teto)
+    if unico and len(unico) <= ESCALONAMENTO_MENSAGEM_UNICA_MAX:
+        return [unico]
+    grupos = _por_unidade_experimental(linhas)
+    mensagens: list = []
+    for unidade, linhas_unidade in grupos.items():
+        corpo = format_escalonamento_experimental(linhas_unidade, teto=teto, unidade=unidade)
+        if corpo:
+            mensagens.append(corpo)
+    return mensagens
 
 
 def linhas_experimental_escalonadas() -> list:
@@ -1026,18 +1102,22 @@ def linhas_experimental_escalonadas() -> list:
 
 
 def montar_mensagens_escalonamento(mensagens_aluno: list, linhas_exp: list) -> list:
-    """Anexa o bloco da experimental (se houver) à fila de mensagens do aluno.
+    """Anexa o(s) bloco(s) da experimental (se houver) à fila do aluno.
 
-    Mensagem própria, apensada por último — não mistura no texto do
-    índice/unidade do aluno, que tem racionamento por gravidade próprio
+    Mensagem(ns) própria(s), apensada(s) por último — não mistura no texto
+    do índice/unidade do aluno, que tem racionamento por gravidade próprio
     (ESCALONAMENTO_BLOCOS_POR_UNIDADE) e não deve mudar de tamanho por causa
     de um bloco de outra origem. Sem pendência experimental, devolve a lista
-    do aluno intacta — o escalonamento que já funciona não muda.
+    do aluno intacta — o escalonamento que já funciona não muda. Pode
+    anexar MAIS de uma mensagem (Important 2, revisão 22/08/2026): quando a
+    experimental cresce demais pra uma mensagem só,
+    `montar_blocos_escalonamento_experimental` já devolve uma lista
+    dividida por unidade.
     """
-    bloco_exp = format_escalonamento_experimental(linhas_exp)
-    if not bloco_exp:
+    blocos_exp = montar_blocos_escalonamento_experimental(linhas_exp)
+    if not blocos_exp:
         return list(mensagens_aluno)
-    return list(mensagens_aluno) + [bloco_exp]
+    return list(mensagens_aluno) + blocos_exp
 
 
 def rodar_escalonamento(professor_id: Optional[int], dry_run: bool) -> Dict[str, Any]:
@@ -1061,14 +1141,27 @@ def rodar_escalonamento(professor_id: Optional[int], dry_run: bool) -> Dict[str,
         mensagens_aluno = montar_escalonamento(linhas)
         professores = len({r.get("professor_id") for r in linhas})
 
-        # I5 (revisão 22/08/2026): fn_experimental_escalonadas() não recebe
-        # professor_id — é visão de coordenação, sempre a escola inteira.
-        # A unit systemd fabio-escalonamento.service roda hoje com
-        # --professor-id 25 e SEM --dry-run ("ATIVO, só professor 25");
-        # buscar a experimental nesse modo vazaria a lista da escola
-        # inteira pro grupo da coordenação. Pular é a única opção segura;
-        # pular em SILÊNCIO trocaria um defeito por outro, então loga.
-        if professor_id is not None:
+        # Ruling 19 (revisão 22/08/2026): interruptor PRÓPRIO, desligado por
+        # padrão -- ver comentário de ESCALONAMENTO_EXPERIMENTAL_ATIVO. Sem
+        # ele, copiar este arquivo pra VPS (Task 6) já ativaria o envio real
+        # pro grupo no minuto seguinte, sem nenhuma decisão humana adicional.
+        #
+        # I5 (revisão 22/08/2026, corrigido): fn_experimental_escalonadas()
+        # não recebe professor_id — é visão de coordenação, sempre a escola
+        # inteira. CORREÇÃO: a unit systemd fabio-escalonamento.service roda
+        # hoje em produção com `--event escalonamento --channel whatsapp
+        # --force` -- SEM --professor-id (medido direto na VPS; a versão
+        # anterior deste comentário dizia "--professor-id 25", informação
+        # que veio de fabio-pendencia.systemd.txt e está desatualizada em
+        # relação à unit viva). Isso não invalida a guarda: rodar
+        # manualmente com --professor-id continua sendo um recorte de
+        # teste/debug, não a visão de coordenação, e vazaria a experimental
+        # da escola inteira pro grupo do mesmo jeito se não fosse pulada.
+        # Pular em SILÊNCIO trocaria um defeito por outro, então loga os dois casos.
+        if not ESCALONAMENTO_EXPERIMENTAL_ATIVO:
+            log("escalonamento_experimental_desativado",
+                motivo="FABIO_ESCALONAMENTO_EXPERIMENTAL_ATIVO desligado (padrao)")
+        elif professor_id is not None:
             log("escalonamento_experimental_pulado",
                 motivo="professor_id setado -- recorte de teste, nao coordenacao")
         else:
