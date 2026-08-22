@@ -230,14 +230,45 @@ def check_agenda_do_dia() -> None:
         ok.append(f"agenda de hoje: {n_aulas} aulas / {r.get('total_alunos', 0)} alunos")
 
 
+# A janela do `fn_fabio_retry_fila`: ele SÓ toca quem tem tentativas < 3 e foi
+# criado nos últimos 3 dias. Quem está fora nunca vai ser retomado por ele —
+# e anunciar esses como "reenfileirados" foi a mentira diária do relatório.
+# Isto aqui EXPLICA o que o RPC decidiu (a contagem do que foi feito vem do
+# retorno dele, nunca daqui) — não é a régua duplicada.
+_RETRY_MAX_TENTATIVAS = 3
+_RETRY_JANELA_DIAS = 3
+
+
+def _fora_do_alcance_do_retry(p: Dict[str, Any]) -> bool:
+    if (p.get("tentativas") or 0) >= _RETRY_MAX_TENTATIVAS:
+        return True
+    criado = p.get("criado_em")
+    if not criado:
+        return False
+    try:
+        dt = datetime.fromisoformat(str(criado).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return dt < datetime.now(timezone.utc) - timedelta(days=_RETRY_JANELA_DIAS)
+
+
+def _motivo_encalhe(presos: List[Dict[str, Any]]) -> str:
+    motivos = []
+    if any((p.get("tentativas") or 0) >= _RETRY_MAX_TENTATIVAS for p in presos):
+        motivos.append("tentativas esgotadas")
+    if any((p.get("tentativas") or 0) < _RETRY_MAX_TENTATIVAS for p in presos):
+        motivos.append(f"mais de {_RETRY_JANELA_DIAS} dias")
+    return " e ".join(motivos) or "fora da janela do retry"
+
+
 def check_fila_audios(fix: bool) -> None:
     limite = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
     try:
         presos = tabela("/rest/v1/fabio_fila_audios", {
-            "select": "id,status,tentativas,atualizado_em",
+            "select": "id,status,tentativas,atualizado_em,criado_em,aula_id",
             "status": "in.(pendente,erro,transcrevendo)",
             "atualizado_em": f"lt.{limite}",
-            "limit": "20",
+            "limit": "100",
         })
     except Exception as e:
         decisao.append(f"Não consegui ler a fila de áudios: {str(e)[:120]}")
@@ -248,10 +279,25 @@ def check_fila_audios(fix: bool) -> None:
     retriaveis = [p for p in presos if p["status"] in ("pendente", "erro")]
     if retriaveis and fix:
         try:
-            n = rpc("fn_fabio_retry_fila", {})
-            consertado.append(f"{len(retriaveis)} áudio(s) parado(s) → reenfileirados ({n} retomados)")
+            # Só o retorno do RPC diz o que foi REALMENTE reenfileirado. Antes
+            # o relatório anunciava len(retriaveis) como "corrigi sozinho" e
+            # jogava o retorno entre parênteses — em 22/08 isso virou "4
+            # áudio(s) parado(s) → reenfileirados (0 retomados)" toda manhã,
+            # sobre 4 áudios de 10–15/08 que o RPC não pode tocar (ele exige
+            # tentativas < 3 E criado_em < 3 dias, e eles tinham 3/3/11/11
+            # tentativas). Alarme que mente todo dia ensina a ignorar o alarme.
+            n = rpc("fn_fabio_retry_fila", {}) or 0
         except Exception as e:
             falhou.append(f"Retry da fila falhou: {str(e)[:120]}")
+        else:
+            if n:
+                consertado.append(f"{n} áudio(s) parado(s) → reenfileirados")
+            encalhados = [p for p in retriaveis if _fora_do_alcance_do_retry(p)]
+            if encalhados:
+                decisao.append(
+                    f"⛔ {len(encalhados)} áudio(s) que o retry NÃO alcança "
+                    f"({_motivo_encalhe(encalhados)}) — decidir: terminalizar ou atacar a causa. "
+                    f"Ex.: {', '.join(p['id'][:8] for p in encalhados[:3])}")
     elif retriaveis:
         decisao.append(f"{len(retriaveis)} áudio(s) parado(s) em pendente/erro")
     # 'transcrevendo' preso: o retry não cobre esse status. Mas às vezes o trabalho
@@ -333,6 +379,22 @@ def check_pipeline_presenca() -> None:
         decisao.append(f"{len(regs)} registro(s) novos, nenhum emitiu presença ainda (aguardando confirmação?)")
 
 
+def _nome_no_relatorio(nome: Any, todos: List[Any]) -> str:
+    """Primeiro nome — mas só enquanto ele identificar a pessoa.
+
+    A casa tem dois Matheus (Felipe e Reis) e o relatório de 22/08 saiu com
+    "Matheus 12a/18d; Matheus 1a/17d": duas pessoas diferentes, o mesmo rótulo,
+    e nenhuma das duas dá pra cobrar. Nome que não identifica não é informação.
+    """
+    partes = str(nome or "?").split()
+    primeiro = partes[0] if partes else "?"
+    repetido = sum(1 for n in todos
+                   if str(n or "?").split()[:1] == [primeiro]) > 1
+    if repetido and len(partes) > 1:
+        return f"{primeiro} {partes[-1][:1]}."
+    return primeiro
+
+
 def check_governanca() -> None:
     """Cobrança é de CONTEÚDO, nunca de presença (regra do Alf).
 
@@ -358,8 +420,10 @@ def check_governanca() -> None:
         return
     total_aulas = sum((p.get("total_aulas") or 0) for p in linhas)
     piores = sorted(linhas, key=lambda p: -(p.get("pior_atraso") or 0))[:3]
+    nomes = [p.get("professor_nome") for p in piores]
     detalhe = "; ".join(
-        f"{(p.get('professor_nome') or '?').split()[0]} {p.get('total_aulas')}a/{p.get('pior_atraso')}d"
+        f"{_nome_no_relatorio(p.get('professor_nome'), nomes)} "
+        f"{p.get('total_aulas')}a/{p.get('pior_atraso')}d"
         for p in piores
     )
     resto = len(linhas) - len(piores)
