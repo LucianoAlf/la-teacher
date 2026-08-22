@@ -151,50 +151,68 @@ checar("8c. mensagem aluno-so e IDENTICA byte a byte (nao so 'parecida')",
 
 
 # ---------------------------------------------------------------------------
-# Ruling 16 (Alf): a secao experimental respeita o MESMO corte de
-# ESCALONAMENTO_DIAS que a regua do aluno ja usa — quem passou da janela e
-# problema da coordenacao (Task 5), cobrar aqui tambem seria a cobranca em
-# dobro que o comentario do filtro de aulas ja existe pra evitar.
+# Ruling 17 (Alf, corrige o Ruling 16): a janela da experimental NAO e mais
+# filtrada aqui em Python por ESCALONAMENTO_DIAS — essa e a janela do
+# REGISTRO do aluno (env var FABIO_ESCALONAMENTO_DIAS), so batia em valor
+# com a janela da experimental (fn_janela_experimental_dias, no banco) por
+# coincidencia. O corte agora mora na propria RPC
+# (fn_experimental_pendencia_do_professor, migration
+# 20260822170000_cobranca_experimental_rpcs.sql) — uma fonte so, a mesma que
+# a Task 5 usa pra escalar. format_pendencias so REPASSA o que a RPC manda:
+# nao filtra de novo, e nao pode voltar a filtrar sem reabrir a divergencia
+# que o Ruling 17 fechou.
 # ---------------------------------------------------------------------------
 
-DENTRO_DA_JANELA = worker.ESCALONAMENTO_DIAS       # limite inclusivo: <= ainda cobra
-FORA_DA_JANELA = worker.ESCALONAMENTO_DIAS + 1     # passou: escalonou, nao cobra mais aqui
 
-
-def fake_rpc_janela_mista(name, body):
+def fake_rpc_ja_filtrada_pela_rpc(name, body):
+    # Simula a RPC real: ela mesma so devolve quem esta dentro da janela.
+    # O fake nao manda ninguem "fora" pra format_pendencias filtrar — porque
+    # a RPC real nunca manda.
     assert name == "fn_experimental_pendencia_do_professor"
     return {"ok": True, "linhas": [
         {"vinculo_id": 2275, "nome_aluno": "Davi Nakashima",
          "curso_nome": "Aula Experimental", "unidade_nome": "Barra",
-         "quando": "21/08 18:00", "dias_em_atraso": DENTRO_DA_JANELA},
-        {"vinculo_id": 2280, "nome_aluno": "Raquel Prado",
-         "curso_nome": "Aula Experimental", "unidade_nome": "Tijuca",
-         "quando": "18/08 19:00", "dias_em_atraso": FORA_DA_JANELA},
+         "quando": "21/08 18:00", "dias_em_atraso": 1}
     ]}
 
 
-def fake_rpc_so_fora_da_janela(name, body):
+def fake_rpc_dias_em_atraso_extremo(name, body):
+    # NEGATIVO do Ruling 17: mesmo um dias_em_atraso MUITO alto (bem acima
+    # de qualquer janela plausivel) tem que APARECER — porque Python nao
+    # filtra mais. Se algum dia reintroduzirem um filtro por
+    # ESCALONAMENTO_DIAS aqui (a regressao que este caso existe pra pegar),
+    # esse lead sumiria e o caso 11b quebra.
     assert name == "fn_experimental_pendencia_do_professor"
     return {"ok": True, "linhas": [
         {"vinculo_id": 2280, "nome_aluno": "Raquel Prado",
          "curso_nome": "Aula Experimental", "unidade_nome": "Tijuca",
-         "quando": "18/08 19:00", "dias_em_atraso": FORA_DA_JANELA},
+         "quando": "18/08 19:00", "dias_em_atraso": 999}
     ]}
 
 
-with patch.object(worker, "rpc", side_effect=fake_rpc_janela_mista):
-    msg_janela_mista = worker.format_pendencias(PROF, {"total_aulas": 0})
-checar("11. lead DENTRO da janela aparece", True,
-       msg_janela_mista is not None and "Davi" in msg_janela_mista)
-checar("11b. lead FORA da janela (ja escalonado) NAO aparece", False,
-       msg_janela_mista is not None and "Raquel" in msg_janela_mista)
+def fake_rpc_vazia_porque_a_rpc_ja_filtrou(name, body):
+    # A RPC real devolve linhas=[] quando tudo ja escalou pra coordenacao —
+    # nao e o Python que decide isso.
+    assert name == "fn_experimental_pendencia_do_professor"
+    return {"ok": True, "linhas": []}
 
-# NEGATIVO: so tem lead fora da janela e nenhuma aula — ninguem sobra pra
-# cobrar, e a mensagem inteira tem que sumir (nao so a secao).
-with patch.object(worker, "rpc", side_effect=fake_rpc_so_fora_da_janela):
-    msg_so_fora = worker.format_pendencias(PROF, {"total_aulas": 0})
-checar("12. so lead escalonado e zero aulas: mensagem inteira e None", None,
-       msg_so_fora)
+
+with patch.object(worker, "rpc", side_effect=fake_rpc_ja_filtrada_pela_rpc):
+    msg_rpc_ja_filtrada = worker.format_pendencias(PROF, {"total_aulas": 0})
+checar("11. lead que a RPC ja considerou dentro da janela aparece", True,
+       msg_rpc_ja_filtrada is not None and "Davi" in msg_rpc_ja_filtrada)
+
+with patch.object(worker, "rpc", side_effect=fake_rpc_dias_em_atraso_extremo):
+    msg_dias_extremo = worker.format_pendencias(PROF, {"total_aulas": 0})
+checar("11b. Python NAO refiltra: dias_em_atraso extremo ainda assim aparece", True,
+       msg_dias_extremo is not None and "Raquel" in msg_dias_extremo)
+
+# NEGATIVO: a RPC devolveu vazio (ja escalou tudo pra coordenacao do lado
+# dela) e nao ha aula de aluno — ninguem sobra pra cobrar, mensagem None.
+with patch.object(worker, "rpc", side_effect=fake_rpc_vazia_porque_a_rpc_ja_filtrou):
+    msg_rpc_vazia = worker.format_pendencias(PROF, {"total_aulas": 0})
+checar("12. RPC devolveu vazio e zero aulas: mensagem inteira e None", None,
+       msg_rpc_vazia)
 
 
 # ---------------------------------------------------------------------------

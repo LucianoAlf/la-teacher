@@ -590,16 +590,20 @@ def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[st
     consertar. Saída: sem seção experimental, mensagem do aluno intacta, e a
     falha vai pro journal em log alto — nunca um `pass` mudo.
 
-    A seção da experimental respeita o MESMO corte de ESCALONAMENTO_DIAS que
-    a régua do aluno usa logo abaixo (Ruling 16): passou da janela, quem
-    cobra é a coordenação (Task 5), não o Fábio aqui — senão é a cobrança em
-    dobro que o comentário do filtro de aulas, duas linhas abaixo, já existe
-    pra evitar.
+    A seção da experimental NÃO filtra por janela aqui (Ruling 17, corrige o
+    Ruling 16): a RPC `fn_experimental_pendencia_do_professor` já devolve só
+    quem está dentro de `fn_janela_experimental_dias()` — o Python confiava
+    nisso em Python via `ESCALONAMENTO_DIAS`, mas essa é a janela do
+    REGISTRO do aluno (env var `FABIO_ESCALONAMENTO_DIAS`), não a da
+    experimental; as duas só batiam em valor (3 e 3) por coincidência, e
+    dependiam de continuar coincidindo pra não abrir a mesma cobrança em
+    dobro que o Ruling 16 tentava fechar. Fonte única agora é a função SQL:
+    quem escala pra coordenação (Task 5, mesma função) sai da lista aqui no
+    mesmo commit, não em dois lugares que podem divergir.
     """
     try:
         linhas_exp = (rpc("fn_experimental_pendencia_do_professor",
                            {"p_professor_id": int(prof.get("id") or 0)}) or {}).get("linhas") or []
-        linhas_exp = [l for l in linhas_exp if int(l.get("dias_em_atraso") or 0) <= ESCALONAMENTO_DIAS]
         secao_exp = format_secao_experimental(linhas_exp)
     except Exception as exc:
         secao_exp = None

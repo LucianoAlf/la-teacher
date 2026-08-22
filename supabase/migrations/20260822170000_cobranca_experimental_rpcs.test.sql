@@ -158,9 +158,19 @@ begin
     raise exception 'FALHOU 7: lembrete trouxe aula velha demais (B ou C): %', r;
   end if;
 
+  -- Ruling 17 (22/08/2026): fn_experimental_pendencia_do_professor passou a
+  -- cortar pela MESMA janela que fn_experimental_escalonadas usa
+  -- (fn_janela_experimental_dias) — quem passou da janela sobe pra
+  -- coordenacao (FALHOU 9/10 abaixo) e nao pode continuar sendo cobrado
+  -- aqui tambem, senao e cobranca em dobro sem ninguem assumir. O cenario
+  -- sintetico A (0 dias) / B (1 dia) / C (4 dias, janela=3) ja da os dois
+  -- lados da borda: A e B ficam DENTRO, C fica FORA.
   r := public.fn_experimental_pendencia_do_professor(v_prof);
-  if (select count(*) from jsonb_array_elements(r->'linhas') x where (x->>'vinculo_id')::bigint in (v_vinc_a, v_vinc_b, v_vinc_c)) <> 3 then
-    raise exception 'FALHOU 8: pendencia do professor nao trouxe as 3 sinteticas: %', r;
+  if (select count(*) from jsonb_array_elements(r->'linhas') x where (x->>'vinculo_id')::bigint in (v_vinc_a, v_vinc_b)) <> 2 then
+    raise exception 'FALHOU 8: pendencia do professor nao trouxe A e B (dentro da janela, dias_em_atraso < %): %', public.fn_janela_experimental_dias(), r;
+  end if;
+  if exists (select 1 from jsonb_array_elements(r->'linhas') x where (x->>'vinculo_id')::bigint = v_vinc_c) then
+    raise exception 'FALHOU 8b: pendencia do professor trouxe C (4 dias, fora da janela de %) — ja escalou pra coordenacao (FALHOU 9), cobrar aqui tambem e a cobranca em dobro do Ruling 17: %', public.fn_janela_experimental_dias(), r;
   end if;
 
   r := public.fn_experimental_escalonadas();
