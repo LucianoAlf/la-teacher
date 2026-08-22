@@ -32,6 +32,7 @@ import fabio_chat_bridge as bridge  # noqa: E402
 TZ = ZoneInfo("America/Sao_Paulo")
 PROF_PILOTO = int(os.getenv("FABIO_AUDIT_PROFESSOR", "25"))
 SERVICOS = ["fabio-hermes-gateway", "fabio-chat-bridge"]
+HERMES_CONFIG = os.path.join(os.getenv("HERMES_HOME", "/home/fabio/.hermes"), "config.yaml")
 
 # Acumuladores do relatório
 ok: List[str] = []          # o que está saudável (vira 1 linha só)
@@ -104,6 +105,94 @@ def check_servicos(fix: bool) -> None:
     # o MCP de presença roda como processo filho do gateway, não como unit
     if "fabio_presence_mcp" not in sh("ps", "-eo", "args"):
         decisao.append("MCP de presença (`fabio_presence_mcp.py`) não aparece nos processos")
+
+
+# ── a trava do update: dependência trocada quebra script NOSSO em silêncio ──
+# O `ps` acima só vê o AGORA. Quando o update do Hermes troca uma dependência
+# da venv (21/08: ImportError no gateway; 22/08: `mcp` 2.0.0 removeu
+# `mcp.server.fastmcp`), o processo velho segue vivo com o código antigo em
+# memória e o `ps` continua verde — o estrago só aparece no próximo restart,
+# que é quando ninguém está olhando. Importar o script no interpretador que o
+# gateway usa mede o DISCO, não a memória: é a diferença entre saber hoje e
+# descobrir depois de o professor reclamar.
+def mcps_declarados(config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Do config.yaml, só os MCPs que são script NOSSO em python.
+
+    Binário de terceiro (postgres-mcp) fica de fora de propósito: não é nosso,
+    não quebra por causa da nossa venv, e alarme falso mata alarme bom.
+    """
+    achados: List[Dict[str, Any]] = []
+    for nome, spec in (config.get("mcp_servers") or {}).items():
+        if not isinstance(spec, dict):
+            continue
+        if spec.get("enabled") is False:  # ausente = ligado (default do Hermes)
+            continue
+        interpretador = str(spec.get("command") or "")
+        if not os.path.basename(interpretador).startswith("python"):
+            continue
+        script = next((str(a) for a in (spec.get("args") or []) if str(a).endswith(".py")), None)
+        if not script:
+            continue
+        achados.append({
+            "nome": nome,
+            "interpretador": interpretador,
+            "script": script,
+            # o gateway sobe o MCP COM este env; checar sem ele mediria um
+            # cenário que não existe
+            "env": {str(k): str(v) for k, v in (spec.get("env") or {}).items()},
+        })
+    return achados
+
+
+# Importa o arquivo com um nome que NÃO é "__main__", então o `mcp.run()` que
+# mora no guard não sobe servidor nenhum — a checagem carrega e sai.
+_CODIGO_IMPORT = (
+    "import importlib.util,sys;"
+    "spec=importlib.util.spec_from_file_location('_checagem_mcp',sys.argv[1]);"
+    "m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)"
+)
+
+
+def importa_limpo(mcp: Dict[str, Any], timeout: int = 45) -> tuple[bool, str]:
+    """Roda o import NO INTERPRETADOR DO MCP (a venv que o update mexe)."""
+    try:
+        p = subprocess.run(
+            [mcp["interpretador"], "-c", _CODIGO_IMPORT, mcp["script"]],
+            capture_output=True, text=True, timeout=timeout,
+            env={**os.environ, **mcp.get("env", {})},
+        )
+    except subprocess.TimeoutExpired:
+        return False, "timeout ao importar"
+    except Exception as e:
+        return False, str(e)[:160]
+    if p.returncode == 0:
+        return True, ""
+    linhas = [l for l in (p.stderr or "").strip().splitlines() if l.strip()]
+    return False, (linhas[-1] if linhas else f"saiu {p.returncode}")[:160]
+
+
+def check_mcps_importam() -> None:
+    try:
+        import yaml  # PyYAML 6 já está no python do sistema
+        with open(HERMES_CONFIG, encoding="utf-8") as fh:
+            config = yaml.safe_load(fh) or {}
+    except Exception as e:
+        decisao.append(f"Não consegui ler o config dos MCPs: {str(e)[:120]}")
+        return
+    mcps = mcps_declarados(config)
+    if not mcps:
+        return
+    quebrados = [
+        f"`{os.path.basename(m['script'])}` ({erro})"
+        for m, (bom, erro) in ((m, importa_limpo(m)) for m in mcps) if not bom
+    ]
+    if quebrados:
+        decisao.append(
+            "🧩 MCP não IMPORTA (update trocou dependência?): " + "; ".join(quebrados)
+            + " — o processo em memória pode estar verde e cair no próximo restart"
+        )
+    else:
+        ok.append(f"{len(mcps)} MCP(s) nosso(s) importam limpo")
 
 
 def check_briefing() -> None:
@@ -452,7 +541,8 @@ def main() -> int:
     fix = not a.no_fix
     janela = a.janela or ("7h" if datetime.now(TZ).hour < 12 else "21h")
 
-    for etapa in (lambda: check_servicos(fix), check_briefing, check_agenda_do_dia,
+    for etapa in (lambda: check_servicos(fix), check_mcps_importam, check_briefing,
+                  check_agenda_do_dia,
                   lambda: check_fila_audios(fix), check_pipeline_presenca,
                   check_promessa_vs_banco, check_governanca, check_recursos):
         try:
