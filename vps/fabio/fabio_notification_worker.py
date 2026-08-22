@@ -575,10 +575,22 @@ def format_pendencias(prof: Dict[str, Any], data: Dict[str, Any]) -> Optional[st
     caso mais comum — precisa continuar recebendo a mensagem. Do jeito que a
     função nasceu, os dois `return None` abaixo engoliriam essa seção inteira
     (capacidade nova, caminho anterior que nunca alcança).
+
+    A busca roda em try/except PRÓPRIO — só ao redor dela, nunca em volta do
+    resto da função (Ruling 15). A cobrança do aluno já funciona há muito
+    tempo e não pode quebrar por causa de uma capacidade nova; mas silenciar
+    a falha em segredo é o mesmo defeito que esta entrega inteira existe pra
+    consertar. Saída: sem seção experimental, mensagem do aluno intacta, e a
+    falha vai pro journal em log alto — nunca um `pass` mudo.
     """
-    secao_exp = format_secao_experimental(
-        (rpc("fn_experimental_pendencia_do_professor",
-             {"p_professor_id": int(prof.get("id") or 0)}) or {}).get("linhas"))
+    try:
+        secao_exp = format_secao_experimental(
+            (rpc("fn_experimental_pendencia_do_professor",
+                 {"p_professor_id": int(prof.get("id") or 0)}) or {}).get("linhas"))
+    except Exception as exc:
+        secao_exp = None
+        log("pendencia_secao_experimental_falhou",
+            professor_id=prof.get("id"), error=str(exc)[:300])
 
     nome = first_name(prof)
     if int(data.get("total_aulas") or 0) <= 0:

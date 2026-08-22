@@ -123,6 +123,43 @@ with patch.object(worker, "rpc", side_effect=fake_rpc_com_experimental):
 checar("9. aula + experimental: as duas secoes aparecem", True,
        msg_os_dois is not None and "Rafael" in msg_os_dois and "Davi" in msg_os_dois)
 
+
+# ---------------------------------------------------------------------------
+# Ruling 15 (Alf): a busca da experimental nao pode DERRUBAR a cobranca do
+# aluno (que ja funciona ha muito tempo) nem falhar CALADA (o mesmo defeito
+# que esta entrega inteira existe pra consertar). As duas metades juntas:
+# degradar SEM a secao experimental, e registrar a falha em log alto que
+# chega ao journal — nunca um `pass` mudo. A Task 3 ja levou essa mordida
+# uma vez (journal dizendo status=ok com 100% dos alvos falhando porque o
+# erro era montado e descartado); aqui o log e chamado direto de dentro da
+# funcao, mesmo padrao ja usado em devolutiva_carimbo_falhou/
+# sem_roster_retomada_falhou.
+# ---------------------------------------------------------------------------
+
+def fake_rpc_explode(name, body):
+    assert name == "fn_experimental_pendencia_do_professor"
+    raise RuntimeError("rpc fn_experimental_pendencia_do_professor 502: bad gateway")
+
+
+log_chamadas: list[tuple] = []
+
+
+def fake_log(msg, **fields):
+    log_chamadas.append((msg, fields))
+
+
+with patch.object(worker, "rpc", side_effect=fake_rpc_explode), \
+     patch.object(worker, "log", side_effect=fake_log):
+    msg_rpc_explodiu = worker.format_pendencias(PROF, DATA_COM_AULA)
+
+checar("10. RPC da experimental explode: aluno AINDA recebe a cobranca", True,
+       msg_rpc_explodiu is not None and "Rafael" in msg_rpc_explodiu)
+checar("10b. sem secao experimental quando a busca falhou", False,
+       msg_rpc_explodiu is not None and "Experimentais" in msg_rpc_explodiu)
+checar("10c. a falha chega ao journal (log chamado com o erro)", True,
+       any("falhou" in m.lower() and "error" in f and "502" in str(f.get("error"))
+           for m, f in log_chamadas))
+
 print(f"\n{total - len(falhas)}/{total} passaram")
 if falhas:
     print("\nFALHAS:")
