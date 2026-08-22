@@ -1,5 +1,49 @@
 # RETOMADA — LA Teacher
 
+> # ⚠️ CORREÇÃO 2: a presença EXISTE — eu estava lendo a coluna errada (22/08)
+>
+> O Alf apontou: *"talvez vocês estejam puxando do lugar errado dentro do banco;
+> a equipe deu a presença ontem"*. Ele estava certo. **Descarte a análise das
+> "39 contradições" do bloco de baixo** — ela lia `lead_experimental_aulas.estado`.
+>
+> **Onde a presença do lead REALMENTE mora:** `lead_experimentais.status`
+> (`experimental_realizada`), escrito pela equipe no LA Report. Medido: os leads
+> do print (Gilson, Claudia Sophia, Maria Fernanda) têm `status=experimental_realizada`
+> com `updated_at` de 21/08 13:17–16:51 — a presença de ontem, exatamente.
+>
+> `lead_experimental_aulas.presenca_status` é usado em **2 de 255** vínculos —
+> mecanismo morto. E `v.estado='faltou'` é espelho velho que **não bloqueia
+> nada** (o worker de áudio não olha esse campo). Era ruído cosmético, não causa.
+>
+> **A regra de negócio que o Alf pediu JÁ EXISTE e está certa.**
+> `app_confirmar_registro_experimental` (migration 038) faz numa transação só:
+> grava presença de fonte FORTE (`professor_la_teacher` / `fabio_audio`), promove
+> o estado do vínculo e dispara o aviso ao comercial
+> (`fabio_claim_aviso_comercial`). Não falta regra.
+>
+> **A causa real da devolutiva não acontecer (30 dias, medido):**
+>
+> | | |
+> |---|---|
+> | experimentais REALIZADAS (presença dada pela equipe) | **98** |
+> | dadas por professor **SEM o app** | **69 (70%)** |
+> | dadas por professor com app | 29 |
+> | com áudio gravado | **7** |
+> | devolutivas experimentais no sistema INTEIRO | **5** (3 são as que recuperei hoje) |
+>
+> Não é casamento, não é reconciliador, não é presença: **70% das experimentais
+> são dadas por quem não tem o app**, então não há como gravar. E dos 29 com
+> app, só 7 gravaram (24%) — aí sim é adoção.
+>
+> **Fila de liberação sugerida (quem mais dá experimental e não tem o app):**
+> Erick Osmy (8, Recreio); Joel de Salles Gouveia Filho (6, CG+Recreio); Erick
+> Cosme da Silva (5, Barra); Israel Rocha (4, CG+Recreio); Matheus Lana (4,
+> Barra); Larissa Bheattriz (4, Recreio); Ana Beatriz "Tia Bia" (4, Recreio);
+> Adriana Mesquita (4, CG). Só esses 8 cobrem **39 das 69** experimentais órfãs.
+>
+> ---
+>
+
 > # ⚠️ CORREÇÃO: o conserto do reconciliador que eu propus era o ERRADO (22/08)
 >
 > O bloco de baixo diz "vale corrigir na régua: o reconciliador deveria tentar
