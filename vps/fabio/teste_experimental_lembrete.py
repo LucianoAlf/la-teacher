@@ -119,6 +119,7 @@ class FakeBackend:
         self.entregues = []        # (pid, channel, corpo)
         self.marcadas_enviadas = []
         self.marcadas_falhas = []
+        self.overrides_enviados = []  # (destino, corpo) — Task 6, Passo 1
 
     def rpc(self, name, body):
         if name == "fn_experimental_lembrete_alvos":
@@ -156,6 +157,9 @@ class FakeBackend:
         self.entregues.append((pid, channel, content))
         return {"ok": True}
 
+    def enviar_override(self, destino, corpo):
+        self.overrides_enviados.append((destino, corpo))
+
 
 PROFESSORES_FAKE = [
     {"id": 10, "nome": "Isaque", "telefone_whatsapp": "5521999990010", "ativo": True},
@@ -163,10 +167,12 @@ PROFESSORES_FAKE = [
 ]
 
 
-def rodar(backend, *, dry_run=False):
+def rodar(backend, *, dry_run=False, override=""):
     with patch.object(worker, "rpc", side_effect=backend.rpc), \
          patch.object(worker, "deliver", side_effect=backend.deliver), \
-         patch.object(worker, "active_professors", return_value=PROFESSORES_FAKE):
+         patch.object(worker, "enviar_uazapi_direto", side_effect=backend.enviar_override), \
+         patch.object(worker, "active_professors", return_value=PROFESSORES_FAKE), \
+         patch.object(worker, "EXPERIMENTAL_DEST_OVERRIDE", override):
         return worker.run_experimental_lembrete("whatsapp", dry_run=dry_run)
 
 
@@ -293,6 +299,87 @@ checar("14. cada linha carrega o erro de verdade (nao None)", True,
        all(linha.get("erro") for linha in logadas))
 checar("14. cada linha carrega o vinculo (pra saber QUAL alvo falhou)",
        {900, 901}, {linha.get("vinculo_id") for linha in logadas})
+
+# ============================================================================
+# CASOS 15+ — Task 6, Passo 1: override de destinatário para o rollout.
+#
+# POR QUE ISTO EXISTE. Ensaio que monta a mensagem e para antes de gravar
+# passa verde e não prova nada — CHECK do banco, índice único e resposta da
+# UAZAPI só aparecem na execução real. O override deixa a máquina rodar
+# INTEIRA (claim de verdade, grava na fila, envia de verdade) só que o envio
+# cai num número só, com um carimbo explícito de teste no corpo — sem isso,
+# quem lê no celular acha que é cobrança real. Os 3 riscos que a spec do
+# rollout marcou como mutante-que-tem-que-morrer: (a) override desligado não
+# muda nada do caminho existente (16); (b) override ligado desvia o envio do
+# professor de verdade pro destino configurado (17); (c) o corpo carrega o
+# aviso de teste com QUEM seria o destinatário real (18); (d) o log registra
+# o destino ORIGINAL, não só que houve override (19) — sem isso a auditoria
+# do banco mentiria que o professor foi avisado.
+# ============================================================================
+
+# ── 15. override vazio (padrão) não muda o caminho feliz já provado no 7 ──
+backend15 = FakeBackend([ALVO_1])
+r15 = rodar(backend15, override="")
+checar("15. override vazio: status ainda 'enviada'", "enviada", r15["resultados"][0]["status"])
+checar("15. override vazio: continua indo por deliver()", 1, len(backend15.entregues))
+checar("15. override vazio: NADA sai pelo caminho de override", [], backend15.overrides_enviados)
+
+# ── 16. override ligado desvia o envio — deliver() NUNCA é chamado ────────
+# Mata o mutante "remove o override" (manda pro professor de verdade mesmo
+# com a env var setada): sem o desvio, backend16.entregues teria 1 item e
+# overrides_enviados ficaria vazio.
+backend16 = FakeBackend([ALVO_1])
+r16 = rodar(backend16, override="5521777770000")
+checar("16. override ligado: status ainda 'enviada' (fila fecha normalmente)",
+       "enviada", r16["resultados"][0]["status"])
+checar("16. override ligado: deliver() NAO e chamado", [], backend16.entregues)
+checar("16. override ligado: o envio saiu pelo caminho de override", 1,
+       len(backend16.overrides_enviados))
+checar("16. override ligado: foi pro numero configurado, nao pro professor",
+       "5521777770000", backend16.overrides_enviados[0][0])
+
+# ── 17. o corpo enviado carrega o aviso de teste + quem seria o real ──────
+# Mata o mutante "remove o aviso de teste do corpo": sem ele, alguém lendo a
+# mensagem no celular do destino de override acha que é cobrança de verdade.
+corpo_enviado_17 = backend16.overrides_enviados[0][1]
+checar("17. corpo carrega aviso de TESTE", True, "TESTE" in corpo_enviado_17)
+checar("17. corpo cita o nome do professor que seria o destinatario real",
+       True, "Isaque" in corpo_enviado_17)
+checar("17. corpo cita o professor_id de quem seria o destinatario real",
+       True, "10" in corpo_enviado_17)
+checar("17. o texto ORIGINAL do lembrete continua dentro do corpo (nao foi substituido)",
+       True, "Davi Nakashima" not in corpo_enviado_17 and "Aluno A" in corpo_enviado_17)
+
+# ── 18. o log registra o destino ORIGINAL, não só "houve override" ───────
+# Mata o mutante "loga o override sem o destino original": sem o destino
+# original no log, a auditoria não distingue "professor avisado de verdade"
+# de "foi tudo pro destino de teste" — a mesma mentira do balde de conserto.
+logadas18: list[dict] = []
+backend18 = FakeBackend([ALVO_1])
+with patch.object(worker, "rpc", side_effect=backend18.rpc), \
+     patch.object(worker, "deliver", side_effect=backend18.deliver), \
+     patch.object(worker, "enviar_uazapi_direto", side_effect=backend18.enviar_override), \
+     patch.object(worker, "active_professors", return_value=PROFESSORES_FAKE), \
+     patch.object(worker, "EXPERIMENTAL_DEST_OVERRIDE", "5521777770000"), \
+     patch.object(worker, "log", side_effect=lambda msg, **f: logadas18.append({"msg": msg, **f})):
+    worker.run_experimental_lembrete("whatsapp", dry_run=False)
+
+logs_override = [l for l in logadas18 if l["msg"] == "experimental_override_ativo"]
+checar("18. o log de override foi emitido exatamente 1x", 1, len(logs_override))
+checar("18. o log carrega o destino do override", "5521777770000",
+       (logs_override[0] if logs_override else {}).get("destino_override"))
+checar("18. o log carrega o destino ORIGINAL (telefone do professor de verdade)",
+       "5521999990010", (logs_override[0] if logs_override else {}).get("destino_original"))
+checar("18. o log carrega o professor_id de verdade", 10,
+       (logs_override[0] if logs_override else {}).get("professor_id"))
+
+# ── 19. --dry-run continua sem efeito colateral, mesmo com override ligado ─
+backend19 = FakeBackend([ALVO_1])
+r19 = rodar(backend19, dry_run=True, override="5521777770000")
+checar("19. dry_run + override: nenhum envio de override sai", [], backend19.overrides_enviados)
+checar("19. dry_run + override: nenhum deliver sai", [], backend19.entregues)
+checar("19. dry_run + override: status dry_run_ready", "dry_run_ready",
+       r19["resultados"][0]["status"])
 
 print(f"\n{total - len(falhas)}/{total} passaram")
 if falhas:

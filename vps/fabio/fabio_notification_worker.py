@@ -60,6 +60,16 @@ ESCALONAMENTO_EXPERIMENTAL_TETO = int(os.getenv("FABIO_ESCALONAMENTO_EXPERIMENTA
 # chave). Precedente na casa: REGISTRO_RECIBO_MODE ("off" por padrao).
 ESCALONAMENTO_EXPERIMENTAL_ATIVO = os.getenv(
     "FABIO_ESCALONAMENTO_EXPERIMENTAL_ATIVO", "false").lower() in {"1", "true", "yes", "sim"}
+# Task 6, passo 2 do rollout: a maquina roda INTEIRA -- detecta, monta, grava
+# na fila, envia de verdade -- mas tudo cai num numero so, em vez do
+# professor de verdade. Existe porque ensaio que monta a mensagem e para
+# antes de gravar passa verde e NAO prova nada: CHECK do banco, indice unico
+# e resposta da UAZAPI so aparecem no envio real (aconteceu duas vezes em
+# 22/08, com erro_tipo e com casado_por). Vazio = envio normal, sem desvio
+# nenhum. So o Passo 1 (este interruptor + o desvio em
+# run_experimental_lembrete) esta implementado aqui -- instalar o timer na
+# VPS e virar a chave sao passos humanos, fora deste commit.
+EXPERIMENTAL_DEST_OVERRIDE = os.getenv("FABIO_EXPERIMENTAL_DEST_OVERRIDE", "").strip()
 # COORDENACAO PEDAGOGICA (Marcos Quintela, Juliane, Fabio). Puxado da UAZAPI.
 GRUPO_COORDENACAO_JID = os.getenv("FABIO_GRUPO_COORDENACAO_JID", "120363304349910605@g.us")
 DEFAULT_ESCALONAMENTO_TIME = os.getenv("FABIO_NOTIFY_ESCALONAMENTO_TIME", "09:00")
@@ -119,6 +129,50 @@ def format_lembrete_experimental(linha: Dict[str, Any]) -> str:
         "Manda a devolutiva enquanto está fresco: o comercial usa ela pra falar "
         "com a família ainda hoje. É rápido — grava o áudio e confirma. 🎤"
     )
+
+
+def resolve_experimental_override(pid: int, prof: Dict[str, Any], corpo: str) -> Dict[str, Any]:
+    """Decide pra onde uma cobrança de experimental vai, de verdade.
+
+    `EXPERIMENTAL_DEST_OVERRIDE` vazio (padrão) devolve `destino=None` — o
+    chamador segue o caminho normal, `deliver()` cuida do professor de
+    verdade. Setado, TODO envio deste processo vai pro número configurado,
+    não importa qual professor ou vínculo — e o corpo ganha um carimbo de
+    teste que nomeia quem seria o destinatário real. Sem o carimbo, quem lê
+    a mensagem no celular pode achar que é cobrança de verdade; sem o
+    `None` no caminho vazio, o override vazaria pro professor real sempre.
+    """
+    destino = EXPERIMENTAL_DEST_OVERRIDE or None
+    if not destino:
+        return {"destino": None, "corpo": corpo}
+    aviso = (
+        "⚠️ TESTE DE ROLLOUT (Task 6) — NÃO é cobrança real. "
+        f"Destinatário verdadeiro seria {prof.get('nome') or 'professor desconhecido'} "
+        f"(professor_id {pid}). Mensagem que ele receberia:\n\n"
+    )
+    return {"destino": destino, "corpo": aviso + corpo}
+
+
+def enviar_uazapi_direto(destino: str, corpo: str) -> None:
+    """Envia direto pro número informado, ignorando o professor da vez.
+
+    Mesmo caminho de `fabio_aviso_comercial_worker.py:74-86` (função
+    `enviar`) — copiado, não reinventado. NÃO existe `deliver_to_number` no
+    worker (conferido antes de escrever isto), e `bridge` também não tem
+    `uazapi_post`; o helper que existe lá é só o payload
+    (`whatsapp_send_payload`), o POST é feito aqui com `requests`, igual ao
+    worker do comercial.
+    """
+    if not bridge.UAZAPI_TOKEN:
+        raise RuntimeError("UAZAPI_TOKEN ausente — sem canal pra entregar")
+    r = requests.post(
+        f"{bridge.UAZAPI_URL}/send/text",
+        headers={"Content-Type": "application/json", "token": bridge.UAZAPI_TOKEN},
+        json=bridge.whatsapp_send_payload(destino, corpo),
+        timeout=30,
+    )
+    if r.status_code >= 400:
+        raise RuntimeError(f"uazapi send/text {r.status_code}: {r.text[:300]}")
 
 
 def run_experimental_lembrete(channel: str, dry_run: bool = False) -> Dict[str, Any]:
@@ -191,7 +245,21 @@ def run_experimental_lembrete(channel: str, dry_run: bool = False) -> Dict[str, 
             notificacao_id = claim.get("notificacao_id")
             lease_token = claim.get("lease_token")
             try:
-                deliver(pid, channel, corpo)
+                override = resolve_experimental_override(pid, prof, corpo)
+                if override["destino"]:
+                    enviar_uazapi_direto(override["destino"], override["corpo"])
+                    # Sem este log, a auditoria do banco (fabio_notificacoes)
+                    # ia dizer que o PROFESSOR foi avisado quando quem
+                    # recebeu foi o destino do override — a mesma mentira
+                    # de "corrigi sozinho" que abriu esta entrega inteira.
+                    log("experimental_override_ativo",
+                        professor_id=pid, vinculo_id=vinculo,
+                        destino_override=override["destino"],
+                        destino_original=(
+                            bridge.canonical_phone(prof.get("telefone_whatsapp") or "")
+                            or f"professor_id:{pid}"))
+                else:
+                    deliver(pid, channel, corpo)
                 # O claim POR REFERENCIA escreve lease_token; mark_sent SEM
                 # token nao casa com nenhum lado da cerca (018) e a
                 # notificacao fica presa em 'processando' com a mensagem ja
