@@ -1,5 +1,56 @@
 # RETOMADA — LA Teacher
 
+> # 🔎 AUDITORIA da devolutiva experimental (22/08) — a máquina está inteira, falta o gatilho
+>
+> Pergunta do Alf: *"de aluno está cobrando; será que de aula experimental não
+> está? A devolutiva dispara sozinha pro comercial, sabia?"*
+>
+> **Dispara sim — PROVADO em rollback.** Confirmando o registro do Antônio como
+> o professor faria no app (`app_confirmar_registro_experimental`):
+> `presenca_gravada: true`, `aviso_claimed: true`, notificação criada para
+> **5521968060404** (comercial), corpo *"🎓 Experimental registrada — Antônio
+> Soares · segunda 10/08 13:30 · presente ✅"*. Tudo na mesma transação
+> (migration 038). **Nada de gambiarra a fazer aqui: a regra existe e está certa.**
+>
+> Canal também já provado em produção: 2 avisos `experimental_registrada`
+> ENVIADOS em 18/08 (Noah Mondego 15:05, Malu Rodrigues 23:50) — é o print do
+> teste com a Kailane. Fila de notificações saudável: 1 falha em 15 dias, e é
+> número fake de fixture (`21999998888`).
+>
+> ## O BURACO (medido, 30 dias, grão = aula)
+>
+> | | |
+> |---|---|
+> | experimentais encerradas SEM conteúdo | **169** |
+> | aparecem na cobrança (`vw_registro_pendencia`) | **23** |
+> | **INVISÍVEIS à cobrança** | **146** |
+> | dessas, com professor que TEM o app | **49** |
+>
+> **Causa:** `vw_registro_pendencia` faz `JOIN alunos al ON al.id = r.aluno_id`.
+> No roster de experimental o lead entra com **`aluno_id` NULO** (185 linhas
+> assim em 30 dias, contra 28 com aluno_id) — o INNER JOIN derruba a aula
+> inteira. Logo o Fábio **nunca cobrou uma experimental**: 49 aulas cujo
+> professor tinha o app, não gravou, e ninguém pediu.
+>
+> Somado ao outro fato já medido (69 das 98 experimentais realizadas são dadas
+> por professor SEM app), fecha a explicação de por que só existem 5 devolutivas
+> experimentais no sistema inteiro — 3 delas recuperadas hoje por mim.
+>
+> ## PRÓXIMO PASSO — brainstorm, não gambiarra (decisão do Alf)
+> Ele pediu explicitamente para NÃO improvisar: a cobrança da experimental entra
+> como escopo de **governança**. Pontos que o brainstorm precisa resolver:
+> 1. o lead não é aluno — a régua de cobrança inteira é por aluno. Estender a
+>    view ou criar trilha própria pra experimental?
+> 2. quem é cobrado quando o professor não tem o app (69 de 98 hoje)?
+> 3. cadência: a experimental tem urgência COMERCIAL (o lead esfria), diferente
+>    do registro de aula normal — cobrar em horas, não em dias?
+> 4. a devolutiva só dispara na CONFIRMAÇÃO do professor; hoje 3 registros
+>    recuperados estão `aguardando_confirmacao` (Matheus Reis, Daiana, Isaque) e
+>    o comercial não recebe até eles tocarem o botão.
+>
+> ---
+>
+
 > # ⚠️ CORREÇÃO 2: a presença EXISTE — eu estava lendo a coluna errada (22/08)
 >
 > O Alf apontou: *"talvez vocês estejam puxando do lugar errado dentro do banco;
