@@ -18,7 +18,7 @@
 - **Trava de duplicata:** usar `fabio_claim_notificacao_por_referencia` com `p_referencia_tipo = 'experimental_vinculo'` e `p_referencia_id = <vinculo_id como texto>`. O índice `uq_fabio_notif_por_referencia` (UNIQUE em `referencia_tipo, referencia_id, canal`) já garante uma vez por vínculo **para sempre**. Não criar índice novo.
 - ⚠️ **`mark_sent` exige o `lease_token` quando o claim é por referência.** Chamar sem token deixa a notificação presa em `processando` com a mensagem já entregue (aconteceu em 03/08/2026). Sempre `mark_sent(notificacao_id, lease_token)`.
 - **Professor sem app nunca entra:** todo caminho passa por `fn_professor_usa_app(professor_id)`.
-- **Fecha na CONFIRMAÇÃO, não na gravação:** pendência só sai quando existe `lead_experimental_registros` com `status` fora de (`descartado`, `aguardando_confirmacao`).
+- **Fecha na CONFIRMAÇÃO, não na gravação, por ALLOWLIST:** pendência só sai quando existe `lead_experimental_registros` com `status = 'confirmado'`. Denylist não serve: `status` tem DEFAULT `'rascunho'`, que fecharia a pendência sem entrega.
 - **Testes SQL rodam em produção via BEGIN/ROLLBACK** (branches são inviáveis neste projeto). Testes Python rodam na VPS em `~/fabio-chat-bridge` com `set -a && . ~/.hermes/.env && set +a`.
 - **Mutante vivo = trava sem teste.** Todo invariante tem mutante que precisa MORRER.
 - **Duas sessões, o mesmo checkout:** `git add <arquivo>` nomeando arquivos; nunca `git add -A`. Antes de criar migration, `ls supabase/migrations/` (o `git log` não vê arquivo não commitado da outra sessão).
@@ -183,11 +183,15 @@ where
   and (a.data_hora_fim at time zone 'America/Sao_Paulo')::date >= public.fn_data_corte_experimental()
   -- não se cobra quem não tem a ferramenta
   and public.fn_professor_usa_app(a.professor_id)
-  -- fecha na CONFIRMAÇÃO: gravado e não confirmado o comercial não recebe
+  -- Fecha SÓ na confirmação, e por ALLOWLIST. `status` tem DEFAULT 'rascunho'
+  -- (CHECK: rascunho|aguardando_confirmacao|confirmado|descartado); um denylist
+  -- trataria 'rascunho' como devolutiva entregue e fecharia a pendência sem o
+  -- comercial receber nada. Allowlist erra do lado seguro: estado novo mantém a
+  -- pendência aberta (cobra demais, alguém vê) em vez de fechá-la (silencioso).
   and not exists (
     select 1 from public.lead_experimental_registros r
      where r.vinculo_id = v.id
-       and r.status not in ('descartado', 'aguardando_confirmacao')
+       and r.status = 'confirmado'
   );
 
 comment on view public.vw_experimental_pendencia is
@@ -207,7 +211,7 @@ Rodar num DO block com ROLLBACK, substituindo a view por versões mutadas e chec
 |---|---|---|
 | M1: sem `fn_professor_usa_app` | remover a linha do where | MORRER no caso 3 |
 | M2: sem data de corte | remover a linha do corte | MORRER no caso 4 |
-| M3: fecha no gravar | trocar `not in ('descartado','aguardando_confirmacao')` por `<> 'descartado'` | MORRER no caso 5 |
+| M3: fecha no gravar | trocar `= 'confirmado'` por `not in ('descartado','aguardando_confirmacao')` | MORRER no caso 5 (inclui o caso `rascunho`) |
 | M4 (controle): view original | — | PASSAR |
 
 ⚠️ M1 e M2 podem sobreviver se os dados de hoje não distinguirem. Se sobreviverem, **escrever o cenário sintético** (UPDATE temporário dentro do ROLLBACK) — nunca apagar a trava. Conferir antes que os triggers das tabelas tocadas não chamam `net.http`:

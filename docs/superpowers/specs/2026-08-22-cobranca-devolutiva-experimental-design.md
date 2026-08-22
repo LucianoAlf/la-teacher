@@ -58,7 +58,7 @@ Uma linha é pendência quando **todas** valem:
 | lead em `experimental_realizada` ou `convertido` | `lead_experimentais.status` |
 | aula encerrada, não cancelada, canônica | `aulas_emusys` + `fn_aula_operacional_id()` |
 | vínculo vigente e não cancelado | `lead_experimental_aulas` |
-| **sem devolutiva** (nenhum registro diferente de descartado) | `lead_experimental_registros` |
+| **sem devolutiva CONFIRMADA** (nenhum registro em `confirmado`) | `lead_experimental_registros` |
 | professor **com o app** | `fn_professor_usa_app()` |
 | aula **a partir da data de corte** | `fn_data_corte_experimental()` |
 
@@ -125,6 +125,16 @@ quando o comercial ainda está sem nada.
 
 Confirmar dispara, na mesma transação que já existe: presença de fonte forte +
 aviso ao comercial + pendência fecha.
+
+⚠️ **A régua é allowlist (`status = 'confirmado'`), não denylist.** Descoberto na
+execução da Task 1: `lead_experimental_registros.status` tem **DEFAULT
+`'rascunho'`** e o CHECK aceita `rascunho | aguardando_confirmacao | confirmado |
+descartado`. Um denylist do tipo `not in ('descartado','aguardando_confirmacao')`
+trataria `rascunho` — o estado mais provável de qualquer caminho de escrita novo,
+por ser o default — como "tem devolutiva", fechando a pendência **sem o comercial
+receber nada**. A allowlist também erra do lado seguro: estado novo no futuro
+mantém a pendência aberta (cobra demais, alguém vê) em vez de fechá-la (cobra de
+menos, ninguém vê).
 
 ## Mensagens
 
