@@ -1,5 +1,53 @@
 # RETOMADA — LA Teacher
 
+> # ✅ Fila de áudios LIMPA + repositórios em dia (22/08)
+>
+> **Alarme diário calou.** O relatório agora diz `fila de áudios limpa` e sobra
+> só o item real (10 professores do app com conteúdo pendente).
+>
+> **Os 4 áudios encalhados, resolvidos um a um:**
+> - `7893ce03` — terminalizado: 0s, arquivo ausente no storage, nada a recuperar.
+> - `be63b8c6` — **RECUPERADO** (Matheus Reis, Bateria 10/08, 118s, experimental
+>   do lead Antônio Soares). Era experimental na fila REGULAR (`vinculo_id`
+>   nulo). O vínculo 774 JÁ apontava pra essa aula (`estado=realizado`, casado
+>   pelo reconciliador) — só roteei. Virou registro `6cb10906` (1411 chars:
+>   anotação pedagógica + devolutiva família + próximos passos), aguardando
+>   confirmação do professor. **12 dias depois da aula.**
+> - `292f9739` (Daiana/Raquel, 78s) e `3c47cf22` (Isaque/Davi, 15s) —
+>   terminalizados com motivo honesto; **transcrição preservada na linha**.
+>   Tentei rotear pelo vínculo: o **claim** do worker não exige
+>   `aula_local_id`, mas o **write** exige (`vinculo_inexistente_ou_sem_aula`)
+>   — inferi de um portão e o outro me desmentiu; entraram em loop de retry e
+>   eu tirei na hora. Depois rodei `fn_reconciliar_experimental_por_lead(20,5)`
+>   em rollback: o reconciliador **RECUSOU** o par. Casar na mão seria escrever
+>   no funil por cima de um conciliador que já disse não.
+>
+> **A causa raiz já estava consertada:** semana de 17/08 teve 2 áudios de
+> experimental, ambos COM vínculo, zero quebrados; a semana de 10/08 teve 5 sem
+> vínculo e 4 quebrados. Era backlog daquela semana, não bug corrente.
+>
+> **PENDÊNCIA DE NEGÓCIO (comercial/coordenação, não é minha):** dois leads
+> estão `experimental_realizada` mas com vínculo `estado=faltou`/`sem_par` —
+> e o áudio do professor PROVA que a aula aconteceu ("a Raquel, ela teve a sua
+> experimental"). Raquel Silvestre (vínculo 2105) e Davi Nakashima (2275). O
+> conteúdo da devolutiva existe e está preso por causa desse descasamento.
+>
+> **Repositórios:** `main` em dia, **zero commits locais não enviados**, **zero
+> PRs abertas** (as 12 estão MERGED). Achado: o `la-journey` tinha 1 commit de
+> 17/08 commitado e **nunca enviado** (`feat/audio-didatico-c2`) — enviado; os
+> 15 arquivos de WIP daquela sessão ficaram intactos, não toquei.
+>
+> ⚠️ **Branch `claude/compassionate-heisenberg-e778a8` NÃO deve ser mergeada.**
+> É de 14/07 (577 commits atrás): o `db.ts` dela é do schema de julho e ela
+> remove o helper `rpcSolta`, que o `main` de hoje usa em **40 lugares** —
+> merge quebra o build. O objetivo dela (regenerar `db.ts`) continua válido e
+> até mais necessário (o `db.ts` do `main` é de 12/07 e não conhece
+> `fabio_chat_mensagens`, `hermes_patch_status`, `fn_pendencias_escalonadas`,
+> `fn_professor_usa_app`), mas tem que ser feito **do schema de hoje**, com
+> `tsc --noEmit` antes de subir. Tarefa própria, não merge.
+>
+> ---
+>
 > # ✅ O relatório das 7h parou de mentir (22/08) — commit 407bcf1
 >
 > Gatilho: eu reportei que o "Corrigi sozinho: 4 áudios" era falso, e o Alf
