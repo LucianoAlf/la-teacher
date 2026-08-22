@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import os
 import sys
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fabio_notification_worker as worker  # noqa: E402
 from fabio_notification_worker import (  # noqa: E402
     format_lembrete_experimental, REFERENCIA_TIPO_EXPERIMENTAL,
 )
@@ -67,6 +69,177 @@ checar("5b. sem hora nao explode", True, isinstance(
 texto_sem_nome = format_lembrete_experimental({**LINHA, "nome_aluno": None})
 for termo in ("vinculo", "vinculo_id", str(LINHA["vinculo_id"])):
     checar(f"6. fallback sem nome nao vaza '{termo}'", False, termo in texto_sem_nome)
+
+# ============================================================================
+# CASOS 7+ — orquestração (run_experimental_lembrete), não só o literal.
+#
+# POR QUE ISTO EXISTE. Os casos 1-6 só testam format_lembrete_experimental e
+# a constante REFERENCIA_TIPO_EXPERIMENTAL — nada ali exercita QUEM USA a
+# trava. Revisão da Task 3 achou 2 mutantes sobrevivendo 14/14 verde por
+# causa disso: referencia_id trocado por aula_id (cobra por AULA, não por
+# vínculo — numa experimental em grupo o segundo lead nunca é cobrado) e
+# referencia_id constante (o primeiro vínculo da história queima a chave pra
+# sempre). Nenhum dos dois aparece testando só a string. Aproveitando a
+# bancada, também cobrimos --dry-run vazando efeito colateral, a janela de
+# minutos sendo trocada, e as duas travas que a Task 3 tinha esquecido de
+# espelhar dos irmãos (can_notify e telefone) — cada trava nova pede o
+# próprio mutante morto, não só a que o revisor nomeou.
+#
+# Todo RPC do worker (claim, mark_sent, mark_failed, can_notify e a própria
+# busca de alvos) passa por `rpc()`; só `active_professors()` fala direto
+# com `bridge.sb_get`. Por isso os testes substituem `worker.rpc`,
+# `worker.deliver` e `worker.active_professors` — nada disto toca rede nem
+# WhatsApp de verdade.
+# ============================================================================
+
+
+class FakeBackend:
+    """Dublê do lado servidor: registra toda chamada, nunca toca a rede."""
+
+    def __init__(self, alvos, *, pode_notificar=True, falhar_claim_para=None):
+        self.alvos = alvos
+        self.pode_notificar = pode_notificar
+        # referencia_id que deve explodir o claim (simula 502 transitório) —
+        # usado só no caso de isolamento por alvo (I4).
+        self.falhar_claim_para = falhar_claim_para
+        self.chamadas_alvos = []   # corpo de cada chamada a fn_experimental_lembrete_alvos
+        self.claims = []           # corpo de cada chamada de claim
+        self._claimadas = set()    # (tipo, referencia_id, canal) já entregues
+        self.entregues = []        # (pid, channel, corpo)
+        self.marcadas_enviadas = []
+        self.marcadas_falhas = []
+
+    def rpc(self, name, body):
+        if name == "fn_experimental_lembrete_alvos":
+            self.chamadas_alvos.append(dict(body))
+            return {"ok": True, "linhas": self.alvos}
+        if name == "fn_fabio_pode_notificar":
+            return self.pode_notificar
+        if name == "fabio_claim_notificacao_por_referencia":
+            self.claims.append(dict(body))
+            ref_id = body.get("p_referencia_id")
+            if self.falhar_claim_para is not None and ref_id == self.falhar_claim_para:
+                raise RuntimeError("rpc fabio_claim_notificacao_por_referencia 502: bad gateway")
+            chave = (body.get("p_referencia_tipo"), ref_id, body.get("p_canal"))
+            if chave in self._claimadas:
+                return {"ok": True, "claimed": False}
+            self._claimadas.add(chave)
+            return {"ok": True, "claimed": True,
+                    "notificacao_id": f"notif-{len(self.claims)}",
+                    "lease_token": f"lease-{len(self.claims)}"}
+        if name == "fabio_marcar_notificacao_enviada":
+            self.marcadas_enviadas.append(dict(body))
+            return True
+        if name == "fabio_marcar_notificacao_falhou":
+            self.marcadas_falhas.append(dict(body))
+            return True
+        raise AssertionError(f"rpc inesperado no fake: {name} {body}")
+
+    def deliver(self, pid, channel, content):
+        self.entregues.append((pid, channel, content))
+        return {"ok": True}
+
+
+PROFESSORES_FAKE = [
+    {"id": 10, "nome": "Isaque", "telefone_whatsapp": "5521999990010", "ativo": True},
+    {"id": 11, "nome": "Outro Professor", "telefone_whatsapp": "", "ativo": True},
+]
+
+
+def rodar(backend, *, dry_run=False):
+    with patch.object(worker, "rpc", side_effect=backend.rpc), \
+         patch.object(worker, "deliver", side_effect=backend.deliver), \
+         patch.object(worker, "active_professors", return_value=PROFESSORES_FAKE):
+        return worker.run_experimental_lembrete("whatsapp", dry_run=dry_run)
+
+
+ALVO_1 = {"vinculo_id": 700, "aula_id": 555, "professor_id": 10,
+          "nome_aluno": "Aluno A", "curso_nome": "Violão", "unidade_nome": "Barra",
+          "hora_fim": "10:00", "horas_em_atraso": 0}
+
+# ── 7. caminho feliz: referência do claim é o VÍNCULO, não a aula ──────────
+# Mata M5 (referencia_id vira aula_id): aula_id=555 e vinculo_id=700 são
+# DIFERENTES de propósito — se o mutante trocar a fonte, este caso pega.
+backend7 = FakeBackend([ALVO_1])
+r7 = rodar(backend7)
+checar("7. resultado ok", True, r7.get("ok"))
+checar("7. um alvo processado", 1, r7.get("alvos"))
+checar("7. status enviada", "enviada", r7["resultados"][0]["status"])
+checar("7. claim referencia = vinculo_id (nao aula_id)",
+       "700", backend7.claims[0]["p_referencia_id"])
+checar("7. claim referencia_tipo correto",
+       "experimental_vinculo", backend7.claims[0]["p_referencia_tipo"])
+checar("7. entregou pro professor certo", 10, backend7.entregues[0][0])
+
+# ── 8. dois leads na MESMA aula (grupo): referência não pode ser constante ─
+# Mata M6 (referencia_id constante): se o claim usasse uma string fixa em
+# vez do vinculo, o segundo lead cairia em "ja_avisado" pelo dedupe do
+# próprio índice — o professor nunca é cobrado pelo segundo aluno.
+ALVO_2A = {"vinculo_id": 701, "aula_id": 555, "professor_id": 10,
+           "nome_aluno": "Aluno B1", "curso_nome": "Violão", "unidade_nome": "Barra",
+           "hora_fim": "10:00", "horas_em_atraso": 0}
+ALVO_2B = {"vinculo_id": 702, "aula_id": 555, "professor_id": 10,
+           "nome_aluno": "Aluno B2", "curso_nome": "Violão", "unidade_nome": "Barra",
+           "hora_fim": "10:00", "horas_em_atraso": 0}
+backend8 = FakeBackend([ALVO_2A, ALVO_2B])
+r8 = rodar(backend8)
+checar("8. dois alvos, duas referencias diferentes", True,
+       backend8.claims[0]["p_referencia_id"] != backend8.claims[1]["p_referencia_id"])
+checar("8. os DOIS leads da mesma aula sao cobrados", ["enviada", "enviada"],
+       [x["status"] for x in r8["resultados"]])
+
+# ── 9. --dry-run não pode ter efeito colateral nenhum ──────────────────────
+# Mata M7 (bypass do --dry-run): se o dry_run for ignorado em algum ramo,
+# claims/entregues deixam de estar vazios.
+backend9 = FakeBackend([ALVO_1])
+r9 = rodar(backend9, dry_run=True)
+checar("9. dry_run nao reserva claim", [], backend9.claims)
+checar("9. dry_run nao entrega mensagem", [], backend9.entregues)
+checar("9. status dry_run_ready", "dry_run_ready", r9["resultados"][0]["status"])
+
+# ── 10. a janela de minutos que vai pra RPC é exatamente 20 ────────────────
+# Mata M8 (janela 20 -> 2000, ou qualquer outro valor): 2000 minutos alcança
+# aula de dias atrás e o lembrete "logo após a experimental" perde o sentido.
+backend10 = FakeBackend([])
+rodar(backend10)
+checar("10. janela pedida ao banco e 20min",
+       {"p_minutos": 20}, backend10.chamadas_alvos[0])
+
+# ── 11. professor que desligou governança não é furado por este evento ────
+# Mata a remoção do can_notify() (I3): sem a chamada, isto sai "enviada".
+backend11 = FakeBackend([ALVO_1], pode_notificar=False)
+r11 = rodar(backend11)
+checar("11. bloqueado por preferencia", "blocked_by_preferences", r11["resultados"][0]["status"])
+checar("11. preferencia desligada nao gera claim", [], backend11.claims)
+
+# ── 12. sem telefone, o vínculo NÃO pode virar 'enviada' mentiroso ─────────
+# Mata a remoção do check de telefone (I5): bridge.send_whatsapp_text não
+# levanta quando falta telefone — sem o skip explícito, o claim grava a
+# linha, deliver volta em silêncio e mark_sent marca 'enviada' pra sempre
+# (chave sem data, nunca mais re-tentada).
+ALVO_SEM_TEL = {**ALVO_1, "vinculo_id": 703, "professor_id": 11}
+backend12 = FakeBackend([ALVO_SEM_TEL])
+r12 = rodar(backend12)
+checar("12. sem telefone -> missing_phone_skip",
+       "missing_phone_skip", r12["resultados"][0]["status"])
+checar("12. sem telefone nao gera claim nem 'enviada' falso", [], backend12.claims)
+
+# ── 13. um 502 no claim do 1º alvo não pode engolir os alvos seguintes ─────
+# Mata a remoção do isolamento por alvo (I4): montagem+claim precisam estar
+# DENTRO do try de cada alvo — do jeito antigo, a exceção do primeiro
+# vazava pra fora do laço inteiro e o segundo alvo nunca era tentado.
+ALVO_3A = {"vinculo_id": 704, "aula_id": 900, "professor_id": 10,
+           "nome_aluno": "Aluno C1", "curso_nome": "Violão", "unidade_nome": "Barra",
+           "hora_fim": "11:00", "horas_em_atraso": 0}
+ALVO_3B = {"vinculo_id": 705, "aula_id": 901, "professor_id": 10,
+           "nome_aluno": "Aluno C2", "curso_nome": "Violão", "unidade_nome": "Barra",
+           "hora_fim": "11:05", "horas_em_atraso": 0}
+backend13 = FakeBackend([ALVO_3A, ALVO_3B], falhar_claim_para="704")
+r13 = rodar(backend13)
+checar("13. run nao propaga a excecao do 1o alvo", True, r13.get("ok"))
+checar("13. 1o alvo registra erro isolado", "erro", r13["resultados"][0]["status"])
+checar("13. 2o alvo AINDA e processado (nao foi engolido)",
+       "enviada", r13["resultados"][1]["status"])
 
 print(f"\n{total - len(falhas)}/{total} passaram")
 if falhas:

@@ -101,48 +101,94 @@ def format_lembrete_experimental(linha: Dict[str, Any]) -> str:
 
 
 def run_experimental_lembrete(channel: str, dry_run: bool = False) -> Dict[str, Any]:
+    """Varre `fn_experimental_lembrete_alvos` e cobra a devolutiva.
+
+    Espelha `run_devolutivas`/`run_sem_roster`: mesmo skip de professor
+    inativo, mesmo `missing_phone_skip` (sem isso o WhatsApp falha em
+    silêncio — `bridge.send_whatsapp_text` não levanta — e o claim já
+    gravado fica marcado 'enviada' pra sempre, sem re-tentativa possível
+    porque a chave é sem data), e mesmo `can_notify` — sem ele um professor
+    que desligou notificações de governança seria furado por este evento e
+    só por ele.
+
+    Cada alvo roda isolado no próprio `try`: a montagem do corpo e o claim
+    entram no isolamento (não só `deliver`/`mark_sent`) porque um 502
+    transitório na RPC do claim do primeiro vínculo da janela não pode
+    abortar o laço inteiro e deixar os outros alvos sem nem serem tentados.
+    """
     spec = EVENTS["experimental_lembrete"]
     alvos = (rpc("fn_experimental_lembrete_alvos", {"p_minutos": 20}) or {}).get("linhas") or []
-    resultados = []
+    resultados: list[Dict[str, Any]] = []
+    por_id = {int(p["id"]): p for p in active_professors()} if alvos else {}
+
     for linha in alvos:
         pid = linha.get("professor_id")
         vinculo = linha.get("vinculo_id")
         if not pid or not vinculo:
             continue
-        corpo = format_lembrete_experimental(linha)
-        if dry_run:
-            resultados.append({"vinculo_id": vinculo, "status": "dry_run_ready"})
-            continue
-        claim = rpc("fabio_claim_notificacao_por_referencia", {
-            "p_professor_id": int(pid),
-            "p_tipo": spec.tipo,
-            "p_categoria": spec.categoria,
-            "p_canal": channel,
-            "p_corpo": corpo,
-            "p_referencia_tipo": REFERENCIA_TIPO_EXPERIMENTAL,
-            "p_referencia_id": str(vinculo),
-            "p_titulo": "Experimental sem devolutiva",
-            "p_lease_minutos": 10,
-        }) or {}
-        if not claim.get("claimed"):
-            resultados.append({"vinculo_id": vinculo, "status": "ja_avisado"})
-            continue
-        notificacao_id = claim.get("notificacao_id")
-        lease_token = claim.get("lease_token")
+        resultado: Dict[str, Any] = {"vinculo_id": vinculo, "status": "init"}
         try:
-            deliver(pid, channel, corpo)
-            # O claim POR REFERENCIA escreve lease_token; mark_sent SEM token
-            # nao casa com nenhum lado da cerca (018) e a notificacao fica
-            # presa em 'processando' com a mensagem ja entregue.
-            if not mark_sent(notificacao_id, lease_token):
-                log("notificacao_enviada_mas_nao_fechada",
-                    notificacao_id=str(notificacao_id), professor_id=pid)
-                resultados.append({"vinculo_id": vinculo, "status": "entregue_mas_nao_fechada"})
+            prof = por_id.get(int(pid))
+            if not prof:
+                resultado["status"] = "professor_inativo_skip"
+                resultados.append(resultado)
                 continue
-            resultados.append({"vinculo_id": vinculo, "status": "enviada"})
+            if channel == "whatsapp" and not bridge.canonical_phone(prof.get("telefone_whatsapp") or ""):
+                resultado["status"] = "missing_phone_skip"
+                resultados.append(resultado)
+                continue
+            if not can_notify(int(pid), spec.categoria) and not dry_run:
+                resultado["status"] = "blocked_by_preferences"
+                resultados.append(resultado)
+                continue
+
+            corpo = format_lembrete_experimental(linha)
+            if dry_run:
+                resultado["status"] = "dry_run_ready"
+                resultados.append(resultado)
+                continue
+
+            claim = rpc("fabio_claim_notificacao_por_referencia", {
+                "p_professor_id": int(pid),
+                "p_tipo": spec.tipo,
+                "p_categoria": spec.categoria,
+                "p_canal": channel,
+                "p_corpo": corpo,
+                "p_referencia_tipo": REFERENCIA_TIPO_EXPERIMENTAL,
+                "p_referencia_id": str(vinculo),
+                "p_titulo": "Experimental sem devolutiva",
+                "p_lease_minutos": 10,
+            }) or {}
+            if not claim.get("claimed"):
+                resultado["status"] = "ja_avisado"
+                resultados.append(resultado)
+                continue
+
+            notificacao_id = claim.get("notificacao_id")
+            lease_token = claim.get("lease_token")
+            try:
+                deliver(pid, channel, corpo)
+                # O claim POR REFERENCIA escreve lease_token; mark_sent SEM
+                # token nao casa com nenhum lado da cerca (018) e a
+                # notificacao fica presa em 'processando' com a mensagem ja
+                # entregue.
+                if not mark_sent(notificacao_id, lease_token):
+                    log("notificacao_enviada_mas_nao_fechada",
+                        notificacao_id=str(notificacao_id), professor_id=pid)
+                    resultado["status"] = "entregue_mas_nao_fechada"
+                else:
+                    resultado["status"] = "enviada"
+            except Exception as exc:
+                mark_failed(notificacao_id, str(exc), lease_token)
+                resultado["status"] = "falhou"
+                resultado["erro"] = str(exc)[:200]
         except Exception as exc:
-            mark_failed(notificacao_id, str(exc), lease_token)
-            resultados.append({"vinculo_id": vinculo, "status": "falhou", "erro": str(exc)[:200]})
+            # Isola o ALVO, nao só o envio: um erro na montagem do corpo ou
+            # no claim (RPC fora do ar, 502 transitório) nao pode derrubar o
+            # laço inteiro e deixar os alvos seguintes sem serem tentados.
+            resultado["status"] = "erro"
+            resultado["erro"] = str(exc)[:500]
+        resultados.append(resultado)
     return {"ok": True, "alvos": len(alvos), "resultados": resultados}
 
 
@@ -1873,7 +1919,7 @@ def main() -> int:
             exp_result = {"ok": False, "error": str(exc)[:500]}
         log("event_result", event="experimental_lembrete",
             status="ok" if exp_result.get("ok") else "error",
-            alvos=exp_result.get("alvos"))
+            alvos=exp_result.get("alvos"), error=exp_result.get("error"))
         results.append({"event": "experimental_lembrete", **exp_result})
         if args.event == "experimental_lembrete":
             payload = {"ok": True, "results": results}
