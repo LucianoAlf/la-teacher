@@ -1,5 +1,49 @@
 # RETOMADA — LA Teacher
 
+> # ✅ O relatório das 7h parou de mentir (22/08) — commit 407bcf1
+>
+> Gatilho: eu reportei que o "Corrigi sozinho: 4 áudios" era falso, e o Alf
+> mandou auditar o relatório inteiro — *"se está quebrado isso, pode ser que
+> estejam quebradas outras coisas também"*. Estavam. Três defeitos:
+>
+> 1. **Conserto que não conserta.** O código anunciava `len(retriaveis)` como
+>    "corrigi sozinho" e jogava o retorno REAL do RPC entre parênteses. Os 4
+>    áudios são de 10–15/08 com 3/3/11/11 tentativas, e `fn_fabio_retry_fila`
+>    exige `tentativas < 3` E `criado_em > now()-3d` — **não podia tocá-los nem
+>    em teoria**. Agora só entra em "corrigi" o que o RPC devolveu.
+> 2. **Cobrança de quem não tem a ferramenta.** "42 professores" eram 44 ativos
+>    dos quais só **10 têm o app**. Não era ruído de relatório: a mesma
+>    `vw_registro_pendencia` alimenta o worker que MANDA cobrança no WhatsApp,
+>    o escalonamento e o contexto do Fábio. `cobravel` agora exige
+>    `fn_professor_usa_app()`. **2388 → 507 linhas; 42 → 10 professores.**
+>    Auto-mantida: **criar o login É liberar** — a próxima leva entra sozinha,
+>    sem migration nova (o Alf libera mais gente esta semana).
+> 3. **Nome que não identifica.** "Matheus 12a/18d; Matheus 1a/17d" eram duas
+>    pessoas. Desempata pelo sobrenome só quando repete.
+>
+> **Provas:** migration 6/6 casos + 4/4 mutantes (2 sobreviveram no 1º round e
+> só morreram com cenário sintético em transação de rollback); auditoria 18/18
+> + 7/7 mutantes; bateria do bridge 10/10; auditor rodado ponta a ponta.
+>
+> **Pendências de 21/08: FECHADAS.** O Alf já tinha feito pelo Claude Web — o
+> guard root ESTÁ no cron (reporta a cada ~10min) e **os 5 agentes estão
+> patchados** (fabio, mila, lia, sol, julia), confirmado em `hermes_patch_status`.
+>
+> **DECISÃO PENDENTE — 3 áudios com trabalho real de professor.** Terminalizei
+> só `7893ce03` (0s, arquivo ausente, nada a recuperar). Os outros 3 têm áudio
+> E transcrição (674/773/156 chars) e caíram numa **zona morta entre duas
+> réguas**: a aula TEM linha de roster (então some de `vw_fila_audio_sem_roster`,
+> que exige aula sem roster nenhum), mas com `aluno_id` NULO — lead não
+> matriculado — então o normalizador diz "roster canônico vazio". São
+> experimentais que foram pelo pipeline REGULAR (`vinculo_id` nulo).
+> - `be63b8c6` (Matheus Reis, Bateria 10/08, 118s) — **recuperável**: tem
+>   vínculo experimental ativo (lead Antônio Soares, `experimental_realizada`)
+>   e nenhum registro ainda.
+> - `292f9739` (Daiana, Canto 11/08, 78s) e `3c47cf22` (Isaque, Experimental
+>   13/08, 15s) — sem vínculo experimental; o conteúdo não tem dono no sistema.
+>
+> ---
+>
 > # ✅ MCP de presença de volta + trava de IMPORT (22/08) — commits 5f0ca53, 98a0501
 >
 > **Alerta das 7h de 22/08** (do `monitor-saude-fabio`/auditoria): "MCP de
